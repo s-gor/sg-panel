@@ -5,7 +5,7 @@ OWNER="${OWNER:-s-gor}"
 REPO="${REPO:-sg-panel}"
 VERSION="${VERSION:-v0.9.3}"
 ASSET="SG-Panel-${VERSION}.zip"
-CHECKSUM="${ASSET}.sha256"
+CHECKSUM="SHA256SUMS.txt"
 BASE_URL="https://github.com/${OWNER}/${REPO}/releases/download/${VERSION}"
 WORK="$(mktemp -d /tmp/sg-panel-install.XXXXXX)"
 
