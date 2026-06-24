@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Пользователи — SG-Panel{% endblock %}
+{% block section %}USERS{% endblock %}
+{% block heading %}Пользователи и трафик{% endblock %}
+{% block subtitle %}UUID, срок действия, статистика, ссылки и доступ{% endblock %}
+{% block content %}
+<section class="users-summary">
+  <article class="panel-card add-user-card">
+    <div class="panel-heading"><div><p class="panel-kicker">NEW IDENTITY</p><h2>Добавить пользователя</h2></div><span class="panel-index">+</span></div>
+    <form method="post" action="{{ url_for('users_add') }}" class="stack modern-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="form-grid"><label><span>Имя пользователя</span><input type="text" name="name" maxlength="80" required placeholder="Например, Irina"></label><label><span>Срок действия, UTC</span><input type="datetime-local" name="expiry_at"></label></div>
+      <label><span>Комментарий</span><input type="text" name="comment" maxlength="500" placeholder="Телефон, назначение, примечание"></label>
+      <button class="button primary" type="submit">Создать пользователя</button>
+    </form>
+    <p class="hint">UUID создаётся автоматически. Изменения попадут в Xray только после Apply config.</p>
+  </article>
+  <article class="panel-card database-card"><div class="database-icon"><svg viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v7c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12v7c0 1.7 3.6 3 8 3s8-1.3 8-3v-7"/></svg></div><div><p class="panel-kicker">SQLITE + XRAY STATS</p><h2>{{ users|length }}</h2><span>пользователей в panel.db</span><form method="post" action="{{ url_for('stats_reset') }}" onsubmit="return confirm('Сбросить все счётчики трафика Xray?')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button ghost small" type="submit">Сбросить статистику</button></form></div></article>
+</section>
+
+<section class="panel-card data-panel">
+  <div class="panel-heading table-heading"><div><p class="panel-kicker">ACCESS CONTROL</p><h2>Список пользователей</h2></div><span class="count-badge">{{ users|length }} records</span></div>
+  {% if users %}<div class="table-wrap"><table><thead><tr><th>ID</th><th>Пользователь</th><th>Статус</th><th>Трафик</th><th>Срок</th><th>UUID</th><th>Действия</th></tr></thead><tbody>
+  {% for user in users %}
+    {% set st = stats.get(user.id, {}) %}
+    <tr>
+      <td><span class="table-id">#{{ user.id }}</span></td>
+      <td><div class="user-cell"><span class="avatar">{{ user.name[:1]|upper }}</span><div><strong>{{ user.name }}</strong>{% if user.comment %}<small>{{ user.comment }}</small>{% endif %}</div></div></td>
+      <td>{% if user_is_expired(user) %}<span class="pill disabled"><i></i>expired</span>{% else %}<span class="pill {{ 'enabled' if user.enabled else 'disabled' }}"><i></i>{{ 'enabled' if user.enabled else 'disabled' }}</span>{% endif %}{% if st.online is sameas true %}<span class="online-dot" title="online"></span>{% endif %}</td>
+      <td><div class="traffic-cell"><strong>{{ format_bytes(st.total|default(0)) }}</strong><small>↑ {{ format_bytes(st.uplink|default(0)) }} · ↓ {{ format_bytes(st.downlink|default(0)) }}</small></div></td>
+      <td>{% if user.expiry_at %}<code>{{ user.expiry_at[:16]|replace('T',' ') }}</code>{% else %}<span class="muted">без срока</span>{% endif %}</td>
+      <td><code class="uuid-code">{{ user.uuid }}</code></td>
+      <td><div class="row-actions"><a class="button ghost small" href="{{ url_for('user_edit_page', user_id=user.id) }}">Изменить</a><a class="button ghost small" href="{{ url_for('user_link', user_id=user.id) }}">Link / QR</a><form method="post" action="{{ url_for('users_toggle', user_id=user.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button secondary small" type="submit">{{ 'Отключить' if user.enabled else 'Включить' }}</button></form><form method="post" action="{{ url_for('users_delete', user_id=user.id) }}" onsubmit="return confirm('Удалить пользователя {{ user.name }}?')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button danger small" type="submit">Удалить</button></form></div></td>
+    </tr>
+  {% endfor %}</tbody></table></div>{% else %}<div class="empty-state"><span>SG</span><h3>Пользователей пока нет</h3><p>Создайте первую запись в форме выше.</p></div>{% endif %}
+</section>
+{% endblock %}

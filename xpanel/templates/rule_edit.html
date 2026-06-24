@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Изменить правило — SG-Panel{% endblock %}
+{% block section %}ROUTING / EDIT{% endblock %}
+{% block heading %}Изменение правила{% endblock %}
+{% block subtitle %}Редактирование условий, приоритета и направления трафика{% endblock %}
+{% block content %}
+<section class="panel-card narrow-card edit-card">
+  <div class="panel-heading"><div><p class="panel-kicker">RULE #{{ rule.id }}</p><h2>{{ rule.name }}</h2></div><span class="panel-index">{{ rule.priority }}</span></div>
+  <form method="post" action="{{ url_for('routing_rule_edit', rule_id=rule.id) }}" class="stack modern-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="form-grid"><label><span>Название</span><input name="name" value="{{ rule.name }}" required></label><label><span>Приоритет</span><input name="priority" type="number" min="1" max="9999" value="{{ rule.priority }}" required></label></div>
+    <label><span>Outbound</span><select name="outbound_tag">{% for tag in outbound_tags %}<option value="{{ tag }}" {% if rule.outbound_tag==tag %}selected{% endif %}>{{ tag }}</option>{% endfor %}</select></label>
+    <label><span>Domains</span><textarea name="domains" rows="5">{{ rule.domains }}</textarea></label>
+    <label><span>IP / CIDR</span><textarea name="ips" rows="5">{{ rule.ips }}</textarea></label>
+    <div class="form-grid"><label><span>Ports</span><input name="ports" value="{{ rule.ports }}"></label><label><span>Network</span><select name="network">{% for value in ['', 'tcp','udp','tcp,udp'] %}<option value="{{ value }}" {% if rule.network==value %}selected{% endif %}>{{ value or 'any' }}</option>{% endfor %}</select></label></div>
+    <label><span>Protocols</span><input name="protocols" value="{{ rule.protocols|replace('\n', ',') }}"></label>
+    <label><span>Inbound tags</span><input name="inbound_tags" value="{{ rule.inbound_tags|replace('\n', ',') }}"></label>
+    <label><span>Пользователи</span><select name="users" multiple size="4">{% set selected_users = rule.users.split('\n') if rule.users else [] %}{% for user in users %}<option value="{{ user.name }}" {% if user.name in selected_users %}selected{% endif %}>{{ user.name }}</option>{% endfor %}</select></label>
+    <div class="actions"><button class="button primary" type="submit">Сохранить правило</button><a class="button secondary" href="{{ url_for('routing_page') }}">Отмена</a></div>
+  </form>
+</section>
+{% endblock %}

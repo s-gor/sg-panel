@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Изменить пользователя — SG-Panel{% endblock %}
+{% block section %}USERS / EDIT{% endblock %}
+{% block heading %}Пользователь {{ user.name }}{% endblock %}
+{% block subtitle %}Имя, UUID, комментарий и срок действия{% endblock %}
+{% block content %}
+<section class="panel-card narrow-card edit-card">
+  <div class="panel-heading"><div><p class="panel-kicker">IDENTITY #{{ user.id }}</p><h2>{{ user.name }}</h2></div><span class="pill {{ 'enabled' if user.enabled else 'disabled' }}"><i></i>{{ 'enabled' if user.enabled else 'disabled' }}</span></div>
+  <form method="post" action="{{ url_for('user_edit', user_id=user.id) }}" class="stack modern-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="form-grid"><label><span>Имя пользователя</span><input name="name" maxlength="80" value="{{ user.name }}" required></label><label><span>Срок действия, UTC</span><input name="expiry_at" type="datetime-local" value="{{ expiry_for_form(user.expiry_at) }}"></label></div>
+    <label><span>UUID</span><input name="uuid" value="{{ user.uuid }}" required></label>
+    <label><span>Комментарий</span><textarea name="comment" rows="4" maxlength="500">{{ user.comment }}</textarea></label>
+    <div class="actions"><button class="button primary" type="submit">Сохранить изменения</button><a class="button secondary" href="{{ url_for('users_page') }}">Отмена</a></div>
+  </form>
+  <div class="danger-zone"><div><p class="panel-kicker">ROTATE IDENTITY</p><h3>Сменить UUID</h3><p>После Apply config старая VLESS-ссылка перестанет работать.</p></div><form method="post" action="{{ url_for('user_regenerate_uuid', user_id=user.id) }}" onsubmit="return confirm('Создать новый UUID для {{ user.name }}?')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button danger" type="submit">Создать новый UUID</button></form></div>
+</section>
+{% endblock %}

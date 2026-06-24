@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Диагностика — SG-Panel{% endblock %}
+{% block section %}DIAGNOSTICS{% endblock %}
+{% block heading %}Диагностика системы{% endblock %}
+{% block subtitle %}Версии, ресурсы, порты, проверка конфига и журналы{% endblock %}
+{% block content %}
+<section class="metric-grid diagnostics-metrics">
+  <article class="metric-card"><div class="metric-copy"><span>ОС</span><strong class="compact-value">{{ diagnostics.os }}</strong><small>kernel {{ diagnostics.kernel }}</small></div></article>
+  <article class="metric-card"><div class="metric-copy"><span>Xray</span><strong class="compact-value">{{ diagnostics.xray_version }}</strong><small>service {{ diagnostics.xray_service }}</small></div></article>
+  <article class="metric-card"><div class="metric-copy"><span>Память</span><strong>{{ diagnostics.memory_available }}</strong><small>доступно из {{ diagnostics.memory_total }}</small></div></article>
+  <article class="metric-card"><div class="metric-copy"><span>Диск</span><strong>{{ diagnostics.disk_free }}</strong><small>свободно из {{ diagnostics.disk_total }}</small></div></article>
+  <article class="metric-card"><div class="metric-copy"><span>Generated config</span><strong class="status {{ 'ok' if diagnostics.config_validation.ok else 'bad' }}">{{ 'OK' if diagnostics.config_validation.ok else 'ERROR' }}</strong><small>{{ diagnostics.config_validation.users }} users</small></div></article>
+  <article class="metric-card"><div class="metric-copy"><span>DNS</span><strong class="status {{ 'ok' if diagnostics.dns_enabled else '' }}">{{ 'enabled' if diagnostics.dns_enabled else 'disabled' }}</strong><small>{{ diagnostics.dns_query_strategy }} · {{ diagnostics.dns_servers|length }} upstreams</small></div></article>
+  <article class="metric-card"><div class="metric-copy"><span>System resolve</span><strong class="status {{ 'ok' if diagnostics.dns_test.ok else 'bad' }}">{{ 'OK' if diagnostics.dns_test.ok else 'ERROR' }}</strong><small>{% if diagnostics.dns_test.ok %}{{ diagnostics.dns_test.latency_ms }} ms{% else %}{{ diagnostics.dns_test.detail }}{% endif %}</small></div></article>
+  <article class="metric-card"><div class="metric-copy"><span>Подписки</span><strong class="status {{ 'ok' if diagnostics.subscription_settings.enabled else '' }}">{{ 'enabled' if diagnostics.subscription_settings.enabled else 'disabled' }}</strong><small>{{ diagnostics.subscription_users_enabled }} user URLs · {{ diagnostics.subscription_settings.base_url or 'auto URL' }}</small></div></article>
+  <article class="metric-card"><div class="metric-copy"><span>IP allowlist</span><strong class="status {{ 'ok' if diagnostics.security_settings.allowlist_enabled else '' }}">{{ 'enabled' if diagnostics.security_settings.allowlist_enabled else 'disabled' }}</strong><small>{{ diagnostics.security_settings.allowed_networks or 'all addresses' }}</small></div></article>
+  <article class="metric-card"><div class="metric-copy"><span>Admin sessions</span><strong>{{ diagnostics.security_overview.active_sessions }}</strong><small>{{ diagnostics.security_overview.failed_logins_24h }} failed logins / 24h</small></div></article>
+</section>
+<div class="actions diagnostic-actions"><a class="button primary" href="{{ url_for('diagnostics_download') }}">Скачать диагностический отчёт</a><a class="button secondary" href="{{ url_for('diagnostics_page') }}">Обновить</a></div>
+<section class="diagnostics-grid">
+  <article class="panel-card"><div class="panel-heading"><div><p class="panel-kicker">LISTEN SOCKETS</p><h2>TCP-порты</h2></div></div><pre class="terminal-box tall">{{ diagnostics.ports }}</pre></article>
+  <article class="panel-card"><div class="panel-heading"><div><p class="panel-kicker">XRAY JOURNAL</p><h2>Последние сообщения Xray</h2></div></div><pre class="terminal-box tall">{{ diagnostics.xray_logs }}</pre></article>
+  <article class="panel-card diagnostics-wide"><div class="panel-heading"><div><p class="panel-kicker">PANEL JOURNAL</p><h2>Последние сообщения SG-Panel</h2></div></div><pre class="terminal-box tall">{{ diagnostics.panel_logs }}</pre></article>
+</section>
+{% endblock %}

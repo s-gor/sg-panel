@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}{{ user.name }} — SG-Panel{% endblock %}
+{% block section %}USERS / ACCESS{% endblock %}
+{% block heading %}Клиентский доступ{% endblock %}
+{% block subtitle %}Прямая VLESS Reality ссылка и постоянная подписка пользователя {{ user.name }}{% endblock %}
+{% block content %}
+<section class="link-grid">
+  <article class="panel-card qr-panel">
+    <div class="panel-heading"><div><p class="panel-kicker">DIRECT QR</p><h2>{{ user.name }}</h2></div><span class="pill {{ 'enabled' if user.enabled else 'disabled' }}"><i></i>{{ 'enabled' if user.enabled else 'disabled' }}</span></div>
+    <div class="qr-frame"><img src="data:image/png;base64,{{ qr_data }}" alt="QR VLESS для {{ user.name }}"></div>
+    <p class="hint center">Прямая ссылка. При изменении сервера её потребуется импортировать заново.</p>
+  </article>
+  <article class="panel-card link-panel">
+    <div class="panel-heading"><div><p class="panel-kicker">VLESS REALITY</p><h2>Прямая ссылка</h2></div><span class="panel-index">#{{ user.id }}</span></div>
+    <label class="link-label" for="link">Connection URI</label>
+    <textarea id="link" class="link-box" readonly>{{ link }}</textarea>
+    <div class="actions"><button class="button primary" type="button" onclick="copyField('link', this)">Скопировать ссылку</button><a class="button secondary" href="{{ url_for('users_page') }}">Назад</a></div>
+    <div class="secure-note"><span>◆</span><p><strong>Персональный UUID</strong><small>Не публикуйте эту ссылку в открытом доступе.</small></p></div>
+  </article>
+</section>
+
+<section class="link-grid subscription-link-grid">
+  <article class="panel-card qr-panel">
+    <div class="panel-heading"><div><p class="panel-kicker">SUBSCRIPTION QR</p><h2>Постоянный URL</h2></div><span class="pill {{ 'enabled' if user.subscription_enabled else 'disabled' }}"><i></i>{{ 'enabled' if user.subscription_enabled else 'disabled' }}</span></div>
+    <div class="qr-frame"><img src="data:image/png;base64,{{ subscription_qr_data }}" alt="QR подписки для {{ user.name }}"></div>
+    <p class="hint center">Клиент обновляет актуальную VLESS-ссылку по этому адресу.</p>
+  </article>
+  <article class="panel-card link-panel">
+    <div class="panel-heading"><div><p class="panel-kicker">BASE64 FEED</p><h2>URL подписки</h2></div><span class="panel-index">SUB</span></div>
+    <label class="link-label" for="subscription-link">Subscription URL</label>
+    <textarea id="subscription-link" class="link-box" readonly>{{ subscription_url }}</textarea>
+    <div class="actions"><button class="button primary" type="button" onclick="copyField('subscription-link', this)">Скопировать подписку</button><a class="button secondary" href="{{ url_for('subscriptions_page') }}">Настройки</a></div>
+    {% if not subscription_settings.enabled %}<div class="alert error">Глобальная выдача подписок выключена. URL начнёт работать после включения на странице «Подписки».</div>{% endif %}
+    {% if not user.subscription_enabled %}<div class="alert error">Подписка этого пользователя отключена.</div>{% endif %}
+    <div class="secure-note"><span>◆</span><p><strong>Стабильный token</strong><small>Адрес не меняется при обновлении UUID сервера, SNI или порта. Новый token отключает старый URL.</small></p></div>
+  </article>
+</section>
+<script>
+async function copyField(id, button) {
+  const field = document.getElementById(id);
+  try {
+    if (navigator.clipboard && window.isSecureContext) await navigator.clipboard.writeText(field.value);
+    else { field.focus(); field.select(); document.execCommand('copy'); }
+    button.textContent = 'Скопировано';
+  } catch (error) {
+    field.focus(); field.select(); button.textContent = 'Выделено — Ctrl+C';
+  }
+}
+</script>
+{% endblock %}

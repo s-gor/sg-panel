@@ -1,0 +1,6 @@
+{% extends "base.html" %}
+{% block title %}Ошибка {{ code }} — SG-Panel{% endblock %}
+{% block section %}SYSTEM ERROR{% endblock %}
+{% block heading %}Ошибка {{ code }}{% endblock %}
+{% block subtitle %}Запрос не может быть выполнен{% endblock %}
+{% block content %}<section class="panel-card error-card"><span>{{ code }}</span><h2>{{ message }}</h2><a class="button primary" href="{{ url_for('dashboard') }}">Вернуться на обзор</a></section>{% endblock %}

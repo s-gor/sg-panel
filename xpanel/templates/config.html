@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Конфигурация — SG-Panel{% endblock %}
+{% block section %}CONFIG PREVIEW{% endblock %}
+{% block heading %}Предварительный просмотр{% endblock %}
+{% block subtitle %}JSON из SQLite и проверка до применения{% endblock %}
+{% block content %}
+<section class="config-layout">
+  <article class="panel-card config-status-card">
+    <div class="panel-heading"><div><p class="panel-kicker">XRAY RUN -TEST</p><h2>{{ 'Конфигурация корректна' if validation.ok else 'Найдена ошибка' }}</h2></div><span class="pill {{ 'enabled' if validation.ok else 'disabled' }}"><i></i>{{ 'OK' if validation.ok else 'ERROR' }}</span></div>
+    <p class="panel-description">В конфигурацию войдут {{ validation.users }} активных пользователей. Эта проверка не заменяет текущий config.json и не перезапускает Xray.</p>
+    {% if validation.detail %}<pre class="terminal-box">{{ validation.detail }}</pre>{% endif %}
+    <div class="actions"><form method="post" action="{{ url_for('config_validate') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button secondary" type="submit">Проверить ещё раз</button></form><form method="post" action="{{ url_for('apply_route') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button primary" type="submit" {% if not validation.ok %}disabled{% endif %}>Apply config</button></form></div>
+  </article>
+  <article class="panel-card json-card"><div class="panel-heading"><div><p class="panel-kicker">GENERATED JSON</p><h2>config.json</h2></div><span class="count-badge">read only</span></div><pre class="json-preview">{{ validation.json }}</pre></article>
+</section>
+{% endblock %}

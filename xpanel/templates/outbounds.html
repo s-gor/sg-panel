@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Выходы — SG-Panel{% endblock %}
+{% block section %}OUTBOUNDS{% endblock %}
+{% block heading %}Исходящие подключения{% endblock %}
+{% block subtitle %}Прямой выход, блокировка и VLESS Reality-каскады на другие Xray-серверы{% endblock %}
+{% block content %}
+<section class="outbound-grid">
+{% for outbound in outbounds %}
+  <article class="panel-card outbound-card {{ 'outbound-disabled' if not outbound.enabled else '' }}">
+    <div class="outbound-top">
+      <span class="outbound-icon {{ outbound.tag if outbound.system else 'cascade' }}">
+        <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6M5 5v14"/></svg>
+      </span>
+      <div class="actions">
+        {% if outbound.tag == default_outbound_tag %}<span class="pill enabled"><i></i>default</span>{% endif %}
+        <span class="pill {{ 'enabled' if outbound.enabled else 'disabled' }}"><i></i>{{ 'system' if outbound.system else ('enabled' if outbound.enabled else 'disabled') }}</span>
+      </div>
+    </div>
+    <p class="panel-kicker">{{ 'SYSTEM OUTBOUND' if outbound.system else 'VLESS REALITY CASCADE' }}</p>
+    <h2>{{ outbound.tag }}</h2>
+    <div class="protocol-label">{{ outbound.protocol }}</div>
+    <p class="outbound-description">{{ outbound.description }}</p>
+    {% if not outbound.system %}
+      <div class="outbound-meta"><span>{{ outbound.name }}</span><code>{{ outbound.address }}:{{ outbound.port }}</code><small>SNI {{ outbound.server_name }}</small></div>
+      <div class="row-actions outbound-actions">
+        <a class="button ghost small" href="{{ url_for('outbound_edit_page', outbound_id=outbound.id) }}">Изменить</a>
+        <form method="post" action="{{ url_for('outbound_test', outbound_id=outbound.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button secondary small" type="submit">TCP test</button></form>
+        <form method="post" action="{{ url_for('outbound_toggle', outbound_id=outbound.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button secondary small" type="submit">{{ 'Отключить' if outbound.enabled else 'Включить' }}</button></form>
+        <form method="post" action="{{ url_for('outbound_delete', outbound_id=outbound.id) }}" onsubmit="return confirm('Удалить outbound {{ outbound.tag }}?')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button danger small" type="submit">Удалить</button></form>
+      </div>
+    {% endif %}
+  </article>
+{% endfor %}
+</section>
+
+<section class="panel-card outbound-create-card">
+  <div class="panel-heading"><div><p class="panel-kicker">NEW CASCADE</p><h2>Добавить VLESS Reality outbound</h2></div><span class="panel-index">+</span></div>
+  <div class="info-strip"><span>i</span><p>Это клиентская сторона второго Xray-сервера. Возьмите UUID, SNI, Reality password/public key и Short ID из его клиентской ссылки.</p></div>
+  <form method="post" action="{{ url_for('outbound_add') }}" class="stack modern-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="form-grid"><label><span>Tag</span><input name="tag" required placeholder="eu-exit"></label><label><span>Название</span><input name="name" required placeholder="EU exit server"></label></div>
+    <div class="form-grid"><label><span>Address</span><input name="address" required placeholder="eu.example.com"></label><label><span>Port</span><input name="port" type="number" min="1" max="65535" value="443" required></label></div>
+    <label><span>UUID</span><input name="uuid" required placeholder="00000000-0000-4000-8000-000000000000"></label>
+    <div class="form-grid"><label><span>Flow</span><select name="flow"><option value="xtls-rprx-vision">xtls-rprx-vision</option><option value="">none</option></select></label><label><span>Fingerprint</span><input name="fingerprint" value="chrome" required></label></div>
+    <label><span>Server name / SNI</span><input name="server_name" required placeholder="www.microsoft.com"></label>
+    <label><span>Reality password / public key</span><input name="public_key" required autocomplete="off"></label>
+    <div class="form-grid"><label><span>Short ID</span><input name="short_id" placeholder="e1c19aeb15479b91"></label><label><span>Spider X</span><input name="spider_x" placeholder="/"></label></div>
+    <button class="button primary" type="submit">Добавить outbound</button>
+  </form>
+</section>
+{% endblock %}

@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Обзор — SG-Panel{% endblock %}
+{% block section %}DASHBOARD{% endblock %}
+{% block heading %}Состояние системы{% endblock %}
+{% block subtitle %}Xray, конфигурация, трафик и пользователи в одном окне{% endblock %}
+{% block content %}
+{% if error %}<div class="alert error">{{ error }}</div>{% endif %}
+{% if status %}
+<section class="metric-grid">
+  <article class="metric-card"><div class="metric-icon {{ 'success' if status.service == 'active' else 'danger' }}"><svg viewBox="0 0 24 24"><path d="M12 2v10M7.1 4.9a9 9 0 1 0 9.8 0"/></svg></div><div class="metric-copy"><span>Служба Xray</span><strong class="status {{ 'ok' if status.service == 'active' else 'bad' }}">{{ status.service }}</strong><small>systemd service</small></div></article>
+  <article class="metric-card"><div class="metric-icon {{ 'success' if status.config_state == 'OK' else 'danger' }}"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16h16V8zM14 2v6h6M8 13l2.3 2.3L16 10"/></svg></div><div class="metric-copy"><span>Конфигурация</span><strong class="status {{ 'ok' if status.config_state == 'OK' else 'bad' }}">{{ status.config_state }}</strong><small>xray run -test</small></div></article>
+  <article class="metric-card"><div class="metric-icon neutral"><svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M8.5 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8"/></svg></div><div class="metric-copy"><span>Пользователи</span><strong>{{ status.enabled_users }} / {{ status.total_users }}</strong><small>{% if status.expired_users %}истекло: {{ status.expired_users }}{% else %}активных / всего{% endif %}</small></div></article>
+  <article class="metric-card"><div class="metric-icon neutral"><svg viewBox="0 0 24 24"><path d="M3 17l6-6 4 4 8-9M14 6h7v7"/></svg></div><div class="metric-copy"><span>Общий трафик</span><strong>{{ status.traffic_total_human }}</strong><small>{{ 'Stats API ' ~ status.api_listen if status.stats_enabled else 'статистика выключена' }}</small></div></article>
+  <article class="metric-card"><div class="metric-icon neutral"><svg viewBox="0 0 24 24"><circle cx="5" cy="6" r="2"/><circle cx="19" cy="6" r="2"/><circle cx="12" cy="18" r="2"/><path d="M7 6h10M6.5 7.5l4.4 8M17.5 7.5l-4.4 8"/></svg></div><div class="metric-copy"><span>Routing rules</span><strong>{{ status.rules_enabled }} / {{ status.rules_total }}</strong><small>{{ status.domain_strategy }} · sniffing {{ 'on' if status.sniffing_enabled else 'off' }}</small></div></article>
+  <article class="metric-card"><div class="metric-icon {{ 'success' if status.subscriptions_global_enabled else 'neutral' }}"><svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 0 1 8-8M4 17a3 3 0 0 1 3 3M4 7a13 13 0 0 1 13 13"/><circle cx="4" cy="20" r="1"/></svg></div><div class="metric-copy"><span>Подписки</span><strong>{{ 'active' if status.subscriptions_global_enabled else 'disabled' }}</strong><small>{{ status.subscriptions_enabled }} пользовательских URL</small></div></article>
+  <article class="metric-card endpoint-card"><div class="metric-icon accent"><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10ZM9 12l2 2 4-4"/></svg></div><div class="metric-copy"><span>Reality endpoint</span><strong>{{ status.address }}:{{ status.port }}</strong><small>{{ status.server_name }}</small></div></article>
+</section>
+
+<section class="dashboard-grid">
+  <article class="panel-card action-panel">
+    <div class="panel-heading"><div><p class="panel-kicker">ОПЕРАЦИИ</p><h2>Управление Xray</h2></div><span class="panel-index">01</span></div>
+    <p class="panel-description">Apply создаёт новый JSON, проверяет его, сохраняет старый конфиг и только затем перезапускает Xray.</p>
+    <div class="operation-list"><div><span>01</span><p><strong>Render</strong><small>Сборка из SQLite</small></p></div><div><span>02</span><p><strong>Validate</strong><small>xray run -test</small></p></div><div><span>03</span><p><strong>Apply</strong><small>backup и restart</small></p></div></div>
+    <div class="actions action-row">
+      <form method="post" action="{{ url_for('apply_route') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button primary" type="submit">Применить конфигурацию</button></form>
+      <a class="button secondary" href="{{ url_for('config_page') }}">Проверить JSON</a>
+      <form method="post" action="{{ url_for('restart_route') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button secondary" type="submit">Перезапустить Xray</button></form>
+    </div>
+  </article>
+  <article class="panel-card server-panel">
+    <div class="panel-heading"><div><p class="panel-kicker">REALITY SERVER</p><h2>Параметры узла</h2></div><a class="button ghost small" href="{{ url_for('settings_page') }}">Настроить</a></div>
+    <dl class="details details-modern"><div><dt>Address</dt><dd><code>{{ status.address }}:{{ status.port }}</code></dd></div><div><dt>Destination</dt><dd>{{ status.dest }}</dd></div><div><dt>Server Name</dt><dd>{{ status.server_name }}</dd></div><div><dt>Config path</dt><dd><code>{{ status.config_path }}</code></dd></div><div><dt>Stats API</dt><dd><code>{{ status.api_listen }}</code></dd></div></dl>
+    <div class="secure-note"><span>◆</span><p><strong>Reality protected</strong><small>Private key в интерфейсе настроек скрыт по умолчанию.</small></p></div>
+  </article>
+</section>
+
+<section class="panel-card data-panel">
+  <div class="panel-heading table-heading"><div><p class="panel-kicker">DATABASE PREVIEW</p><h2>Последние пользователи</h2></div><a class="button ghost small" href="{{ url_for('users_page') }}">Открыть всех</a></div>
+  {% if users %}<div class="table-wrap"><table><thead><tr><th>ID</th><th>Пользователь</th><th>Статус</th><th>Трафик</th><th>UUID</th></tr></thead><tbody>
+  {% for user in users %}<tr><td><span class="table-id">#{{ user.id }}</span></td><td><div class="user-cell"><span class="avatar">{{ user.name[:1]|upper }}</span><div><strong>{{ user.name }}</strong>{% if user.comment %}<small>{{ user.comment }}</small>{% endif %}</div></div></td><td>{% if user_is_expired(user) %}<span class="pill disabled"><i></i>expired</span>{% else %}<span class="pill {{ 'enabled' if user.enabled else 'disabled' }}"><i></i>{{ 'enabled' if user.enabled else 'disabled' }}</span>{% endif %}</td><td>{{ format_bytes(stats.get(user.id, {}).get('total', 0)) }}</td><td><code class="uuid-code">{{ user.uuid }}</code></td></tr>{% endfor %}
+  </tbody></table></div>{% else %}<p class="empty">Пользователей пока нет.</p>{% endif %}
+</section>
+{% endif %}
+{% endblock %}

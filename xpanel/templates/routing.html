@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Маршрутизация — SG-Panel{% endblock %}
+{% block section %}ROUTING{% endblock %}
+{% block heading %}Маршрутизация{% endblock %}
+{% block subtitle %}Приоритетные правила, sniffing и направление трафика по outbounds{% endblock %}
+{% block content %}
+<section class="routing-layout">
+  <article class="panel-card">
+    <div class="panel-heading"><div><p class="panel-kicker">ENGINE SETTINGS</p><h2>Routing / Sniffing</h2></div><span class="panel-index">01</span></div>
+    <form method="post" action="{{ url_for('routing_settings_save') }}" class="stack modern-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label><span>Default outbound</span><select name="default_outbound_tag">{% for tag in outbound_tags %}{% if tag != 'blocked' %}<option value="{{ tag }}" {% if settings.default_outbound_tag == tag %}selected{% endif %}>{{ tag }}</option>{% endif %}{% endfor %}</select><small>Если ни одно правило не совпало, Xray отправит трафик через этот выход.</small></label>
+      <label><span>Domain strategy</span><select name="domain_strategy">{% for value in ['AsIs','IPIfNonMatch','IPOnDemand'] %}<option value="{{ value }}" {% if settings.domain_strategy == value %}selected{% endif %}>{{ value }}</option>{% endfor %}</select></label>
+      <div class="switch-list">
+        <label class="switch-row"><div><strong>Sniffing</strong><small>Определять фактический протокол и домен</small></div><input type="checkbox" name="sniffing_enabled" {% if settings.sniffing_enabled %}checked{% endif %}><span class="switch"></span></label>
+        <label class="switch-row"><div><strong>Route only</strong><small>Использовать найденный домен только для routing</small></div><input type="checkbox" name="sniffing_route_only" {% if settings.sniffing_route_only %}checked{% endif %}><span class="switch"></span></label>
+      </div>
+      <div class="protocol-box"><span>Протоколы распознавания</span><div class="checks-inline">
+        <label class="check-chip"><input type="checkbox" name="sniff_http" {% if settings.sniff_http %}checked{% endif %}><span>HTTP</span></label>
+        <label class="check-chip"><input type="checkbox" name="sniff_tls" {% if settings.sniff_tls %}checked{% endif %}><span>TLS</span></label>
+        <label class="check-chip"><input type="checkbox" name="sniff_quic" {% if settings.sniff_quic %}checked{% endif %}><span>QUIC</span></label>
+      </div></div>
+      <button class="button primary" type="submit">Сохранить настройки</button>
+    </form>
+  </article>
+
+  <article class="panel-card">
+    <div class="panel-heading"><div><p class="panel-kicker">NEW ROUTE</p><h2>Добавить правило</h2></div><span class="panel-index">02</span></div>
+    <form method="post" action="{{ url_for('routing_rule_add') }}" class="stack modern-form compact-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="form-grid"><label><span>Название</span><input name="name" required placeholder="Block ads"></label><label><span>Приоритет</span><input name="priority" type="number" min="1" max="9999" value="100" required></label></div>
+      <label><span>Outbound</span><select name="outbound_tag">{% for tag in outbound_tags %}<option value="{{ tag }}">{{ tag }}</option>{% endfor %}</select></label>
+      <label><span>Domains</span><textarea name="domains" rows="3" placeholder="geosite:category-ads-all&#10;domain:example.com"></textarea></label>
+      <label><span>IP / CIDR</span><textarea name="ips" rows="3" placeholder="203.0.113.0/24&#10;geoip:private"></textarea></label>
+      <div class="form-grid"><label><span>Ports</span><input name="ports" placeholder="443,1000-2000"></label><label><span>Network</span><select name="network"><option value="">any</option><option>tcp</option><option>udp</option><option value="tcp,udp">tcp,udp</option></select></label></div>
+      <label><span>Protocols</span><input name="protocols" placeholder="http,tls,quic,bittorrent"></label>
+      <label><span>Inbound tags</span><input name="inbound_tags" placeholder="vless-reality-in"></label>
+      <label><span>Пользователи</span><select name="users" multiple size="4">{% for user in users %}<option value="{{ user.name }}">{{ user.name }}</option>{% endfor %}</select><small>Можно выбрать одного или нескольких пользователей. Ctrl/Command — множественный выбор.</small></label>
+      <button class="button primary" type="submit">Добавить правило</button>
+    </form>
+  </article>
+</section>
+
+<section class="panel-card data-panel routing-table-card">
+  <div class="panel-heading table-heading"><div><p class="panel-kicker">PRIORITY CHAIN</p><h2>Routing rules</h2></div><div class="actions"><span class="count-badge">{{ rules|length }} rules</span><form method="post" action="{{ url_for('apply_route') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button primary small" type="submit">Применить</button></form></div></div>
+  <div class="info-strip"><span>i</span><p>Меньший приоритет выполняется раньше. Xray использует первое совпавшее правило.</p></div>
+  {% if rules %}<div class="table-wrap"><table><thead><tr><th>Priority</th><th>Rule</th><th>Conditions</th><th>Outbound</th><th>Status</th><th>Actions</th></tr></thead><tbody>
+  {% for rule in rules %}<tr>
+    <td><span class="priority-badge">{{ rule.priority }}</span></td><td><strong>{{ rule.name }}</strong></td>
+    <td class="conditions">
+      {% if rule.domains %}<div><b>domain</b><span>{{ rule.domains|replace('\n', ', ') }}</span></div>{% endif %}
+      {% if rule.ips %}<div><b>ip</b><span>{{ rule.ips|replace('\n', ', ') }}</span></div>{% endif %}
+      {% if rule.ports %}<div><b>port</b><span>{{ rule.ports }}</span></div>{% endif %}
+      {% if rule.network %}<div><b>network</b><span>{{ rule.network }}</span></div>{% endif %}
+      {% if rule.protocols %}<div><b>protocol</b><span>{{ rule.protocols|replace('\n', ', ') }}</span></div>{% endif %}
+      {% if rule.inbound_tags %}<div><b>inbound</b><span>{{ rule.inbound_tags|replace('\n', ', ') }}</span></div>{% endif %}
+      {% if rule.users %}<div><b>user</b><span>{{ rule.users|replace('\n', ', ') }}</span></div>{% endif %}
+    </td>
+    <td><span class="route-tag {{ 'blocked' if rule.outbound_tag == 'blocked' else ('direct' if rule.outbound_tag == 'direct' else 'cascade') }}">{{ rule.outbound_tag }}</span></td>
+    <td><span class="pill {{ 'enabled' if rule.enabled else 'disabled' }}"><i></i>{{ 'enabled' if rule.enabled else 'disabled' }}</span></td>
+    <td><div class="row-actions"><a class="button ghost small" href="{{ url_for('routing_rule_edit_page', rule_id=rule.id) }}">Изменить</a>
+      <form method="post" action="{{ url_for('routing_rule_toggle', rule_id=rule.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button secondary small" type="submit">{{ 'Отключить' if rule.enabled else 'Включить' }}</button></form>
+      <form method="post" action="{{ url_for('routing_rule_delete', rule_id=rule.id) }}" onsubmit="return confirm('Удалить правило {{ rule.name }}?')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button danger small" type="submit">Удалить</button></form>
+    </div></td>
+  </tr>{% endfor %}</tbody></table></div>{% else %}<div class="empty-state"><span>↗</span><h3>Правил нет</h3><p>Трафик будет направлен через первый outbound direct.</p></div>{% endif %}
+</section>
+{% endblock %}

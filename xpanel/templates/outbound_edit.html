@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Изменить outbound — SG-Panel{% endblock %}
+{% block section %}OUTBOUNDS / EDIT{% endblock %}
+{% block heading %}Изменение outbound{% endblock %}
+{% block subtitle %}Параметры клиентского VLESS Reality-подключения ко второму Xray-серверу{% endblock %}
+{% block content %}
+<section class="panel-card narrow-card edit-card">
+  <div class="panel-heading"><div><p class="panel-kicker">OUTBOUND #{{ outbound.id }}</p><h2>{{ outbound.tag }}</h2></div><span class="panel-index">VLESS</span></div>
+  <form method="post" action="{{ url_for('outbound_edit', outbound_id=outbound.id) }}" class="stack modern-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="form-grid"><label><span>Tag</span><input name="tag" value="{{ outbound.tag }}" required></label><label><span>Название</span><input name="name" value="{{ outbound.name }}" required></label></div>
+    <div class="form-grid"><label><span>Address</span><input name="address" value="{{ outbound.address }}" required></label><label><span>Port</span><input name="port" type="number" min="1" max="65535" value="{{ outbound.port }}" required></label></div>
+    <label><span>UUID</span><input name="uuid" value="{{ outbound.uuid }}" required></label>
+    <div class="form-grid"><label><span>Flow</span><select name="flow"><option value="xtls-rprx-vision" {% if outbound.flow=='xtls-rprx-vision' %}selected{% endif %}>xtls-rprx-vision</option><option value="" {% if not outbound.flow %}selected{% endif %}>none</option></select></label><label><span>Fingerprint</span><input name="fingerprint" value="{{ outbound.fingerprint }}" required></label></div>
+    <label><span>Server name / SNI</span><input name="server_name" value="{{ outbound.server_name }}" required></label>
+    <label><span>Reality password / public key</span><input name="public_key" value="{{ outbound.public_key }}" required autocomplete="off"></label>
+    <div class="form-grid"><label><span>Short ID</span><input name="short_id" value="{{ outbound.short_id }}"></label><label><span>Spider X</span><input name="spider_x" value="{{ outbound.spider_x }}"></label></div>
+    <div class="actions"><button class="button primary" type="submit">Сохранить outbound</button><a class="button secondary" href="{{ url_for('outbounds_page') }}">Отмена</a></div>
+  </form>
+</section>
+{% endblock %}

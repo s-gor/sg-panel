@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#121722">
+  <title>Вход — SG-Panel</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}?v={{ xpanel_version }}">
+</head>
+<body class="login-body">
+  <div class="login-grid" aria-hidden="true"></div>
+  <div class="login-glow login-glow-one" aria-hidden="true"></div>
+  <div class="login-glow login-glow-two" aria-hidden="true"></div>
+
+  <main class="login-card">
+    <div class="login-card-line" aria-hidden="true"></div>
+
+    <header class="login-header">
+      <div class="login-logo" aria-hidden="true">
+        <svg viewBox="0 0 64 64" role="img">
+          <path d="M32 4 54 16v32L32 60 10 48V16L32 4Z" class="logo-hex"/>
+          <path d="M40.5 20.5H27.2c-4.6 0-7.2 2.5-7.2 6.2 0 3.4 2.2 5.2 6.4 6l8.5 1.2c2 .3 2.9 1.1 2.9 2.4 0 1.6-1.2 2.6-3.5 2.6H20.5v5h14.2c5.6 0 8.8-2.8 8.8-7.1 0-3.8-2.4-5.8-7.2-6.5l-8.1-1.2c-1.8-.3-2.6-.9-2.6-2.1 0-1.4 1.1-2.3 3.1-2.3h11.8v-4.2Z" class="logo-s"/>
+          <path d="M45.5 29.8h-9v4.4h4.1v5.1c-1.6.7-3.4 1-5.3 1-5.1 0-8.5-3.1-8.5-8.3 0-4.9 3.2-8.2 8.3-8.2 2.4 0 4.5.7 6.4 2l2.6-4.2c-2.7-1.8-5.7-2.7-9.2-2.7-8.3 0-14 5.3-14 13.2 0 8 5.5 13 14.2 13 4.1 0 7.6-1 10.4-2.7V29.8Z" class="logo-g"/>
+        </svg>
+      </div>
+      <div class="login-brand-copy">
+        <p class="login-kicker">УПРАВЛЕНИЕ XRAY</p>
+        <h1>SG-Panel</h1>
+        <div class="login-status"><span></span> СИСТЕМА ГОТОВА <b>v{{ xpanel_version }}</b></div>
+      </div>
+    </header>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="alert {{ category }} login-alert">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    {% if login_error %}<div class="alert error login-alert">{{ login_error }}</div>{% endif %}
+
+    <section class="login-access">
+      <p class="login-section-label">ЗАЩИЩЁННЫЙ ВХОД</p>
+      <h2>Вход в панель</h2>
+      <p class="login-intro">Введите пароль администратора для управления Xray.</p>
+
+      <form method="post" action="{{ url_for('login_post') }}" class="stack login-form">
+        <label class="login-label" for="admin-password">Пароль администратора</label>
+        <div class="password-field">
+          <span class="password-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M7 10V7a5 5 0 0 1 10 0v3m-11 0h12a2 2 0 0 1 2 2v8H4v-8a2 2 0 0 1 2-2Z"/><path d="M12 14v3"/></svg>
+          </span>
+          <input id="admin-password" type="password" name="password" required autofocus autocomplete="current-password" placeholder="Введите пароль" {% if login_block and login_block.blocked %}disabled{% endif %}>
+          <button class="password-toggle" type="button" aria-label="Показать пароль" data-password-toggle>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z"/><circle cx="12" cy="12" r="2.7"/></svg>
+          </button>
+        </div>
+        <button class="button login-submit full" type="submit" {% if login_block and login_block.blocked %}disabled{% endif %}>
+          <span>Войти</span>
+          
+        </button>
+      </form>
+    </section>
+
+    <footer class="login-footer">
+      <span class="footer-shield" aria-hidden="true">◆</span>
+      Локальное защищённое подключение
+    </footer>
+  </main>
+
+  <script>
+    (() => {
+      const toggle = document.querySelector('[data-password-toggle]');
+      const input = document.getElementById('admin-password');
+      if (!toggle || !input) return;
+      toggle.addEventListener('click', () => {
+        const visible = input.type === 'text';
+        input.type = visible ? 'password' : 'text';
+        toggle.setAttribute('aria-label', visible ? 'Показать пароль' : 'Скрыть пароль');
+        input.focus();
+      });
+    })();
+  </script>
+</body>
+</html>

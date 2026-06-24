@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}Безопасность — SG-Panel{% endblock %}
+{% block section %}SECURITY & ACCESS{% endblock %}
+{% block heading %}Безопасность панели{% endblock %}
+{% block subtitle %}Сессии, защита входа, IP allowlist и публикация подписок{% endblock %}
+{% block content %}
+<section class="metric-grid security-metrics">
+  <article class="metric-card"><div class="metric-copy"><span>Активные сессии</span><strong>{{ overview.active_sessions }}</strong><small>Текущая отмечена в таблице</small></div></article>
+  <article class="metric-card"><div class="metric-copy"><span>Ошибки входа, 24 ч</span><strong>{{ overview.failed_logins_24h }}</strong><small>Блокировка работает по IP</small></div></article>
+  <article class="metric-card"><div class="metric-copy"><span>HTTPS</span><strong class="{% if request_is_secure %}text-success{% else %}text-warning{% endif %}">{{ 'active' if request_is_secure else 'off' }}</strong><small>Secure cookie: {{ 'on' if secure_cookies else 'off' }}</small></div></article>
+  <article class="metric-card"><div class="metric-copy"><span>Listen панели</span><strong class="mono small-value">{{ panel_bind }}:{{ panel_port }}</strong><small>Текущий IP: {{ current_ip }}</small></div></article>
+</section>
+
+<section class="settings-grid security-layout">
+  <article class="panel-card settings-main">
+    <div class="panel-heading"><div><p class="panel-kicker">ACCESS POLICY</p><h2>Защита входа и сессий</h2></div><span class="panel-index">01</span></div>
+    <form method="post" action="{{ url_for('security_settings_save') }}" class="stack modern-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="form-grid">
+        <label><span>Тайм-аут сессии, минут</span><input type="number" min="5" max="1440" name="session_timeout_minutes" value="{{ settings.session_timeout_minutes }}" required></label>
+        <label><span>Максимум попыток входа</span><input type="number" min="3" max="20" name="max_login_attempts" value="{{ settings.max_login_attempts }}" required></label>
+      </div>
+      <div class="form-grid">
+        <label><span>Блокировка, минут</span><input type="number" min="1" max="1440" name="lockout_minutes" value="{{ settings.lockout_minutes }}" required></label>
+        <label><span>Хранение журнала, дней</span><input type="number" min="7" max="3650" name="audit_retention_days" value="{{ settings.audit_retention_days }}" required></label>
+      </div>
+      <label class="switch-row"><div><strong>IP allowlist для GUI</strong><small>Разрешать административную часть только указанным сетям</small></div><input type="checkbox" name="allowlist_enabled" {% if settings.allowlist_enabled %}checked{% endif %}><span class="switch"></span></label>
+      <label><span>Разрешённые IP/CIDR</span><textarea name="allowed_networks" placeholder="192.168.1.0/24&#10;203.0.113.10/32">{{ settings.allowed_networks }}</textarea><small class="field-help">Текущий адрес обязательно должен входить в список. Loopback разрешён всегда.</small></label>
+      <label class="switch-row"><div><strong>Доверять X-Forwarded-For</strong><small>Только если панель доступна через локальный reverse proxy</small></div><input type="checkbox" name="trust_proxy_headers" {% if settings.trust_proxy_headers %}checked{% endif %}><span class="switch"></span></label>
+
+      <div class="section-divider"></div>
+      <div><p class="panel-kicker">PUBLIC SUBSCRIPTIONS</p><h3>Ограничения подписок</h3></div>
+      <div class="switch-list">
+        <label class="switch-row"><div><strong>Разрешить plain-формат</strong><small>Возвращает открытую VLESS-ссылку</small></div><input type="checkbox" name="subscription_plain_enabled" {% if settings.subscription_plain_enabled %}checked{% endif %}><span class="switch"></span></label>
+        <label class="switch-row"><div><strong>Разрешить JSON-формат</strong><small>Для интеграций и диагностики</small></div><input type="checkbox" name="subscription_json_enabled" {% if settings.subscription_json_enabled %}checked{% endif %}><span class="switch"></span></label>
+        <label class="switch-row"><div><strong>IP allowlist для подписок</strong><small>Base64/plain/JSON доступны только указанным сетям</small></div><input type="checkbox" name="subscription_allowlist_enabled" {% if settings.subscription_allowlist_enabled %}checked{% endif %}><span class="switch"></span></label>
+      </div>
+      <label><span>Разрешённые сети подписок</span><textarea name="subscription_allowed_networks" placeholder="192.168.1.0/24">{{ settings.subscription_allowed_networks }}</textarea></label>
+      <div class="actions"><button class="button primary" type="submit">Сохранить безопасность</button></div>
+    </form>
+  </article>
+
+  <aside class="settings-side stack">
+    <article class="panel-card">
+      <div class="panel-heading"><div><p class="panel-kicker">SECURITY STATUS</p><h2>Текущие предупреждения</h2></div><span class="panel-index">02</span></div>
+      <div class="security-checks">
+        <div class="security-check {% if request_is_secure %}ok{% else %}warn{% endif %}"><strong>HTTPS</strong><span>{{ 'Соединение защищено' if request_is_secure else 'Панель открыта по HTTP' }}</span></div>
+        <div class="security-check {% if settings.allowlist_enabled %}ok{% else %}warn{% endif %}"><strong>IP allowlist</strong><span>{{ 'Включён' if settings.allowlist_enabled else 'Выключен' }}</span></div>
+        <div class="security-check {% if panel_bind in ['127.0.0.1','::1'] %}ok{% else %}warn{% endif %}"><strong>Listen</strong><span>{{ panel_bind }}:{{ panel_port }}</span></div>
+        <div class="security-check {% if secure_cookies %}ok{% else %}warn{% endif %}"><strong>Secure cookie</strong><span>{{ 'Включена' if secure_cookies else 'Выключена для HTTP' }}</span></div>
+      </div>
+      <p class="panel-description">Для удалённого управления безопаснее использовать SSH-туннель. HTTPS на отдельном порту настраивается скриптом <code>deploy/configure-https.sh</code>.</p>
+      <pre class="command-box">ssh -L 8080:127.0.0.1:8080 user@SERVER_IP</pre>
+    </article>
+  </aside>
+</section>
+
+<section class="panel-card section-gap">
+  <div class="panel-heading"><div><p class="panel-kicker">ADMIN SESSIONS</p><h2>Активные и завершённые сессии</h2></div><span class="panel-index">03</span></div>
+  <div class="actions compact-actions">
+    <form method="post" action="{{ url_for('security_sessions_revoke_all') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button ghost" type="submit">Завершить остальные</button></form>
+    <form method="post" action="{{ url_for('security_sessions_revoke_all') }}" onsubmit="return confirm('Будет завершена и текущая сессия. Продолжить?')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="include_current" value="1"><button class="button danger" type="submit">Завершить все</button></form>
+  </div>
+  <div class="table-wrap"><table><thead><tr><th>Состояние</th><th>IP</th><th>Создана</th><th>Последняя активность</th><th>Браузер</th><th></th></tr></thead><tbody>
+  {% for item in sessions %}<tr><td>{% if item.id == current_session_id %}<span class="status-pill active">текущая</span>{% elif not item.revoked_at %}<span class="status-pill active">active</span>{% else %}<span class="status-pill disabled">revoked</span>{% endif %}</td><td class="mono">{{ item.ip_address }}</td><td>{{ item.created_at }}</td><td>{{ item.last_seen_at }}</td><td class="ua-cell">{{ item.user_agent or '—' }}</td><td>{% if not item.revoked_at %}<form method="post" action="{{ url_for('security_session_revoke', session_id=item.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button danger small" type="submit">Завершить</button></form>{% endif %}</td></tr>{% endfor %}
+  </tbody></table></div>
+</section>
+
+<section class="dashboard-grid section-gap">
+  <article class="panel-card">
+    <div class="panel-heading"><div><p class="panel-kicker">LOGIN EVENTS</p><h2>Последние попытки входа</h2></div><span class="panel-index">04</span></div>
+    <div class="table-wrap"><table><thead><tr><th>Время</th><th>IP</th><th>Результат</th></tr></thead><tbody>{% for item in login_attempts %}<tr><td>{{ item.attempted_at }}</td><td class="mono">{{ item.ip_address }}</td><td><span class="status-pill {{ 'active' if item.success else 'disabled' }}">{{ 'success' if item.success else 'failed' }}</span></td></tr>{% endfor %}</tbody></table></div>
+  </article>
+  <article class="panel-card">
+    <div class="panel-heading"><div><p class="panel-kicker">AUDIT LOG</p><h2>Журнал действий</h2></div><span class="panel-index">05</span></div>
+    <form method="post" action="{{ url_for('security_history_purge') }}" class="actions compact-actions"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button ghost small" type="submit">Очистить старые записи</button></form>
+    <div class="table-wrap"><table><thead><tr><th>Время</th><th>Событие</th><th>IP</th><th>Результат</th></tr></thead><tbody>{% for item in audit_log %}<tr><td>{{ item.created_at }}</td><td><strong>{{ item.event }}</strong><small class="table-note">{{ item.detail }}</small></td><td class="mono">{{ item.ip_address or '—' }}</td><td><span class="status-pill {{ 'active' if item.success else 'disabled' }}">{{ 'OK' if item.success else 'ERROR' }}</span></td></tr>{% endfor %}</tbody></table></div>
+  </article>
+</section>
+{% endblock %}
