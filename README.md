@@ -166,7 +166,7 @@ sudo apt-get update && sudo apt-get install -y curl ca-certificates unzip && cur
 Домен Xray-сервера
 Домен HTTPS-панели
 Внешний HTTPS-порт панели [61443]
-Имя первого пользователя [Sergey]
+Имя первого пользователя [sg-admin]
 Reality target [www.microsoft.com:443]
 Reality SNI [www.microsoft.com]
 Пароль администратора панели
