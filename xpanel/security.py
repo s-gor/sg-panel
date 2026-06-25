@@ -321,6 +321,20 @@ def recent_login_attempts(limit: int = 100) -> list[sqlite3.Row]:
         ).fetchall()
 
 
+def clear_failed_login_attempts(ip_address: str | None = None) -> int:
+    """Remove failed login attempts so an administrator can regain access."""
+    init_db()
+    with connect() as con:
+        if ip_address:
+            cursor = con.execute(
+                "DELETE FROM login_attempts WHERE success = 0 AND ip_address = ?",
+                (ip_address[:80],),
+            )
+        else:
+            cursor = con.execute("DELETE FROM login_attempts WHERE success = 0")
+        return max(0, int(cursor.rowcount))
+
+
 def purge_security_history() -> None:
     settings = get_security_settings()
     cutoff = _now() - timedelta(days=int(settings["audit_retention_days"]))

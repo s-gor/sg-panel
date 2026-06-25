@@ -325,6 +325,26 @@ class V09SecurityWebTest(WebTest):
         response = self.client.post("/login", data={"password": "correct-password"})
         self.assertEqual(response.status_code, 429)
 
+    def test_login_lockout_can_be_cleared(self):
+        from xpanel.security import clear_failed_login_attempts
+
+        with connect() as con:
+            con.execute(
+                "UPDATE security_settings SET max_login_attempts = 3, lockout_minutes = 15 WHERE id = 1"
+            )
+        for _ in range(3):
+            self.client.post("/login", data={"password": "wrong"})
+
+        self.assertEqual(
+            self.client.post("/login", data={"password": "correct-password"}).status_code,
+            429,
+        )
+        self.assertEqual(clear_failed_login_attempts("127.0.0.1"), 3)
+        self.assertEqual(
+            self.client.post("/login", data={"password": "correct-password"}).status_code,
+            302,
+        )
+
     def test_subscription_formats_can_be_disabled(self):
         self.login()
         self.client.post(

@@ -536,6 +536,18 @@ def cmd_revoke_sessions(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_unlock_admin(args: argparse.Namespace) -> int:
+    require_root()
+    from .security import clear_failed_login_attempts
+
+    count = clear_failed_login_attempts(args.ip)
+    if args.ip:
+        print(f"Блокировка входа снята для IP {args.ip}. Удалено неудачных попыток: {count}")
+    else:
+        print(f"Блокировка входа снята для всех IP. Удалено неудачных попыток: {count}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="xpanel",
@@ -624,6 +636,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("revoke-sessions", help="завершить все административные сессии")
     p.set_defaults(func=cmd_revoke_sessions)
+
+    p = sub.add_parser("unlock-admin", help="снять блокировку входа в панель")
+    p.add_argument("--ip", help="снять блокировку только для указанного IP")
+    p.set_defaults(func=cmd_unlock_admin)
 
     p = sub.add_parser("list-outbounds", help="показать системные и пользовательские outbounds")
     p.set_defaults(func=cmd_list_outbounds)

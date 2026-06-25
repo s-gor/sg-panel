@@ -8,7 +8,7 @@ DEFAULT_HTTPS_PORT="61443"
 DEFAULT_BACKEND_PORT="8080"
 DEFAULT_REALITY_DEST="www.microsoft.com:443"
 DEFAULT_REALITY_SNI="www.microsoft.com"
-DEFAULT_USER="Sergey"
+DEFAULT_USER="sg-admin"
 ACME_ROOT="/var/www/letsencrypt"
 
 log(){ printf '[SG-Panel EC2] %s\n' "$*"; }
@@ -35,6 +35,11 @@ prompt_value(){
 }
 
 printf '%s\n' \
+  "Для вопросов со значением в квадратных скобках уже задан рекомендуемый вариант." \
+  "Чтобы принять значение по умолчанию, просто нажмите Enter." \
+  ""
+
+printf '%s\n' \
   "Введите доменное имя Xray-сервера." \
   "A-запись домена должна указывать на публичный IPv4 этого EC2." \
   "Пример: vpn.example.dynu.net"
@@ -50,12 +55,23 @@ prompt_value REALITY_DEST "Reality target" "$DEFAULT_REALITY_DEST"
 prompt_value REALITY_SNI "Reality SNI" "$DEFAULT_REALITY_SNI"
 
 if [[ -z "${XPANEL_ADMIN_PASSWORD:-}" ]]; then
-  prompt_value XPANEL_ADMIN_PASSWORD "Пароль администратора панели: " "" 1
-  prompt_value XPANEL_ADMIN_PASSWORD_2 "Повторите пароль: " "" 1
-  [[ "$XPANEL_ADMIN_PASSWORD" == "$XPANEL_ADMIN_PASSWORD_2" ]] || fail "пароли не совпадают"
-fi
+  while true; do
+    prompt_value XPANEL_ADMIN_PASSWORD "Пароль администратора панели (не менее 8 символов): " "" 1
+    prompt_value XPANEL_ADMIN_PASSWORD_2 "Повторите пароль: " "" 1
 
-[[ ${#XPANEL_ADMIN_PASSWORD} -ge 8 ]] || fail "пароль должен содержать не менее 8 символов"
+    if (( ${#XPANEL_ADMIN_PASSWORD} < 8 )); then
+      echo "Ошибка: пароль должен содержать не менее 8 символов." >&2
+    elif [[ "$XPANEL_ADMIN_PASSWORD" != "$XPANEL_ADMIN_PASSWORD_2" ]]; then
+      echo "Ошибка: пароли не совпадают. Повторите ввод." >&2
+    else
+      break
+    fi
+
+    unset XPANEL_ADMIN_PASSWORD XPANEL_ADMIN_PASSWORD_2
+  done
+else
+  [[ ${#XPANEL_ADMIN_PASSWORD} -ge 8 ]] || fail "пароль должен содержать не менее 8 символов"
+fi
 [[ "$XRAY_ADDRESS" =~ ^([A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,63}$ ]] || fail "некорректный домен Xray"
 [[ "$PANEL_DOMAIN" =~ ^([A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,63}$ ]] || fail "некорректный домен панели"
 [[ "$PANEL_HTTPS_PORT" =~ ^[0-9]+$ ]] && (( PANEL_HTTPS_PORT >= 49152 && PANEL_HTTPS_PORT <= 65535 )) || fail "для EC2 выберите private/dynamic порт 49152-65535"
