@@ -215,7 +215,7 @@ with connect() as con:
     con.execute("UPDATE security_settings SET trust_proxy_headers = 1, updated_at = CURRENT_TIMESTAMP WHERE id = 1")
 PYSEC
 
-/opt/xpanel-mvp/deploy/install-service.sh
+bash /opt/xpanel-mvp/deploy/install-service.sh
 systemctl restart xpanel-web
 
 mkdir -p /etc/letsencrypt/renewal-hooks/deploy

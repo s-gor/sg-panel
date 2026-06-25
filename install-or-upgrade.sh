@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-EXPECTED_VERSION="0.9.3"
+EXPECTED_VERSION="0.9.4"
 TARGET="/opt/xpanel-mvp"
 SERVICE="xpanel-web"
 SOURCE_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
@@ -57,8 +57,8 @@ if [[ -f "$BACKUP_ROOT/xpanel-mvp/data/panel.db" ]]; then cp -a "$BACKUP_ROOT/xp
 
 cd "$TARGET"
 [[ -x .venv/bin/python ]] || python3 -m venv .venv
-.venv/bin/pip install -q --upgrade pip
-.venv/bin/pip install -q -r requirements.txt
+.venv/bin/pip install --no-cache-dir -q --upgrade pip
+.venv/bin/pip install --no-cache-dir -q -r requirements.txt
 .venv/bin/python -m xpanel init-db
 
 if [[ ! -f /etc/xpanel-mvp/web.env ]]; then

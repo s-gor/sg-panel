@@ -25,24 +25,15 @@ fail() {
 }
 
 [[ $EUID -eq 0 ]] || fail "Run this script as root"
-
 command -v curl >/dev/null 2>&1 || fail "curl is not installed"
 command -v unzip >/dev/null 2>&1 || fail "unzip is not installed"
 
 log "Downloading ${OWNER}/${REPO}, branch ${BRANCH}"
-
-curl \
-    -fL \
-    --retry 3 \
-    --retry-delay 2 \
-    --connect-timeout 15 \
-    -o "$WORK/$ARCHIVE" \
-    "$ARCHIVE_URL"
+curl -fL --retry 3 --retry-delay 2 --connect-timeout 15 \
+    -o "$WORK/$ARCHIVE" "$ARCHIVE_URL"
 
 mkdir -p "$WORK/extracted"
-
 log "Extracting repository archive"
-
 unzip -q "$WORK/$ARCHIVE" -d "$WORK/extracted"
 
 INSTALLER="$(
@@ -54,16 +45,17 @@ INSTALLER="$(
         -quit
 )"
 
-[[ -n "$INSTALLER" && -f "$INSTALLER" ]] ||
+[[ -n "$INSTALLER" && -f "$INSTALLER" ]] || \
     fail "deploy/ec2-first-install.sh was not found in the repository archive"
 
 SOURCE="$(dirname "$(dirname "$INSTALLER")")"
-
-[[ -f "$SOURCE/install-or-upgrade.sh" ]] ||
+[[ -f "$SOURCE/install-or-upgrade.sh" ]] || \
     fail "Unable to determine the SG-Panel project directory"
+
+# GitHub source archives do not preserve executable bits reliably.
+find "$SOURCE" -type f -name '*.sh' -exec chmod 755 {} +
 
 log "Project directory: $SOURCE"
 log "Starting SG-Panel installation wizard"
-
 cd "$SOURCE"
 bash "$INSTALLER"

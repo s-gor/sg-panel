@@ -10,7 +10,6 @@ from datetime import datetime, timezone
 from functools import wraps
 from pathlib import Path
 
-import qrcode
 from flask import (
     Flask,
     Response,
@@ -487,6 +486,8 @@ def create_app(test_config: dict | None = None) -> Flask:
     @app.get("/users/<int:user_id>/link")
     @login_required
     def user_link(user_id: int):
+        import qrcode
+
         user = find_user(user_id)
         link = make_link(user_id, allow_disabled=True)
         image = qrcode.make(link)

@@ -35,8 +35,8 @@ fi
 
 cd "$PROJECT_DIR"
 python3 -m venv .venv
-.venv/bin/pip install -q --upgrade pip
-.venv/bin/pip install -q -r requirements.txt
+.venv/bin/pip install --no-cache-dir -q --upgrade pip
+.venv/bin/pip install --no-cache-dir -q -r requirements.txt
 
 mkdir -p "$ENV_DIR"
 SECRET_KEY="$(python3 - <<'PY'
@@ -61,8 +61,8 @@ XPANEL_TRUST_PROXY_HEADERS=$TRUST_PROXY_HEADERS
 EOF_ENV
 chmod 600 "$ENV_FILE"
 
-"$PROJECT_DIR/deploy/install-service.sh"
-"$PROJECT_DIR/deploy/install-maintenance.sh"
+bash "$PROJECT_DIR/deploy/install-service.sh"
+bash "$PROJECT_DIR/deploy/install-maintenance.sh"
 systemctl restart xpanel-web
 systemctl --no-pager --full status xpanel-web
 

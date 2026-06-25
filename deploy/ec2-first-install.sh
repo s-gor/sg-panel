@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-EXPECTED_VERSION="0.9.3"
+EXPECTED_VERSION="0.9.4"
 SOURCE_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 XRAY_VERSION="v26.3.27"
 DEFAULT_HTTPS_PORT="61443"
@@ -34,9 +34,16 @@ prompt_value(){
   printf -v "$var_name" '%s' "$value"
 }
 
-prompt_value XRAY_ADDRESS "Домен подключения Xray в Dynu"
+printf '%s\n' \
+  "Введите доменное имя Xray-сервера." \
+  "A-запись домена должна указывать на публичный IPv4 этого EC2." \
+  "Пример: vpn.example.dynu.net"
+prompt_value XRAY_ADDRESS "Домен Xray-сервера"
+
+printf '%s\n' \
+  "Введите доменное имя HTTPS-панели." \
+  "Можно использовать тот же домен, поскольку Xray и панель работают на разных портах."
 prompt_value PANEL_DOMAIN "Домен HTTPS-панели" "$XRAY_ADDRESS"
-prompt_value LETSENCRYPT_EMAIL "Email для Let's Encrypt"
 prompt_value PANEL_HTTPS_PORT "Внешний HTTPS-порт панели" "$DEFAULT_HTTPS_PORT"
 prompt_value FIRST_USER "Имя первого пользователя" "$DEFAULT_USER"
 prompt_value REALITY_DEST "Reality target" "$DEFAULT_REALITY_DEST"
@@ -51,7 +58,6 @@ fi
 [[ ${#XPANEL_ADMIN_PASSWORD} -ge 8 ]] || fail "пароль должен содержать не менее 8 символов"
 [[ "$XRAY_ADDRESS" =~ ^([A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,63}$ ]] || fail "некорректный домен Xray"
 [[ "$PANEL_DOMAIN" =~ ^([A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,63}$ ]] || fail "некорректный домен панели"
-[[ "$LETSENCRYPT_EMAIL" == *@*.* ]] || fail "некорректный email"
 [[ "$PANEL_HTTPS_PORT" =~ ^[0-9]+$ ]] && (( PANEL_HTTPS_PORT >= 49152 && PANEL_HTTPS_PORT <= 65535 )) || fail "для EC2 выберите private/dynamic порт 49152-65535"
 [[ -n "$FIRST_USER" ]] || fail "имя пользователя не может быть пустым"
 [[ "$REALITY_DEST" == *:* ]] || fail "Reality target должен иметь вид host:port"
@@ -59,6 +65,26 @@ fi
 for reserved in 22 80 443 "$DEFAULT_BACKEND_PORT"; do
   [[ "$PANEL_HTTPS_PORT" != "$reserved" ]] || fail "порт $PANEL_HTTPS_PORT нельзя использовать для панели"
 done
+
+ensure_swap(){
+  local mem_kib
+  mem_kib="$(awk '/MemTotal:/ {print $2}' /proc/meminfo)"
+  if (( mem_kib < 1572864 )) && ! swapon --show=NAME --noheadings | grep -qx '/swapfile'; then
+    log "Мало оперативной памяти: подготавливаю swap 2 ГиБ"
+    if [[ ! -f /swapfile ]]; then
+      fallocate -l 2G /swapfile
+    fi
+    chmod 600 /swapfile
+    if ! blkid /swapfile 2>/dev/null | grep -q 'TYPE="swap"'; then
+      mkswap /swapfile >/dev/null
+    fi
+    swapon /swapfile
+    grep -q '^/swapfile[[:space:]]' /etc/fstab || \
+      echo '/swapfile none swap sw 0 0' >> /etc/fstab
+  fi
+}
+
+ensure_swap
 
 log "Устанавливаю системные пакеты"
 export DEBIAN_FRONTEND=noninteractive
@@ -178,12 +204,12 @@ log "Получаю сертификат Let's Encrypt"
 certbot certonly \
   --webroot -w "$ACME_ROOT" \
   --domain "$PANEL_DOMAIN" \
-  --email "$LETSENCRYPT_EMAIL" \
+  --register-unsafely-without-email \
   --agree-tos --non-interactive --keep-until-expiring
 
 log "Настраиваю HTTPS панели на порту $PANEL_HTTPS_PORT"
 rm -f /etc/nginx/sites-enabled/sg-panel-acme
-/opt/xpanel-mvp/deploy/configure-https.sh \
+bash /opt/xpanel-mvp/deploy/configure-https.sh \
   --domain "$PANEL_DOMAIN" \
   --cert "/etc/letsencrypt/live/$PANEL_DOMAIN/fullchain.pem" \
   --key "/etc/letsencrypt/live/$PANEL_DOMAIN/privkey.pem" \

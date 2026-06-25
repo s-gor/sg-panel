@@ -1,0 +1,14 @@
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+*.log
+*.tmp
+*.bak
+.DS_Store
+Thumbs.db
+data/*.db
+data/*.db-*
+backups/*
+!backups/.gitkeep
+!data/.gitkeep

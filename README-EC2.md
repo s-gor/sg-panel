@@ -1,4 +1,4 @@
-# SG-Panel v0.9.3: установка на Amazon EC2
+# SG-Panel v0.9.4: установка на Amazon EC2
 
 Эта версия предназначена для первой реальной проверки SG-Panel на EC2.
 После успешной проверки именно эта схема станет основой версии 1.0.0.
@@ -72,7 +72,7 @@ TCP 8080
 На компьютере:
 
 ```powershell
-scp "$env:USERPROFILE\Downloads\SG-Panel-v0.9.3.zip" \
+scp "$env:USERPROFILE\Downloads\SG-Panel-v0.9.4.zip" \
   ubuntu@PUBLIC_IP:/tmp/
 ```
 
@@ -96,7 +96,7 @@ apt install -y unzip
 rm -rf /tmp/sg-panel-v093
 mkdir -p /tmp/sg-panel-v093
 
-unzip -q /tmp/SG-Panel-v0.9.3.zip \
+unzip -q /tmp/SG-Panel-v0.9.4.zip \
   -d /tmp/sg-panel-v093
 
 cd /tmp/sg-panel-v093/xpanel-mvp
@@ -165,7 +165,7 @@ systemctl is-active xpanel-maintenance.timer
 Ожидается:
 
 ```text
-xpanel 0.9.3
+xpanel 0.9.4
 active
 active
 active
@@ -253,7 +253,7 @@ apt install -y curl unzip
 curl -fsSL https://raw.githubusercontent.com/s-gor/sg-panel/main/install-from-github.sh \
   -o /tmp/install-sg-panel.sh
 chmod +x /tmp/install-sg-panel.sh
-VERSION=v0.9.3 /tmp/install-sg-panel.sh
+VERSION=v0.9.4 /tmp/install-sg-panel.sh
 ```
 
 Скрипт скачивает ZIP и файл SHA-256 из GitHub Releases, проверяет контрольную сумму и только затем запускает EC2-мастер.

@@ -37,7 +37,7 @@ Wants=network-online.target
 Type=simple
 WorkingDirectory=$PROJECT_DIR
 EnvironmentFile=$ENV_FILE
-ExecStart=$PROJECT_DIR/.venv/bin/waitress-serve --listen=$LISTEN_ADDRESS xpanel.web:app
+ExecStart=$PROJECT_DIR/.venv/bin/waitress-serve --threads=2 --listen=$LISTEN_ADDRESS xpanel.web:app
 Restart=on-failure
 RestartSec=3
 User=root

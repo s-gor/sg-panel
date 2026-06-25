@@ -26,7 +26,7 @@ Description=Run SG-Panel expiry maintenance
 
 [Timer]
 OnBootSec=2min
-OnUnitActiveSec=5min
+OnUnitActiveSec=15min
 Persistent=true
 Unit=xpanel-maintenance.service
 

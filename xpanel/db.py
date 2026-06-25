@@ -27,7 +27,7 @@ CREATE TABLE IF NOT EXISTS server_settings (
     flow TEXT NOT NULL DEFAULT '',
     loglevel TEXT NOT NULL DEFAULT 'warning',
     api_listen TEXT NOT NULL DEFAULT '127.0.0.1:10085',
-    stats_enabled INTEGER NOT NULL DEFAULT 1 CHECK (stats_enabled IN (0, 1)),
+    stats_enabled INTEGER NOT NULL DEFAULT 0 CHECK (stats_enabled IN (0, 1)),
     config_path TEXT NOT NULL DEFAULT '/usr/local/etc/xray/config.json',
     xray_bin TEXT NOT NULL DEFAULT '/usr/local/bin/xray',
     xray_service TEXT NOT NULL DEFAULT 'xray'
@@ -250,7 +250,7 @@ def _migrate(con: sqlite3.Connection) -> None:
     _ensure_column(con, "server_settings", "flow", "TEXT NOT NULL DEFAULT ''")
     _ensure_column(con, "server_settings", "loglevel", "TEXT NOT NULL DEFAULT 'warning'")
     _ensure_column(con, "server_settings", "api_listen", "TEXT NOT NULL DEFAULT '127.0.0.1:10085'")
-    _ensure_column(con, "server_settings", "stats_enabled", "INTEGER NOT NULL DEFAULT 1")
+    _ensure_column(con, "server_settings", "stats_enabled", "INTEGER NOT NULL DEFAULT 0")
 
     # v0.5 users
     _ensure_column(con, "users", "comment", "TEXT NOT NULL DEFAULT ''")

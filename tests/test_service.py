@@ -123,8 +123,8 @@ class V05ServiceTest(unittest.TestCase):
                 INSERT INTO server_settings (
                     id, address, listen, port, dest, server_name,
                     private_key, public_key, short_id, fingerprint,
-                    config_path, xray_bin, xray_service
-                ) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    stats_enabled, config_path, xray_bin, xray_service
+                ) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)
                 """,
                 (
                     "192.168.1.200", "0.0.0.0", 443,
