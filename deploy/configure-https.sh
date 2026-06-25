@@ -218,6 +218,43 @@ PYSEC
 bash /opt/xpanel-mvp/deploy/install-service.sh
 systemctl restart xpanel-web
 
+wait_for_backend(){
+  local attempt
+  log_prefix='[SG-Panel HTTPS]'
+  printf '%s %s\n' "$log_prefix" "Ожидаю готовность backend 127.0.0.1:$BACKEND_PORT"
+  for ((attempt=1; attempt<=30; attempt++)); do
+    if curl -fsS --max-time 3 "http://127.0.0.1:$BACKEND_PORT/login" >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 1
+  done
+
+  printf '%s %s\n' "$log_prefix" "ERROR: backend не стал доступен за 30 секунд" >&2
+  systemctl --no-pager --full status xpanel-web >&2 || true
+  journalctl -u xpanel-web -n 50 --no-pager >&2 || true
+  return 1
+}
+
+wait_for_https(){
+  local attempt
+  printf '%s %s\n' '[SG-Panel HTTPS]' "Проверяю HTTPS https://$DOMAIN:$HTTPS_PORT/login"
+  for ((attempt=1; attempt<=15; attempt++)); do
+    if curl -kfsS --max-time 5 \
+      --resolve "$DOMAIN:$HTTPS_PORT:127.0.0.1" \
+      "https://$DOMAIN:$HTTPS_PORT/login" >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 1
+  done
+
+  printf '%s %s\n' '[SG-Panel HTTPS]' "ERROR: HTTPS не стал доступен за 15 секунд" >&2
+  tail -n 50 /var/log/nginx/error.log >&2 2>/dev/null || true
+  return 1
+}
+
+wait_for_backend || exit 1
+wait_for_https || exit 1
+
 mkdir -p /etc/letsencrypt/renewal-hooks/deploy
 cat > /etc/letsencrypt/renewal-hooks/deploy/reload-sg-panel-nginx.sh <<'EOF_HOOK'
 #!/usr/bin/env bash

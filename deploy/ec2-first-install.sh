@@ -234,7 +234,27 @@ CLI_VERSION="$(.venv/bin/python -m xpanel --version | awk '{print $2}')"
 systemctl is-active --quiet xpanel-web || fail "xpanel-web не active"
 systemctl is-active --quiet xray || fail "xray не active"
 systemctl is-active --quiet nginx || fail "nginx не active"
-curl -kfsS "https://127.0.0.1:$PANEL_HTTPS_PORT/login" -H "Host: $PANEL_DOMAIN" | grep -q "v$EXPECTED_VERSION" || fail "HTTPS GUI не прошёл проверку"
+
+wait_for_gui(){
+  local attempt body
+  log "Ожидаю готовность HTTPS GUI"
+  for ((attempt=1; attempt<=30; attempt++)); do
+    if body="$(curl -kfsS --max-time 5 \
+      --resolve "$PANEL_DOMAIN:$PANEL_HTTPS_PORT:127.0.0.1" \
+      "https://$PANEL_DOMAIN:$PANEL_HTTPS_PORT/login" 2>/dev/null)" && \
+      grep -q "v$EXPECTED_VERSION" <<<"$body"; then
+      return 0
+    fi
+    sleep 1
+  done
+
+  systemctl --no-pager --full status xpanel-web >&2 || true
+  journalctl -u xpanel-web -n 50 --no-pager >&2 || true
+  tail -n 50 /var/log/nginx/error.log >&2 2>/dev/null || true
+  return 1
+}
+
+wait_for_gui || fail "HTTPS GUI не прошёл проверку за 30 секунд"
 
 LINK="$(.venv/bin/python -m xpanel show-link "$FIRST_USER" 2>/dev/null || true)"
 SSH_IP="${SSH_CONNECTION%% *}"
