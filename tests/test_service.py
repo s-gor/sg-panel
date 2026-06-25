@@ -392,3 +392,148 @@ class V09SecurityMigrationTest(unittest.TestCase):
                         self.assertIsNotNone(row)
             finally:
                 os.environ.pop("XPANEL_DB", None)
+
+class V095OutboundTransportTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        root = Path(self.tmp.name)
+        os.environ["XPANEL_DB"] = str(root / "panel.db")
+        init_db()
+        with connect() as con:
+            con.execute(
+                """
+                INSERT INTO server_settings (
+                    id, address, listen, port, dest, server_name,
+                    private_key, public_key, short_id, fingerprint,
+                    config_path, xray_bin, xray_service
+                ) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    "192.168.1.200", "0.0.0.0", 443,
+                    "www.microsoft.com:443", "www.microsoft.com",
+                    "private", "public", "0011223344556677", "chrome",
+                    str(root / "config.json"), "/bin/true", "xray",
+                ),
+            )
+        add_user("Sergey")
+
+    def tearDown(self):
+        self.tmp.cleanup()
+        os.environ.pop("XPANEL_DB", None)
+
+    def test_xhttp_tls_outbound_json(self):
+        from xpanel.service import add_vless_outbound, build_config
+        row = add_vless_outbound(
+            tag="xhttp-tls", name="XHTTP TLS", address="cdn.example.com", port=443,
+            user_uuid="11111111-1111-4111-8111-111111111111",
+            flow="", network="xhttp", security="tls",
+            server_name="cdn.example.com", fingerprint="chrome",
+            xhttp_host="cdn.example.com", xhttp_path="/api/connect",
+            xhttp_mode="packet-up", allow_insecure=False, alpn="h2,http/1.1",
+        )
+        config, _server, _users = build_config()
+        outbound = next(item for item in config["outbounds"] if item["tag"] == row["tag"])
+        stream = outbound["streamSettings"]
+        self.assertEqual(stream["network"], "xhttp")
+        self.assertEqual(stream["security"], "tls")
+        self.assertEqual(stream["xhttpSettings"]["path"], "/api/connect")
+        self.assertEqual(stream["xhttpSettings"]["mode"], "packet-up")
+        self.assertEqual(stream["tlsSettings"]["serverName"], "cdn.example.com")
+        self.assertEqual(stream["tlsSettings"]["alpn"], ["h2", "http/1.1"])
+        self.assertFalse(stream["tlsSettings"]["allowInsecure"])
+        self.assertNotIn("realitySettings", stream)
+
+    def test_xhttp_reality_outbound_json(self):
+        from xpanel.service import add_vless_outbound, build_config
+        row = add_vless_outbound(
+            tag="xhttp-reality", name="XHTTP Reality", address="edge.example.com", port=443,
+            user_uuid="22222222-2222-4222-8222-222222222222",
+            flow="", network="xhttp", security="reality",
+            server_name="www.microsoft.com", public_key="reality-public-key",
+            short_id="aabbccdd", fingerprint="chrome", spider_x="/",
+            xhttp_host="edge.example.com", xhttp_path="/stream",
+            xhttp_mode="stream-one",
+        )
+        config, _server, _users = build_config()
+        outbound = next(item for item in config["outbounds"] if item["tag"] == row["tag"])
+        stream = outbound["streamSettings"]
+        self.assertEqual(stream["network"], "xhttp")
+        self.assertEqual(stream["security"], "reality")
+        self.assertEqual(stream["xhttpSettings"]["mode"], "stream-one")
+        self.assertEqual(stream["realitySettings"]["password"], "reality-public-key")
+        self.assertNotIn("tlsSettings", stream)
+
+    def test_raw_tls_is_rejected(self):
+        from xpanel.service import add_vless_outbound
+        with self.assertRaisesRegex(ValueError, "комбинация"):
+            add_vless_outbound(
+                tag="raw-tls", name="Unsupported", address="example.com", port=443,
+                user_uuid="33333333-3333-4333-8333-333333333333",
+                flow="", network="raw", security="tls",
+                server_name="example.com",
+            )
+
+    def test_database_has_new_outbound_columns(self):
+        with connect() as con:
+            columns = {row["name"] for row in con.execute("PRAGMA table_info(outbounds)")}
+        self.assertTrue({"xhttp_host", "xhttp_path", "xhttp_mode", "allow_insecure", "alpn"} <= columns)
+
+class V095OutboundMigrationTest(unittest.TestCase):
+    def test_existing_outbound_is_migrated_without_data_loss(self):
+        import sqlite3
+        with tempfile.TemporaryDirectory() as temp:
+            database = Path(temp) / "panel.db"
+            con = sqlite3.connect(database)
+            con.execute(
+                """
+                CREATE TABLE outbounds (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    tag TEXT NOT NULL UNIQUE COLLATE NOCASE,
+                    name TEXT NOT NULL,
+                    type TEXT NOT NULL DEFAULT 'vless_reality',
+                    enabled INTEGER NOT NULL DEFAULT 1,
+                    address TEXT NOT NULL,
+                    port INTEGER NOT NULL,
+                    uuid TEXT NOT NULL,
+                    flow TEXT NOT NULL DEFAULT 'xtls-rprx-vision',
+                    network TEXT NOT NULL DEFAULT 'raw',
+                    security TEXT NOT NULL DEFAULT 'reality',
+                    server_name TEXT NOT NULL,
+                    public_key TEXT NOT NULL,
+                    short_id TEXT NOT NULL DEFAULT '',
+                    fingerprint TEXT NOT NULL DEFAULT 'chrome',
+                    spider_x TEXT NOT NULL DEFAULT '',
+                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+            )
+            con.execute(
+                """
+                INSERT INTO outbounds (
+                    tag, name, address, port, uuid, server_name, public_key
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    "old-exit", "Old exit", "old.example.com", 443,
+                    "44444444-4444-4444-8444-444444444444",
+                    "www.microsoft.com", "old-public-key",
+                ),
+            )
+            con.commit()
+            con.close()
+            os.environ["XPANEL_DB"] = str(database)
+            try:
+                init_db()
+                with connect() as migrated:
+                    row = migrated.execute(
+                        "SELECT * FROM outbounds WHERE tag = 'old-exit'"
+                    ).fetchone()
+                self.assertEqual(row["address"], "old.example.com")
+                self.assertEqual(row["network"], "raw")
+                self.assertEqual(row["security"], "reality")
+                self.assertEqual(row["xhttp_path"], "/")
+                self.assertEqual(row["xhttp_mode"], "auto")
+                self.assertFalse(bool(row["allow_insecure"]))
+            finally:
+                os.environ.pop("XPANEL_DB", None)

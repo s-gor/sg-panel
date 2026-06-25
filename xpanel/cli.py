@@ -431,6 +431,13 @@ def cmd_add_vless_outbound(args: argparse.Namespace) -> int:
         short_id=args.short_id,
         fingerprint=args.fingerprint,
         spider_x=args.spider_x,
+        network=args.network,
+        security=args.security,
+        xhttp_host=args.xhttp_host,
+        xhttp_path=args.xhttp_path,
+        xhttp_mode=args.xhttp_mode,
+        allow_insecure=args.allow_insecure,
+        alpn=args.alpn,
     )
     print(f"Outbound добавлен: {row['tag']} -> {row['address']}:{row['port']}")
     return 0
@@ -644,18 +651,25 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("list-outbounds", help="показать системные и пользовательские outbounds")
     p.set_defaults(func=cmd_list_outbounds)
 
-    p = sub.add_parser("add-vless-outbound", help="добавить VLESS Reality outbound для каскада")
+    p = sub.add_parser("add-vless-outbound", help="добавить VLESS outbound для каскада")
     p.add_argument("--tag", required=True)
     p.add_argument("--name", required=True)
     p.add_argument("--address", required=True)
     p.add_argument("--port", type=int, default=443)
     p.add_argument("--uuid", required=True)
     p.add_argument("--flow", default="xtls-rprx-vision")
+    p.add_argument("--network", choices=("raw", "xhttp"), default="raw")
+    p.add_argument("--security", choices=("reality", "tls"), default="reality")
     p.add_argument("--server-name", required=True)
-    p.add_argument("--public-key", required=True, help="Reality password/public key второго сервера")
+    p.add_argument("--public-key", default="", help="Reality password/public key второго сервера")
     p.add_argument("--short-id", default="")
     p.add_argument("--fingerprint", default="chrome")
     p.add_argument("--spider-x", default="")
+    p.add_argument("--xhttp-host", default="")
+    p.add_argument("--xhttp-path", default="/")
+    p.add_argument("--xhttp-mode", choices=("auto", "packet-up", "stream-up", "stream-one"), default="auto")
+    p.add_argument("--allow-insecure", action="store_true")
+    p.add_argument("--alpn", default="", help="значения ALPN через запятую")
     p.set_defaults(func=cmd_add_vless_outbound)
 
     p = sub.add_parser("delete-outbound", help="удалить пользовательский outbound")

@@ -1164,12 +1164,19 @@ def create_app(test_config: dict | None = None) -> Flask:
             "address": request.form.get("address", ""),
             "port": int(request.form.get("port", "443")),
             "user_uuid": request.form.get("uuid", ""),
-            "flow": request.form.get("flow", "xtls-rprx-vision"),
+            "flow": request.form.get("flow", ""),
+            "network": request.form.get("network", "raw"),
+            "security": request.form.get("security", "reality"),
             "server_name": request.form.get("server_name", ""),
             "public_key": request.form.get("public_key", ""),
             "short_id": request.form.get("short_id", ""),
             "fingerprint": request.form.get("fingerprint", "chrome"),
             "spider_x": request.form.get("spider_x", ""),
+            "xhttp_host": request.form.get("xhttp_host", ""),
+            "xhttp_path": request.form.get("xhttp_path", "/"),
+            "xhttp_mode": request.form.get("xhttp_mode", "auto"),
+            "allow_insecure": request.form.get("allow_insecure") == "on",
+            "alpn": request.form.get("alpn", ""),
         }
 
     @app.post("/outbounds/add")

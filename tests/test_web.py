@@ -191,10 +191,10 @@ class V092StyleTest(WebTest):
     def test_versioned_stylesheet_and_compact_actions(self):
         response = self.client.get("/login")
         self.assertEqual(response.status_code, 200)
-        self.assertIn(b"app.css?v=0.9.4", response.data)
+        self.assertIn(b"app.css?v=0.9.5", response.data)
         css = (Path(__file__).parents[1] / "xpanel" / "static" / "app.css").read_text(encoding="utf-8")
         self.assertIn("Calm Slate", css)
-        self.assertIn("v0.9.4 — EC2 Ready", css)
+        self.assertIn("v0.9.5 — VLESS outbound transport selector", css)
         self.assertIn(".button.full { width: 100%; }", css)
         self.assertIn("justify-self: start", css)
 
@@ -379,3 +379,46 @@ class V09SecurityWebTest(WebTest):
             "/login", environ_base={"REMOTE_ADDR": "203.0.113.10"}
         )
         self.assertEqual(response.status_code, 403)
+
+class V095OutboundWebTest(WebTest):
+    def test_outbound_page_explains_supported_combinations(self):
+        self.login()
+        response = self.client.get("/outbounds")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("VLESS + RAW/TCP + REALITY".encode("utf-8"), response.data)
+        self.assertIn("VLESS + XHTTP + TLS".encode("utf-8"), response.data)
+        self.assertIn("XHTTP — это транспорт VLESS".encode("utf-8"), response.data)
+        self.assertIn(b"direct", response.data)
+        self.assertIn(b"blocked", response.data)
+
+    def test_add_xhttp_tls_outbound(self):
+        self.login()
+        response = self.client.post(
+            "/outbounds/add",
+            data={
+                "csrf_token": self.csrf(),
+                "protocol": "vless",
+                "tag": "xhttp-tls",
+                "name": "XHTTP TLS",
+                "address": "cdn.example.com",
+                "port": "443",
+                "uuid": "11111111-1111-4111-8111-111111111111",
+                "flow": "",
+                "network": "xhttp",
+                "security": "tls",
+                "server_name": "cdn.example.com",
+                "fingerprint": "chrome",
+                "xhttp_host": "cdn.example.com",
+                "xhttp_path": "/api/connect",
+                "xhttp_mode": "stream-up",
+                "alpn": "h2,http/1.1",
+            },
+            follow_redirects=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"xhttp-tls", response.data)
+        with connect() as con:
+            row = con.execute("SELECT * FROM outbounds WHERE tag = 'xhttp-tls'").fetchone()
+        self.assertEqual(row["network"], "xhttp")
+        self.assertEqual(row["security"], "tls")
+        self.assertEqual(row["xhttp_mode"], "stream-up")

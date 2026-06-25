@@ -32,6 +32,14 @@ ALLOWED_DNS_QUERY_STRATEGIES = {"UseIP", "UseIPv4", "UseIPv6", "UseSystem"}
 ALLOWED_DNS_SERVER_QUERY_STRATEGIES = {"", *ALLOWED_DNS_QUERY_STRATEGIES}
 ALLOWED_LOGLEVELS = {"debug", "info", "warning", "error", "none"}
 ALLOWED_FLOWS = {"", "xtls-rprx-vision", "xtls-rprx-vision-udp443"}
+ALLOWED_OUTBOUND_NETWORKS = {"raw", "xhttp"}
+ALLOWED_OUTBOUND_SECURITY = {"reality", "tls"}
+ALLOWED_XHTTP_MODES = {"auto", "packet-up", "stream-up", "stream-one"}
+SUPPORTED_VLESS_OUTBOUND_COMBINATIONS = {
+    ("raw", "reality"),
+    ("xhttp", "tls"),
+    ("xhttp", "reality"),
+}
 OUTBOUND_TAG_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$")
 RESERVED_OUTBOUND_TAGS = {"direct", "blocked", "api"}
 DEFAULT_BACKUP_DIR = PROJECT_ROOT / "backups"
@@ -905,6 +913,10 @@ def _system_outbounds() -> list[dict[str, object]]:
             "name": "Direct internet",
             "type": "freedom",
             "protocol": "freedom",
+            "network": "",
+            "security": "",
+            "transport_label": "SYSTEM",
+            "security_label": "",
             "enabled": 1,
             "system": True,
             "description": "Прямой выход в интернет.",
@@ -915,6 +927,10 @@ def _system_outbounds() -> list[dict[str, object]]:
             "name": "Blocked",
             "type": "blackhole",
             "protocol": "blackhole",
+            "network": "",
+            "security": "",
+            "transport_label": "SYSTEM",
+            "security_label": "",
             "enabled": 1,
             "system": True,
             "description": "Отбрасывает трафик, совпавший с блокирующим правилом.",
@@ -932,15 +948,32 @@ def list_custom_outbounds(*, enabled_only: bool = False) -> list[sqlite3.Row]:
         return con.execute(query).fetchall()
 
 
+def _transport_label(network: str, mode: str = "") -> str:
+    if network == "xhttp":
+        return f"XHTTP / {(mode or 'auto').upper()}"
+    return "RAW / TCP"
+
+
 def list_outbounds() -> list[dict[str, object]]:
     result = _system_outbounds()
     for row in list_custom_outbounds():
         item = dict(row)
+        network = str(row["network"] or "raw")
+        security = str(row["security"] or "reality")
+        mode = str(row["xhttp_mode"] or "auto")
+        transport_label = _transport_label(network, mode)
+        security_label = security.upper()
         item.update(
             {
                 "protocol": "vless",
                 "system": False,
-                "description": f"VLESS REALITY cascade to {row['address']}:{row['port']}",
+                "transport_label": transport_label,
+                "security_label": security_label,
+                "combination_label": f"VLESS + {transport_label} + {security_label}",
+                "description": (
+                    f"VLESS {transport_label} + {security_label} cascade "
+                    f"to {row['address']}:{row['port']}"
+                ),
             }
         )
         result.append(item)
@@ -971,6 +1004,19 @@ def _validate_outbound_tag(tag: str) -> str:
     return tag
 
 
+def _normalise_alpn(value: str) -> str:
+    tokens = [token for token in re.split(r"[,\s]+", value.strip()) if token]
+    unique: list[str] = []
+    for token in tokens:
+        if not re.fullmatch(r"[A-Za-z0-9._/-]{1,32}", token):
+            raise ValueError(f"некорректное значение ALPN: {token}")
+        if token not in unique:
+            unique.append(token)
+    if len(unique) > 8:
+        raise ValueError("можно указать не более восьми значений ALPN")
+    return ",".join(unique)
+
+
 def validate_vless_outbound_values(
     *,
     tag: str,
@@ -978,21 +1024,37 @@ def validate_vless_outbound_values(
     address: str,
     port: int,
     user_uuid: str,
-    flow: str,
+    flow: str = "xtls-rprx-vision",
+    network: str = "raw",
+    security: str = "reality",
     server_name: str,
-    public_key: str,
-    short_id: str,
-    fingerprint: str,
+    public_key: str = "",
+    short_id: str = "",
+    fingerprint: str = "chrome",
     spider_x: str = "",
+    xhttp_host: str = "",
+    xhttp_path: str = "/",
+    xhttp_mode: str = "auto",
+    allow_insecure: bool = False,
+    alpn: str = "",
 ) -> dict[str, object]:
     tag = _validate_outbound_tag(tag)
     name = name.strip()
     address = address.strip()
+    flow = flow.strip()
+    network = network.strip().lower() or "raw"
+    security = security.strip().lower() or "reality"
     server_name = server_name.strip()
     public_key = public_key.strip()
     short_id = short_id.strip().lower()
     fingerprint = fingerprint.strip() or "chrome"
     spider_x = spider_x.strip()
+    xhttp_host = xhttp_host.strip()
+    xhttp_path = xhttp_path.strip() or "/"
+    xhttp_mode = xhttp_mode.strip().lower() or "auto"
+    allow_insecure = bool(allow_insecure)
+    alpn = _normalise_alpn(alpn)
+
     if not name:
         raise ValueError("название outbound не может быть пустым")
     if not address:
@@ -1005,12 +1067,48 @@ def validate_vless_outbound_values(
         raise ValueError("некорректный UUID второго сервера") from exc
     if flow not in ALLOWED_FLOWS:
         raise ValueError("неподдерживаемый flow")
+    if network not in ALLOWED_OUTBOUND_NETWORKS:
+        raise ValueError("поддерживаются только транспорты RAW/TCP и XHTTP")
+    if security not in ALLOWED_OUTBOUND_SECURITY:
+        raise ValueError("поддерживаются только REALITY и TLS")
+    if (network, security) not in SUPPORTED_VLESS_OUTBOUND_COMBINATIONS:
+        raise ValueError(
+            "эта комбинация пока не поддерживается; используйте "
+            "RAW/TCP + REALITY, XHTTP + TLS или XHTTP + REALITY"
+        )
     if not server_name:
-        raise ValueError("serverName не может быть пустым")
-    if not public_key:
-        raise ValueError("Reality password/public key не может быть пустым")
-    if short_id and (not re.fullmatch(r"[0-9a-f]{2,16}", short_id) or len(short_id) % 2):
-        raise ValueError("shortId должен содержать чётное число hex-символов, максимум 16")
+        raise ValueError("Server name / SNI не может быть пустым")
+
+    if network == "xhttp":
+        if flow:
+            raise ValueError("для XHTTP поле Flow должно быть none")
+        if xhttp_mode not in ALLOWED_XHTTP_MODES:
+            raise ValueError("неподдерживаемый режим XHTTP")
+        if not xhttp_path.startswith("/"):
+            raise ValueError("XHTTP path должен начинаться с /")
+        if any(char.isspace() for char in xhttp_path):
+            raise ValueError("XHTTP path не должен содержать пробелы")
+        if len(xhttp_path) > 512:
+            raise ValueError("XHTTP path слишком длинный")
+        if xhttp_host and ("/" in xhttp_host or any(char.isspace() for char in xhttp_host)):
+            raise ValueError("XHTTP host должен быть доменным именем без схемы и пути")
+    else:
+        xhttp_host = ""
+        xhttp_path = "/"
+        xhttp_mode = "auto"
+
+    if security == "reality":
+        if not public_key:
+            raise ValueError("Reality password/public key не может быть пустым")
+        if short_id and (not re.fullmatch(r"[0-9a-f]{2,16}", short_id) or len(short_id) % 2):
+            raise ValueError("shortId должен содержать чётное число hex-символов, максимум 16")
+        allow_insecure = False
+        alpn = ""
+    else:
+        public_key = ""
+        short_id = ""
+        spider_x = ""
+
     return {
         "tag": tag,
         "name": name,
@@ -1018,11 +1116,18 @@ def validate_vless_outbound_values(
         "port": int(port),
         "uuid": user_uuid.strip(),
         "flow": flow,
+        "network": network,
+        "security": security,
         "server_name": server_name,
         "public_key": public_key,
         "short_id": short_id,
         "fingerprint": fingerprint,
         "spider_x": spider_x,
+        "xhttp_host": xhttp_host,
+        "xhttp_path": xhttp_path,
+        "xhttp_mode": xhttp_mode,
+        "allow_insecure": int(allow_insecure),
+        "alpn": alpn,
     }
 
 
@@ -1035,14 +1140,17 @@ def add_vless_outbound(**values) -> sqlite3.Row:
                 INSERT INTO outbounds (
                     tag, name, type, enabled, address, port, uuid, flow,
                     network, security, server_name, public_key, short_id,
-                    fingerprint, spider_x
-                ) VALUES (?, ?, 'vless_reality', 1, ?, ?, ?, ?, 'raw', 'reality', ?, ?, ?, ?, ?)
+                    fingerprint, spider_x, xhttp_host, xhttp_path, xhttp_mode,
+                    allow_insecure, alpn
+                ) VALUES (?, ?, 'vless_reality', 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     cleaned["tag"], cleaned["name"], cleaned["address"], cleaned["port"],
-                    cleaned["uuid"], cleaned["flow"], cleaned["server_name"],
-                    cleaned["public_key"], cleaned["short_id"], cleaned["fingerprint"],
-                    cleaned["spider_x"],
+                    cleaned["uuid"], cleaned["flow"], cleaned["network"], cleaned["security"],
+                    cleaned["server_name"], cleaned["public_key"], cleaned["short_id"],
+                    cleaned["fingerprint"], cleaned["spider_x"], cleaned["xhttp_host"],
+                    cleaned["xhttp_path"], cleaned["xhttp_mode"], cleaned["allow_insecure"],
+                    cleaned["alpn"],
                 ),
             )
             outbound_id = int(cur.lastrowid)
@@ -1060,15 +1168,19 @@ def update_vless_outbound(outbound_id: int, **values) -> sqlite3.Row:
                 """
                 UPDATE outbounds SET
                     tag = ?, name = ?, address = ?, port = ?, uuid = ?, flow = ?,
-                    server_name = ?, public_key = ?, short_id = ?, fingerprint = ?,
-                    spider_x = ?, updated_at = CURRENT_TIMESTAMP
+                    network = ?, security = ?, server_name = ?, public_key = ?,
+                    short_id = ?, fingerprint = ?, spider_x = ?, xhttp_host = ?,
+                    xhttp_path = ?, xhttp_mode = ?, allow_insecure = ?, alpn = ?,
+                    updated_at = CURRENT_TIMESTAMP
                 WHERE id = ?
                 """,
                 (
                     cleaned["tag"], cleaned["name"], cleaned["address"], cleaned["port"],
-                    cleaned["uuid"], cleaned["flow"], cleaned["server_name"],
-                    cleaned["public_key"], cleaned["short_id"], cleaned["fingerprint"],
-                    cleaned["spider_x"], outbound_id,
+                    cleaned["uuid"], cleaned["flow"], cleaned["network"], cleaned["security"],
+                    cleaned["server_name"], cleaned["public_key"], cleaned["short_id"],
+                    cleaned["fingerprint"], cleaned["spider_x"], cleaned["xhttp_host"],
+                    cleaned["xhttp_path"], cleaned["xhttp_mode"], cleaned["allow_insecure"],
+                    cleaned["alpn"], outbound_id,
                 ),
             )
             if cleaned["tag"] != current["tag"]:
@@ -1133,13 +1245,6 @@ def test_outbound_tcp(outbound_id: int, *, timeout: float = 4.0) -> dict[str, ob
 
 
 def build_outbound_json(row: sqlite3.Row) -> dict[str, object]:
-    reality = {
-        "serverName": row["server_name"],
-        "fingerprint": row["fingerprint"],
-        "password": row["public_key"],
-        "shortId": row["short_id"],
-        "spiderX": row["spider_x"],
-    }
     settings: dict[str, object] = {
         "address": row["address"],
         "port": row["port"],
@@ -1149,15 +1254,47 @@ def build_outbound_json(row: sqlite3.Row) -> dict[str, object]:
     }
     if row["flow"]:
         settings["flow"] = row["flow"]
+
+    network = str(row["network"] or "raw")
+    security = str(row["security"] or "reality")
+    stream_settings: dict[str, object] = {
+        "network": network,
+        "security": security,
+    }
+
+    if network == "xhttp":
+        xhttp_settings: dict[str, object] = {
+            "path": row["xhttp_path"] or "/",
+            "mode": row["xhttp_mode"] or "auto",
+        }
+        if row["xhttp_host"]:
+            xhttp_settings["host"] = row["xhttp_host"]
+        stream_settings["xhttpSettings"] = xhttp_settings
+
+    if security == "reality":
+        stream_settings["realitySettings"] = {
+            "serverName": row["server_name"],
+            "fingerprint": row["fingerprint"],
+            "password": row["public_key"],
+            "shortId": row["short_id"],
+            "spiderX": row["spider_x"],
+        }
+    elif security == "tls":
+        tls_settings: dict[str, object] = {
+            "serverName": row["server_name"],
+            "fingerprint": row["fingerprint"],
+            "allowInsecure": bool(row["allow_insecure"]),
+        }
+        alpn = [value for value in str(row["alpn"] or "").split(",") if value]
+        if alpn:
+            tls_settings["alpn"] = alpn
+        stream_settings["tlsSettings"] = tls_settings
+
     return {
         "tag": row["tag"],
         "protocol": "vless",
         "settings": settings,
-        "streamSettings": {
-            "network": row["network"],
-            "security": row["security"],
-            "realitySettings": reality,
-        },
+        "streamSettings": stream_settings,
     }
 
 

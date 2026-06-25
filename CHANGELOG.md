@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.9.5 — VLESS outbound transports
+
+- добавлены кнопки выбора протокола, транспорта и защиты в разделе Outbounds;
+- поддержаны VLESS + RAW/TCP + REALITY, VLESS + XHTTP + TLS и VLESS + XHTTP + REALITY;
+- добавлены XHTTP Host, Path и Mode;
+- добавлены TLS ALPN и Allow insecure с безопасным значением по умолчанию;
+- добавлена миграция существующей SQLite-базы без потери outbounds;
+- системные `direct` и `blocked` явно показаны в начале страницы;
+- добавлены пояснения о текущих ограничениях и будущих протоколах.
+
 ## 0.9.4 — Clean reinstall and EC2 micro fixes
 
 - добавлен `deploy/uninstall.sh` для чистой повторной установки;

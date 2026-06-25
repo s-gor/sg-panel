@@ -2,8 +2,22 @@
 {% block title %}Выходы — SG-Panel{% endblock %}
 {% block section %}OUTBOUNDS{% endblock %}
 {% block heading %}Исходящие подключения{% endblock %}
-{% block subtitle %}Прямой выход, блокировка и VLESS Reality-каскады на другие Xray-серверы{% endblock %}
+{% block subtitle %}Системные выходы и VLESS-каскады на другие Xray-серверы{% endblock %}
 {% block content %}
+<section class="panel-card outbound-intro-card">
+  <div class="panel-heading">
+    <div><p class="panel-kicker">ПОДДЕРЖИВАЕМЫЕ СХЕМЫ</p><h2>Что можно настроить в этой версии</h2></div>
+    <span class="panel-index">i</span>
+  </div>
+  <p class="outbound-intro-text">Встроенные выходы <code>direct</code> и <code>blocked</code> доступны всегда. Пользовательские каскады сейчас создаются на протоколе VLESS.</p>
+  <div class="support-matrix">
+    <span class="support-chip ok">VLESS + RAW/TCP + REALITY</span>
+    <span class="support-chip ok">VLESS + XHTTP + TLS</span>
+    <span class="support-chip ok">VLESS + XHTTP + REALITY</span>
+  </div>
+  <p class="field-help">VMess, Trojan, Shadowsocks и другие протоколы пока не добавлены. Они будут рассматриваться после стабильной проверки этих трёх схем. XHTTP — это транспорт VLESS, а не отдельный протокол.</p>
+</section>
+
 <section class="outbound-grid">
 {% for outbound in outbounds %}
   <article class="panel-card outbound-card {{ 'outbound-disabled' if not outbound.enabled else '' }}">
@@ -16,12 +30,16 @@
         <span class="pill {{ 'enabled' if outbound.enabled else 'disabled' }}"><i></i>{{ 'system' if outbound.system else ('enabled' if outbound.enabled else 'disabled') }}</span>
       </div>
     </div>
-    <p class="panel-kicker">{{ 'SYSTEM OUTBOUND' if outbound.system else 'VLESS REALITY CASCADE' }}</p>
+    <p class="panel-kicker">{{ 'SYSTEM OUTBOUND' if outbound.system else outbound.combination_label }}</p>
     <h2>{{ outbound.tag }}</h2>
     <div class="protocol-label">{{ outbound.protocol }}</div>
     <p class="outbound-description">{{ outbound.description }}</p>
     {% if not outbound.system %}
-      <div class="outbound-meta"><span>{{ outbound.name }}</span><code>{{ outbound.address }}:{{ outbound.port }}</code><small>SNI {{ outbound.server_name }}</small></div>
+      <div class="outbound-meta">
+        <span>{{ outbound.name }}</span>
+        <code>{{ outbound.address }}:{{ outbound.port }}</code>
+        <small>{{ outbound.transport_label }} · {{ outbound.security_label }} · SNI {{ outbound.server_name }}</small>
+      </div>
       <div class="row-actions outbound-actions">
         <a class="button ghost small" href="{{ url_for('outbound_edit_page', outbound_id=outbound.id) }}">Изменить</a>
         <form method="post" action="{{ url_for('outbound_test', outbound_id=outbound.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button secondary small" type="submit">TCP test</button></form>
@@ -34,18 +52,130 @@
 </section>
 
 <section class="panel-card outbound-create-card">
-  <div class="panel-heading"><div><p class="panel-kicker">NEW CASCADE</p><h2>Добавить VLESS Reality outbound</h2></div><span class="panel-index">+</span></div>
-  <div class="info-strip"><span>i</span><p>Это клиентская сторона второго Xray-сервера. Возьмите UUID, SNI, Reality password/public key и Short ID из его клиентской ссылки.</p></div>
-  <form method="post" action="{{ url_for('outbound_add') }}" class="stack modern-form">
+  <div class="panel-heading"><div><p class="panel-kicker">NEW CASCADE</p><h2>Добавить VLESS outbound</h2></div><span class="panel-index">+</span></div>
+  <div class="info-strip"><span>i</span><p>Это клиентская сторона второго Xray-сервера. Перенесите параметры из его клиентской ссылки или JSON-конфигурации. После сохранения проверьте конфиг и нажмите «Применить».</p></div>
+  <form method="post" action="{{ url_for('outbound_add') }}" class="stack modern-form outbound-dynamic-form" data-mode="create">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+    <div class="outbound-choice-section">
+      <span class="outbound-choice-title">Протокол</span>
+      <div class="outbound-choice-grid four">
+        <label class="outbound-choice"><input type="radio" name="protocol" value="vless" checked><span><strong>VLESS</strong><small>поддерживается</small></span></label>
+        <span class="outbound-choice planned"><strong>VMess</strong><small>позже</small></span>
+        <span class="outbound-choice planned"><strong>Trojan</strong><small>позже</small></span>
+        <span class="outbound-choice planned"><strong>Shadowsocks</strong><small>позже</small></span>
+      </div>
+    </div>
+
+    <div class="outbound-choice-section">
+      <span class="outbound-choice-title">Транспорт</span>
+      <div class="outbound-choice-grid two">
+        <label class="outbound-choice"><input type="radio" name="network" value="raw" checked><span><strong>RAW / TCP</strong><small>обычное TCP-подключение</small></span></label>
+        <label class="outbound-choice"><input type="radio" name="network" value="xhttp"><span><strong>XHTTP</strong><small>host, path и mode</small></span></label>
+      </div>
+    </div>
+
+    <div class="outbound-choice-section">
+      <span class="outbound-choice-title">Защита транспорта</span>
+      <div class="outbound-choice-grid two">
+        <label class="outbound-choice"><input type="radio" name="security" value="reality" checked><span><strong>REALITY</strong><small>public key и Short ID</small></span></label>
+        <label class="outbound-choice" data-tls-choice><input type="radio" name="security" value="tls"><span><strong>TLS</strong><small>сертификат удалённого сервера</small></span></label>
+      </div>
+      <p class="field-help" data-combination-help>Для RAW/TCP в этой версии используется REALITY. TLS становится доступен при выборе XHTTP.</p>
+    </div>
+
     <div class="form-grid"><label><span>Tag</span><input name="tag" required placeholder="eu-exit"></label><label><span>Название</span><input name="name" required placeholder="EU exit server"></label></div>
     <div class="form-grid"><label><span>Address</span><input name="address" required placeholder="eu.example.com"></label><label><span>Port</span><input name="port" type="number" min="1" max="65535" value="443" required></label></div>
     <label><span>UUID</span><input name="uuid" required placeholder="00000000-0000-4000-8000-000000000000"></label>
-    <div class="form-grid"><label><span>Flow</span><select name="flow"><option value="xtls-rprx-vision">xtls-rprx-vision</option><option value="">none</option></select></label><label><span>Fingerprint</span><input name="fingerprint" value="chrome" required></label></div>
+    <div class="form-grid"><label><span>Flow</span><select name="flow"><option value="xtls-rprx-vision" selected>xtls-rprx-vision</option><option value="">none</option></select><small class="field-help">Для XHTTP автоматически используется none.</small></label><label><span>Fingerprint</span><input name="fingerprint" value="chrome" required></label></div>
     <label><span>Server name / SNI</span><input name="server_name" required placeholder="www.microsoft.com"></label>
-    <label><span>Reality password / public key</span><input name="public_key" required autocomplete="off"></label>
-    <div class="form-grid"><label><span>Short ID</span><input name="short_id" placeholder="e1c19aeb15479b91"></label><label><span>Spider X</span><input name="spider_x" placeholder="/"></label></div>
+
+    <fieldset class="outbound-field-group" data-xhttp-fields hidden>
+      <legend>XHTTP</legend>
+      <div class="form-grid"><label><span>Host</span><input name="xhttp_host" placeholder="cdn.example.com"><small class="field-help">Без https:// и без пути. Можно оставить пустым.</small></label><label><span>Path</span><input name="xhttp_path" value="/" placeholder="/api/v1/connect"></label></div>
+      <span class="outbound-choice-title">Mode</span>
+      <div class="outbound-choice-grid four compact">
+        <label class="outbound-choice"><input type="radio" name="xhttp_mode" value="auto" checked><span><strong>auto</strong></span></label>
+        <label class="outbound-choice"><input type="radio" name="xhttp_mode" value="packet-up"><span><strong>packet-up</strong></span></label>
+        <label class="outbound-choice"><input type="radio" name="xhttp_mode" value="stream-up"><span><strong>stream-up</strong></span></label>
+        <label class="outbound-choice"><input type="radio" name="xhttp_mode" value="stream-one"><span><strong>stream-one</strong></span></label>
+      </div>
+      <p class="field-help">Параметры должны совпадать с inbound удалённого сервера. При проблемах совместимости XHTTP + REALITY начните со stream-one.</p>
+    </fieldset>
+
+    <fieldset class="outbound-field-group" data-reality-fields>
+      <legend>REALITY</legend>
+      <label><span>Reality password / public key</span><input name="public_key" required autocomplete="off"></label>
+      <div class="form-grid"><label><span>Short ID</span><input name="short_id" placeholder="e1c19aeb15479b91"></label><label><span>Spider X</span><input name="spider_x" placeholder="/"></label></div>
+    </fieldset>
+
+    <fieldset class="outbound-field-group" data-tls-fields hidden>
+      <legend>TLS</legend>
+      <label><span>ALPN</span><input name="alpn" placeholder="h2,http/1.1"><small class="field-help">Необязательно. Несколько значений разделяйте запятыми.</small></label>
+      <label class="switch-row outbound-danger-switch"><span><strong>Allow insecure</strong><small>Не проверять сертификат удалённого сервера. Оставляйте выключенным.</small></span><input type="checkbox" name="allow_insecure"></label>
+    </fieldset>
+
     <button class="button primary" type="submit">Добавить outbound</button>
   </form>
 </section>
+
+<script>
+(function () {
+  function initOutboundForm(form) {
+    const networkInputs = [...form.querySelectorAll('input[name="network"]')];
+    const securityInputs = [...form.querySelectorAll('input[name="security"]')];
+    const tlsChoice = form.querySelector('[data-tls-choice] input');
+    const flow = form.querySelector('select[name="flow"]');
+    const xhttpFields = form.querySelector('[data-xhttp-fields]');
+    const realityFields = form.querySelector('[data-reality-fields]');
+    const tlsFields = form.querySelector('[data-tls-fields]');
+    const publicKey = form.querySelector('input[name="public_key"]');
+    const xhttpPath = form.querySelector('input[name="xhttp_path"]');
+    const help = form.querySelector('[data-combination-help]');
+
+    function checked(name) {
+      const input = form.querySelector('input[name="' + name + '"]:checked');
+      return input ? input.value : '';
+    }
+
+    function update() {
+      const network = checked('network') || 'raw';
+      let security = checked('security') || 'reality';
+      const isXhttp = network === 'xhttp';
+
+      if (!isXhttp && security === 'tls') {
+        const reality = form.querySelector('input[name="security"][value="reality"]');
+        reality.checked = true;
+        security = 'reality';
+      }
+      tlsChoice.disabled = !isXhttp;
+      tlsChoice.closest('.outbound-choice').classList.toggle('choice-disabled', !isXhttp);
+
+      xhttpFields.hidden = !isXhttp;
+      realityFields.hidden = security !== 'reality';
+      tlsFields.hidden = security !== 'tls';
+      xhttpPath.required = isXhttp;
+      publicKey.required = security === 'reality';
+
+      if (isXhttp) {
+        flow.dataset.previous = flow.value;
+        flow.value = '';
+        flow.disabled = true;
+      } else {
+        flow.disabled = false;
+        if (form.dataset.mode === 'create' && !flow.value) flow.value = 'xtls-rprx-vision';
+      }
+
+      help.textContent = isXhttp
+        ? 'XHTTP поддерживает TLS и REALITY. Все параметры должны совпадать с удалённым inbound.'
+        : 'Для RAW/TCP в этой версии используется REALITY. TLS становится доступен при выборе XHTTP.';
+    }
+
+    [...networkInputs, ...securityInputs].forEach(input => input.addEventListener('change', update));
+    update();
+  }
+
+  document.querySelectorAll('.outbound-dynamic-form').forEach(initOutboundForm);
+})();
+</script>
 {% endblock %}

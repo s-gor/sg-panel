@@ -128,6 +128,11 @@ CREATE TABLE IF NOT EXISTS outbounds (
     short_id TEXT NOT NULL DEFAULT '',
     fingerprint TEXT NOT NULL DEFAULT 'chrome',
     spider_x TEXT NOT NULL DEFAULT '',
+    xhttp_host TEXT NOT NULL DEFAULT '',
+    xhttp_path TEXT NOT NULL DEFAULT '/',
+    xhttp_mode TEXT NOT NULL DEFAULT 'auto',
+    allow_insecure INTEGER NOT NULL DEFAULT 0 CHECK (allow_insecure IN (0, 1)),
+    alpn TEXT NOT NULL DEFAULT '',
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -263,6 +268,19 @@ def _migrate(con: sqlite3.Connection) -> None:
     _ensure_column(con, "routing_rules", "users", "TEXT NOT NULL DEFAULT ''")
 
     # v0.7 DNS tables are created by SCHEMA.
+
+    # v0.9.5 VLESS outbound transports and TLS options
+    _ensure_column(con, "outbounds", "network", "TEXT NOT NULL DEFAULT 'raw'")
+    _ensure_column(con, "outbounds", "security", "TEXT NOT NULL DEFAULT 'reality'")
+    _ensure_column(con, "outbounds", "xhttp_host", "TEXT NOT NULL DEFAULT ''")
+    _ensure_column(con, "outbounds", "xhttp_path", "TEXT NOT NULL DEFAULT '/'")
+    _ensure_column(con, "outbounds", "xhttp_mode", "TEXT NOT NULL DEFAULT 'auto'")
+    _ensure_column(con, "outbounds", "allow_insecure", "INTEGER NOT NULL DEFAULT 0")
+    _ensure_column(con, "outbounds", "alpn", "TEXT NOT NULL DEFAULT ''")
+    con.execute("UPDATE outbounds SET network = 'raw' WHERE network IS NULL OR network = ''")
+    con.execute("UPDATE outbounds SET security = 'reality' WHERE security IS NULL OR security = ''")
+    con.execute("UPDATE outbounds SET xhttp_path = '/' WHERE xhttp_path IS NULL OR xhttp_path = ''")
+    con.execute("UPDATE outbounds SET xhttp_mode = 'auto' WHERE xhttp_mode IS NULL OR xhttp_mode = ''")
 
     # v0.8 persistent subscription URLs
     _ensure_column(con, "users", "subscription_enabled", "INTEGER NOT NULL DEFAULT 1")

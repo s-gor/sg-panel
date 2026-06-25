@@ -2,20 +2,119 @@
 {% block title %}Изменить outbound — SG-Panel{% endblock %}
 {% block section %}OUTBOUNDS / EDIT{% endblock %}
 {% block heading %}Изменение outbound{% endblock %}
-{% block subtitle %}Параметры клиентского VLESS Reality-подключения ко второму Xray-серверу{% endblock %}
+{% block subtitle %}Параметры клиентского VLESS-подключения ко второму Xray-серверу{% endblock %}
 {% block content %}
 <section class="panel-card narrow-card edit-card">
   <div class="panel-heading"><div><p class="panel-kicker">OUTBOUND #{{ outbound.id }}</p><h2>{{ outbound.tag }}</h2></div><span class="panel-index">VLESS</span></div>
-  <form method="post" action="{{ url_for('outbound_edit', outbound_id=outbound.id) }}" class="stack modern-form">
+  <div class="info-strip"><span>i</span><p>Поддерживаются RAW/TCP + REALITY, XHTTP + TLS и XHTTP + REALITY. Изменение транспорта или защиты вступит в силу только после «Применить».</p></div>
+  <form method="post" action="{{ url_for('outbound_edit', outbound_id=outbound.id) }}" class="stack modern-form outbound-dynamic-form" data-mode="edit">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+    <div class="outbound-choice-section">
+      <span class="outbound-choice-title">Протокол</span>
+      <div class="outbound-choice-grid four">
+        <label class="outbound-choice"><input type="radio" name="protocol" value="vless" checked><span><strong>VLESS</strong><small>поддерживается</small></span></label>
+        <span class="outbound-choice planned"><strong>VMess</strong><small>позже</small></span>
+        <span class="outbound-choice planned"><strong>Trojan</strong><small>позже</small></span>
+        <span class="outbound-choice planned"><strong>Shadowsocks</strong><small>позже</small></span>
+      </div>
+    </div>
+
+    <div class="outbound-choice-section">
+      <span class="outbound-choice-title">Транспорт</span>
+      <div class="outbound-choice-grid two">
+        <label class="outbound-choice"><input type="radio" name="network" value="raw" {% if outbound.network == 'raw' %}checked{% endif %}><span><strong>RAW / TCP</strong><small>обычное TCP-подключение</small></span></label>
+        <label class="outbound-choice"><input type="radio" name="network" value="xhttp" {% if outbound.network == 'xhttp' %}checked{% endif %}><span><strong>XHTTP</strong><small>host, path и mode</small></span></label>
+      </div>
+    </div>
+
+    <div class="outbound-choice-section">
+      <span class="outbound-choice-title">Защита транспорта</span>
+      <div class="outbound-choice-grid two">
+        <label class="outbound-choice"><input type="radio" name="security" value="reality" {% if outbound.security == 'reality' %}checked{% endif %}><span><strong>REALITY</strong><small>public key и Short ID</small></span></label>
+        <label class="outbound-choice" data-tls-choice><input type="radio" name="security" value="tls" {% if outbound.security == 'tls' %}checked{% endif %}><span><strong>TLS</strong><small>сертификат удалённого сервера</small></span></label>
+      </div>
+      <p class="field-help" data-combination-help></p>
+    </div>
+
     <div class="form-grid"><label><span>Tag</span><input name="tag" value="{{ outbound.tag }}" required></label><label><span>Название</span><input name="name" value="{{ outbound.name }}" required></label></div>
     <div class="form-grid"><label><span>Address</span><input name="address" value="{{ outbound.address }}" required></label><label><span>Port</span><input name="port" type="number" min="1" max="65535" value="{{ outbound.port }}" required></label></div>
     <label><span>UUID</span><input name="uuid" value="{{ outbound.uuid }}" required></label>
-    <div class="form-grid"><label><span>Flow</span><select name="flow"><option value="xtls-rprx-vision" {% if outbound.flow=='xtls-rprx-vision' %}selected{% endif %}>xtls-rprx-vision</option><option value="" {% if not outbound.flow %}selected{% endif %}>none</option></select></label><label><span>Fingerprint</span><input name="fingerprint" value="{{ outbound.fingerprint }}" required></label></div>
+    <div class="form-grid"><label><span>Flow</span><select name="flow"><option value="xtls-rprx-vision" {% if outbound.flow=='xtls-rprx-vision' %}selected{% endif %}>xtls-rprx-vision</option><option value="" {% if not outbound.flow %}selected{% endif %}>none</option></select><small class="field-help">Для XHTTP используется none.</small></label><label><span>Fingerprint</span><input name="fingerprint" value="{{ outbound.fingerprint }}" required></label></div>
     <label><span>Server name / SNI</span><input name="server_name" value="{{ outbound.server_name }}" required></label>
-    <label><span>Reality password / public key</span><input name="public_key" value="{{ outbound.public_key }}" required autocomplete="off"></label>
-    <div class="form-grid"><label><span>Short ID</span><input name="short_id" value="{{ outbound.short_id }}"></label><label><span>Spider X</span><input name="spider_x" value="{{ outbound.spider_x }}"></label></div>
+
+    <fieldset class="outbound-field-group" data-xhttp-fields {% if outbound.network != 'xhttp' %}hidden{% endif %}>
+      <legend>XHTTP</legend>
+      <div class="form-grid"><label><span>Host</span><input name="xhttp_host" value="{{ outbound.xhttp_host }}" placeholder="cdn.example.com"><small class="field-help">Без https:// и без пути. Можно оставить пустым.</small></label><label><span>Path</span><input name="xhttp_path" value="{{ outbound.xhttp_path or '/' }}" placeholder="/api/v1/connect"></label></div>
+      <span class="outbound-choice-title">Mode</span>
+      <div class="outbound-choice-grid four compact">
+        {% for mode in ['auto', 'packet-up', 'stream-up', 'stream-one'] %}
+        <label class="outbound-choice"><input type="radio" name="xhttp_mode" value="{{ mode }}" {% if outbound.xhttp_mode == mode %}checked{% endif %}><span><strong>{{ mode }}</strong></span></label>
+        {% endfor %}
+      </div>
+      <p class="field-help">Параметры должны совпадать с inbound удалённого сервера. При проблемах совместимости XHTTP + REALITY начните со stream-one.</p>
+    </fieldset>
+
+    <fieldset class="outbound-field-group" data-reality-fields {% if outbound.security != 'reality' %}hidden{% endif %}>
+      <legend>REALITY</legend>
+      <label><span>Reality password / public key</span><input name="public_key" value="{{ outbound.public_key }}" autocomplete="off"></label>
+      <div class="form-grid"><label><span>Short ID</span><input name="short_id" value="{{ outbound.short_id }}"></label><label><span>Spider X</span><input name="spider_x" value="{{ outbound.spider_x }}"></label></div>
+    </fieldset>
+
+    <fieldset class="outbound-field-group" data-tls-fields {% if outbound.security != 'tls' %}hidden{% endif %}>
+      <legend>TLS</legend>
+      <label><span>ALPN</span><input name="alpn" value="{{ outbound.alpn }}" placeholder="h2,http/1.1"><small class="field-help">Необязательно. Несколько значений разделяйте запятыми.</small></label>
+      <label class="switch-row outbound-danger-switch"><span><strong>Allow insecure</strong><small>Не проверять сертификат удалённого сервера. Оставляйте выключенным.</small></span><input type="checkbox" name="allow_insecure" {% if outbound.allow_insecure %}checked{% endif %}></label>
+    </fieldset>
+
     <div class="actions"><button class="button primary" type="submit">Сохранить outbound</button><a class="button secondary" href="{{ url_for('outbounds_page') }}">Отмена</a></div>
   </form>
 </section>
+
+<script>
+(function () {
+  const form = document.querySelector('.outbound-dynamic-form');
+  if (!form) return;
+  const tlsChoice = form.querySelector('[data-tls-choice] input');
+  const flow = form.querySelector('select[name="flow"]');
+  const xhttpFields = form.querySelector('[data-xhttp-fields]');
+  const realityFields = form.querySelector('[data-reality-fields]');
+  const tlsFields = form.querySelector('[data-tls-fields]');
+  const publicKey = form.querySelector('input[name="public_key"]');
+  const xhttpPath = form.querySelector('input[name="xhttp_path"]');
+  const help = form.querySelector('[data-combination-help]');
+
+  function checked(name) {
+    const input = form.querySelector('input[name="' + name + '"]:checked');
+    return input ? input.value : '';
+  }
+  function update() {
+    const network = checked('network') || 'raw';
+    let security = checked('security') || 'reality';
+    const isXhttp = network === 'xhttp';
+    if (!isXhttp && security === 'tls') {
+      form.querySelector('input[name="security"][value="reality"]').checked = true;
+      security = 'reality';
+    }
+    tlsChoice.disabled = !isXhttp;
+    tlsChoice.closest('.outbound-choice').classList.toggle('choice-disabled', !isXhttp);
+    xhttpFields.hidden = !isXhttp;
+    realityFields.hidden = security !== 'reality';
+    tlsFields.hidden = security !== 'tls';
+    xhttpPath.required = isXhttp;
+    publicKey.required = security === 'reality';
+    if (isXhttp) {
+      flow.value = '';
+      flow.disabled = true;
+    } else {
+      flow.disabled = false;
+    }
+    help.textContent = isXhttp
+      ? 'XHTTP поддерживает TLS и REALITY. Все параметры должны совпадать с удалённым inbound.'
+      : 'Для RAW/TCP в этой версии используется REALITY. TLS становится доступен при выборе XHTTP.';
+  }
+  form.querySelectorAll('input[name="network"], input[name="security"]').forEach(input => input.addEventListener('change', update));
+  update();
+})();
+</script>
 {% endblock %}
