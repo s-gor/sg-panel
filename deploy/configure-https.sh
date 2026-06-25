@@ -9,6 +9,8 @@ MODE="full"
 ENV_FILE="/etc/xpanel-mvp/web.env"
 NGINX_CONF="/etc/nginx/sites-available/sg-panel"
 ACME_ROOT="/var/www/letsencrypt"
+PLACEHOLDER_SOURCE="/opt/xpanel-mvp/assets/placeholders/sg-dark/index.html"
+PLACEHOLDER_ROOT="/var/www/sg-panel-placeholder"
 
 usage(){
   cat <<'USAGE'
@@ -105,7 +107,20 @@ reserve_port
 BACKEND_PORT="$(grep -E '^XPANEL_PORT=' "$ENV_FILE" 2>/dev/null | tail -1 | cut -d= -f2- || true)"
 BACKEND_PORT="${BACKEND_PORT:-8080}"
 
-mkdir -p /etc/nginx/sites-available /etc/nginx/sites-enabled "$ACME_ROOT/.well-known/acme-challenge"
+mkdir -p /etc/nginx/sites-available /etc/nginx/sites-enabled \
+  "$ACME_ROOT/.well-known/acme-challenge" "$PLACEHOLDER_ROOT"
+
+[[ -f "$PLACEHOLDER_SOURCE" ]] || {
+  echo "Не найден шаблон страницы-заглушки: $PLACEHOLDER_SOURCE" >&2
+  exit 1
+}
+
+# index.default.html обновляется вместе с SG-Panel. Пользовательский index.html
+# создаётся только один раз и не перезаписывается при обновлении.
+install -m 0644 "$PLACEHOLDER_SOURCE" "$PLACEHOLDER_ROOT/index.default.html"
+if [[ ! -f "$PLACEHOLDER_ROOT/index.html" ]]; then
+  install -m 0644 "$PLACEHOLDER_SOURCE" "$PLACEHOLDER_ROOT/index.html"
+fi
 
 if [[ "$MODE" == "full" ]]; then
   LOCATION_BLOCK=$(cat <<EOF_LOCATION
@@ -151,7 +166,13 @@ server {
     }
 
     location / {
-        return 301 https://\$host:$HTTPS_PORT\$request_uri;
+        root $PLACEHOLDER_ROOT;
+        index index.html;
+        try_files \$uri \$uri/ /index.html;
+        add_header Cache-Control "no-cache" always;
+        add_header X-Content-Type-Options nosniff always;
+        add_header X-Frame-Options DENY always;
+        add_header Referrer-Policy no-referrer always;
     }
 }
 
@@ -266,3 +287,5 @@ echo "HTTPS настроен: https://$DOMAIN:$HTTPS_PORT"
 echo "Backend: 127.0.0.1:$BACKEND_PORT"
 echo "Режим: $MODE"
 echo "Порт $HTTPS_PORT зарезервирован в net.ipv4.ip_local_reserved_ports"
+echo "Страница-заглушка: http://$DOMAIN"
+echo "Файл страницы: $PLACEHOLDER_ROOT/index.html"

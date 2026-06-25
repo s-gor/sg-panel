@@ -132,6 +132,7 @@ if [[ $PURGE_ALL -eq 1 ]]; then
     /var/cache/nginx \
     /var/lib/nginx \
     /var/www/letsencrypt \
+    /var/www/sg-panel-placeholder \
     /etc/letsencrypt \
     /var/lib/letsencrypt \
     /var/log/letsencrypt
