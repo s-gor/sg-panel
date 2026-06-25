@@ -7,7 +7,6 @@ VERSION="${VERSION:-v0.9.3}"
 
 ASSET="SG-Panel-${VERSION}.zip"
 CHECKSUM="SHA256SUMS.txt"
-
 BASE_URL="https://github.com/${OWNER}/${REPO}/releases/download/${VERSION}"
 WORK="$(mktemp -d /tmp/sg-panel-install.XXXXXX)"
 
@@ -26,18 +25,18 @@ fail() {
     exit 1
 }
 
-[[ $EUID -eq 0 ]] || fail "запустите скрипт от root"
+[[ $EUID -eq 0 ]] || fail "Run this script as root"
 
 command -v curl >/dev/null 2>&1 ||
-    fail "не найден curl"
+    fail "curl is not installed"
 
 command -v unzip >/dev/null 2>&1 ||
-    fail "не найден unzip"
+    fail "unzip is not installed"
 
 command -v sha256sum >/dev/null 2>&1 ||
-    fail "не найден sha256sum"
+    fail "sha256sum is not installed"
 
-log "Скачиваю ${ASSET}"
+log "Downloading ${ASSET}"
 
 curl \
     -fL \
@@ -47,7 +46,7 @@ curl \
     -o "$WORK/$ASSET" \
     "$BASE_URL/$ASSET"
 
-log "Скачиваю контрольную сумму"
+log "Downloading checksum file"
 
 curl \
     -fL \
@@ -59,14 +58,14 @@ curl \
 
 cd "$WORK"
 
-log "Проверяю SHA-256"
+log "Verifying SHA-256"
 
 sha256sum -c "$CHECKSUM" ||
-    fail "контрольная сумма архива не совпадает"
+    fail "SHA-256 verification failed"
 
 mkdir -p "$WORK/extracted"
 
-log "Распаковываю релиз"
+log "Extracting release archive"
 
 unzip -q "$ASSET" -d "$WORK/extracted"
 
@@ -80,16 +79,16 @@ INSTALLER="$(
 )"
 
 [[ -n "$INSTALLER" && -f "$INSTALLER" ]] ||
-    fail "в архиве не найден deploy/ec2-first-install.sh"
+    fail "deploy/ec2-first-install.sh was not found in the archive"
 
 SOURCE="$(dirname "$(dirname "$INSTALLER")")"
 
 [[ -f "$SOURCE/install-or-upgrade.sh" ]] ||
-    fail "не удалось определить корневой каталог SG-Panel"
+    fail "Unable to determine the SG-Panel release directory"
 
-log "Найден каталог релиза: $SOURCE"
-log "Запускаю мастер установки ${VERSION}"
+log "Release directory: $SOURCE"
+log "Starting SG-Panel ${VERSION} installation wizard"
 
 cd "$SOURCE"
 
-exec bash "$INSTALLER"
+bash "$INSTALLER"
