@@ -257,27 +257,50 @@ wait_for_gui(){
 wait_for_gui || fail "HTTPS GUI не прошёл проверку за 30 секунд"
 
 LINK="$(.venv/bin/python -m xpanel show-link "$FIRST_USER" 2>/dev/null || true)"
-SSH_IP="${SSH_CONNECTION%% *}"
+LINK_FILE="/root/sg-panel-first-user.txt"
+if [[ -n "$LINK" ]]; then
+  printf '%s\n' "$LINK" > "$LINK_FILE"
+  chmod 600 "$LINK_FILE"
+fi
+
+SSH_IP="${SSH_CONNECTION:-}"
+SSH_IP="${SSH_IP%% *}"
+SSH_SOURCE="${SSH_IP:+$SSH_IP/32}"
+SSH_SOURCE="${SSH_SOURCE:-ваш публичный IP/32}"
 
 cat <<EOF_RESULT
 
 ============================================================
-SG-Panel $EXPECTED_VERSION установлен на EC2
+ SG-Panel $EXPECTED_VERSION — установка завершена успешно
 ============================================================
-Панель:       https://$PANEL_DOMAIN:$PANEL_HTTPS_PORT
-Xray:         $XRAY_ADDRESS:443
-Backend GUI:  127.0.0.1:$DEFAULT_BACKEND_PORT
-Публичный IP: $PUBLIC_IP
 
-Откройте в AWS Security Group:
-  TCP 22      только с вашего IP${SSH_IP:+ ($SSH_IP/32)}
-  TCP 80      0.0.0.0/0 — Let's Encrypt HTTP-01 и renewal
-  TCP 443     0.0.0.0/0 — Xray Reality
-  TCP $PANEL_HTTPS_PORT только с вашего IP${SSH_IP:+ ($SSH_IP/32)}
+ПАНЕЛЬ УПРАВЛЕНИЯ
+  Адрес:           https://$PANEL_DOMAIN:$PANEL_HTTPS_PORT
+  Вход:            пароль администратора, заданный при установке
 
-НЕ открывайте TCP $DEFAULT_BACKEND_PORT в Security Group.
+XRAY REALITY
+  Сервер:          $XRAY_ADDRESS:443
+  Пользователь:    $FIRST_USER
+  VLESS-ссылка:    $LINK_FILE
+  Показать ссылку: cat $LINK_FILE
 
-VLESS-ссылка первого пользователя:
-$LINK
+ПРОВЕРКИ
+  SG-Panel:        active — 127.0.0.1:$DEFAULT_BACKEND_PORT
+  Nginx:           active — HTTPS :$PANEL_HTTPS_PORT
+  Xray:            active — Reality :443
+  HTTPS GUI:       OK
+  Публичный IPv4:  $PUBLIC_IP
+
+AWS SECURITY GROUP
+  22/tcp           $SSH_SOURCE
+  80/tcp           0.0.0.0/0       Let's Encrypt
+  443/tcp          0.0.0.0/0       Xray Reality
+  $PANEL_HTTPS_PORT/tcp       $SSH_SOURCE
+  $DEFAULT_BACKEND_PORT/tcp         НЕ ОТКРЫВАТЬ
+
+DNS
+  $PANEL_DOMAIN -> $PUBLIC_IP
+
+Откройте панель в браузере и войдите с заданным паролем.
 ============================================================
 EOF_RESULT
