@@ -93,7 +93,7 @@ apt-get install -y \
   curl ca-certificates unzip rsync \
   python3 python3-venv python3-pip \
   sqlite3 jq iproute2 dnsutils \
-  nginx certbot
+  nginx certbot openssl
 
 if ss -lntH | awk '{print $4}' | grep -Eq "(^|:)$PANEL_HTTPS_PORT$"; then
   fail "порт $PANEL_HTTPS_PORT уже занят"
@@ -200,12 +200,63 @@ nginx -t
 systemctl enable --now nginx
 systemctl reload nginx
 
-log "Получаю сертификат Let's Encrypt"
-certbot certonly \
-  --webroot -w "$ACME_ROOT" \
-  --domain "$PANEL_DOMAIN" \
-  --register-unsafely-without-email \
-  --agree-tos --non-interactive --keep-until-expiring
+CERT_DIR="/etc/letsencrypt/live/$PANEL_DOMAIN"
+CERT_FILE="$CERT_DIR/fullchain.pem"
+KEY_FILE="$CERT_DIR/privkey.pem"
+
+certificate_is_usable(){
+  [[ -s "$CERT_FILE" && -s "$KEY_FILE" ]] || return 1
+  openssl x509 -checkend 604800 -noout -in "$CERT_FILE" >/dev/null 2>&1
+}
+
+print_certbot_error(){
+  local output="$1" retry_line=""
+
+  printf '%s\n' "$output" >&2
+  echo >&2
+
+  if grep -Eqi 'too many certificates|rate limit|rateLimited' <<<"$output"; then
+    retry_line="$(grep -Eio 'retry after[^[:cntrl:]]*' <<<"$output" | head -n 1 || true)"
+    echo "ПРИЧИНА: Let's Encrypt временно запретил выпуск нового сертификата из-за лимита." >&2
+    [[ -z "$retry_line" ]] || echo "Срок следующей попытки: $retry_line" >&2
+    echo "Удаление старого сертификата не снимает этот лимит." >&2
+    echo "Повторите установку после указанного срока." >&2
+  elif grep -Eqi 'timeout during connect|connection refused|likely firewall problem' <<<"$output"; then
+    echo "ПРИЧИНА: сервер Let's Encrypt не смог подключиться к TCP-порту 80." >&2
+    echo "Проверьте правило HTTP 80/tcp = 0.0.0.0/0 в AWS Security Group." >&2
+    echo "Также проверьте, что домен указывает на публичный IPv4 этого EC2." >&2
+  elif grep -Eqi 'unauthorized|invalid response|challenge failed|failed to authenticate' <<<"$output"; then
+    echo "ПРИЧИНА: Let's Encrypt не подтвердил управление доменом." >&2
+    echo "Проверьте A-запись DNS, порт 80 и доступность /.well-known/acme-challenge/." >&2
+  elif grep -Eqi 'dns problem|nxdomain|no valid ip addresses found' <<<"$output"; then
+    echo "ПРИЧИНА: доменное имя не разрешается в публичный IPv4." >&2
+    echo "Создайте или исправьте A-запись и дождитесь обновления DNS." >&2
+  else
+    echo "ПРИЧИНА: Certbot не смог получить сертификат Let's Encrypt." >&2
+    echo "Полный ответ Certbot показан выше." >&2
+  fi
+}
+
+if certificate_is_usable; then
+  CERT_EXPIRES="$(openssl x509 -enddate -noout -in "$CERT_FILE" | cut -d= -f2-)"
+  log "Использую существующий сертификат Let's Encrypt"
+  log "Сертификат действует до: $CERT_EXPIRES"
+else
+  log "Получаю сертификат Let's Encrypt для $PANEL_DOMAIN"
+
+  if ! CERTBOT_OUTPUT="$(certbot certonly \
+      --webroot -w "$ACME_ROOT" \
+      --domain "$PANEL_DOMAIN" \
+      --register-unsafely-without-email \
+      --agree-tos \
+      --non-interactive \
+      --keep-until-expiring 2>&1)"; then
+    print_certbot_error "$CERTBOT_OUTPUT"
+    fail "установка остановлена: сертификат Let's Encrypt не получен"
+  fi
+
+  printf '%s\n' "$CERTBOT_OUTPUT"
+fi
 
 log "Настраиваю HTTPS панели на порту $PANEL_HTTPS_PORT"
 rm -f /etc/nginx/sites-enabled/sg-panel-acme
