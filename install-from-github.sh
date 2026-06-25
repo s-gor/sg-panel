@@ -3,39 +3,67 @@ set -Eeuo pipefail
 
 OWNER="${OWNER:-s-gor}"
 REPO="${REPO:-sg-panel}"
-VERSION="${VERSION:-v0.9.3}"
-ASSET="SG-Panel-${VERSION}.zip"
-CHECKSUM="SHA256SUMS.txt"
-BASE_URL="https://github.com/${OWNER}/${REPO}/releases/download/${VERSION}"
+BRANCH="${BRANCH:-main}"
+
+ARCHIVE="${REPO}-${BRANCH}.zip"
+ARCHIVE_URL="https://github.com/${OWNER}/${REPO}/archive/refs/heads/${BRANCH}.zip"
 WORK="$(mktemp -d /tmp/sg-panel-install.XXXXXX)"
 
-cleanup(){ rm -rf "$WORK"; }
+cleanup() {
+    rm -rf "$WORK"
+}
+
 trap cleanup EXIT
 
-log(){ printf '[SG-Panel bootstrap] %s\n' "$*"; }
-fail(){ printf '[SG-Panel bootstrap] ERROR: %s\n' "$*" >&2; exit 1; }
+log() {
+    printf '[SG-Panel bootstrap] %s\n' "$*"
+}
 
-[[ $EUID -eq 0 ]] || fail "запустите скрипт от root"
-command -v curl >/dev/null || fail "не найден curl"
-command -v unzip >/dev/null || fail "не найден unzip"
-command -v sha256sum >/dev/null || fail "не найден sha256sum"
+fail() {
+    printf '[SG-Panel bootstrap] ERROR: %s\n' "$*" >&2
+    exit 1
+}
 
-log "Скачиваю ${ASSET}"
-curl -fL --retry 3 --connect-timeout 15 \
-  -o "$WORK/$ASSET" "$BASE_URL/$ASSET"
+[[ $EUID -eq 0 ]] || fail "Run this script as root"
 
-log "Скачиваю контрольную сумму"
-curl -fL --retry 3 --connect-timeout 15 \
-  -o "$WORK/$CHECKSUM" "$BASE_URL/$CHECKSUM"
+command -v curl >/dev/null 2>&1 || fail "curl is not installed"
+command -v unzip >/dev/null 2>&1 || fail "unzip is not installed"
 
-cd "$WORK"
-sha256sum -c "$CHECKSUM"
+log "Downloading ${OWNER}/${REPO}, branch ${BRANCH}"
 
-unzip -q "$ASSET" -d extracted
-SOURCE="$(find extracted -maxdepth 4 -type f -path '*/deploy/ec2-first-install.sh' -printf '%h/..\n' | head -1)"
-[[ -n "$SOURCE" && -x "$SOURCE/deploy/ec2-first-install.sh" ]] || \
-  fail "в архиве не найден deploy/ec2-first-install.sh"
+curl \
+    -fL \
+    --retry 3 \
+    --retry-delay 2 \
+    --connect-timeout 15 \
+    -o "$WORK/$ARCHIVE" \
+    "$ARCHIVE_URL"
 
-log "Запускаю мастер установки ${VERSION}"
+mkdir -p "$WORK/extracted"
+
+log "Extracting repository archive"
+
+unzip -q "$WORK/$ARCHIVE" -d "$WORK/extracted"
+
+INSTALLER="$(
+    find "$WORK/extracted" \
+        -maxdepth 5 \
+        -type f \
+        -path '*/deploy/ec2-first-install.sh' \
+        -print \
+        -quit
+)"
+
+[[ -n "$INSTALLER" && -f "$INSTALLER" ]] ||
+    fail "deploy/ec2-first-install.sh was not found in the repository archive"
+
+SOURCE="$(dirname "$(dirname "$INSTALLER")")"
+
+[[ -f "$SOURCE/install-or-upgrade.sh" ]] ||
+    fail "Unable to determine the SG-Panel project directory"
+
+log "Project directory: $SOURCE"
+log "Starting SG-Panel installation wizard"
+
 cd "$SOURCE"
-exec ./deploy/ec2-first-install.sh
+bash "$INSTALLER"
