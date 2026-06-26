@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-EXPECTED_VERSION="0.9.7"
+EXPECTED_VERSION="0.9.8"
 SOURCE_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 XRAY_VERSION="v26.3.27"
 DEFAULT_HTTPS_PORT="61443"
@@ -44,7 +44,7 @@ if existing_install_is_complete; then
 fi
 
 if [[ -e "$TARGET" || -e /etc/xpanel-mvp/web.env || -e /etc/systemd/system/xpanel-web.service ]]; then
-  fail "обнаружена неполная старая установка; сначала сохраните данные и выполните обычное удаление SG-Panel"
+  fail "обнаружена неполная старая установка; сохраните данные и запустите безопасный deploy/uninstall.sh без параметра --remove-xray"
 fi
 
 prompt_value(){
