@@ -1,8 +1,8 @@
 {% extends "base.html" %}
-{% block title %}Конфигурация — SG-Panel{% endblock %}
-{% block section %}CONFIG PREVIEW{% endblock %}
-{% block heading %}Предварительный просмотр{% endblock %}
-{% block subtitle %}Проверка сформированного config.json перед применением{% endblock %}
+{% block title %}Xray Config — SG-Panel{% endblock %}
+{% block section %}XRAY CONFIG{% endblock %}
+{% block heading %}Xray Config{% endblock %}
+{% block subtitle %}Расширенный просмотр, ручное редактирование и проверка итогового config.json{% endblock %}
 {% block content %}
 <script>document.body.classList.add('ui-standard-page','config-preview-page');</script>
 <div class="ui-page ui-page-wide">
@@ -19,9 +19,36 @@
       <span class="ui-status-text {{ 'is-ok' if validation.ok else 'is-error' }}"><i></i>{{ 'Проверка пройдена' if validation.ok else 'Требуется исправление' }}</span>
       <div class="ui-actions">
         <form method="post" action="{{ url_for('config_validate') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button secondary" type="submit">Проверить ещё раз</button></form>
-        <form method="post" action="{{ url_for('apply_route') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button primary" type="submit" {% if not validation.ok %}disabled{% endif %}>Применить конфигурацию</button></form>
+        <form method="post" action="{{ url_for('apply_route') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button primary" type="submit" {% if not validation.ok %}disabled{% endif %}>Применить config.json вручную</button></form>
       </div>
     </div>
+  </section>
+
+  <section class="ui-card config-runtime-card">
+    <header class="ui-card-heading">
+      <div>
+        <p class="panel-kicker">XRAY RUNTIME</p>
+        <h2>Служебные параметры Xray</h2>
+        <p>Журналирование, Stats API, путь к config.json, бинарному файлу и systemd-службе.</p>
+      </div>
+    </header>
+    <form method="post" action="{{ url_for('config_runtime_save') }}" class="ui-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="ui-field-grid config-runtime-grid">
+        <label><span>Уровень журналирования</span><select name="loglevel">{% for value in ['debug','info','warning','error','none'] %}<option value="{{ value }}" {% if server.loglevel == value %}selected{% endif %}>{{ value }}</option>{% endfor %}</select></label>
+        <label><span>Stats API listen</span><input name="api_listen" value="{{ server.api_listen }}" required></label>
+        <label class="ui-toggle-row ui-toggle-compact"><span><strong>Статистика Xray</strong><small>Трафик пользователей, inbounds и outbounds.</small></span><input type="checkbox" name="stats_enabled" {% if server.stats_enabled %}checked{% endif %}><span class="switch" aria-hidden="true"></span></label>
+      </div>
+      <details class="ui-details">
+        <summary>Системные пути</summary>
+        <div class="ui-field-grid ui-details-grid">
+          <label><span>config.json</span><input name="config_path" value="{{ server.config_path }}" required></label>
+          <label><span>Xray binary</span><input name="xray_bin" value="{{ server.xray_bin }}" required></label>
+          <label><span>systemd service</span><input name="xray_service" value="{{ server.xray_service }}" required></label>
+        </div>
+      </details>
+      <div class="ui-actions"><button class="button primary" type="submit">Сохранить и применить</button></div>
+    </form>
   </section>
 
   {% if validation.detail %}
@@ -33,7 +60,17 @@
 
   <!-- GENERATED JSON -->
   <section class="ui-card json-card ui-code-card">
-    <header class="ui-card-heading ui-card-heading-row"><div><p class="panel-kicker">СФОРМИРОВАННЫЙ JSON</p><h2>config.json</h2><p>Только для чтения. Данные сформированы из SQLite.</p></div><span class="ui-counter">только чтение</span></header>
+    <header class="ui-card-heading ui-card-heading-row">
+      <div>
+        <p class="panel-kicker">КОНФИГУРАЦИЯ XRAY</p>
+        <h2>config.json</h2>
+        <p>Форма и JSON редактируют одну конфигурацию. Здесь показан итог, который будет передан Xray.</p>
+      </div>
+      <div class="ui-heading-actions">
+        <span class="ui-counter">предпросмотр</span>
+        <a class="button secondary json-action" href="{{ url_for('config_json_page') }}">{ } Редактировать JSON</a>
+      </div>
+    </header>
     <pre class="json-preview">{{ validation.json }}</pre>
   </section>
 </div>

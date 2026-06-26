@@ -20,7 +20,7 @@
           <label class="ui-toggle-row"><span><strong>Отключить fallback</strong><small>Использовать только совпавшие по domains серверы.</small></span><input type="checkbox" name="disable_fallback" {% if settings.disable_fallback %}checked{% endif %}><span class="switch"></span></label>
           <label class="ui-toggle-row"><span><strong>Fallback при совпадении</strong><small>Не добавлять fallback, если domains совпали.</small></span><input type="checkbox" name="disable_fallback_if_match" {% if settings.disable_fallback_if_match %}checked{% endif %}><span class="switch"></span></label>
         </div>
-        <div class="ui-actions"><button class="button primary" type="submit">Сохранить DNS</button></div>
+        <div class="ui-actions"><button class="button primary" type="submit">Сохранить и применить</button></div>
       </form>
       <div class="ui-info-note"><span>i</span><p>Маршрутизация сейчас использует <strong>{{ routing.domain_strategy }}</strong>. Встроенный DNS участвует в IP-routing при IPIfNonMatch или IPOnDemand.</p></div>
     </article>
@@ -57,7 +57,7 @@
     <article class="ui-card ui-code-card">
       <header class="ui-card-heading"><div><p class="panel-kicker">ПРЕДПРОСМОТР</p><h2>Раздел dns</h2><p>JSON, который войдёт в конфигурацию Xray.</p></div></header>
       <pre class="json-preview dns-preview">{{ preview }}</pre>
-      <div class="ui-actions dns-preview-actions"><form method="post" action="{{ url_for('dns_test') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input name="domain" value="example.com" aria-label="Домен для теста"><button class="button secondary" type="submit">Проверить DNS</button></form><form method="post" action="{{ url_for('apply_route') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button primary" type="submit">Применить конфигурацию</button></form></div>
+      <div class="ui-actions dns-preview-actions"><form method="post" action="{{ url_for('dns_test') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input name="domain" value="example.com" aria-label="Домен для теста"><button class="button secondary" type="submit">Проверить DNS</button></form></div>
     </article>
   </section>
 </div>

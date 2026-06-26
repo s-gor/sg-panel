@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}JSON маршрутизации — SG-Panel{% endblock %}
+{% block section %}ROUTING / JSON{% endblock %}
+{% block heading %}JSON маршрутизации{% endblock %}
+{% block subtitle %}Правила, балансировщики и расширенные параметры routing в одном документе{% endblock %}
+{% block content %}
+<script>document.body.classList.add('ui-standard-page','json-workbench-page');</script>
+<div class="ui-page json-workbench">
+  <section class="ui-card">
+    <header class="ui-card-heading ui-card-heading-row">
+      <div>
+        <p class="panel-kicker">КОНСТРУКТОР + JSON</p>
+        <h2>Объект routing</h2>
+        <p>Это второй редактор тех же данных. После сохранения правила сразу появятся в графическом конструкторе.</p>
+      </div>
+      <span class="json-mode-badge">{ } JSON</span>
+    </header>
+
+    <div class="json-warning">
+      <strong>Сохранение заменяет текущий набор правил маршрутизации.</strong>
+      <span>Перед изменением SG-Panel проверяет структуру, выходы и balancerTag. Применение к Xray выполняется отдельно.</span>
+    </div>
+
+    <div class="json-info-grid">
+      <div><strong>rules</strong><span>Все правила в реальном порядке выполнения.</span></div>
+      <div><strong>balancers</strong><span>Можно добавлять расширенные балансировщики Xray.</span></div>
+      <div><strong>_sgPanel</strong><span>Хранит имена, приоритеты и включённое состояние правил.</span></div>
+    </div>
+
+    <form method="post" action="{{ url_for('routing_json_save') }}" class="json-editor-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label class="json-editor-label" for="json_config">Полный объект routing</label>
+      <textarea id="json_config" name="json_config" class="json-editor json-editor-tall" spellcheck="false">{{ routing_json }}</textarea>
+      <div class="json-editor-actions">
+        <a class="button secondary" href="{{ url_for('routing_page') }}">Вернуться к конструктору</a>
+        <button class="button ghost" type="button" data-format-json>Форматировать</button>
+        <button class="button primary" type="submit">Сохранить в панели</button>
+      </div>
+    </form>
+  </section>
+</div>
+<script>
+(() => {
+  const editor = document.getElementById('json_config');
+  document.querySelector('[data-format-json]')?.addEventListener('click', () => {
+    try { editor.value = JSON.stringify(JSON.parse(editor.value), null, 2) + '\n'; }
+    catch (error) { alert('JSON содержит ошибку: ' + error.message); }
+  });
+})();
+</script>
+{% endblock %}

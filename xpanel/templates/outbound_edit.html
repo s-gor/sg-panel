@@ -11,9 +11,12 @@
       <div>
         <p class="panel-kicker">ВЫХОД #{{ outbound.id }}</p>
         <h2>{{ outbound.tag }}</h2>
-        <p>Изменения вступят в силу после проверки и применения конфигурации.</p>
+        <p>После сохранения SG-Panel проверит конфигурацию и сразу применит изменение.</p>
       </div>
-      <span class="ob-form-badge">VLESS</span>
+      <div class="ui-heading-actions">
+        <a class="button secondary" href="{{ url_for('outbound_json_edit_page', outbound_id=outbound.id) }}">{ } JSON</a>
+        <span class="ob-form-badge">VLESS</span>
+      </div>
     </header>
 
     <form method="post" action="{{ url_for('outbound_edit', outbound_id=outbound.id) }}" class="ob-form outbound-dynamic-form" data-mode="edit">

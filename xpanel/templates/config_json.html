@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}Xray Config / JSON — SG-Panel{% endblock %}
+{% block section %}CONFIG / JSON{% endblock %}
+{% block heading %}Xray Config / JSON{% endblock %}
+{% block subtitle %}Тот же config.json, который настраивается через графические страницы панели{% endblock %}
+{% block content %}
+<script>document.body.classList.add('ui-standard-page','json-workbench-page','config-json-page');</script>
+<div class="ui-page json-workbench">
+  <section class="ui-card">
+    <header class="ui-card-heading ui-card-heading-row">
+      <div>
+        <p class="panel-kicker">ФОРМЫ + JSON</p>
+        <h2>Полный config.json</h2>
+        <p>Известные параметры синхронизируются с пользователями, сервером, выходами, DNS и маршрутизацией. Дополнительные поля Xray сохраняются.</p>
+      </div>
+      <span class="json-mode-badge">{ } JSON</span>
+    </header>
+
+    <div class="json-warning">
+      <strong>Сохранение изменяет данные панели, но не перезапускает Xray.</strong>
+      <span>SG-Panel сначала проверит JSON командой xray run -test, затем синхронизирует SQLite. Применение выполняется отдельно на странице «Xray Config».</span>
+    </div>
+
+    <div class="json-info-grid">
+      <div><strong>Одна конфигурация</strong><span>Изменения известных полей появятся на обычных страницах панели.</span></div>
+      <div><strong>Расширенные параметры</strong><span>Неизвестные GUI секции и поля сохраняются в итоговом config.json.</span></div>
+      <div><strong>Защита от ошибок</strong><span>При ошибке проверки база автоматически возвращается в прежнее состояние.</span></div>
+    </div>
+
+    <div class="config-json-scope">
+      <strong>Синхронизируются:</strong>
+      <span>основной Reality inbound</span>
+      <span>пользователи</span>
+      <span>выходы</span>
+      <span>routing</span>
+      <span>DNS</span>
+      <span>log / stats</span>
+    </div>
+
+    <form method="post" action="{{ url_for('config_json_save') }}" class="json-editor-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label class="json-editor-label" for="json_config">Полная конфигурация Xray</label>
+      <textarea id="json_config" name="json_config" class="json-editor json-editor-config" spellcheck="false" autocomplete="off">{{ config_json }}</textarea>
+      <div class="json-editor-actions">
+        <a class="button secondary" href="{{ url_for('config_page') }}">Вернуться к предпросмотру</a>
+        <button class="button ghost" type="button" data-format-json>Форматировать</button>
+        <button class="button primary" type="submit">Сохранить в панели</button>
+      </div>
+    </form>
+  </section>
+</div>
+<script>
+(() => {
+  const editor = document.getElementById('json_config');
+  document.querySelector('[data-format-json]')?.addEventListener('click', () => {
+    try { editor.value = JSON.stringify(JSON.parse(editor.value), null, 2) + '\n'; }
+    catch (error) { alert('JSON содержит ошибку: ' + error.message); }
+  });
+})();
+</script>
+{% endblock %}

@@ -37,7 +37,7 @@ class ServiceTest(unittest.TestCase):
                 """,
                 (
                     "192.168.1.200", "0.0.0.0", 443,
-                    "www.microsoft.com:443", "www.microsoft.com",
+                    "www.bing.com:443", "www.bing.com",
                     "private", "public", "0011223344556677", "chrome",
                     str(self.config), str(self.xray), "xray",
                 ),
@@ -89,7 +89,7 @@ class RoutingServiceTest(unittest.TestCase):
                 """,
                 (
                     "192.168.1.200", "0.0.0.0", 443,
-                    "www.microsoft.com:443", "www.microsoft.com",
+                    "www.bing.com:443", "www.bing.com",
                     "private", "public", "0011223344556677", "chrome",
                     str(root / "config.json"), "/bin/true", "xray",
                 ),
@@ -128,7 +128,7 @@ class V05ServiceTest(unittest.TestCase):
                 """,
                 (
                     "192.168.1.200", "0.0.0.0", 443,
-                    "www.microsoft.com:443", "www.microsoft.com",
+                    "www.bing.com:443", "www.bing.com",
                     "private", "public", "0011223344556677", "chrome",
                     str(root / "config.json"), "/bin/true", "xray",
                 ),
@@ -182,7 +182,7 @@ class V06OutboundTest(unittest.TestCase):
                 """,
                 (
                     "192.168.1.200", "0.0.0.0", 443,
-                    "www.microsoft.com:443", "www.microsoft.com",
+                    "www.bing.com:443", "www.bing.com",
                     "private", "public", "0011223344556677", "chrome",
                     str(root / "config.json"), "/bin/true", "xray",
                 ),
@@ -198,7 +198,7 @@ class V06OutboundTest(unittest.TestCase):
         outbound = add_vless_outbound(
             tag="eu-exit", name="EU", address="eu.example.com", port=443,
             user_uuid="11111111-1111-4111-8111-111111111111",
-            flow="xtls-rprx-vision", server_name="www.microsoft.com",
+            flow="xtls-rprx-vision", server_name="www.bing.com",
             public_key="public-password", short_id="aabbccdd",
             fingerprint="chrome", spider_x="/",
         )
@@ -236,7 +236,7 @@ class V07DnsTest(unittest.TestCase):
                 """,
                 (
                     "192.168.1.200", "0.0.0.0", 443,
-                    "www.microsoft.com:443", "www.microsoft.com",
+                    "www.bing.com:443", "www.bing.com",
                     "private", "public", "0011223344556677", "chrome",
                     str(root / "config.json"), "/bin/true", "xray",
                 ),
@@ -296,7 +296,7 @@ class V08SubscriptionServiceTest(unittest.TestCase):
                 """,
                 (
                     "vpn.example.com", "0.0.0.0", 443,
-                    "www.microsoft.com:443", "www.microsoft.com",
+                    "www.bing.com:443", "www.bing.com",
                     "private", "public", "0011223344556677", "chrome",
                     str(root / "config.json"), "/bin/true", "xray",
                 ),
@@ -410,7 +410,7 @@ class V095OutboundTransportTest(unittest.TestCase):
                 """,
                 (
                     "192.168.1.200", "0.0.0.0", 443,
-                    "www.microsoft.com:443", "www.microsoft.com",
+                    "www.bing.com:443", "www.bing.com",
                     "private", "public", "0011223344556677", "chrome",
                     str(root / "config.json"), "/bin/true", "xray",
                 ),
@@ -449,7 +449,7 @@ class V095OutboundTransportTest(unittest.TestCase):
             tag="xhttp-reality", name="XHTTP Reality", address="edge.example.com", port=443,
             user_uuid="22222222-2222-4222-8222-222222222222",
             flow="", network="xhttp", security="reality",
-            server_name="www.microsoft.com", public_key="reality-public-key",
+            server_name="www.bing.com", public_key="reality-public-key",
             short_id="aabbccdd", fingerprint="chrome", spider_x="/",
             xhttp_host="edge.example.com", xhttp_path="/stream",
             xhttp_mode="stream-one",
@@ -517,7 +517,7 @@ class V095OutboundMigrationTest(unittest.TestCase):
                 (
                     "old-exit", "Old exit", "old.example.com", 443,
                     "44444444-4444-4444-8444-444444444444",
-                    "www.microsoft.com", "old-public-key",
+                    "www.bing.com", "old-public-key",
                 ),
             )
             con.commit()

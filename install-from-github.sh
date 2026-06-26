@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
+INSTALLER_ARGS=("$@")
+
 OWNER="${OWNER:-s-gor}"
 REPO="${REPO:-sg-panel}"
 BRANCH="${BRANCH:-main}"
@@ -60,4 +62,4 @@ find "$SOURCE" -type f -name '*.sh' -exec chmod 755 {} +
 log "Каталог проекта: $SOURCE"
 log "Запускаю установку или обновление SG-Panel"
 cd "$SOURCE"
-bash "$INSTALLER"
+bash "$INSTALLER" "${INSTALLER_ARGS[@]}"

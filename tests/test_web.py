@@ -6,6 +6,7 @@ import os
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 os.environ.setdefault("XPANEL_SECRET_KEY", "test-secret")
 os.environ.setdefault(
@@ -35,11 +36,21 @@ class WebTest(unittest.TestCase):
                 """,
                 (
                     "192.168.1.200", "0.0.0.0", 443,
-                    "www.microsoft.com:443", "www.microsoft.com",
+                    "www.bing.com:443", "www.bing.com",
                     "private", "public", "0011223344556677", "chrome",
                     "/tmp/config.json", "/bin/true", "xray",
                 ),
             )
+        self.apply_patcher = patch(
+            "xpanel.web.apply_config",
+            return_value={
+                "enabled_users": 1,
+                "enabled_rules": 2,
+                "service": "active",
+                "profile": "raw_reality",
+            },
+        )
+        self.apply_mock = self.apply_patcher.start()
         self.app = create_app(
             {
                 "TESTING": True,
@@ -50,6 +61,7 @@ class WebTest(unittest.TestCase):
         self.client = self.app.test_client()
 
     def tearDown(self):
+        self.apply_patcher.stop()
         self.tmp.cleanup()
         os.environ.pop("XPANEL_DB", None)
 
@@ -132,8 +144,8 @@ class V05WebTest(WebTest):
     def test_new_admin_pages(self):
         self.login()
         for path, marker in (
-            ("/settings", b"Stats API listen"),
-            ("/config", b"GENERATED JSON"),
+            ("/settings", b"PRIMARY INBOUND"),
+            ("/config", b"Stats API listen"),
             ("/backups", b"MANUAL SNAPSHOT"),
         ):
             response = self.client.get(path)
@@ -174,7 +186,7 @@ class V06WebTest(WebTest):
                 "port": "443",
                 "uuid": "11111111-1111-4111-8111-111111111111",
                 "flow": "xtls-rprx-vision",
-                "server_name": "www.microsoft.com",
+                "server_name": "www.bing.com",
                 "public_key": "public-password",
                 "short_id": "aabbccdd",
                 "fingerprint": "chrome",
@@ -191,7 +203,7 @@ class V096StyleTest(WebTest):
     def test_versioned_stylesheet_and_compact_actions(self):
         response = self.client.get("/login")
         self.assertEqual(response.status_code, 200)
-        self.assertIn(b"app.css?v=0.9.8", response.data)
+        self.assertIn(b"app.css?v=0.10.0-rc7", response.data)
         css = (Path(__file__).parents[1] / "xpanel" / "static" / "app.css").read_text(encoding="utf-8")
         self.assertIn("Calm Slate", css)
         self.assertIn("v0.9.7 — unified readable interface", css)
@@ -201,6 +213,68 @@ class V096StyleTest(WebTest):
         self.assertIn(".outbound-planned-list", css)
         self.assertIn("content: \"✓\"", css)
 
+
+
+class RC7WorkflowWebTest(WebTest):
+    def test_dashboard_is_read_only_and_diagnostics_owns_service_actions(self):
+        self.login()
+        status_data = {
+            "overall_ok": True, "service": "active", "config_state": "OK",
+            "inbound_profile_label": "RAW/TCP + REALITY",
+            "address": "vpn.example.com", "port": 443,
+            "default_outbound_tag": "warp",
+            "enabled_users": 1, "total_users": 1, "expired_users": 0,
+            "traffic_total_human": "1 GB", "stats_enabled": True,
+            "config_updated_at": "2026-06-26 13:42 UTC",
+        }
+        with patch("xpanel.web.get_status", return_value=status_data):
+            dashboard = self.client.get("/")
+        self.assertEqual(dashboard.status_code, 200)
+        self.assertNotIn(b'action="/apply"', dashboard.data)
+        self.assertNotIn(b'action="/restart"', dashboard.data)
+        self.assertIn("Всё работает".encode("utf-8"), dashboard.data)
+
+        diagnostics_data = {
+            "os": "Ubuntu", "kernel": "test", "python": "3.13",
+            "xray_version": "Xray test", "xray_service": "active",
+            "panel_service": "active", "nginx_service": "active",
+            "disk_total": "10 GB", "disk_free": "5 GB",
+            "memory_total": "2 GB", "memory_available": "1 GB",
+            "memory_used": "1 GB", "memory_used_percent": 50,
+            "ports": "tcp", "xray_logs": "xray", "panel_logs": "panel",
+            "nginx_logs": "nginx",
+            "config_validation": {"ok": True, "users": 1, "detail": "", "json": "{}"},
+            "dns_enabled": True, "dns_query_strategy": "UseIPv4",
+            "dns_servers": [], "dns_test": {"ok": True, "latency_ms": 1, "detail": ""},
+            "subscription_settings": {"enabled": 0}, "subscription_users_enabled": 0,
+            "security_settings": {"allowlist_enabled": 0, "allowed_networks": ""},
+            "security_overview": {"active_sessions": 1, "failed_logins_24h": 0},
+            "warp": {"configured": True, "enabled": True, "last_test_state": "on",
+                     "last_test_ip": "2a09::1", "last_test_at": "now"},
+            "warp_endpoint": "162.159.192.1:2408",
+            "default_outbound_tag": "warp",
+            "server_address": "vpn.example.com", "server_port": 443,
+        }
+        with patch("xpanel.web.get_diagnostics", return_value=diagnostics_data):
+            diagnostics = self.client.get("/diagnostics")
+        self.assertEqual(diagnostics.status_code, 200)
+        self.assertIn("Перезапустить Xray".encode("utf-8"), diagnostics.data)
+        self.assertIn(b"162.159.192.1:2408", diagnostics.data)
+
+    def test_routing_change_is_applied_immediately(self):
+        self.login()
+        response = self.client.post(
+            "/routing/settings",
+            data={
+                "csrf_token": self.csrf(),
+                "domain_strategy": "AsIs",
+                "default_outbound_tag": "direct",
+            },
+            follow_redirects=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.apply_mock.assert_called_once()
+        self.assertIn("Настройки сохранены и применены".encode("utf-8"), response.data)
 
 
 class V07DnsWebTest(WebTest):
@@ -425,3 +499,141 @@ class V095OutboundWebTest(WebTest):
         self.assertEqual(row["network"], "xhttp")
         self.assertEqual(row["security"], "tls")
         self.assertEqual(row["xhttp_mode"], "stream-up")
+
+class RC5ProfilesAndWarpWebTest(WebTest):
+    def test_settings_shows_three_current_profiles_without_grpc_card(self):
+        self.login()
+        response = self.client.get("/settings")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"RAW/TCP + REALITY", response.data)
+        self.assertIn(b"XHTTP + TLS", response.data)
+        self.assertIn(b"XHTTP + REALITY", response.data)
+        self.assertNotIn(b"<strong>gRPC + TLS</strong>", response.data)
+
+    def test_outbounds_page_contains_warp_manager(self):
+        self.login()
+        response = self.client.get("/outbounds")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"Cloudflare", response.data)
+        self.assertIn(b"WARP", response.data)
+        self.assertIn("Создать WARP".encode("utf-8"), response.data)
+
+
+class RC5NavigationAndSeparationWebTest(WebTest):
+    def test_navigation_uses_clear_technical_names_in_workflow_order(self):
+        self.login()
+        response = self.client.get("/settings")
+        self.assertEqual(response.status_code, 200)
+        html = response.data.decode("utf-8")
+        labels = [
+            ">Inbound<",
+            ">Outbounds<",
+            ">Routing<",
+            ">DNS<",
+            ">Xray Config<",
+        ]
+        positions = [html.index(label) for label in labels]
+        self.assertEqual(positions, sorted(positions))
+        self.assertNotIn(">Сервер<", html)
+        self.assertNotIn(">Выходы<", html)
+        self.assertNotIn(">Маршрутизация<", html)
+        self.assertNotIn(">Конфиг<", html)
+
+    def test_warp_management_and_routing_are_separate(self):
+        self.login()
+        outbounds = self.client.get("/outbounds")
+        self.assertEqual(outbounds.status_code, 200)
+        self.assertIn(b"WARP Outbound", outbounds.data)
+        self.assertIn("Открыть Routing".encode("utf-8"), outbounds.data)
+        self.assertNotIn(b'name="route_mode"', outbounds.data)
+
+        routing = self.client.get("/routing")
+        self.assertEqual(routing.status_code, 200)
+        self.assertIn(b"WARP Routing", routing.data)
+        self.assertIn("Открыть Outbounds".encode("utf-8"), routing.data)
+
+    def test_password_is_on_security_not_inbound(self):
+        self.login()
+        inbound = self.client.get("/settings")
+        security = self.client.get("/security")
+        self.assertNotIn('name="current_password"'.encode(), inbound.data)
+        self.assertIn('name="current_password"'.encode(), security.data)
+        self.assertIn("Сменить пароль".encode("utf-8"), security.data)
+
+    def test_xray_runtime_settings_live_on_config_page(self):
+        self.login()
+        inbound = self.client.get("/settings")
+        config = self.client.get("/config")
+        self.assertNotIn(b'name="api_listen"', inbound.data)
+        self.assertIn(b'name="api_listen"', config.data)
+        self.assertIn(b'Xray Config', config.data)
+
+    def test_inbound_save_preserves_runtime_settings(self):
+        self.login()
+        with connect() as con:
+            con.execute(
+                "UPDATE server_settings SET loglevel = 'error', api_listen = '127.0.0.1:19085', "
+                "stats_enabled = 0, config_path = '/tmp/kept.json', xray_bin = '/bin/true', "
+                "xray_service = 'kept-xray' WHERE id = 1"
+            )
+        response = self.client.post(
+            "/settings/server",
+            data={
+                "csrf_token": self.csrf(),
+                "inbound_profile": "raw_reality",
+                "address": "192.168.1.200",
+                "listen": "0.0.0.0",
+                "port": "443",
+                "server_name": "www.bing.com",
+                "fingerprint": "chrome",
+                "flow": "xtls-rprx-vision",
+                "dest": "www.bing.com:443",
+                "private_key": "private",
+                "public_key": "public",
+                "short_id": "0011223344556677",
+                "transport_listen": "127.0.0.1",
+                "transport_port": "8443",
+                "xhttp_path": "/sg-xhttp",
+                "xhttp_mode": "auto",
+                "tls_cert_path": "/tmp/fullchain.pem",
+                "tls_key_path": "/tmp/privkey.pem",
+            },
+            follow_redirects=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        with connect() as con:
+            row = con.execute("SELECT * FROM server_settings WHERE id = 1").fetchone()
+        self.assertEqual(row["loglevel"], "error")
+        self.assertEqual(row["api_listen"], "127.0.0.1:19085")
+        self.assertEqual(row["stats_enabled"], 0)
+        self.assertEqual(row["config_path"], "/tmp/kept.json")
+        self.assertEqual(row["xray_service"], "kept-xray")
+
+    def test_config_runtime_save_preserves_inbound(self):
+        self.login()
+        with connect() as con:
+            before = con.execute("SELECT * FROM server_settings WHERE id = 1").fetchone()
+        response = self.client.post(
+            "/config/runtime",
+            data={
+                "csrf_token": self.csrf(),
+                "loglevel": "info",
+                "api_listen": "127.0.0.1:18085",
+                "stats_enabled": "on",
+                "config_path": "/tmp/config-new.json",
+                "xray_bin": "/bin/true",
+                "xray_service": "xray-new",
+            },
+            follow_redirects=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        with connect() as con:
+            after = con.execute("SELECT * FROM server_settings WHERE id = 1").fetchone()
+        self.assertEqual(after["address"], before["address"])
+        self.assertEqual(after["private_key"], before["private_key"])
+        self.assertEqual(after["inbound_profile"], before["inbound_profile"])
+        self.assertEqual(after["loglevel"], "info")
+        self.assertEqual(after["api_listen"], "127.0.0.1:18085")
+        self.assertEqual(after["stats_enabled"], 1)
+        self.assertEqual(after["config_path"], "/tmp/config-new.json")
+        self.assertEqual(after["xray_service"], "xray-new")

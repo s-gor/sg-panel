@@ -46,14 +46,21 @@ from .security import (
 from .service import (
     XPanelError,
     add_routing_rule,
+    add_routing_rule_json,
+    add_geo_policy,
     add_dns_host,
     add_dns_server,
     add_vless_outbound,
+    add_vless_outbound_json,
     add_user,
     apply_config,
+    config_json_document,
     backup_file,
     create_backup,
+    create_warp,
+    configure_warp_routing,
     delete_backup,
+    delete_warp,
     delete_dns_host,
     delete_dns_server,
     delete_routing_rule,
@@ -69,22 +76,28 @@ from .service import (
     format_bytes,
     generate_reality_keys,
     get_diagnostics,
+    get_geodata_status,
     get_dns_settings,
     get_routing_settings,
     get_server,
     get_status,
     get_subscription_settings,
     get_user_stats,
+    get_warp_overview,
     list_backups,
     list_dns_hosts,
     list_dns_servers,
     list_outbounds,
     list_outbound_tags,
+    list_balancer_tags,
     list_routing_rules,
     list_users,
     make_link,
+    outbound_json_document,
     make_subscription_url,
     preview_dns_json,
+    routing_json_document,
+    rule_json_document,
     regenerate_user_uuid,
     regenerate_subscription_token,
     reset_stats,
@@ -97,11 +110,16 @@ from .service import (
     set_outbound_enabled,
     set_user_enabled,
     set_user_subscription_enabled,
+    set_warp_enabled,
     update_routing_rule,
+    update_routing_rule_json,
+    update_config_json_document,
+    update_routing_json_document,
     update_dns_host,
     update_dns_server,
     update_dns_settings,
     update_vless_outbound,
+    update_vless_outbound_json,
     update_routing_settings,
     update_server_settings,
     update_user,
@@ -111,6 +129,7 @@ from .service import (
     validate_generated_config,
     test_dns_resolution,
     test_outbound_tcp,
+    test_warp,
 )
 
 
@@ -234,6 +253,19 @@ def create_app(test_config: dict | None = None) -> Flask:
         return token
 
     app.jinja_env.globals["csrf_token"] = csrf_token
+
+    def apply_saved_change(message: str) -> dict[str, object]:
+        """Apply a saved GUI change immediately and keep the user on the same page."""
+        label = message.rstrip(" .")
+        try:
+            result = apply_config()
+        except (XPanelError, ValueError, PermissionError, FileNotFoundError, OSError) as exc:
+            raise XPanelError(
+                f"{label} сохранено в панели, но не применено к Xray. "
+                f"Предыдущий рабочий config.json восстановлен. Причина: {exc}"
+            ) from exc
+        flash(f"{label}. Настройки сохранены и применены. Xray работает.", "success")
+        return result
 
     @app.before_request
     def protect_requests():
@@ -418,7 +450,7 @@ def create_app(test_config: dict | None = None) -> Flask:
                 comment=request.form.get("comment", ""),
                 expiry_at=request.form.get("expiry_at", ""),
             )
-            flash(f"Пользователь {user['name']} добавлен. Нажмите Apply config.", "success")
+            apply_saved_change(f"Пользователь {user['name']} добавлен")
         except (ValueError, XPanelError) as exc:
             flash(str(exc), "error")
         return redirect(url_for("users_page"))
@@ -439,7 +471,7 @@ def create_app(test_config: dict | None = None) -> Flask:
                 comment=request.form.get("comment", ""),
                 expiry_at=request.form.get("expiry_at", ""),
             )
-            flash(f"Пользователь {user['name']} обновлён. Нажмите Apply config.", "success")
+            apply_saved_change(f"Пользователь {user['name']} обновлён")
             return redirect(url_for("users_page"))
         except (ValueError, XPanelError) as exc:
             flash(str(exc), "error")
@@ -450,9 +482,8 @@ def create_app(test_config: dict | None = None) -> Flask:
     def user_regenerate_uuid(user_id: int):
         try:
             user = regenerate_user_uuid(user_id)
-            flash(
-                f"Для {user['name']} создан новый UUID. Старая ссылка перестанет работать после Apply config.",
-                "success",
+            apply_saved_change(
+                f"Для {user['name']} создан новый UUID; старая ссылка больше не работает"
             )
         except XPanelError as exc:
             flash(str(exc), "error")
@@ -464,10 +495,8 @@ def create_app(test_config: dict | None = None) -> Flask:
         try:
             current = find_user(user_id)
             updated = set_user_enabled(user_id, not bool(current["enabled"]))
-            flash(
-                f"{updated['name']}: {'включён' if updated['enabled'] else 'отключён'}. "
-                "Нажмите Apply config.",
-                "success",
+            apply_saved_change(
+                f"{updated['name']}: {'включён' if updated['enabled'] else 'отключён'}"
             )
         except XPanelError as exc:
             flash(str(exc), "error")
@@ -478,7 +507,7 @@ def create_app(test_config: dict | None = None) -> Flask:
     def users_delete(user_id: int):
         try:
             user = delete_user(user_id)
-            flash(f"Пользователь {user['name']} удалён. Нажмите Apply config.", "success")
+            apply_saved_change(f"Пользователь {user['name']} удалён")
         except XPanelError as exc:
             flash(str(exc), "error")
         return redirect(url_for("users_page"))
@@ -643,9 +672,10 @@ def create_app(test_config: dict | None = None) -> Flask:
     @login_required
     def settings_save():
         try:
+            current = get_server()
             server = update_server_settings(
                 address=request.form.get("address", ""),
-                listen=request.form.get("listen", ""),
+                listen=request.form.get("listen", current["listen"]),
                 port=int(request.form.get("port", "443")),
                 dest=request.form.get("dest", ""),
                 server_name=request.form.get("server_name", ""),
@@ -654,17 +684,24 @@ def create_app(test_config: dict | None = None) -> Flask:
                 short_id=request.form.get("short_id", ""),
                 fingerprint=request.form.get("fingerprint", "chrome"),
                 flow=request.form.get("flow", "xtls-rprx-vision"),
-                loglevel=request.form.get("loglevel", "warning"),
-                api_listen=request.form.get("api_listen", "127.0.0.1:10085"),
-                stats_enabled="stats_enabled" in request.form,
-                config_path=request.form.get("config_path", ""),
-                xray_bin=request.form.get("xray_bin", ""),
-                xray_service=request.form.get("xray_service", ""),
+                loglevel=current["loglevel"],
+                api_listen=current["api_listen"],
+                stats_enabled=bool(current["stats_enabled"]),
+                config_path=current["config_path"],
+                xray_bin=current["xray_bin"],
+                xray_service=current["xray_service"],
+                inbound_profile=request.form.get("inbound_profile", "raw_reality"),
+                transport_listen=request.form.get("transport_listen", current["transport_listen"]),
+                transport_port=int(request.form.get("transport_port", current["transport_port"])),
+                xhttp_path=request.form.get("xhttp_path", current["xhttp_path"]),
+                xhttp_mode=request.form.get("xhttp_mode", current["xhttp_mode"]),
+                grpc_service_name=current["grpc_service_name"],
+                tls_cert_path=request.form.get("tls_cert_path", current["tls_cert_path"]),
+                tls_key_path=request.form.get("tls_key_path", current["tls_key_path"]),
             )
-            flash(
-                f"Настройки сервера сохранены для {server['address']}:{server['port']}. "
-                "Проверьте конфиг и нажмите Apply config.",
-                "success",
+            apply_saved_change(
+                f"Inbound {server['inbound_profile']} сохранён для "
+                f"{server['address']}:{server['port']}"
             )
         except (ValueError, XPanelError) as exc:
             flash(str(exc), "error")
@@ -695,10 +732,8 @@ def create_app(test_config: dict | None = None) -> Flask:
                 xray_bin=server["xray_bin"],
                 xray_service=server["xray_service"],
             )
-            flash(
-                "Созданы новые Reality-ключи. Все старые клиентские ссылки перестанут работать "
-                "после Apply config.",
-                "success",
+            apply_saved_change(
+                "Созданы новые Reality-ключи; старые клиентские ссылки больше не работают"
             )
         except (ValueError, XPanelError, FileNotFoundError) as exc:
             flash(str(exc), "error")
@@ -712,13 +747,13 @@ def create_app(test_config: dict | None = None) -> Flask:
         repeat = request.form.get("repeat_password", "")
         if not check_password_hash(app.config["PASSWORD_HASH"], current):
             flash("Текущий пароль указан неверно", "error")
-            return redirect(url_for("settings_page"))
+            return redirect(url_for("security_page"))
         if len(new) < 8:
             flash("Новый пароль должен содержать не менее 8 символов", "error")
-            return redirect(url_for("settings_page"))
+            return redirect(url_for("security_page"))
         if new != repeat:
             flash("Новые пароли не совпадают", "error")
-            return redirect(url_for("settings_page"))
+            return redirect(url_for("security_page"))
         new_hash = generate_password_hash(new)
         write_audit(
             "password_changed", ip_address=getattr(g, "client_ip", ""),
@@ -831,7 +866,43 @@ def create_app(test_config: dict | None = None) -> Flask:
     @login_required
     def config_page():
         validation = validate_generated_config()
-        return render_template("config.html", validation=validation)
+        return render_template("config.html", validation=validation, server=get_server())
+
+    @app.post("/config/runtime")
+    @login_required
+    def config_runtime_save():
+        try:
+            current = get_server()
+            update_server_settings(
+                address=current["address"],
+                listen=current["listen"],
+                port=current["port"],
+                dest=current["dest"],
+                server_name=current["server_name"],
+                private_key=current["private_key"],
+                public_key=current["public_key"],
+                short_id=current["short_id"],
+                fingerprint=current["fingerprint"],
+                flow=current["flow"],
+                loglevel=request.form.get("loglevel", current["loglevel"]),
+                api_listen=request.form.get("api_listen", current["api_listen"]),
+                stats_enabled="stats_enabled" in request.form,
+                config_path=request.form.get("config_path", current["config_path"]),
+                xray_bin=request.form.get("xray_bin", current["xray_bin"]),
+                xray_service=request.form.get("xray_service", current["xray_service"]),
+                inbound_profile=current["inbound_profile"],
+                transport_listen=current["transport_listen"],
+                transport_port=current["transport_port"],
+                xhttp_path=current["xhttp_path"],
+                xhttp_mode=current["xhttp_mode"],
+                grpc_service_name=current["grpc_service_name"],
+                tls_cert_path=current["tls_cert_path"],
+                tls_key_path=current["tls_key_path"],
+            )
+            apply_saved_change("Служебные параметры Xray сохранены")
+        except (ValueError, XPanelError) as exc:
+            flash(str(exc), "error")
+        return redirect(url_for("config_page"))
 
     @app.post("/config/validate")
     @login_required
@@ -844,6 +915,28 @@ def create_app(test_config: dict | None = None) -> Flask:
             "success" if validation["ok"] else "error",
         )
         return redirect(url_for("config_page"))
+
+    @app.get("/config/json")
+    @login_required
+    def config_json_page():
+        return render_template("config_json.html", config_json=config_json_document())
+
+    @app.post("/config/json")
+    @login_required
+    def config_json_save():
+        source = request.form.get("json_config", "")
+        try:
+            result = update_config_json_document(source)
+            flash(
+                "JSON синхронизирован с панелью: "
+                f"{result['users']} пользователей, {result['outbounds']} выходов, "
+                f"{result['rules']} правил. Проверьте и примените конфигурацию.",
+                "success",
+            )
+            return redirect(url_for("config_page"))
+        except (ValueError, XPanelError) as exc:
+            flash(str(exc), "error")
+            return render_template("config_json.html", config_json=source), 400
 
     @app.get("/backups")
     @login_required
@@ -930,7 +1023,7 @@ def create_app(test_config: dict | None = None) -> Flask:
                 enable_parallel_query="enable_parallel_query" in request.form,
                 use_system_hosts="use_system_hosts" in request.form,
             )
-            flash("Настройки DNS сохранены. Проверьте JSON и нажмите Apply config.", "success")
+            apply_saved_change("Настройки DNS сохранены")
         except (ValueError, XPanelError) as exc:
             flash(str(exc), "error")
         return redirect(url_for("dns_page"))
@@ -953,7 +1046,7 @@ def create_app(test_config: dict | None = None) -> Flask:
     def dns_server_add():
         try:
             row = add_dns_server(**dns_server_form_values())
-            flash(f"DNS-сервер {row['name']} добавлен. Нажмите Apply config.", "success")
+            apply_saved_change(f"DNS-сервер {row['name']} добавлен")
         except (ValueError, XPanelError) as exc:
             flash(str(exc), "error")
         return redirect(url_for("dns_page"))
@@ -968,7 +1061,7 @@ def create_app(test_config: dict | None = None) -> Flask:
     def dns_server_edit(server_id: int):
         try:
             row = update_dns_server(server_id, **dns_server_form_values())
-            flash(f"DNS-сервер {row['name']} обновлён. Нажмите Apply config.", "success")
+            apply_saved_change(f"DNS-сервер {row['name']} обновлён")
             return redirect(url_for("dns_page"))
         except (ValueError, XPanelError) as exc:
             flash(str(exc), "error")
@@ -980,7 +1073,10 @@ def create_app(test_config: dict | None = None) -> Flask:
         try:
             current = find_dns_server(server_id)
             row = set_dns_server_enabled(server_id, not bool(current["enabled"]))
-            flash(f"DNS-сервер {row['name']}: {'enabled' if row['enabled'] else 'disabled'}", "success")
+            apply_saved_change(
+                f"DNS-сервер {row['name']}: "
+                f"{'включён' if row['enabled'] else 'отключён'}"
+            )
         except XPanelError as exc:
             flash(str(exc), "error")
         return redirect(url_for("dns_page"))
@@ -990,7 +1086,7 @@ def create_app(test_config: dict | None = None) -> Flask:
     def dns_server_delete(server_id: int):
         try:
             row = delete_dns_server(server_id)
-            flash(f"DNS-сервер {row['name']} удалён", "success")
+            apply_saved_change(f"DNS-сервер {row['name']} удалён")
         except XPanelError as exc:
             flash(str(exc), "error")
         return redirect(url_for("dns_page"))
@@ -1000,7 +1096,7 @@ def create_app(test_config: dict | None = None) -> Flask:
     def dns_host_add():
         try:
             row = add_dns_host(domain=request.form.get("domain", ""), addresses=request.form.get("addresses", ""))
-            flash(f"Hosts-запись {row['domain']} добавлена. Нажмите Apply config.", "success")
+            apply_saved_change(f"Hosts-запись {row['domain']} добавлена")
         except (ValueError, XPanelError) as exc:
             flash(str(exc), "error")
         return redirect(url_for("dns_page"))
@@ -1010,7 +1106,7 @@ def create_app(test_config: dict | None = None) -> Flask:
     def dns_host_edit(host_id: int):
         try:
             row = update_dns_host(host_id, domain=request.form.get("domain", ""), addresses=request.form.get("addresses", ""))
-            flash(f"Hosts-запись {row['domain']} обновлена. Нажмите Apply config.", "success")
+            apply_saved_change(f"Hosts-запись {row['domain']} обновлена")
         except (ValueError, XPanelError) as exc:
             flash(str(exc), "error")
         return redirect(url_for("dns_page"))
@@ -1021,7 +1117,10 @@ def create_app(test_config: dict | None = None) -> Flask:
         try:
             current = find_dns_host(host_id)
             row = set_dns_host_enabled(host_id, not bool(current["enabled"]))
-            flash(f"Hosts-запись {row['domain']}: {'enabled' if row['enabled'] else 'disabled'}", "success")
+            apply_saved_change(
+                f"Hosts-запись {row['domain']}: "
+                f"{'включена' if row['enabled'] else 'отключена'}"
+            )
         except XPanelError as exc:
             flash(str(exc), "error")
         return redirect(url_for("dns_page"))
@@ -1031,7 +1130,7 @@ def create_app(test_config: dict | None = None) -> Flask:
     def dns_host_delete(host_id: int):
         try:
             row = delete_dns_host(host_id)
-            flash(f"Hosts-запись {row['domain']} удалена", "success")
+            apply_saved_change(f"Hosts-запись {row['domain']} удалена")
         except XPanelError as exc:
             flash(str(exc), "error")
         return redirect(url_for("dns_page"))
@@ -1057,7 +1156,11 @@ def create_app(test_config: dict | None = None) -> Flask:
             settings=get_routing_settings(),
             rules=list_routing_rules(),
             outbound_tags=list_outbound_tags(enabled_only=True),
+            balancer_tags=list_balancer_tags(),
+            geodata=get_geodata_status(),
+            format_bytes=format_bytes,
             users=list_users(),
+            warp=get_warp_overview(),
         )
 
     @app.post("/routing/settings")
@@ -1073,7 +1176,7 @@ def create_app(test_config: dict | None = None) -> Flask:
                 sniff_quic="sniff_quic" in request.form,
                 default_outbound_tag=request.form.get("default_outbound_tag", "direct"),
             )
-            flash("Настройки routing сохранены. Нажмите Apply config.", "success")
+            apply_saved_change("Настройки Routing сохранены")
         except (ValueError, XPanelError) as exc:
             flash(str(exc), "error")
         return redirect(url_for("routing_page"))
@@ -1083,6 +1186,7 @@ def create_app(test_config: dict | None = None) -> Flask:
             "name": request.form.get("name", ""),
             "priority": int(request.form.get("priority", "100")),
             "outbound_tag": request.form.get("outbound_tag", "blocked"),
+            "target_type": request.form.get("target_type", "outbound"),
             "domains": request.form.get("domains", ""),
             "ips": request.form.get("ips", ""),
             "ports": request.form.get("ports", ""),
@@ -1092,12 +1196,95 @@ def create_app(test_config: dict | None = None) -> Flask:
             "users": "\n".join(request.form.getlist("users")),
         }
 
+    @app.get("/routing/json")
+    @login_required
+    def routing_json_page():
+        return render_template("routing_json.html", routing_json=routing_json_document())
+
+    @app.post("/routing/json")
+    @login_required
+    def routing_json_save():
+        try:
+            result = update_routing_json_document(request.form.get("json_config", ""))
+            apply_saved_change(
+                f"JSON Routing сохранён: {result['rules']} правил, "
+                f"{result['balancers']} балансировщиков"
+            )
+            return redirect(url_for("routing_page"))
+        except (ValueError, XPanelError) as exc:
+            flash(str(exc), "error")
+            return render_template(
+                "routing_json.html", routing_json=request.form.get("json_config", "")
+            ), 400
+
+    @app.post("/routing/presets/add")
+    @login_required
+    def routing_geo_preset_add():
+        try:
+            rows = add_geo_policy(
+                kind=request.form.get("kind", ""),
+                value=request.form.get("value", ""),
+                outbound_tag=request.form.get("outbound_tag", "direct"),
+                priority=int(request.form.get("priority", "100")),
+                name=request.form.get("name", ""),
+            )
+            apply_saved_change(
+                "Добавлены гео-правила: "
+                + ", ".join(str(row["name"]) for row in rows)
+            )
+        except (ValueError, XPanelError) as exc:
+            flash(str(exc), "error")
+        return redirect(url_for("routing_page"))
+
+    @app.get("/routing/rules/json/new")
+    @login_required
+    def routing_rule_json_new_page():
+        return render_template(
+            "rule_json.html", rule=None, rule_json=rule_json_document(None)
+        )
+
+    @app.post("/routing/rules/json/new")
+    @login_required
+    def routing_rule_json_add():
+        try:
+            row = add_routing_rule_json(request.form.get("json_config", ""))
+            apply_saved_change(f"Правило {row['name']} создано из JSON")
+            return redirect(url_for("routing_page"))
+        except (ValueError, XPanelError) as exc:
+            flash(str(exc), "error")
+            return render_template(
+                "rule_json.html", rule=None, rule_json=request.form.get("json_config", "")
+            ), 400
+
+    @app.get("/routing/rules/<int:rule_id>/json")
+    @login_required
+    def routing_rule_json_edit_page(rule_id: int):
+        row = find_routing_rule(rule_id)
+        return render_template(
+            "rule_json.html", rule=row, rule_json=rule_json_document(row)
+        )
+
+    @app.post("/routing/rules/<int:rule_id>/json")
+    @login_required
+    def routing_rule_json_edit(rule_id: int):
+        try:
+            row = update_routing_rule_json(rule_id, request.form.get("json_config", ""))
+            apply_saved_change(f"JSON правила {row['name']} сохранён")
+            return redirect(url_for("routing_page"))
+        except (ValueError, XPanelError) as exc:
+            flash(str(exc), "error")
+            return render_template(
+                "rule_json.html",
+                rule=find_routing_rule(rule_id),
+                rule_json=request.form.get("json_config", ""),
+            ), 400
+
     @app.post("/routing/rules/add")
     @login_required
     def routing_rule_add():
         try:
             rule = add_routing_rule(**rule_form_values())
-            flash(f"Правило {rule['name']} добавлено. Нажмите Apply config.", "success")
+            apply_saved_change(f"Правило {rule['name']} добавлено")
         except (ValueError, XPanelError) as exc:
             flash(str(exc), "error")
         return redirect(url_for("routing_page"))
@@ -1109,6 +1296,7 @@ def create_app(test_config: dict | None = None) -> Flask:
             "rule_edit.html",
             rule=find_routing_rule(rule_id),
             outbound_tags=list_outbound_tags(enabled_only=True),
+            balancer_tags=list_balancer_tags(),
             users=list_users(),
         )
 
@@ -1117,7 +1305,7 @@ def create_app(test_config: dict | None = None) -> Flask:
     def routing_rule_edit(rule_id: int):
         try:
             rule = update_routing_rule(rule_id, **rule_form_values())
-            flash(f"Правило {rule['name']} обновлено. Нажмите Apply config.", "success")
+            apply_saved_change(f"Правило {rule['name']} обновлено")
             return redirect(url_for("routing_page"))
         except (ValueError, XPanelError) as exc:
             flash(str(exc), "error")
@@ -1129,9 +1317,9 @@ def create_app(test_config: dict | None = None) -> Flask:
         try:
             current = find_routing_rule(rule_id)
             updated = set_routing_rule_enabled(rule_id, not bool(current["enabled"]))
-            flash(
-                f"{updated['name']}: {'включено' if updated['enabled'] else 'отключено'}",
-                "success",
+            apply_saved_change(
+                f"Правило {updated['name']}: "
+                f"{'включено' if updated['enabled'] else 'отключено'}"
             )
         except XPanelError as exc:
             flash(str(exc), "error")
@@ -1142,7 +1330,7 @@ def create_app(test_config: dict | None = None) -> Flask:
     def routing_rule_delete(rule_id: int):
         try:
             rule = delete_routing_rule(rule_id)
-            flash(f"Правило {rule['name']} удалено", "success")
+            apply_saved_change(f"Правило {rule['name']} удалено")
         except XPanelError as exc:
             flash(str(exc), "error")
         return redirect(url_for("routing_page"))
@@ -1155,7 +1343,72 @@ def create_app(test_config: dict | None = None) -> Flask:
             "outbounds.html",
             outbounds=list_outbounds(),
             default_outbound_tag=settings["default_outbound_tag"],
+            warp=get_warp_overview(),
         )
+
+    @app.post("/warp/create")
+    @login_required
+    def warp_create():
+        try:
+            create_warp()
+            apply_saved_change("WARP Outbound создан и включён")
+        except (ValueError, XPanelError, FileNotFoundError, OSError, PermissionError) as exc:
+            flash(str(exc), "error")
+        return redirect(url_for("outbounds_page"))
+
+    @app.post("/warp/regenerate")
+    @login_required
+    def warp_regenerate():
+        try:
+            create_warp(regenerate=True)
+            apply_saved_change("Учётные данные WARP пересозданы")
+        except (ValueError, XPanelError, FileNotFoundError, OSError, PermissionError) as exc:
+            flash(str(exc), "error")
+        return redirect(url_for("outbounds_page"))
+
+    @app.post("/warp/toggle")
+    @login_required
+    def warp_toggle():
+        try:
+            current = get_warp_overview()
+            updated = set_warp_enabled(not bool(current["enabled"]))
+            state = "включён" if updated["enabled"] else "отключён"
+            apply_saved_change(f"WARP {state}")
+        except (ValueError, XPanelError, FileNotFoundError, OSError, PermissionError) as exc:
+            flash(str(exc), "error")
+        return redirect(url_for("outbounds_page"))
+
+    @app.post("/warp/delete")
+    @login_required
+    def warp_delete():
+        try:
+            delete_warp()
+            apply_saved_change("WARP удалён")
+        except (XPanelError, OSError, PermissionError) as exc:
+            flash(str(exc), "error")
+        return redirect(url_for("outbounds_page"))
+
+    @app.post("/warp/routing")
+    @login_required
+    def warp_routing():
+        try:
+            mode = request.form.get("route_mode", "off")
+            configure_warp_routing(mode, request.form.get("selected_domains", ""))
+            apply_saved_change("Маршрут WARP сохранён")
+        except (ValueError, XPanelError) as exc:
+            flash(str(exc), "error")
+        return redirect(url_for("routing_page"))
+
+    @app.post("/warp/test")
+    @login_required
+    def warp_test():
+        try:
+            result = test_warp()
+            flash(result["detail"], "success")
+        except (ValueError, XPanelError, FileNotFoundError, OSError, PermissionError) as exc:
+            flash(str(exc), "error")
+        target = "diagnostics_page" if request.form.get("next") == "diagnostics" else "outbounds_page"
+        return redirect(url_for(target))
 
     def outbound_form_values() -> dict:
         return {
@@ -1179,12 +1432,59 @@ def create_app(test_config: dict | None = None) -> Flask:
             "alpn": request.form.get("alpn", ""),
         }
 
+    @app.get("/outbounds/json/new")
+    @login_required
+    def outbound_json_new_page():
+        return render_template(
+            "outbound_json.html", outbound=None, outbound_json=outbound_json_document(None)
+        )
+
+    @app.post("/outbounds/json/new")
+    @login_required
+    def outbound_json_add():
+        try:
+            row = add_vless_outbound_json(request.form.get("json_config", ""))
+            flash(f"Выход {row['tag']} создан из JSON. Проверьте routing и нажмите Применить.", "success")
+            return redirect(url_for("outbounds_page"))
+        except (ValueError, XPanelError) as exc:
+            flash(str(exc), "error")
+            return render_template(
+                "outbound_json.html",
+                outbound=None,
+                outbound_json=request.form.get("json_config", ""),
+            ), 400
+
+    @app.get("/outbounds/<int:outbound_id>/json")
+    @login_required
+    def outbound_json_edit_page(outbound_id: int):
+        row = find_outbound(outbound_id)
+        return render_template(
+            "outbound_json.html", outbound=row, outbound_json=outbound_json_document(row)
+        )
+
+    @app.post("/outbounds/<int:outbound_id>/json")
+    @login_required
+    def outbound_json_edit(outbound_id: int):
+        try:
+            row = update_vless_outbound_json(
+                outbound_id, request.form.get("json_config", "")
+            )
+            apply_saved_change(f"JSON Outbound {row['tag']} сохранён")
+            return redirect(url_for("outbounds_page"))
+        except (ValueError, XPanelError) as exc:
+            flash(str(exc), "error")
+            return render_template(
+                "outbound_json.html",
+                outbound=find_outbound(outbound_id),
+                outbound_json=request.form.get("json_config", ""),
+            ), 400
+
     @app.post("/outbounds/add")
     @login_required
     def outbound_add():
         try:
             outbound = add_vless_outbound(**outbound_form_values())
-            flash(f"Outbound {outbound['tag']} добавлен. Проверьте routing и нажмите Apply config.", "success")
+            apply_saved_change(f"Outbound {outbound['tag']} добавлен")
         except (ValueError, XPanelError) as exc:
             flash(str(exc), "error")
         return redirect(url_for("outbounds_page"))
@@ -1199,7 +1499,7 @@ def create_app(test_config: dict | None = None) -> Flask:
     def outbound_edit(outbound_id: int):
         try:
             outbound = update_vless_outbound(outbound_id, **outbound_form_values())
-            flash(f"Outbound {outbound['tag']} обновлён. Нажмите Apply config.", "success")
+            apply_saved_change(f"Outbound {outbound['tag']} обновлён")
             return redirect(url_for("outbounds_page"))
         except (ValueError, XPanelError) as exc:
             flash(str(exc), "error")
@@ -1211,7 +1511,10 @@ def create_app(test_config: dict | None = None) -> Flask:
         try:
             current = find_outbound(outbound_id)
             updated = set_outbound_enabled(outbound_id, not bool(current["enabled"]))
-            flash(f"Outbound {updated['tag']}: {'enabled' if updated['enabled'] else 'disabled'}. Нажмите Apply config.", "success")
+            apply_saved_change(
+                f"Outbound {updated['tag']}: "
+                f"{'включён' if updated['enabled'] else 'отключён'}"
+            )
         except XPanelError as exc:
             flash(str(exc), "error")
         return redirect(url_for("outbounds_page"))
@@ -1221,7 +1524,7 @@ def create_app(test_config: dict | None = None) -> Flask:
     def outbound_delete(outbound_id: int):
         try:
             outbound = delete_outbound(outbound_id)
-            flash(f"Outbound {outbound['tag']} удалён. Нажмите Apply config.", "success")
+            apply_saved_change(f"Outbound {outbound['tag']} удалён")
         except XPanelError as exc:
             flash(str(exc), "error")
         return redirect(url_for("outbounds_page"))
@@ -1247,7 +1550,7 @@ def create_app(test_config: dict | None = None) -> Flask:
                 f"{result['enabled_rules']} routing rules.",
                 "success",
             )
-        except (XPanelError, ValueError, PermissionError, FileNotFoundError) as exc:
+        except (XPanelError, ValueError, PermissionError, FileNotFoundError, OSError) as exc:
             flash(str(exc), "error")
         return redirect(request.referrer or url_for("dashboard"))
 
@@ -1259,7 +1562,46 @@ def create_app(test_config: dict | None = None) -> Flask:
             flash("Xray перезапущен", "success")
         except (XPanelError, PermissionError, FileNotFoundError) as exc:
             flash(str(exc), "error")
-        return redirect(url_for("dashboard"))
+        return redirect(url_for("diagnostics_page"))
+
+    @app.post("/diagnostics/restart/<service_name>")
+    @login_required
+    def diagnostics_restart_service(service_name: str):
+        if service_name == "xray":
+            return restart_route()
+        allowed = {"nginx": "nginx", "panel": "xpanel-web"}
+        unit = allowed.get(service_name)
+        if unit is None:
+            abort(404)
+        try:
+            if service_name == "panel":
+                subprocess.Popen(
+                    [
+                        "systemd-run",
+                        f"--unit=sg-panel-web-restart-{secrets.token_hex(4)}",
+                        "--on-active=2s",
+                        "/bin/systemctl",
+                        "restart",
+                        unit,
+                    ],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
+                flash("Перезапуск SG-Panel запланирован через 2 секунды", "success")
+            else:
+                proc = subprocess.run(
+                    ["systemctl", "restart", unit],
+                    capture_output=True, text=True, timeout=30, check=False,
+                )
+                if proc.returncode != 0:
+                    raise XPanelError(
+                        (proc.stderr or proc.stdout).strip()
+                        or f"не удалось перезапустить {unit}"
+                    )
+                flash(f"Служба {unit} перезапущена", "success")
+        except (XPanelError, OSError, subprocess.TimeoutExpired) as exc:
+            flash(str(exc), "error")
+        return redirect(url_for("diagnostics_page"))
 
     @app.errorhandler(400)
     def bad_request(error):

@@ -30,7 +30,15 @@ CREATE TABLE IF NOT EXISTS server_settings (
     stats_enabled INTEGER NOT NULL DEFAULT 0 CHECK (stats_enabled IN (0, 1)),
     config_path TEXT NOT NULL DEFAULT '/usr/local/etc/xray/config.json',
     xray_bin TEXT NOT NULL DEFAULT '/usr/local/bin/xray',
-    xray_service TEXT NOT NULL DEFAULT 'xray'
+    xray_service TEXT NOT NULL DEFAULT 'xray',
+    inbound_profile TEXT NOT NULL DEFAULT 'raw_reality',
+    transport_listen TEXT NOT NULL DEFAULT '127.0.0.1',
+    transport_port INTEGER NOT NULL DEFAULT 8443 CHECK (transport_port BETWEEN 1 AND 65535),
+    xhttp_path TEXT NOT NULL DEFAULT '/sg-xhttp',
+    xhttp_mode TEXT NOT NULL DEFAULT 'auto',
+    grpc_service_name TEXT NOT NULL DEFAULT 'sg-grpc',
+    tls_cert_path TEXT NOT NULL DEFAULT '',
+    tls_key_path TEXT NOT NULL DEFAULT ''
 );
 
 CREATE TABLE IF NOT EXISTS users (
@@ -56,6 +64,12 @@ CREATE TABLE IF NOT EXISTS subscription_settings (
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS config_settings (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    document_json TEXT NOT NULL DEFAULT '{}',
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE IF NOT EXISTS routing_settings (
     id INTEGER PRIMARY KEY CHECK (id = 1),
     domain_strategy TEXT NOT NULL DEFAULT 'AsIs'
@@ -66,7 +80,8 @@ CREATE TABLE IF NOT EXISTS routing_settings (
     sniff_http INTEGER NOT NULL DEFAULT 1 CHECK (sniff_http IN (0, 1)),
     sniff_tls INTEGER NOT NULL DEFAULT 1 CHECK (sniff_tls IN (0, 1)),
     sniff_quic INTEGER NOT NULL DEFAULT 1 CHECK (sniff_quic IN (0, 1)),
-    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    extra_json TEXT NOT NULL DEFAULT '{}'
 );
 
 
@@ -133,7 +148,23 @@ CREATE TABLE IF NOT EXISTS outbounds (
     xhttp_mode TEXT NOT NULL DEFAULT 'auto',
     allow_insecure INTEGER NOT NULL DEFAULT 0 CHECK (allow_insecure IN (0, 1)),
     alpn TEXT NOT NULL DEFAULT '',
+    config_json TEXT NOT NULL DEFAULT '',
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS warp_settings (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    enabled INTEGER NOT NULL DEFAULT 0 CHECK (enabled IN (0, 1)),
+    outbound_json TEXT NOT NULL DEFAULT '',
+    account_json TEXT NOT NULL DEFAULT '',
+    route_mode TEXT NOT NULL DEFAULT 'off'
+        CHECK (route_mode IN ('off', 'selected', 'all')),
+    selected_domains TEXT NOT NULL DEFAULT '',
+    last_test_state TEXT NOT NULL DEFAULT '',
+    last_test_ip TEXT NOT NULL DEFAULT '',
+    last_test_at TEXT,
+    created_at TEXT,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -150,6 +181,8 @@ CREATE TABLE IF NOT EXISTS routing_rules (
     protocols TEXT NOT NULL DEFAULT '',
     inbound_tags TEXT NOT NULL DEFAULT '',
     users TEXT NOT NULL DEFAULT '',
+    target_type TEXT NOT NULL DEFAULT 'outbound',
+    config_json TEXT NOT NULL DEFAULT '',
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -257,6 +290,22 @@ def _migrate(con: sqlite3.Connection) -> None:
     _ensure_column(con, "server_settings", "api_listen", "TEXT NOT NULL DEFAULT '127.0.0.1:10085'")
     _ensure_column(con, "server_settings", "stats_enabled", "INTEGER NOT NULL DEFAULT 0")
 
+    # v0.10 RC3 inbound profiles
+    _ensure_column(con, "server_settings", "inbound_profile", "TEXT NOT NULL DEFAULT 'raw_reality'")
+    _ensure_column(con, "server_settings", "transport_listen", "TEXT NOT NULL DEFAULT '127.0.0.1'")
+    _ensure_column(con, "server_settings", "transport_port", "INTEGER NOT NULL DEFAULT 8443")
+    _ensure_column(con, "server_settings", "xhttp_path", "TEXT NOT NULL DEFAULT '/sg-xhttp'")
+    _ensure_column(con, "server_settings", "xhttp_mode", "TEXT NOT NULL DEFAULT 'auto'")
+    _ensure_column(con, "server_settings", "grpc_service_name", "TEXT NOT NULL DEFAULT 'sg-grpc'")
+    _ensure_column(con, "server_settings", "tls_cert_path", "TEXT NOT NULL DEFAULT ''")
+    _ensure_column(con, "server_settings", "tls_key_path", "TEXT NOT NULL DEFAULT ''")
+    con.execute("UPDATE server_settings SET inbound_profile='raw_reality' WHERE inbound_profile IS NULL OR inbound_profile=''")
+    con.execute("UPDATE server_settings SET transport_listen='127.0.0.1' WHERE transport_listen IS NULL OR transport_listen=''")
+    con.execute("UPDATE server_settings SET transport_port=8443 WHERE transport_port IS NULL OR transport_port=0")
+    con.execute("UPDATE server_settings SET xhttp_path='/sg-xhttp' WHERE xhttp_path IS NULL OR xhttp_path=''")
+    con.execute("UPDATE server_settings SET xhttp_mode='auto' WHERE xhttp_mode IS NULL OR xhttp_mode=''")
+    con.execute("UPDATE server_settings SET grpc_service_name='sg-grpc' WHERE grpc_service_name IS NULL OR grpc_service_name=''")
+
     # v0.5 users
     _ensure_column(con, "users", "comment", "TEXT NOT NULL DEFAULT ''")
     _ensure_column(con, "users", "expiry_at", "TEXT")
@@ -281,6 +330,14 @@ def _migrate(con: sqlite3.Connection) -> None:
     con.execute("UPDATE outbounds SET security = 'reality' WHERE security IS NULL OR security = ''")
     con.execute("UPDATE outbounds SET xhttp_path = '/' WHERE xhttp_path IS NULL OR xhttp_path = ''")
     con.execute("UPDATE outbounds SET xhttp_mode = 'auto' WHERE xhttp_mode IS NULL OR xhttp_mode = ''")
+
+    # v0.10 bidirectional form / JSON editing
+    _ensure_column(con, "outbounds", "config_json", "TEXT NOT NULL DEFAULT ''")
+    _ensure_column(con, "routing_rules", "target_type", "TEXT NOT NULL DEFAULT 'outbound'")
+    _ensure_column(con, "routing_rules", "config_json", "TEXT NOT NULL DEFAULT ''")
+    _ensure_column(con, "routing_settings", "extra_json", "TEXT NOT NULL DEFAULT '{}'")
+    con.execute("UPDATE routing_rules SET target_type = 'outbound' WHERE target_type IS NULL OR target_type = ''")
+    con.execute("UPDATE routing_settings SET extra_json = '{}' WHERE extra_json IS NULL OR extra_json = ''")
 
     # v0.8 persistent subscription URLs
     _ensure_column(con, "users", "subscription_enabled", "INTEGER NOT NULL DEFAULT 1")
@@ -320,6 +377,16 @@ def init_db() -> Path:
             INSERT OR IGNORE INTO subscription_settings (
                 id, enabled, base_url, profile_title
             ) VALUES (1, 0, '', 'SG-Panel')
+            """
+        )
+        con.execute(
+            "INSERT OR IGNORE INTO config_settings (id, document_json) VALUES (1, '{}')"
+        )
+        con.execute(
+            """
+            INSERT OR IGNORE INTO warp_settings (
+                id, enabled, outbound_json, account_json, route_mode, selected_domains
+            ) VALUES (1, 0, '', '', 'off', '')
             """
         )
         con.execute(

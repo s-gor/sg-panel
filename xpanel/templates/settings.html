@@ -1,74 +1,151 @@
 {% extends "base.html" %}
-{% block title %}Сервер — SG-Panel{% endblock %}
-{% block section %}SERVER SETTINGS{% endblock %}
-{% block heading %}Настройки сервера{% endblock %}
-{% block subtitle %}Входящее VLESS Reality-подключение, служебные параметры и доступ к панели{% endblock %}
+{% block title %}Inbound — SG-Panel{% endblock %}
+{% block section %}INBOUND{% endblock %}
+{% block heading %}Inbound{% endblock %}
+{% block subtitle %}Основное входящее подключение Xray, транспорт и параметры клиентских ссылок{% endblock %}
 {% block content %}
-<script>document.body.classList.add('ui-standard-page','server-settings-page');</script>
+<script>document.body.classList.add('ui-standard-page','server-settings-page','inbound-page');</script>
 <div class="ui-page ui-page-wide">
   <section class="ui-card server-main-card">
     <header class="ui-card-heading">
       <div>
-        <p class="panel-kicker">XRAY REALITY</p>
-        <h2>Входящее подключение</h2>
-        <p>Основные параметры сервера и данные, которые входят в клиентскую ссылку.</p>
+        <p class="panel-kicker">PRIMARY INBOUND</p>
+        <h2>Основное подключение</h2>
+        <p>Выберите готовую схему. Пользователи и UUID сохраняются, меняются транспорт, защита и клиентские ссылки.</p>
       </div>
     </header>
 
-    <form method="post" action="{{ url_for('settings_save') }}" class="ui-form server-settings-form">
+    <form method="post" action="{{ url_for('settings_save') }}" class="ui-form server-settings-form" id="server-profile-form">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
       <section class="ui-form-section">
-        <header><span>1</span><div><h3>Адрес и порт</h3><p>Публичный адрес сервера и локальный интерфейс прослушивания.</p></div></header>
-        <div class="ui-field-grid server-address-grid">
-          <label><span>Публичный адрес / домен</span><input name="address" value="{{ server.address }}" required></label>
-          <label><span>Порт</span><input name="port" type="number" min="1" max="65535" value="{{ server.port }}" required></label>
-          <label><span>Listen</span><input name="listen" value="{{ server.listen }}" required></label>
-          <label><span>Уровень журналирования</span><select name="loglevel">{% for value in ['debug','info','warning','error','none'] %}<option value="{{ value }}" {% if server.loglevel == value %}selected{% endif %}>{{ value }}</option>{% endfor %}</select></label>
+        <header><span>1</span><div><h3>Профиль подключения</h3><p>Три актуальные схемы, проверенные на реальном EC2.</p></div></header>
+        <div class="inbound-profile-grid" role="radiogroup" aria-label="Профиль входящего подключения">
+          <label class="inbound-profile-card">
+            <input type="radio" name="inbound_profile" value="raw_reality" {% if server.inbound_profile == 'raw_reality' %}checked{% endif %}>
+            <span class="profile-card-body"><span class="profile-card-top"><strong>RAW/TCP + REALITY</strong><b>Рекомендуется</b></span><small>Xray принимает соединение напрямую на 443. Используется Vision.</small></span>
+          </label>
+          <label class="inbound-profile-card">
+            <input type="radio" name="inbound_profile" value="xhttp_tls" {% if server.inbound_profile == 'xhttp_tls' %}checked{% endif %}>
+            <span class="profile-card-body"><span class="profile-card-top"><strong>XHTTP + TLS</strong><b>Основной TLS</b></span><small>Nginx принимает TLS на 443 и передаёт XHTTP локальному Xray.</small></span>
+          </label>
+          <label class="inbound-profile-card">
+            <input type="radio" name="inbound_profile" value="xhttp_reality" {% if server.inbound_profile == 'xhttp_reality' %}checked{% endif %}>
+            <span class="profile-card-body"><span class="profile-card-top"><strong>XHTTP + REALITY</strong><b>Расширенный</b></span><small>XHTTP без сертификата Let's Encrypt. Xray принимает соединение напрямую.</small></span>
+          </label>
         </div>
+        <div class="ui-info-note profile-change-note"><span>i</span><p>Нажмите «Сохранить и применить». SG-Panel сама соберёт JSON, проверит его, создаст резервную копию и перезапустит Xray. При ошибке рабочие конфиги Xray и Nginx будут восстановлены.</p></div>
       </section>
 
       <section class="ui-form-section">
-        <header><span>2</span><div><h3>Reality</h3><p>Маскировочный адрес, имя сервера и параметры клиента.</p></div></header>
-        <div class="ui-field-grid server-reality-grid">
-          <label><span>Reality target</span><input name="dest" value="{{ server.dest }}" required></label>
+        <header><span>2</span><div><h3>Публичное подключение</h3><p>Эти значения входят в VLESS-ссылки и QR-коды пользователей.</p></div></header>
+        <div class="ui-field-grid server-public-grid">
+          <label><span>Публичный адрес / домен</span><input name="address" value="{{ server.address }}" required></label>
+          <label><span>Публичный порт</span><input name="port" type="number" min="1" max="65535" value="{{ server.port }}" required></label>
           <label><span>Server name / SNI</span><input name="server_name" value="{{ server.server_name }}" required></label>
           <label><span>Fingerprint</span><input name="fingerprint" value="{{ server.fingerprint }}" required></label>
-          <label><span>Flow</span><select name="flow"><option value="" {% if not server.flow %}selected{% endif %}>без flow</option><option value="xtls-rprx-vision" {% if server.flow == 'xtls-rprx-vision' %}selected{% endif %}>xtls-rprx-vision</option><option value="xtls-rprx-vision-udp443" {% if server.flow == 'xtls-rprx-vision-udp443' %}selected{% endif %}>xtls-rprx-vision-udp443</option></select></label>
-          <label class="ui-field-wide"><span>Reality private key</span><input id="private-key" name="private_key" type="password" value="{{ server.private_key }}" required></label>
-          <label><span>Reality public key / password</span><input name="public_key" value="{{ server.public_key }}" required></label>
-          <label><span>Short ID</span><input name="short_id" value="{{ server.short_id }}" required></label>
+          <label data-profile-section="raw_reality"><span>Flow</span><select name="flow"><option value="" {% if not server.flow %}selected{% endif %}>без flow</option><option value="xtls-rprx-vision" {% if server.flow == 'xtls-rprx-vision' %}selected{% endif %}>xtls-rprx-vision</option><option value="xtls-rprx-vision-udp443" {% if server.flow == 'xtls-rprx-vision-udp443' %}selected{% endif %}>xtls-rprx-vision-udp443</option></select></label>
+        </div>
+        <details class="ui-details inbound-advanced-details">
+          <summary>Расширенный параметр Inbound</summary>
+          <div class="ui-field-grid ui-details-grid">
+            <label><span>Listen Xray</span><input name="listen" value="{{ server.listen }}" required><small>Адрес, на котором Xray принимает прямое подключение.</small></label>
+          </div>
+        </details>
+      </section>
+
+      <section class="ui-form-section profile-section" data-profile-section="raw_reality xhttp_reality">
+        <header><span>3</span><div><h3>REALITY</h3><p>Маскировочный адрес и ключи для профилей с REALITY.</p></div></header>
+        <div class="ui-field-grid server-reality-grid">
+          <label><span>Reality target</span><input name="dest" value="{{ server.dest }}"></label>
+          <label class="ui-field-wide"><span>Reality private key</span><input id="private-key" name="private_key" type="password" value="{{ server.private_key }}"></label>
+          <label><span>Reality public key / password</span><input name="public_key" value="{{ server.public_key }}"></label>
+          <label><span>Short ID</span><input name="short_id" value="{{ server.short_id }}"></label>
         </div>
       </section>
 
-      <section class="ui-form-section">
-        <header><span>3</span><div><h3>Статистика и служебные параметры</h3><p>Локальный Stats API и системные пути SG-Panel.</p></div></header>
-        <div class="ui-field-grid server-service-grid">
-          <label><span>Stats API listen</span><input name="api_listen" value="{{ server.api_listen }}" required></label>
-          <label class="ui-toggle-row ui-toggle-compact"><span><strong>Статистика Xray</strong><small>Трафик пользователей, входов и выходов.</small></span><input type="checkbox" name="stats_enabled" {% if server.stats_enabled %}checked{% endif %}><span class="switch" aria-hidden="true"></span></label>
+      <section class="ui-form-section profile-section" data-profile-section="xhttp_tls xhttp_reality">
+        <header><span>4</span><div><h3>XHTTP</h3><p>Path должен совпадать в Xray, Nginx и клиентской ссылке.</p></div></header>
+        <div class="ui-field-grid server-xhttp-grid">
+          <label><span>XHTTP Path</span><input name="xhttp_path" value="{{ server.xhttp_path }}" placeholder="/sg-xhttp"></label>
+          <label><span>Mode</span><select name="xhttp_mode">{% for value in ['auto','packet-up','stream-up','stream-one'] %}<option value="{{ value }}" {% if server.xhttp_mode == value %}selected{% endif %}>{{ value }}</option>{% endfor %}</select></label>
         </div>
-        <details class="ui-details"><summary>Системные пути</summary><div class="ui-field-grid ui-details-grid"><label><span>config.json</span><input name="config_path" value="{{ server.config_path }}" required></label><label><span>Xray binary</span><input name="xray_bin" value="{{ server.xray_bin }}" required></label><label><span>systemd service</span><input name="xray_service" value="{{ server.xray_service }}" required></label></div></details>
       </section>
 
-      <div class="ui-actions"><button class="button primary" type="submit">Сохранить настройки</button><button type="button" class="button ghost" onclick="const e=document.getElementById('private-key');e.type=e.type==='password'?'text':'password';this.textContent=e.type==='password'?'Показать private key':'Скрыть private key'">Показать private key</button></div>
+      <section class="ui-form-section profile-section" data-profile-section="xhttp_tls">
+        <header><span>5</span><div><h3>TLS и локальный Xray</h3><p>Nginx занимает публичный порт, Xray слушает только локальный адрес.</p></div></header>
+        <div class="ui-field-grid server-tls-grid">
+          <label><span>Локальный listen Xray</span><input name="transport_listen" value="{{ server.transport_listen }}" placeholder="127.0.0.1"></label>
+          <label><span>Локальный порт Xray</span><input name="transport_port" type="number" min="1" max="65535" value="{{ server.transport_port }}"></label>
+          <label class="ui-field-wide"><span>TLS certificate</span><input name="tls_cert_path" value="{{ server.tls_cert_path }}" placeholder="/etc/letsencrypt/live/domain/fullchain.pem"></label>
+          <label class="ui-field-wide"><span>TLS private key</span><input name="tls_key_path" value="{{ server.tls_key_path }}" placeholder="/etc/letsencrypt/live/domain/privkey.pem"></label>
+        </div>
+      </section>
+
+      <div class="ui-actions"><button class="button primary" type="submit">Сохранить и применить</button><button type="button" class="button ghost reality-key-toggle" onclick="const e=document.getElementById('private-key');e.type=e.type==='password'?'text':'password';this.textContent=e.type==='password'?'Показать private key':'Скрыть private key'">Показать private key</button></div>
     </form>
   </section>
 
-  <section class="ui-bottom-grid server-actions-grid">
-    <article class="ui-card ui-action-card">
-      <header class="ui-card-heading"><div><p class="panel-kicker">КЛЮЧИ REALITY</p><h2>Сгенерировать новый комплект</h2><p>Заменяет private key, public key и Short ID в базе данных.</p></div></header>
-      <div class="ui-warning-note"><span>!</span><p>Текущие клиенты продолжат работать до следующего применения конфигурации.</p></div>
-      <form method="post" action="{{ url_for('settings_generate_reality') }}" onsubmit="return confirm('Сгенерировать новые Reality-ключи? После применения конфигурации старые ссылки перестанут работать.')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button danger" type="submit">Сгенерировать новые ключи</button></form>
-    </article>
-
-    <article class="ui-card ui-action-card">
-      <header class="ui-card-heading"><div><p class="panel-kicker">ДОСТУП К ПАНЕЛИ</p><h2>Сменить пароль</h2><p>Новый пароль должен содержать не менее восьми символов.</p></div></header>
-      <form method="post" action="{{ url_for('settings_password') }}" class="ui-form ui-password-form">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <div class="ui-field-grid password-grid"><label><span>Текущий пароль</span><input type="password" name="current_password" required></label><label><span>Новый пароль</span><input type="password" name="new_password" minlength="8" required></label><label><span>Повторите новый пароль</span><input type="password" name="repeat_password" minlength="8" required></label></div>
-        <div class="ui-actions"><button class="button primary" type="submit">Сменить пароль</button></div>
-      </form>
-    </article>
+  <section class="ui-card ui-action-card reality-action-card inbound-reality-actions">
+    <header class="ui-card-heading"><div><p class="panel-kicker">КЛЮЧИ REALITY</p><h2>Сгенерировать новый комплект</h2><p>Заменяет private key, public key и Short ID в базе данных.</p></div></header>
+    <div class="ui-warning-note"><span>!</span><p>После применения текущие REALITY-ссылки перестанут работать.</p></div>
+    <form method="post" action="{{ url_for('settings_generate_reality') }}" onsubmit="return confirm('Сгенерировать новые Reality-ключи? После применения конфигурации старые ссылки перестанут работать.')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button danger" type="submit">Сгенерировать новые ключи</button></form>
   </section>
 </div>
+<script>
+(() => {
+  const form = document.getElementById('server-profile-form');
+  if (!form) return;
+  const selected = () => form.querySelector('input[name="inbound_profile"]:checked')?.value || 'raw_reality';
+  const address = form.querySelector('input[name="address"]');
+  const serverName = form.querySelector('input[name="server_name"]');
+  const dest = form.querySelector('input[name="dest"]');
+  const cert = form.querySelector('input[name="tls_cert_path"]');
+  const key = form.querySelector('input[name="tls_key_path"]');
+  const flow = form.querySelector('select[name="flow"]');
+  let previousProfile = '{{ server.inbound_profile }}';
+
+  function realityName() {
+    const value = (dest?.value || '').trim();
+    if (!value) return '';
+    if (value.startsWith('[')) return value.slice(1, value.indexOf(']'));
+    return value.includes(':') ? value.slice(0, value.lastIndexOf(':')) : value;
+  }
+
+  function applyProfileDefaults(profile) {
+    if (profile === previousProfile) return;
+    if (profile === 'xhttp_tls') {
+      if (serverName && address) serverName.value = address.value.trim();
+      if (flow) flow.value = '';
+      const domain = address?.value.trim() || '';
+      if (domain) {
+        if (cert && (!cert.value.trim() || cert.value.includes('/etc/letsencrypt/live/'))) cert.value = `/etc/letsencrypt/live/${domain}/fullchain.pem`;
+        if (key && (!key.value.trim() || key.value.includes('/etc/letsencrypt/live/'))) key.value = `/etc/letsencrypt/live/${domain}/privkey.pem`;
+      }
+    } else if (profile === 'raw_reality' || profile === 'xhttp_reality') {
+      const name = realityName();
+      if (serverName && name) serverName.value = name;
+      if (flow) flow.value = profile === 'raw_reality' ? 'xtls-rprx-vision' : '';
+    }
+    previousProfile = profile;
+  }
+
+  const update = (useDefaults = false) => {
+    const profile = selected();
+    if (useDefaults) applyProfileDefaults(profile);
+    document.querySelectorAll('[data-profile-section]').forEach((node) => {
+      const allowed = (node.dataset.profileSection || '').split(/\s+/).filter(Boolean);
+      node.hidden = !allowed.includes(profile);
+    });
+    document.querySelectorAll('.inbound-profile-card').forEach((card) => {
+      card.classList.toggle('is-selected', !!card.querySelector('input:checked'));
+    });
+    document.querySelectorAll('.reality-action-card,.reality-key-toggle').forEach((node) => {
+      node.hidden = !['raw_reality','xhttp_reality'].includes(profile);
+    });
+  };
+  form.querySelectorAll('input[name="inbound_profile"]').forEach((radio) => radio.addEventListener('change', () => update(true)));
+  update();
+})();
+</script>
 {% endblock %}

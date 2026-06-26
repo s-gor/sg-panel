@@ -14,6 +14,19 @@
     <article class="ui-status-card"><span>Listen панели</span><strong class="ui-value-compact mono">{{ panel_bind }}:{{ panel_port }}</strong><small>Текущий IP: {{ current_ip }}</small></article>
   </section>
 
+  <section class="ui-card ui-action-card security-password-card">
+    <header class="ui-card-heading"><div><p class="panel-kicker">ДОСТУП К ПАНЕЛИ</p><h2>Сменить пароль</h2><p>После смены пароля все административные сессии будут завершены.</p></div></header>
+    <form method="post" action="{{ url_for('settings_password') }}" class="ui-form ui-password-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="ui-field-grid password-grid">
+        <label><span>Текущий пароль</span><input type="password" name="current_password" required></label>
+        <label><span>Новый пароль</span><input type="password" name="new_password" minlength="8" required></label>
+        <label><span>Повторите новый пароль</span><input type="password" name="repeat_password" minlength="8" required></label>
+      </div>
+      <div class="ui-actions"><button class="button primary" type="submit">Сменить пароль</button></div>
+    </form>
+  </section>
+
   <section class="ui-top-grid security-main-grid">
     <article class="ui-card ui-card-form">
       <header class="ui-card-heading"><div><p class="panel-kicker">ПОЛИТИКА ДОСТУПА</p><h2>Вход и сессии</h2><p>Ограничения входа, срок сессии и сетевой доступ к панели.</p></div></header>

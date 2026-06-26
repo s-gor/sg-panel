@@ -2,54 +2,51 @@
 {% block title %}Обзор — SG-Panel{% endblock %}
 {% block section %}DASHBOARD{% endblock %}
 {% block heading %}Состояние системы{% endblock %}
-{% block subtitle %}Xray, конфигурация, пользователи и основные параметры{% endblock %}
+{% block subtitle %}Краткий ответ на главный вопрос: всё ли сейчас работает{% endblock %}
 {% block content %}
-<script>document.body.classList.add('ui-standard-page','dashboard-page');</script>
+<script>document.body.classList.add('ui-standard-page','dashboard-page','dashboard-clean');</script>
 <div class="ui-page ui-page-wide">
 {% if error %}<div class="alert error">{{ error }}</div>{% endif %}
 {% if status %}
-  <section class="ui-dashboard-metrics">
-    <article class="ui-status-card"><span>Служба Xray</span><strong class="{{ 'text-success' if status.service == 'active' else 'text-danger' }}">{{ status.service }}</strong><small>systemd service</small></article>
-    <article class="ui-status-card"><span>Конфигурация</span><strong class="{{ 'text-success' if status.config_state == 'OK' else 'text-danger' }}">{{ status.config_state }}</strong><small>xray run -test</small></article>
-    <article class="ui-status-card"><span>Пользователи</span><strong>{{ status.enabled_users }} / {{ status.total_users }}</strong><small>{% if status.expired_users %}Истекло: {{ status.expired_users }}{% else %}Активных / всего{% endif %}</small></article>
-    <article class="ui-status-card"><span>Общий трафик</span><strong>{{ status.traffic_total_human }}</strong><small>{{ 'Stats API включён' if status.stats_enabled else 'Статистика выключена' }}</small></article>
-    <article class="ui-status-card"><span>Правила маршрутизации</span><strong>{{ status.rules_enabled }} / {{ status.rules_total }}</strong><small>{{ status.domain_strategy }} · sniffing {{ 'включён' if status.sniffing_enabled else 'выключен' }}</small></article>
-    <article class="ui-status-card"><span>Подписки</span><strong>{{ 'Включены' if status.subscriptions_global_enabled else 'Выключены' }}</strong><small>{{ status.subscriptions_enabled }} пользовательских URL</small></article>
+  <section class="dashboard-health {{ 'is-ok' if status.overall_ok else 'is-error' }}">
+    <span class="dashboard-health-dot" aria-hidden="true"></span>
+    <div>
+      <strong>{{ 'Всё работает' if status.overall_ok else 'Требуется внимание' }}</strong>
+      <p>{% if status.overall_ok %}Xray активен, рабочий config.json корректен.{% else %}Откройте Diagnostics, чтобы увидеть подробности и выполнить проверки.{% endif %}</p>
+    </div>
+    <a class="button ghost small" href="{{ url_for('diagnostics_page') }}">Открыть Diagnostics</a>
   </section>
 
-  <section class="ui-top-grid dashboard-main-grid">
-    <article class="ui-card ui-action-card">
-      <header class="ui-card-heading"><div><p class="panel-kicker">УПРАВЛЕНИЕ</p><h2>Конфигурация Xray</h2><p>Применение создаёт новый JSON, проверяет его, сохраняет предыдущий конфиг и только затем перезапускает Xray.</p></div></header>
-      <div class="ui-operation-steps">
-        <div><span>1</span><strong>Сборка</strong><small>Данные из SQLite</small></div>
-        <div><span>2</span><strong>Проверка</strong><small>xray run -test</small></div>
-        <div><span>3</span><strong>Применение</strong><small>Backup и restart</small></div>
-      </div>
-      <div class="ui-actions">
-        <form method="post" action="{{ url_for('apply_route') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button primary" type="submit">Применить конфигурацию</button></form>
-        <a class="button secondary" href="{{ url_for('config_page') }}">Проверить JSON</a>
-        <form method="post" action="{{ url_for('restart_route') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button secondary" type="submit">Перезапустить Xray</button></form>
-      </div>
-    </article>
-
-    <article class="ui-card ui-node-card">
-      <header class="ui-card-heading ui-card-heading-row"><div><p class="panel-kicker">REALITY</p><h2>Параметры узла</h2><p>Основные сведения о текущем входящем подключении.</p></div><a class="button ghost small" href="{{ url_for('settings_page') }}">Настроить</a></header>
-      <dl class="ui-details-list">
-        <div><dt>Адрес</dt><dd><code>{{ status.address }}:{{ status.port }}</code></dd></div>
-        <div><dt>Назначение</dt><dd>{{ status.dest }}</dd></div>
-        <div><dt>Server name</dt><dd>{{ status.server_name }}</dd></div>
-        <div><dt>Конфигурация</dt><dd><code>{{ status.config_path }}</code></dd></div>
-        <div><dt>Stats API</dt><dd><code>{{ status.api_listen }}</code></dd></div>
-      </dl>
-      <div class="ui-info-note"><span>i</span><p><strong>Reality private key скрыт.</strong> Он доступен только на странице настроек сервера.</p></div>
-    </article>
+  <section class="ui-dashboard-metrics dashboard-clean-metrics">
+    <a class="ui-status-card ui-status-link" href="{{ url_for('diagnostics_page') }}">
+      <span>Xray</span><strong class="{{ 'text-success' if status.service == 'active' else 'text-danger' }}">{{ status.service }}</strong><small>{{ 'Работает' if status.service == 'active' else 'Проверить службу' }}</small>
+    </a>
+    <a class="ui-status-card ui-status-link" href="{{ url_for('settings_page') }}">
+      <span>Inbound</span><strong class="ui-value-compact">{{ status.inbound_profile_label }}</strong><small>{{ status.address }}:{{ status.port }}</small>
+    </a>
+    <a class="ui-status-card ui-status-link" href="{{ url_for('outbounds_page') }}">
+      <span>Default Outbound</span><strong class="ui-value-compact">{{ status.default_outbound_tag|upper }}</strong><small>Выход для остального трафика</small>
+    </a>
+    <a class="ui-status-card ui-status-link" href="{{ url_for('users_page') }}">
+      <span>Пользователи</span><strong>{{ status.enabled_users }} / {{ status.total_users }}</strong><small>{% if status.expired_users %}Истекло: {{ status.expired_users }}{% else %}Активных / всего{% endif %}</small>
+    </a>
+    <a class="ui-status-card ui-status-link" href="{{ url_for('users_page') }}">
+      <span>Общий трафик</span><strong>{{ status.traffic_total_human }}</strong><small>{{ 'Stats API включён' if status.stats_enabled else 'Статистика выключена' }}</small>
+    </a>
+    <a class="ui-status-card ui-status-link" href="{{ url_for('config_page') }}">
+      <span>Последнее применение</span><strong class="ui-value-compact">{{ status.config_updated_at or 'ещё не выполнялось' }}</strong><small>Рабочий config.json</small>
+    </a>
   </section>
 
-  <section class="ui-card ui-table-card">
-    <header class="ui-card-heading ui-card-heading-row"><div><p class="panel-kicker">ПОЛЬЗОВАТЕЛИ</p><h2>Последние пользователи</h2><p>Краткий список записей из panel.db.</p></div><a class="button ghost small" href="{{ url_for('users_page') }}">Открыть всех</a></header>
-    {% if users %}<div class="table-wrap"><table><thead><tr><th>ID</th><th>Пользователь</th><th>Статус</th><th>Трафик</th><th>UUID</th></tr></thead><tbody>
-    {% for user in users %}<tr><td><span class="table-id">#{{ user.id }}</span></td><td><div class="user-cell"><span class="avatar">{{ user.name[:1]|upper }}</span><div><strong>{{ user.name }}</strong>{% if user.comment %}<small>{{ user.comment }}</small>{% endif %}</div></div></td><td>{% if user_is_expired(user) %}<span class="pill disabled"><i></i>Истёк</span>{% else %}<span class="pill {{ 'enabled' if user.enabled else 'disabled' }}"><i></i>{{ 'Активен' if user.enabled else 'Отключён' }}</span>{% endif %}</td><td>{{ format_bytes(stats.get(user.id, {}).get('total', 0)) }}</td><td><code class="uuid-code">{{ user.uuid }}</code></td></tr>{% endfor %}
-    </tbody></table></div>{% else %}<div class="ui-empty-compact"><strong>Пользователей пока нет</strong><p>Создайте первую запись на странице «Пользователи».</p></div>{% endif %}
+  <section class="ui-card dashboard-path-card">
+    <header class="ui-card-heading">
+      <div><p class="panel-kicker">БЫСТРЫЙ ПУТЬ</p><h2>Обычная настройка без повторных кнопок</h2><p>Измените нужный раздел и нажмите «Сохранить и применить». Проверка, резервная копия и перезапуск Xray выполняются автоматически.</p></div>
+    </header>
+    <div class="dashboard-path-grid">
+      <a href="{{ url_for('settings_page') }}"><span>1</span><strong>Inbound</strong><small>Как клиент подключается к серверу</small></a>
+      <a href="{{ url_for('outbounds_page') }}"><span>2</span><strong>Outbounds</strong><small>Какие выходы доступны Xray</small></a>
+      <a href="{{ url_for('routing_page') }}"><span>3</span><strong>Routing</strong><small>Какой трафик направлять в каждый выход</small></a>
+    </div>
   </section>
 {% endif %}
 </div>

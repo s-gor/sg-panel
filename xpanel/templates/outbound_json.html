@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}JSON выхода — SG-Panel{% endblock %}
+{% block section %}OUTBOUNDS / JSON{% endblock %}
+{% block heading %}{{ 'JSON выхода' if outbound else 'Новый выход из JSON' }}{% endblock %}
+{% block subtitle %}Тот же объект Xray, который редактируется графической формой{% endblock %}
+{% block content %}
+<script>document.body.classList.add('ui-standard-page','json-workbench-page');</script>
+<div class="ui-page json-workbench">
+  <section class="ui-card">
+    <header class="ui-card-heading ui-card-heading-row">
+      <div>
+        <p class="panel-kicker">РАСШИРЕННЫЙ РЕДАКТОР</p>
+        <h2>{{ outbound.tag if outbound else 'VLESS-выход' }}</h2>
+        <p>Известные поля синхронизируются с формой. Дополнительные параметры Xray сохраняются и не удаляются при последующем редактировании через GUI.</p>
+      </div>
+      <span class="json-mode-badge">{ } JSON</span>
+    </header>
+
+    <div class="json-info-grid">
+      <div><strong>Одна конфигурация</strong><span>После сохранения изменения появятся на обычной странице выхода.</span></div>
+      <div><strong>Безопасная проверка</strong><span>Итоговый config.json всё равно проходит xray run -test перед применением.</span></div>
+      <div><strong>Метаданные панели</strong><span>Блок <code>_sgPanel</code> хранит название и состояние; в Xray он не передаётся.</span></div>
+    </div>
+
+    <form method="post" action="{{ url_for('outbound_json_edit', outbound_id=outbound.id) if outbound else url_for('outbound_json_add') }}" class="json-editor-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label class="json-editor-label" for="json_config">Объект outbound</label>
+      <textarea id="json_config" name="json_config" class="json-editor" spellcheck="false" autocomplete="off">{{ outbound_json }}</textarea>
+      <div class="json-editor-actions">
+        <a class="button secondary" href="{{ url_for('outbound_edit_page', outbound_id=outbound.id) if outbound else url_for('outbounds_page') }}">{{ 'Открыть форму' if outbound else 'Отмена' }}</a>
+        <button class="button ghost" type="button" data-format-json>Форматировать</button>
+        <button class="button primary" type="submit">{{ 'Сохранить JSON' if outbound else 'Создать выход' }}</button>
+      </div>
+    </form>
+  </section>
+</div>
+<script>
+(() => {
+  const editor = document.getElementById('json_config');
+  const button = document.querySelector('[data-format-json]');
+  button?.addEventListener('click', () => {
+    try {
+      editor.value = JSON.stringify(JSON.parse(editor.value), null, 2) + '\n';
+    } catch (error) {
+      alert('JSON содержит ошибку: ' + error.message);
+    }
+  });
+})();
+</script>
+{% endblock %}

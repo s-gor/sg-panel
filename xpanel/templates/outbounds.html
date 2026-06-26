@@ -1,7 +1,7 @@
 {% extends "base.html" %}
-{% block title %}Выходы — SG-Panel{% endblock %}
+{% block title %}Outbounds — SG-Panel{% endblock %}
 {% block section %}OUTBOUNDS{% endblock %}
-{% block heading %}Исходящие подключения{% endblock %}
+{% block heading %}Outbounds{% endblock %}
 {% block subtitle %}Системные и пользовательские выходы Xray{% endblock %}
 {% block content %}
 <script>document.body.classList.add('outbounds-page');</script>
@@ -9,7 +9,7 @@
   <section class="ob-system-panel" aria-labelledby="ob-system-title">
     <header class="ob-section-heading">
       <div>
-        <h2 id="ob-system-title">Системные выходы</h2>
+        <h2 id="ob-system-title">System outbounds</h2>
         <p>Встроенные маршруты Xray: прямой доступ и блокировка трафика.</p>
       </div>
     </header>
@@ -39,14 +39,74 @@
     </div>
   </section>
 
+  <section class="warp-panel" aria-labelledby="warp-title">
+    <header class="warp-heading">
+      <div>
+        <p class="panel-kicker">CLOUDFLARE</p>
+        <h2 id="warp-title">WARP Outbound</h2>
+        <p>Встроенный WireGuard-outbound Xray. Системный WARP-клиент и отдельный сетевой интерфейс не требуются.</p>
+      </div>
+      <div class="warp-status {{ 'is-on' if warp.enabled else ('is-ready' if warp.configured else 'is-off') }}">
+        <i aria-hidden="true"></i>
+        {% if warp.enabled %}Активен{% elif warp.configured %}Отключён{% else %}Не настроен{% endif %}
+      </div>
+    </header>
+
+    {% if not warp.configured %}
+    <div class="warp-create-box">
+      <div>
+        <strong>Создать выход <code>warp</code></strong>
+        <p>SG-Panel зарегистрирует учётные данные Cloudflare и добавит native WireGuard outbound в конфигурацию Xray.</p>
+        {% if not warp.helper_installed %}<small class="warp-helper-warning">Компонент wgcf-cli не найден. Повторно запустите установщик SG-Panel.</small>{% endif %}
+      </div>
+      <form method="post" action="{{ url_for('warp_create') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button class="button primary" type="submit" {% if not warp.helper_installed %}disabled{% endif %}>Создать WARP</button>
+      </form>
+    </div>
+    {% else %}
+    <div class="warp-summary-grid">
+      <article>
+        <span>Outbound tag</span>
+        <strong><code>warp</code></strong>
+        <small>protocol: wireguard · noKernelTun</small>
+      </article>
+      <article>
+        <span>Последняя проверка</span>
+        <strong>{{ warp.last_test_ip or 'ещё не выполнялась' }}</strong>
+        <small>{{ warp.last_test_state or 'Нажмите «Проверить WARP».' }}{% if warp.last_test_at %} · {{ warp.last_test_at }}{% endif %}</small>
+      </article>
+    </div>
+
+    <div class="warp-actions">
+      <form method="post" action="{{ url_for('warp_test') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button secondary" type="submit" {% if not warp.enabled %}disabled{% endif %}>Проверить WARP</button></form>
+      <form method="post" action="{{ url_for('warp_toggle') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button secondary" type="submit">{{ 'Отключить' if warp.enabled else 'Включить' }}</button></form>
+      <form method="post" action="{{ url_for('warp_regenerate') }}" onsubmit="return confirm('Пересоздать учётные данные WARP? После применения старый выход будет заменён.')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button ghost" type="submit">Пересоздать</button></form>
+      <form method="post" action="{{ url_for('warp_delete') }}" onsubmit="return confirm('Удалить WARP и связанные правила маршрутизации?')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button danger" type="submit">Удалить</button></form>
+    </div>
+
+    {% endif %}
+
+    <div class="warp-routing-link">
+      <div>
+        <strong>Маршрутизация настраивается отдельно</strong>
+        <p>Режим «выбранные сайты» или «весь трафик» находится на странице <b>Routing</b>.</p>
+      </div>
+      <a class="button primary" href="{{ url_for('routing_page') }}">Открыть Routing</a>
+    </div>
+  </section>
+
   <section class="ob-user-outputs-panel" aria-labelledby="ob-user-outputs-title">
     <header class="ob-user-outputs-heading">
       <div>
         <p class="panel-kicker">ВЫХОДЫ</p>
-        <h2 id="ob-user-outputs-title">Пользовательские выходы</h2>
+        <h2 id="ob-user-outputs-title">Custom outbounds</h2>
         <p>Каждый выход имеет собственные параметры подключения и отдельный тег.</p>
       </div>
-      <button class="button primary ob-output-toggle" type="button" aria-expanded="false" aria-controls="ob-output-form">Добавить выход</button>
+      <div class="ui-heading-actions">
+        <a class="button secondary" href="{{ url_for('outbound_json_new_page') }}">{ } Создать из JSON</a>
+        <button class="button primary ob-output-toggle" type="button" aria-expanded="false" aria-controls="ob-output-form">Добавить выход</button>
+      </div>
     </header>
 
     <div class="ob-user-output-list">
@@ -62,20 +122,33 @@
             <span>{{ outbound.name }}</span>
           </div>
           <p>{{ outbound.description }}</p>
+          {% if outbound.json_only %}
+          <small>Управляется через полный JSON конфигурации</small>
+          {% else %}
           <small>{{ outbound.address }}:{{ outbound.port }} · {{ outbound.transport_label }} · {{ outbound.security_label }}</small>
+          {% endif %}
         </div>
 
         <div class="ob-system-meta" aria-label="Состояние выхода">
           <code>{{ outbound.protocol }}</code>
           {% if outbound.tag == default_outbound_tag %}<span class="ob-meta-label is-default"><i aria-hidden="true"></i>По умолчанию</span>{% endif %}
+          {% if outbound.json_only %}
+          <span class="ob-meta-label">JSON</span>
+          {% else %}
           <span class="ob-meta-label {{ 'is-on' if outbound.enabled else 'is-off' }}"><i aria-hidden="true"></i>{{ 'Активен' if outbound.enabled else 'Отключён' }}</span>
+          {% endif %}
         </div>
 
         <div class="ob-system-actions">
-          <a class="button ghost small" href="{{ url_for('outbound_edit_page', outbound_id=outbound.id) }}">Изменить</a>
+          {% if outbound.json_only %}
+          <a class="button ghost small json-action" href="{{ url_for('config_json_page') }}">{ } Полный JSON</a>
+          {% else %}
+          <a class="button ghost small" href="{{ url_for('outbound_edit_page', outbound_id=outbound.id) }}">Форма</a>
+          <a class="button ghost small json-action" href="{{ url_for('outbound_json_edit_page', outbound_id=outbound.id) }}">{ } JSON</a>
           <form method="post" action="{{ url_for('outbound_test', outbound_id=outbound.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button secondary small" type="submit">Проверить TCP</button></form>
           <form method="post" action="{{ url_for('outbound_toggle', outbound_id=outbound.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button secondary small" type="submit">{{ 'Отключить' if outbound.enabled else 'Включить' }}</button></form>
           <form method="post" action="{{ url_for('outbound_delete', outbound_id=outbound.id) }}" onsubmit="return confirm('Удалить выход {{ outbound.tag }}?')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button danger small" type="submit">Удалить</button></form>
+          {% endif %}
         </div>
       </article>
     {% else %}
@@ -184,7 +257,7 @@
             <div><h3>Защита соединения</h3><p>Параметры должны совпадать с настройками защиты удалённого inbound.</p></div>
           </header>
           <div class="ob-fields ob-fields-security">
-            <label><span>Server name / SNI</span><input name="server_name" required placeholder="www.microsoft.com"></label>
+            <label><span>Server name / SNI</span><input name="server_name" required placeholder="www.bing.com"></label>
             <label><span>Fingerprint</span><input name="fingerprint" value="chrome" required></label>
           </div>
 
@@ -210,7 +283,7 @@
       </div>
 
       <footer class="ob-form-footer">
-        <p>После создания проверьте конфигурацию и примените её на странице «Конфиг».</p>
+        <p>После создания SG-Panel автоматически проверит и применит конфигурацию.</p>
         <button class="button primary" type="submit">Создать выход</button>
       </footer>
     </form>

@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}JSON правила — SG-Panel{% endblock %}
+{% block section %}ROUTING / RULE JSON{% endblock %}
+{% block heading %}{{ 'JSON правила' if rule else 'Новое правило из JSON' }}{% endblock %}
+{% block subtitle %}Расширенные условия маршрутизации без потери графического управления{% endblock %}
+{% block content %}
+<script>document.body.classList.add('ui-standard-page','json-workbench-page');</script>
+<div class="ui-page json-workbench">
+  <section class="ui-card">
+    <header class="ui-card-heading ui-card-heading-row">
+      <div>
+        <p class="panel-kicker">ROUTING RULE</p>
+        <h2>{{ rule.name if rule else 'Новое правило' }}</h2>
+        <p>Можно добавлять поля Xray, которых ещё нет в форме. SG-Panel сохранит их при дальнейших изменениях основных параметров.</p>
+      </div>
+      <span class="json-mode-badge">{ } JSON</span>
+    </header>
+    <div class="json-callout">
+      <strong>Поддерживаются outboundTag и balancerTag.</strong>
+      <span>Блок <code>_sgPanel</code> хранит название, приоритет и состояние правила и удаляется из итогового config.json.</span>
+    </div>
+    <form method="post" action="{{ url_for('routing_rule_json_edit', rule_id=rule.id) if rule else url_for('routing_rule_json_add') }}" class="json-editor-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label class="json-editor-label" for="json_config">Объект routing rule</label>
+      <textarea id="json_config" name="json_config" class="json-editor" spellcheck="false">{{ rule_json }}</textarea>
+      <div class="json-editor-actions">
+        <a class="button secondary" href="{{ url_for('routing_rule_edit_page', rule_id=rule.id) if rule else url_for('routing_page') }}">{{ 'Открыть форму' if rule else 'Отмена' }}</a>
+        <button class="button ghost" type="button" data-format-json>Форматировать</button>
+        <button class="button primary" type="submit">{{ 'Сохранить JSON' if rule else 'Создать правило' }}</button>
+      </div>
+    </form>
+  </section>
+</div>
+<script>
+(() => {
+  const editor = document.getElementById('json_config');
+  document.querySelector('[data-format-json]')?.addEventListener('click', () => {
+    try { editor.value = JSON.stringify(JSON.parse(editor.value), null, 2) + '\n'; }
+    catch (error) { alert('JSON содержит ошибку: ' + error.message); }
+  });
+})();
+</script>
+{% endblock %}

@@ -13,6 +13,6 @@
     <label><span>Комментарий</span><textarea name="comment" rows="4" maxlength="500">{{ user.comment }}</textarea></label>
     <div class="actions"><button class="button primary" type="submit">Сохранить изменения</button><a class="button secondary" href="{{ url_for('users_page') }}">Отмена</a></div>
   </form>
-  <div class="danger-zone"><div><p class="panel-kicker">ROTATE IDENTITY</p><h3>Сменить UUID</h3><p>После Apply config старая VLESS-ссылка перестанет работать.</p></div><form method="post" action="{{ url_for('user_regenerate_uuid', user_id=user.id) }}" onsubmit="return confirm('Создать новый UUID для {{ user.name }}?')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button danger" type="submit">Создать новый UUID</button></form></div>
+  <div class="danger-zone"><div><p class="panel-kicker">ROTATE IDENTITY</p><h3>Сменить UUID</h3><p>После подтверждения новая конфигурация будет применена сразу, и старая VLESS-ссылка перестанет работать.</p></div><form method="post" action="{{ url_for('user_regenerate_uuid', user_id=user.id) }}" onsubmit="return confirm('Создать новый UUID для {{ user.name }}?')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button danger" type="submit">Создать новый UUID</button></form></div>
 </section>
 {% endblock %}

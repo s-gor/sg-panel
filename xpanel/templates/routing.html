@@ -1,30 +1,91 @@
 {% extends "base.html" %}
-{% block title %}Маршрутизация — SG-Panel{% endblock %}
+{% block title %}Routing — SG-Panel{% endblock %}
 {% block section %}ROUTING{% endblock %}
-{% block heading %}Маршрутизация{% endblock %}
+{% block heading %}Routing{% endblock %}
 {% block subtitle %}Правила направления трафика по системным и пользовательским выходам{% endblock %}
 {% block content %}
 <script>document.body.classList.add('ui-standard-page','routing-page');</script>
 <div class="ui-page ui-page-wide">
   <section class="ui-card routing-settings-card">
-    <header class="ui-card-heading"><div><p class="panel-kicker">ОСНОВНЫЕ ПАРАМЕТРЫ</p><h2>Обработка трафика</h2><p>Выход по умолчанию, стратегия доменов и распознавание протоколов.</p></div></header>
+    <header class="ui-card-heading ui-card-heading-row"><div><p class="panel-kicker">ОСНОВНЫЕ ПАРАМЕТРЫ</p><h2>Обработка трафика</h2><p>Выход по умолчанию, стратегия доменов и распознавание протоколов.</p></div><a class="button secondary" href="{{ url_for('routing_json_page') }}">{ } JSON routing</a></header>
     <form method="post" action="{{ url_for('routing_settings_save') }}" class="ui-form routing-settings-form">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="routing-settings-grid">
-        <label><span>Выход по умолчанию</span><select name="default_outbound_tag">{% for tag in outbound_tags %}{% if tag != 'blocked' %}<option value="{{ tag }}" {% if settings.default_outbound_tag == tag %}selected{% endif %}>{{ tag }}</option>{% endif %}{% endfor %}</select><small>Используется, когда ни одно правило не совпало.</small></label>
+        <label><span>Выход по умолчанию</span><select name="default_outbound_tag">{% for tag in outbound_tags %}{% if tag != 'blocked' %}<option value="{{ tag }}" {% if settings.default_outbound_tag == tag %}selected{% endif %}>{{ tag }}</option>{% endif %}{% endfor %}</select><small>Используется, когда ни одно правило не совпало. Выбор <code>warp</code> синхронизирует режим «Весь трафик» ниже.</small></label>
         <label><span>Стратегия доменов</span><select name="domain_strategy">{% for value in ['AsIs','IPIfNonMatch','IPOnDemand'] %}<option value="{{ value }}" {% if settings.domain_strategy == value %}selected{% endif %}>{{ value }}</option>{% endfor %}</select></label>
         <label class="ui-toggle-row ui-toggle-compact"><span><strong>Sniffing</strong><small>Определять фактический протокол и домен.</small></span><input type="checkbox" name="sniffing_enabled" {% if settings.sniffing_enabled %}checked{% endif %}><span class="switch" aria-hidden="true"></span></label>
         <label class="ui-toggle-row ui-toggle-compact"><span><strong>Route only</strong><small>Использовать найденный домен только для маршрутизации.</small></span><input type="checkbox" name="sniffing_route_only" {% if settings.sniffing_route_only %}checked{% endif %}><span class="switch" aria-hidden="true"></span></label>
       </div>
       <div class="routing-protocol-row"><span>Распознавать протоколы</span><div class="checks-inline"><label class="check-chip"><input type="checkbox" name="sniff_http" {% if settings.sniff_http %}checked{% endif %}><span>HTTP</span></label><label class="check-chip"><input type="checkbox" name="sniff_tls" {% if settings.sniff_tls %}checked{% endif %}><span>TLS</span></label><label class="check-chip"><input type="checkbox" name="sniff_quic" {% if settings.sniff_quic %}checked{% endif %}><span>QUIC</span></label></div></div>
-      <div class="ui-actions"><button class="button primary" type="submit">Сохранить настройки</button></div>
+      <div class="ui-actions"><button class="button primary" type="submit">Сохранить и применить</button></div>
+    </form>
+  </section>
+
+  <section class="warp-panel warp-routing-card" aria-labelledby="warp-routing-title">
+    <header class="warp-heading">
+      <div>
+        <p class="panel-kicker">CLOUDFLARE WARP</p>
+        <h2 id="warp-routing-title">WARP Routing</h2>
+        <p>Здесь выбирается, какой трафик направлять через outbound <code>warp</code>.</p>
+      </div>
+      <div class="warp-status {{ 'is-on' if warp.enabled else ('is-ready' if warp.configured else 'is-off') }}">
+        <i aria-hidden="true"></i>
+        {% if warp.enabled %}Outbound активен{% elif warp.configured %}Outbound отключён{% else %}Outbound не настроен{% endif %}
+      </div>
+    </header>
+
+    {% if not warp.configured %}
+    <div class="warp-create-box">
+      <div>
+        <strong>Сначала создайте WARP Outbound</strong>
+        <p>Учётные данные и WireGuard-outbound создаются на странице <b>Outbounds</b>.</p>
+      </div>
+      <a class="button primary" href="{{ url_for('outbounds_page') }}">Открыть Outbounds</a>
+    </div>
+    {% else %}
+    <form method="post" action="{{ url_for('warp_routing') }}" class="warp-routing-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="warp-route-options">
+        <label><input type="radio" name="route_mode" value="off" {% if warp.route_mode == 'off' %}checked{% endif %}><span><strong>Не использовать WARP</strong><small>Outbound остаётся доступным, но автоматическая маршрутизация выключена.</small></span></label>
+        <label><input type="radio" name="route_mode" value="selected" {% if warp.route_mode == 'selected' %}checked{% endif %}><span><strong>Только выбранные сайты</strong><small>Создаётся правило Cloudflare WARP с приоритетом 40.</small></span></label>
+        <label><input type="radio" name="route_mode" value="all" {% if warp.route_mode == 'all' %}checked{% endif %}><span><strong>Весь трафик через WARP</strong><small>Outbound <code>warp</code> становится выходом по умолчанию.</small></span></label>
+      </div>
+      <div class="geo-policy-note"><strong>Текущий default outbound:</strong> <code>{{ settings.default_outbound_tag }}</code>. {% if warp.route_mode == 'all' %}Отдельное правило WARP не создаётся: весь трафик без совпавшего правила идёт через первый outbound <code>warp</code>.{% elif warp.route_mode == 'selected' %}Для выбранных доменов создаётся отдельное правило с выходом <code>warp</code>.{% else %}Автоматическая маршрутизация через WARP отключена.{% endif %}</div>
+      <label class="warp-domains"><span>Домены для выборочного режима</span><textarea name="selected_domains" rows="10">{{ warp.selected_domains or warp.default_domains }}</textarea><small>По одному условию в строке. Допускаются domain:, full:, keyword:, regexp: и geosite:.</small></label>
+      <div class="warp-routing-footer">
+        <p>{% if warp.enabled %}Настройка будет сразу проверена и применена к Xray.{% else %}Сначала включите WARP Outbound на странице Outbounds.{% endif %}</p>
+        <button class="button primary" type="submit" {% if not warp.enabled %}disabled{% endif %}>Сохранить и применить</button>
+      </div>
+    </form>
+    {% endif %}
+  </section>
+
+  <section class="ui-card geo-policy-card">
+    <header class="ui-card-heading ui-card-heading-row">
+      <div><p class="panel-kicker">ГЕО-ПРАВИЛА</p><h2>Готовые региональные правила</h2><p>SG-Panel создаёт обычные geosite/geoip-правила Xray. Для страны создаются два отдельных правила: домены и IP.</p></div>
+      <div class="geodata-status">
+        {% for item in geodata %}
+        <span class="geodata-file {{ 'is-ready' if item.installed else 'is-missing' }}"><i></i><strong>{{ item.name }}</strong><small>{{ format_bytes(item.size) if item.installed else 'не найден' }}</small></span>
+        {% endfor %}
+      </div>
+    </header>
+    <form method="post" action="{{ url_for('routing_geo_preset_add') }}" class="ui-form geo-policy-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="ui-field-grid geo-policy-grid">
+        <label><span>Шаблон</span><select name="kind" data-geo-kind><option value="ads">Блокировать рекламу</option><option value="private">Локальные сети</option><option value="country">Страна: домены + IP</option><option value="geosite">Категория geosite</option></select></label>
+        <label><span>Код / категория</span><input name="value" data-geo-value placeholder="fr"><small>Для страны: fr, de, us. Для geosite: category-ads-all.</small></label>
+        <label><span>Выход</span><select name="outbound_tag">{% for tag in outbound_tags %}<option value="{{ tag }}" {% if tag == 'blocked' %}selected{% endif %}>{{ tag }}</option>{% endfor %}</select></label>
+        <label><span>Приоритет</span><input name="priority" type="number" min="1" max="9998" value="100"></label>
+      </div>
+      <div class="ui-field-grid geo-policy-name-grid"><label><span>Название (необязательно)</span><input name="name" placeholder="Франция напрямую"></label><div class="geo-policy-note">Условия разных типов в Xray объединяются логически. Поэтому страна создаётся двумя правилами, а не одним.</div></div>
+      <div class="ui-actions"><button class="button primary" type="submit">Добавить готовое правило</button></div>
     </form>
   </section>
 
   <section class="ui-card ui-table-card routing-rules-card">
     <header class="ui-card-heading ui-card-heading-row">
       <div><p class="panel-kicker">ПРАВИЛА</p><h2>Правила маршрутизации</h2><p>Меньшее значение приоритета выполняется раньше. Xray использует первое совпавшее правило.</p></div>
-      <div class="ui-heading-actions"><span class="ui-counter">{{ rules|length }} {{ 'правило' if rules|length == 1 else 'правил' }}</span><form method="post" action="{{ url_for('apply_route') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button secondary" type="submit">Применить</button></form><button class="button primary routing-add-toggle" type="button" aria-expanded="false" aria-controls="routing-add-form">Добавить правило</button></div>
+      <div class="ui-heading-actions"><span class="ui-counter">{{ rules|length }} {{ 'правило' if rules|length == 1 else 'правил' }}</span><a class="button ghost" href="{{ url_for('routing_rule_json_new_page') }}">{ } Новое из JSON</a><button class="button primary routing-add-toggle" type="button" aria-expanded="false" aria-controls="routing-add-form">Добавить правило</button></div>
     </header>
 
     {% if rules %}<div class="table-wrap"><table><thead><tr><th>Приоритет</th><th>Название</th><th>Условия</th><th>Выход</th><th>Состояние</th><th>Действия</th></tr></thead><tbody>
@@ -39,9 +100,9 @@
         {% if rule.inbound_tags %}<div><b>inbound</b><span>{{ rule.inbound_tags|replace('\n', ', ') }}</span></div>{% endif %}
         {% if rule.users %}<div><b>user</b><span>{{ rule.users|replace('\n', ', ') }}</span></div>{% endif %}
       </td>
-      <td><span class="route-tag {{ 'blocked' if rule.outbound_tag == 'blocked' else ('direct' if rule.outbound_tag == 'direct' else 'custom') }}">{{ rule.outbound_tag }}</span></td>
+      <td><span class="route-tag {{ 'balancer' if rule.target_type == 'balancer' else ('blocked' if rule.outbound_tag == 'blocked' else ('direct' if rule.outbound_tag == 'direct' else 'custom')) }}">{{ rule.outbound_tag }}</span>{% if rule.target_type == 'balancer' %}<small class="route-target-kind">balancer</small>{% endif %}</td>
       <td><span class="pill {{ 'enabled' if rule.enabled else 'disabled' }}"><i></i>{{ 'Включено' if rule.enabled else 'Выключено' }}</span></td>
-      <td><div class="row-actions"><a class="button ghost small" href="{{ url_for('routing_rule_edit_page', rule_id=rule.id) }}">Изменить</a><form method="post" action="{{ url_for('routing_rule_toggle', rule_id=rule.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button secondary small" type="submit">{{ 'Отключить' if rule.enabled else 'Включить' }}</button></form><form method="post" action="{{ url_for('routing_rule_delete', rule_id=rule.id) }}" onsubmit="return confirm('Удалить правило {{ rule.name }}?')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button danger small" type="submit">Удалить</button></form></div></td>
+      <td><div class="row-actions"><a class="button ghost small" href="{{ url_for('routing_rule_edit_page', rule_id=rule.id) }}">Форма</a><a class="button ghost small json-action" href="{{ url_for('routing_rule_json_edit_page', rule_id=rule.id) }}">{ } JSON</a><form method="post" action="{{ url_for('routing_rule_toggle', rule_id=rule.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button secondary small" type="submit">{{ 'Отключить' if rule.enabled else 'Включить' }}</button></form><form method="post" action="{{ url_for('routing_rule_delete', rule_id=rule.id) }}" onsubmit="return confirm('Удалить правило {{ rule.name }}?')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button danger small" type="submit">Удалить</button></form></div></td>
     </tr>{% endfor %}</tbody></table></div>
     {% else %}<div class="empty-state routing-empty"><span>↗</span><h3>Правил пока нет</h3><p>Трафик будет направляться через выход по умолчанию.</p></div>{% endif %}
 
@@ -49,6 +110,7 @@
       <header><div><p class="panel-kicker">НОВОЕ ПРАВИЛО</p><h2>Добавить правило</h2><p>Заполняйте только те условия, которые должны участвовать в совпадении.</p></div></header>
       <form method="post" action="{{ url_for('routing_rule_add') }}" class="ui-form routing-rule-form">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="target_type" value="outbound">
         <div class="ui-field-grid rule-main-grid"><label><span>Название</span><input name="name" required placeholder="Блокировка рекламы"></label><label><span>Приоритет</span><input name="priority" type="number" min="1" max="9999" value="100" required></label><label><span>Выход</span><select name="outbound_tag">{% for tag in outbound_tags %}<option value="{{ tag }}">{{ tag }}</option>{% endfor %}</select></label></div>
         <div class="ui-field-grid rule-conditions-grid"><label><span>Домены</span><textarea name="domains" rows="3" placeholder="geosite:category-ads-all&#10;domain:example.com"></textarea></label><label><span>IP / CIDR</span><textarea name="ips" rows="3" placeholder="203.0.113.0/24&#10;geoip:private"></textarea></label></div>
         <div class="ui-field-grid rule-small-grid"><label><span>Порты</span><input name="ports" placeholder="443,1000-2000"></label><label><span>Сеть</span><select name="network"><option value="">любая</option><option>tcp</option><option>udp</option><option value="tcp,udp">tcp,udp</option></select></label><label><span>Протоколы</span><input name="protocols" placeholder="http,tls,quic,bittorrent"></label></div>
@@ -72,6 +134,21 @@
   };
   openButton.addEventListener('click', () => setOpen(editor.hidden));
   cancelButton?.addEventListener('click', () => setOpen(false));
+})();
+
+(() => {
+  const kind = document.querySelector('[data-geo-kind]');
+  const value = document.querySelector('[data-geo-value]');
+  if (!kind || !value) return;
+  const update = () => {
+    const needsValue = kind.value === 'country' || kind.value === 'geosite';
+    value.disabled = !needsValue;
+    value.required = needsValue;
+    value.placeholder = kind.value === 'country' ? 'fr' : (kind.value === 'geosite' ? 'category-ads-all' : 'не требуется');
+    if (!needsValue) value.value = '';
+  };
+  kind.addEventListener('change', update);
+  update();
 })();
 </script>
 {% endblock %}

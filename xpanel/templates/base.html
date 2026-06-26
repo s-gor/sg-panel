@@ -30,27 +30,27 @@
         <svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 0 1 8-8M4 17a3 3 0 0 1 3 3M4 7a13 13 0 0 1 13 13"/><circle cx="4" cy="20" r="1"/></svg><span>Подписки</span>
       </a>
       <a href="{{ url_for('settings_page') }}" class="{% if request.endpoint and request.endpoint.startswith('settings_') %}active{% endif %}">
-        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56V21h-4v-.07A1.7 1.7 0 0 0 8.97 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.53-1.03H3v-4h.07A1.7 1.7 0 0 0 4.6 8.94a1.7 1.7 0 0 0-.34-1.88L4.2 7l2.83-2.83.06.06a1.7 1.7 0 0 0 1.88.34A1.7 1.7 0 0 0 10 3.04V3h4v.07a1.7 1.7 0 0 0 1.03 1.53 1.7 1.7 0 0 0 1.88-.34l.06-.06L19.8 7l-.06.06a1.7 1.7 0 0 0-.34 1.88A1.7 1.7 0 0 0 20.93 10H21v4h-.07A1.7 1.7 0 0 0 19.4 15Z"/></svg><span>Сервер</span>
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56V21h-4v-.07A1.7 1.7 0 0 0 8.97 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.53-1.03H3v-4h.07A1.7 1.7 0 0 0 4.6 8.94a1.7 1.7 0 0 0-.34-1.88L4.2 7l2.83-2.83.06.06a1.7 1.7 0 0 0 1.88.34A1.7 1.7 0 0 0 10 3.04V3h4v.07a1.7 1.7 0 0 0 1.03 1.53 1.7 1.7 0 0 0 1.88-.34l.06-.06L19.8 7l-.06.06a1.7 1.7 0 0 0-.34 1.88A1.7 1.7 0 0 0 20.93 10H21v4h-.07A1.7 1.7 0 0 0 19.4 15Z"/></svg><span>Inbound</span>
       </a>
-      <a href="{{ url_for('config_page') }}" class="{% if request.endpoint and request.endpoint.startswith('config_') %}active{% endif %}">
-        <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16h16V8zM14 2v6h6M8 13h8M8 17h6"/></svg><span>Конфиг</span>
+      <a href="{{ url_for('outbounds_page') }}" class="{% if request.endpoint and (request.endpoint == 'outbounds_page' or request.endpoint.startswith('outbound_')) %}active{% endif %}">
+        <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6M5 5v14"/></svg><span>Outbounds</span>
       </a>
-      <a href="{{ url_for('routing_page') }}" class="{% if request.endpoint and request.endpoint.startswith('routing_') %}active{% endif %}">
-        <svg viewBox="0 0 24 24"><circle cx="6" cy="6" r="2"/><circle cx="18" cy="6" r="2"/><circle cx="12" cy="18" r="2"/><path d="M8 6h8M7.5 7.5l3.3 8M16.5 7.5l-3.3 8"/></svg><span>Маршрутизация</span>
-      </a>
-      <a href="{{ url_for('outbounds_page') }}" class="{% if request.endpoint == 'outbounds_page' %}active{% endif %}">
-        <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6M5 5v14"/></svg><span>Выходы</span>
+      <a href="{{ url_for('routing_page') }}" class="{% if request.endpoint and (request.endpoint.startswith('routing_') or request.endpoint == 'warp_routing') %}active{% endif %}">
+        <svg viewBox="0 0 24 24"><circle cx="6" cy="6" r="2"/><circle cx="18" cy="6" r="2"/><circle cx="12" cy="18" r="2"/><path d="M8 6h8M7.5 7.5l3.3 8M16.5 7.5l-3.3 8"/></svg><span>Routing</span>
       </a>
       <a href="{{ url_for('dns_page') }}" class="{% if request.endpoint and request.endpoint.startswith('dns_') %}active{% endif %}">
         <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 4.5 6 4.5 9S15 18 12 21M12 3c-3 3-4.5 6-4.5 9S9 18 12 21"/></svg><span>DNS</span>
+      </a>
+      <a href="{{ url_for('config_page') }}" class="{% if request.endpoint and request.endpoint.startswith('config_') %}active{% endif %}">
+        <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16h16V8zM14 2v6h6M8 13h8M8 17h6"/></svg><span>Xray Config</span>
       </a>
       <a href="{{ url_for('backups_page') }}" class="{% if request.endpoint and request.endpoint.startswith('backups_') %}active{% endif %}">
         <svg viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v7c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12v7c0 1.7 3.6 3 8 3s8-1.3 8-3v-7"/></svg><span>Резервные копии</span>
       </a>
       <a href="{{ url_for('diagnostics_page') }}" class="{% if request.endpoint and request.endpoint.startswith('diagnostics_') %}active{% endif %}">
-        <svg viewBox="0 0 24 24"><path d="M3 12h4l2-7 4 14 2-7h6"/></svg><span>Диагностика</span>
+        <svg viewBox="0 0 24 24"><path d="M3 12h4l2-7 4 14 2-7h6"/></svg><span>Diagnostics</span>
       </a>
-      <a href="{{ url_for('security_page') }}" class="{% if request.endpoint and request.endpoint.startswith('security_') %}active{% endif %}">
+      <a href="{{ url_for('security_page') }}" class="{% if request.endpoint and (request.endpoint.startswith('security_') or request.endpoint == 'settings_password') %}active{% endif %}">
         <svg viewBox="0 0 24 24"><path d="M12 2 20 5v6c0 5.2-3.4 9.2-8 11-4.6-1.8-8-5.8-8-11V5l8-3Z"/><path d="M9 12l2 2 4-5"/></svg><span>Безопасность</span>
       </a>
     </nav>
@@ -75,7 +75,9 @@
     </header>
 
     {% with messages = get_flashed_messages(with_categories=true) %}
-      {% for category, message in messages %}<div class="alert {{ category }}">{{ message }}</div>{% endfor %}
+      {% if messages %}<div class="flash-stack" aria-live="polite">
+        {% for category, message in messages %}<div class="alert {{ category }} flash-toast"><span>{{ message }}</span><button type="button" aria-label="Закрыть" onclick="this.parentElement.remove()">×</button></div>{% endfor %}
+      </div>{% endif %}
     {% endwith %}
 
     {% block content %}{% endblock %}

@@ -143,8 +143,8 @@ def cmd_gen_keys(args: argparse.Namespace) -> int:
         values = {
             "address": "192.168.1.200",
             "port": "443",
-            "dest": "www.microsoft.com:443",
-            "server_name": "www.microsoft.com",
+            "dest": "www.bing.com:443",
+            "server_name": "www.bing.com",
             "private_key": private_key,
             "public_key": public_key,
             "short_id": short_id,
@@ -576,7 +576,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--address", required=True, help="IP или домен для клиентской ссылки")
     p.add_argument("--listen", default="0.0.0.0")
     p.add_argument("--port", type=int, default=443)
-    p.add_argument("--dest", required=True, help="например www.microsoft.com:443")
+    p.add_argument("--dest", required=True, help="например www.bing.com:443")
     p.add_argument("--server-name", required=True)
     p.add_argument("--private-key", required=True)
     p.add_argument("--public-key", required=True)

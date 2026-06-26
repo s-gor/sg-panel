@@ -1,50 +1,125 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-EXPECTED_VERSION="0.9.8"
+EXPECTED_VERSION="0.10.0-rc7"
 SOURCE_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 XRAY_VERSION="v26.3.27"
 DEFAULT_HTTPS_PORT="61443"
 DEFAULT_BACKEND_PORT="8080"
-DEFAULT_REALITY_DEST="www.microsoft.com:443"
-DEFAULT_REALITY_SNI="www.microsoft.com"
+DEFAULT_REALITY_DEST="www.bing.com:443"
+DEFAULT_REALITY_SNI="www.bing.com"
 DEFAULT_USER="sg-admin"
 ACME_ROOT="/var/www/letsencrypt"
+TARGET="/opt/xpanel-mvp"
+SERVICE="xpanel-web"
+INSTALL_STATE_DIR="/etc/xpanel-mvp"
+INSTALL_MARKER="$INSTALL_STATE_DIR/install-complete.env"
+RECONFIGURE=0
+PARTIAL_INSTALL=0
 
 log(){ printf '[SG-Panel EC2] %s\n' "$*"; }
 fail(){ printf '[SG-Panel EC2] ERROR: %s\n' "$*" >&2; exit 1; }
 
+usage(){
+  cat <<'USAGE'
+Использование:
+  ec2-first-install.sh [--reconfigure]
+
+Без параметров:
+  - завершённая установка обновляется без изменения настроек;
+  - незавершённая установка автоматически возвращается к мастеру.
+
+--reconfigure
+  Повторно запустить мастер для изменения домена, HTTPS-порта,
+  Reality target и Reality SNI. Существующие пароль, ключи и пользователи сохраняются.
+USAGE
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --reconfigure) RECONFIGURE=1; shift ;;
+    -h|--help) usage; exit 0 ;;
+    *) fail "неизвестный параметр: $1" ;;
+  esac
+done
+
 [[ $EUID -eq 0 ]] || fail "запустите скрипт от root"
+cd /
 [[ -f "$SOURCE_DIR/xpanel/__init__.py" ]] || fail "не найден каталог проекта"
 grep -q "__version__ = \"$EXPECTED_VERSION\"" "$SOURCE_DIR/xpanel/__init__.py" || fail "исходники не версии $EXPECTED_VERSION"
 
-
-TARGET="/opt/xpanel-mvp"
-SERVICE="xpanel-web"
-
-existing_install_is_complete(){
+core_panel_files_exist(){
   [[ -d "$TARGET/xpanel" ]] &&
   [[ -x "$TARGET/.venv/bin/python" ]] &&
   [[ -f /etc/xpanel-mvp/web.env ]] &&
   [[ -f /etc/systemd/system/xpanel-web.service ]]
 }
 
-if existing_install_is_complete; then
+configured_https_is_usable(){
+  local conf="/etc/nginx/sites-available/sg-panel" cert key
+  [[ -s "$conf" ]] || return 1
+  cert="$(awk '$1 == "ssl_certificate" {gsub(/;/, "", $2); print $2; exit}' "$conf" 2>/dev/null || true)"
+  key="$(awk '$1 == "ssl_certificate_key" {gsub(/;/, "", $2); print $2; exit}' "$conf" 2>/dev/null || true)"
+  [[ -n "$cert" && -n "$key" && -s "$cert" && -s "$key" ]] || return 1
+  openssl x509 -checkend 60 -noout -in "$cert" >/dev/null 2>&1
+}
+
+existing_install_is_complete(){
+  core_panel_files_exist &&
+  [[ -s /usr/local/etc/xray/config.json ]] &&
+  configured_https_is_usable
+}
+
+partial_install_artifacts_exist(){
+  [[ -e "$TARGET" || -e /etc/xpanel-mvp/web.env ||
+     -e /etc/systemd/system/xpanel-web.service ||
+     -e /usr/local/etc/xray/config.json ||
+     -e /etc/nginx/sites-available/sg-panel-acme ||
+     -e /etc/nginx/sites-available/sg-panel ]]
+}
+
+write_install_marker(){
+  local domain="$1" port="$2"
+  mkdir -p "$INSTALL_STATE_DIR"
+  cat > "$INSTALL_MARKER" <<EOF_MARKER
+INSTALL_COMPLETE=1
+VERSION=$EXPECTED_VERSION
+PANEL_DOMAIN=$domain
+PANEL_HTTPS_PORT=$port
+COMPLETED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+EOF_MARKER
+  chmod 600 "$INSTALL_MARKER"
+}
+
+if existing_install_is_complete && [[ $RECONFIGURE -eq 0 ]]; then
   CURRENT_VERSION="$(cd "$TARGET" && .venv/bin/python -m xpanel --version 2>/dev/null | awk '{print $2}' || true)"
   CURRENT_VERSION="${CURRENT_VERSION:-неизвестна}"
-  log "Обнаружена установленная SG-Panel $CURRENT_VERSION"
+  log "Обнаружена завершённая SG-Panel $CURRENT_VERSION"
   log "Перехожу в режим обновления без изменения домена, сертификата, пароля и настроек Xray"
-  cd /
   bash "$SOURCE_DIR/install-or-upgrade.sh"
   NEW_VERSION="$(cd "$TARGET" && .venv/bin/python -m xpanel --version | awk '{print $2}')"
   [[ "$NEW_VERSION" == "$EXPECTED_VERSION" ]] || fail "после обновления установлена версия $NEW_VERSION"
   systemctl is-active --quiet "$SERVICE" || fail "служба $SERVICE не active после обновления"
+  if [[ ! -f "$INSTALL_MARKER" ]]; then
+    LEGACY_DOMAIN="$(awk '$1 == "server_name" {gsub(/;/, "", $2); if ($2 != "_") {print $2; exit}}' /etc/nginx/sites-available/sg-panel 2>/dev/null || true)"
+    LEGACY_PORT="$(awk '$1 == "listen" && $2 ~ /^[0-9]+$/ {print $2; exit}' /etc/nginx/sites-available/sg-panel 2>/dev/null || true)"
+    [[ -n "$LEGACY_DOMAIN" && -n "$LEGACY_PORT" ]] && write_install_marker "$LEGACY_DOMAIN" "$LEGACY_PORT"
+  fi
   log "Обновление завершено: SG-Panel $NEW_VERSION"
   exit 0
 fi
 
-if [[ -e "$TARGET" || -e /etc/xpanel-mvp/web.env || -e /etc/systemd/system/xpanel-web.service ]]; then
-  fail "обнаружена неполная старая установка; сохраните данные и запустите безопасный deploy/uninstall.sh без параметра --remove-xray"
+if partial_install_artifacts_exist; then
+  PARTIAL_INSTALL=1
+  if [[ $RECONFIGURE -eq 1 ]]; then
+    log "Запущено изменение существующей установки"
+  else
+    log "Обнаружена незавершённая установка"
+    log "Повторно запускаю мастер. Домен и параметры подключения можно ввести заново"
+  fi
+  rm -f "$INSTALL_MARKER"
+elif [[ $RECONFIGURE -eq 1 ]]; then
+  log "Завершённая установка не найдена; запускаю обычный мастер"
 fi
 
 prompt_value(){
@@ -63,6 +138,46 @@ prompt_value(){
   printf -v "$var_name" '%s' "$value"
 }
 
+DB_PATH="$TARGET/data/panel.db"
+existing_db_value(){
+  local sql="$1"
+  [[ -f "$DB_PATH" ]] && command -v sqlite3 >/dev/null 2>&1 || return 0
+  sqlite3 -noheader "$DB_PATH" "$sql" 2>/dev/null | head -n 1 || true
+}
+
+CURRENT_XRAY_ADDRESS="$(existing_db_value 'SELECT address FROM server_settings WHERE id = 1;')"
+CURRENT_REALITY_DEST="$(existing_db_value 'SELECT dest FROM server_settings WHERE id = 1;')"
+CURRENT_REALITY_SNI="$(existing_db_value 'SELECT server_name FROM server_settings WHERE id = 1;')"
+CURRENT_FIRST_USER="$(existing_db_value 'SELECT name FROM users ORDER BY id LIMIT 1;')"
+CURRENT_BASE_URL="$(existing_db_value 'SELECT base_url FROM subscription_settings WHERE id = 1;')"
+CURRENT_PANEL_DOMAIN=""
+CURRENT_PANEL_PORT=""
+
+if [[ -f "$INSTALL_MARKER" ]]; then
+  CURRENT_PANEL_DOMAIN="$(grep -E '^PANEL_DOMAIN=' "$INSTALL_MARKER" | tail -1 | cut -d= -f2- || true)"
+  CURRENT_PANEL_PORT="$(grep -E '^PANEL_HTTPS_PORT=' "$INSTALL_MARKER" | tail -1 | cut -d= -f2- || true)"
+fi
+
+if [[ -z "$CURRENT_PANEL_DOMAIN" ]]; then
+  for conf in /etc/nginx/sites-available/sg-panel /etc/nginx/sites-available/sg-panel-acme; do
+    [[ -f "$conf" ]] || continue
+    CURRENT_PANEL_DOMAIN="$(awk '$1 == "server_name" {gsub(/;/, "", $2); if ($2 != "_") {print $2; exit}}' "$conf" 2>/dev/null || true)"
+    [[ -n "$CURRENT_PANEL_DOMAIN" ]] && break
+  done
+fi
+
+if [[ "$CURRENT_BASE_URL" =~ ^https://([^/:]+):([0-9]+) ]]; then
+  [[ -n "$CURRENT_PANEL_DOMAIN" ]] || CURRENT_PANEL_DOMAIN="${BASH_REMATCH[1]}"
+  [[ -n "$CURRENT_PANEL_PORT" ]] || CURRENT_PANEL_PORT="${BASH_REMATCH[2]}"
+fi
+
+XRAY_ADDRESS_DEFAULT="${CURRENT_XRAY_ADDRESS:-}"
+PANEL_DOMAIN_DEFAULT="${CURRENT_PANEL_DOMAIN:-${CURRENT_XRAY_ADDRESS:-}}"
+PANEL_HTTPS_PORT_DEFAULT="${CURRENT_PANEL_PORT:-$DEFAULT_HTTPS_PORT}"
+FIRST_USER_DEFAULT="${CURRENT_FIRST_USER:-$DEFAULT_USER}"
+REALITY_DEST_DEFAULT="${CURRENT_REALITY_DEST:-$DEFAULT_REALITY_DEST}"
+REALITY_SNI_DEFAULT="${CURRENT_REALITY_SNI:-$DEFAULT_REALITY_SNI}"
+
 printf '%s\n' \
   "Для вопросов со значением в квадратных скобках уже задан рекомендуемый вариант." \
   "Чтобы принять значение по умолчанию, просто нажмите Enter." \
@@ -72,18 +187,26 @@ printf '%s\n' \
   "Введите доменное имя Xray-сервера." \
   "A-запись домена должна указывать на публичный IPv4 этого EC2." \
   "Пример: vpn.example.dynu.net"
-prompt_value XRAY_ADDRESS "Домен Xray-сервера"
+prompt_value XRAY_ADDRESS "Домен Xray-сервера" "$XRAY_ADDRESS_DEFAULT"
 
 printf '%s\n' \
   "Введите доменное имя HTTPS-панели." \
   "Можно использовать тот же домен, поскольку Xray и панель работают на разных портах."
-prompt_value PANEL_DOMAIN "Домен HTTPS-панели" "$XRAY_ADDRESS"
-prompt_value PANEL_HTTPS_PORT "Внешний HTTPS-порт панели" "$DEFAULT_HTTPS_PORT"
-prompt_value FIRST_USER "Имя первого пользователя" "$DEFAULT_USER"
-prompt_value REALITY_DEST "Reality target" "$DEFAULT_REALITY_DEST"
-prompt_value REALITY_SNI "Reality SNI" "$DEFAULT_REALITY_SNI"
+PANEL_PROMPT_DEFAULT="${PANEL_DOMAIN_DEFAULT:-$XRAY_ADDRESS}"
+if [[ $PARTIAL_INSTALL -eq 1 || $RECONFIGURE -eq 1 ]]; then
+  if [[ -z "$CURRENT_PANEL_DOMAIN" || "$CURRENT_PANEL_DOMAIN" == "$CURRENT_XRAY_ADDRESS" ]]; then
+    PANEL_PROMPT_DEFAULT="$XRAY_ADDRESS"
+  fi
+fi
+prompt_value PANEL_DOMAIN "Домен HTTPS-панели" "$PANEL_PROMPT_DEFAULT"
+prompt_value PANEL_HTTPS_PORT "Внешний HTTPS-порт панели" "$PANEL_HTTPS_PORT_DEFAULT"
+prompt_value FIRST_USER "Имя первого пользователя" "$FIRST_USER_DEFAULT"
+prompt_value REALITY_DEST "Reality target" "$REALITY_DEST_DEFAULT"
+prompt_value REALITY_SNI "Reality SNI" "$REALITY_SNI_DEFAULT"
 
-if [[ -z "${XPANEL_ADMIN_PASSWORD:-}" ]]; then
+if [[ -f /etc/xpanel-mvp/web.env ]]; then
+  log "Существующий пароль администратора будет сохранён"
+elif [[ -z "${XPANEL_ADMIN_PASSWORD:-}" ]]; then
   while true; do
     prompt_value XPANEL_ADMIN_PASSWORD "Пароль администратора панели (не менее 8 символов): " "" 1
     prompt_value XPANEL_ADMIN_PASSWORD_2 "Повторите пароль: " "" 1
@@ -135,13 +258,19 @@ log "Устанавливаю системные пакеты"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update
 apt-get install -y \
-  curl ca-certificates unzip rsync \
+  curl ca-certificates unzip rsync zstd \
   python3 python3-venv python3-pip \
   sqlite3 jq iproute2 dnsutils \
   nginx certbot openssl
 
+port_is_used_by_current_nginx(){
+  command -v nginx >/dev/null 2>&1 || return 1
+  nginx -T 2>/dev/null | grep -Eq "listen[[:space:]]+${PANEL_HTTPS_PORT}([[:space:]]|;)"
+}
+
 if ss -lntH | awk '{print $4}' | grep -Eq "(^|:)$PANEL_HTTPS_PORT$"; then
-  fail "порт $PANEL_HTTPS_PORT уже занят"
+  port_is_used_by_current_nginx || fail "порт $PANEL_HTTPS_PORT уже занят другим процессом"
+  log "Порт $PANEL_HTTPS_PORT уже используется текущей конфигурацией Nginx и будет перенастроен"
 fi
 
 PUBLIC_IP="$(curl -4fsS --max-time 15 https://checkip.amazonaws.com | tr -d '[:space:]')" || fail "не удалось определить публичный IPv4"
@@ -180,9 +309,11 @@ export XPANEL_BIND_ADDRESS="127.0.0.1"
 export XPANEL_PORT="$DEFAULT_BACKEND_PORT"
 export XPANEL_SECURE_COOKIES="0"
 export XPANEL_TRUST_PROXY_HEADERS="0"
-export XPANEL_ADMIN_PASSWORD
+if [[ -n "${XPANEL_ADMIN_PASSWORD:-}" ]]; then
+  export XPANEL_ADMIN_PASSWORD
+fi
 bash "$SOURCE_DIR/install-or-upgrade.sh"
-unset XPANEL_ADMIN_PASSWORD
+unset XPANEL_ADMIN_PASSWORD XPANEL_ADMIN_PASSWORD_2 2>/dev/null || true
 
 cd /opt/xpanel-mvp
 
@@ -206,6 +337,23 @@ if [[ "$SERVER_COUNT" == "0" ]]; then
     --fingerprint chrome
   rm -f "$TMP_ENV"
   unset PRIVATE_KEY PUBLIC_KEY SHORT_ID
+elif [[ $PARTIAL_INSTALL -eq 1 || $RECONFIGURE -eq 1 ]]; then
+  log "Обновляю домен и Reality-параметры существующего Xray-сервера"
+  python3 - data/panel.db "$XRAY_ADDRESS" "$REALITY_DEST" "$REALITY_SNI" <<'PY_UPDATE_SERVER'
+import sqlite3
+import sys
+
+path, address, dest, server_name = sys.argv[1:]
+with sqlite3.connect(path) as con:
+    con.execute(
+        """
+        UPDATE server_settings
+           SET address = ?, dest = ?, server_name = ?
+         WHERE id = 1
+        """,
+        (address, dest, server_name),
+    )
+PY_UPDATE_SERVER
 else
   log "Существующие Reality-настройки сохранены"
 fi
@@ -239,7 +387,7 @@ server {
     }
 }
 EOF_ACME
-rm -f /etc/nginx/sites-enabled/default
+rm -f   /etc/nginx/sites-enabled/default   /etc/nginx/sites-enabled/sg-panel   /etc/nginx/sites-enabled/sg-panel-acme
 ln -sfn /etc/nginx/sites-available/sg-panel-acme /etc/nginx/sites-enabled/sg-panel-acme
 nginx -t
 systemctl enable --now nginx
@@ -351,6 +499,7 @@ wait_for_gui(){
 }
 
 wait_for_gui || fail "HTTPS GUI не прошёл проверку за 30 секунд"
+write_install_marker "$PANEL_DOMAIN" "$PANEL_HTTPS_PORT"
 
 LINK="$(.venv/bin/python -m xpanel show-link "$FIRST_USER" 2>/dev/null || true)"
 LINK_FILE="/root/sg-panel-first-user.txt"

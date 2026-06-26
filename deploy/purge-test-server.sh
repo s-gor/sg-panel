@@ -41,6 +41,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 [[ $EUID -eq 0 ]] || { echo "Ошибка: запустите скрипт от root" >&2; exit 1; }
+cd /
 [[ $EXPLICIT_CONFIRM -eq 1 ]] || {
   echo "Отказ: требуется явный параметр --destroy-test-server" >&2
   usage >&2
@@ -64,8 +65,8 @@ if [[ $ASSUME_YES -ne 1 ]]; then
 
 SSH, системная сеть и правила облачного firewall не изменяются.
 WARNING
-  read -r -p "Введите УДАЛИТЬ ТЕСТОВЫЙ СЕРВЕР для продолжения: " answer
-  [[ "$answer" == "УДАЛИТЬ ТЕСТОВЫЙ СЕРВЕР" ]] || { echo "Отменено."; exit 0; }
+  read -r -p "Type DELETE ALL to continue: " answer
+  [[ "$answer" == "DELETE ALL" ]] || { echo "Отменено."; exit 0; }
 fi
 
 log() {
@@ -119,7 +120,32 @@ for package in \
   fi
 done
 
+wait_for_package_manager(){
+  local attempts=0
+  while true; do
+    if command -v fuser >/dev/null 2>&1; then
+      if ! fuser /var/lib/dpkg/lock-frontend /var/lib/dpkg/lock           /var/cache/apt/archives/lock >/dev/null 2>&1; then
+        return 0
+      fi
+    elif ! pgrep -x apt >/dev/null 2>&1 &&          ! pgrep -x apt-get >/dev/null 2>&1 &&          ! pgrep -x dpkg >/dev/null 2>&1 &&          ! pgrep -f unattended-upgrade >/dev/null 2>&1; then
+      return 0
+    fi
+
+    attempts=$((attempts + 1))
+    if (( attempts >= 120 )); then
+      echo "Ошибка: менеджер пакетов занят более 10 минут." >&2
+      echo "Дождитесь завершения обновления Ubuntu и повторите запуск." >&2
+      exit 1
+    fi
+    if (( attempts == 1 || attempts % 6 == 0 )); then
+      log "Ожидаю освобождения менеджера пакетов Ubuntu"
+    fi
+    sleep 5
+  done
+}
+
 if (( ${#packages[@]} > 0 )); then
+  wait_for_package_manager
   export DEBIAN_FRONTEND=noninteractive
   apt-get purge -y "${packages[@]}"
   apt-get autoremove -y --purge

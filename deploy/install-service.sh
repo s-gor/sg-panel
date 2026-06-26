@@ -47,7 +47,7 @@ NoNewPrivileges=false
 PrivateTmp=true
 ProtectHome=true
 ProtectSystem=full
-ReadWritePaths=$PROJECT_DIR/data $PROJECT_DIR/backups /etc/xpanel-mvp /usr/local/etc/xray
+ReadWritePaths=$PROJECT_DIR/data $PROJECT_DIR/backups /etc/xpanel-mvp /usr/local/etc/xray /etc/nginx /var/www/sg-panel-placeholder
 
 [Install]
 WantedBy=multi-user.target

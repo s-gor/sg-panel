@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-EXPECTED_VERSION="0.9.8"
+EXPECTED_VERSION="0.10.0-rc7"
 TARGET="/opt/xpanel-mvp"
 SERVICE="xpanel-web"
 SOURCE_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
@@ -28,6 +28,7 @@ fi
 [[ -f /etc/xpanel-mvp/web.env ]] && cp -a /etc/xpanel-mvp/web.env "$BACKUP_ROOT/web.env"
 [[ -f /etc/systemd/system/xpanel-web.service ]] && cp -a /etc/systemd/system/xpanel-web.service "$BACKUP_ROOT/xpanel-web.service"
 [[ -f /usr/local/etc/xray/config.json ]] && cp -a /usr/local/etc/xray/config.json "$BACKUP_ROOT/xray-config.json"
+[[ -d /etc/xpanel-mvp/warp ]] && cp -a /etc/xpanel-mvp/warp "$BACKUP_ROOT/warp"
 
 rollback(){
   local rc=$?
@@ -38,6 +39,11 @@ rollback(){
     if [[ $OLD_EXISTS -eq 1 && -d "$BACKUP_ROOT/xpanel-mvp" ]]; then cp -a "$BACKUP_ROOT/xpanel-mvp" "$TARGET"; fi
     if [[ -f "$BACKUP_ROOT/web.env" ]]; then mkdir -p /etc/xpanel-mvp; cp -a "$BACKUP_ROOT/web.env" /etc/xpanel-mvp/web.env; fi
     if [[ -f "$BACKUP_ROOT/xpanel-web.service" ]]; then cp -a "$BACKUP_ROOT/xpanel-web.service" /etc/systemd/system/xpanel-web.service; fi
+    if [[ -d "$BACKUP_ROOT/warp" ]]; then
+      rm -rf /etc/xpanel-mvp/warp
+      mkdir -p /etc/xpanel-mvp
+      cp -a "$BACKUP_ROOT/warp" /etc/xpanel-mvp/warp
+    fi
     systemctl daemon-reload || true
     systemctl restart "$SERVICE" 2>/dev/null || true
   fi
@@ -58,6 +64,9 @@ mkdir -p "$TARGET/data" "$TARGET/backups"
 if [[ -f "$BACKUP_ROOT/xpanel-mvp/data/panel.db" ]]; then cp -a "$BACKUP_ROOT/xpanel-mvp/data/panel.db" "$TARGET/data/panel.db"; fi
 
 cd "$TARGET"
+if ! bash deploy/install-wgcf-cli.sh; then
+  log "WARNING: wgcf-cli was not installed; SG-Panel works, but WARP creation is unavailable until the helper is installed"
+fi
 [[ -x .venv/bin/python ]] || python3 -m venv .venv
 .venv/bin/pip install --no-cache-dir -q --upgrade pip
 .venv/bin/pip install --no-cache-dir -q -r requirements.txt
