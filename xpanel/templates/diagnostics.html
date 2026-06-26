@@ -9,7 +9,7 @@
   <section class="ui-diagnostics-summary">
     <article class="ui-status-card"><span>Операционная система</span><strong class="ui-value-compact">{{ diagnostics.os }}</strong><small>Kernel {{ diagnostics.kernel }}</small></article>
     <article class="ui-status-card"><span>Xray</span><strong class="ui-value-compact">{{ diagnostics.xray_version }}</strong><small>Service {{ diagnostics.xray_service }}</small></article>
-    <article class="ui-status-card"><span>Память</span><strong>{{ diagnostics.memory_available }}</strong><small>Доступно из {{ diagnostics.memory_total }}</small></article>
+    <article class="ui-status-card"><span>Оперативная память</span><strong>{{ diagnostics.memory_used_percent }}%</strong><small>{{ diagnostics.memory_used }} из {{ diagnostics.memory_total }}</small></article>
     <article class="ui-status-card"><span>Диск</span><strong>{{ diagnostics.disk_free }}</strong><small>Свободно из {{ diagnostics.disk_total }}</small></article>
     <article class="ui-status-card"><span>Конфигурация</span><strong class="{{ 'text-success' if diagnostics.config_validation.ok else 'text-danger' }}">{{ 'Корректна' if diagnostics.config_validation.ok else 'Ошибка' }}</strong><small>{{ diagnostics.config_validation.users }} пользователей</small></article>
     <article class="ui-status-card"><span>DNS</span><strong>{{ 'Включён' if diagnostics.dns_enabled else 'Выключен' }}</strong><small>{{ diagnostics.dns_query_strategy }} · {{ diagnostics.dns_servers|length }} upstream</small></article>

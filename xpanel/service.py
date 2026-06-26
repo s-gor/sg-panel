@@ -1999,6 +1999,12 @@ def get_diagnostics() -> dict[str, object]:
         "disk_free": format_bytes(disk.free),
         "memory_total": format_bytes(mem_total),
         "memory_available": format_bytes(mem_available),
+        "memory_used": format_bytes(max(mem_total - mem_available, 0)),
+        "memory_used_percent": (
+            round(max(mem_total - mem_available, 0) * 100 / mem_total)
+            if mem_total
+            else 0
+        ),
         "ports": ports,
         "xray_logs": logs,
         "panel_logs": panel_logs,
@@ -2029,7 +2035,9 @@ def diagnostic_report() -> str:
         f"Xray service: {data['xray_service']}",
         f"Panel service: {data['panel_service']}",
         f"Disk free: {data['disk_free']} / {data['disk_total']}",
-        f"Memory available: {data['memory_available']} / {data['memory_total']}",
+        f"Memory used: {data['memory_used']} / {data['memory_total']} "
+        f"({data['memory_used_percent']}%)",
+        f"Memory available: {data['memory_available']}",
         f"Generated config: {'OK' if validation['ok'] else 'ERROR'}",
         f"DNS enabled: {data['dns_enabled']}",
         f"DNS query strategy: {data['dns_query_strategy']}",
