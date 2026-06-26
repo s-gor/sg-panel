@@ -970,7 +970,7 @@ def create_app(test_config: dict | None = None) -> Flask:
         try:
             result = restore_backup(name)
             flash(
-                f"База восстановлена из {result['name']}. Страховочная копия: {result['safety']}",
+                f"База восстановлена из {result['name']}. Проверьте Inbound, Outbounds и Routing, затем примените конфигурацию. Страховочная копия: {result['safety']}",
                 "success",
             )
         except (ValueError, FileNotFoundError, OSError, PermissionError) as exc:
@@ -1444,7 +1444,7 @@ def create_app(test_config: dict | None = None) -> Flask:
     def outbound_json_add():
         try:
             row = add_vless_outbound_json(request.form.get("json_config", ""))
-            flash(f"Выход {row['tag']} создан из JSON. Проверьте routing и нажмите Применить.", "success")
+            apply_saved_change(f"JSON Outbound {row['tag']} создан")
             return redirect(url_for("outbounds_page"))
         except (ValueError, XPanelError) as exc:
             flash(str(exc), "error")

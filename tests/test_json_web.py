@@ -49,7 +49,7 @@ class JsonEditorsWebTest(unittest.TestCase):
                 "profile": "raw_reality",
             },
         )
-        self.apply_patcher.start()
+        self.apply_mock = self.apply_patcher.start()
         self.app = create_app(
             {
                 "TESTING": True,
@@ -112,6 +112,8 @@ class JsonEditorsWebTest(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"eu-exit", response.data)
         self.assertIn(b"JSON", response.data)
+        self.assertGreaterEqual(self.apply_mock.call_count, 1)
+        self.assertIn("сохранены и применены".encode("utf-8"), response.data)
 
         rule = {
             "_sgPanel": {"name": "EU domains", "priority": 30, "enabled": True},

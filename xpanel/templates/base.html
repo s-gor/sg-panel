@@ -44,11 +44,11 @@
       <a href="{{ url_for('config_page') }}" class="{% if request.endpoint and request.endpoint.startswith('config_') %}active{% endif %}">
         <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16h16V8zM14 2v6h6M8 13h8M8 17h6"/></svg><span>Xray Config</span>
       </a>
-      <a href="{{ url_for('backups_page') }}" class="{% if request.endpoint and request.endpoint.startswith('backups_') %}active{% endif %}">
-        <svg viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v7c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12v7c0 1.7 3.6 3 8 3s8-1.3 8-3v-7"/></svg><span>Резервные копии</span>
-      </a>
       <a href="{{ url_for('diagnostics_page') }}" class="{% if request.endpoint and request.endpoint.startswith('diagnostics_') %}active{% endif %}">
         <svg viewBox="0 0 24 24"><path d="M3 12h4l2-7 4 14 2-7h6"/></svg><span>Diagnostics</span>
+      </a>
+      <a href="{{ url_for('backups_page') }}" class="{% if request.endpoint and request.endpoint.startswith('backups_') %}active{% endif %}">
+        <svg viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v7c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12v7c0 1.7 3.6 3 8 3s8-1.3 8-3v-7"/></svg><span>Резервные копии</span>
       </a>
       <a href="{{ url_for('security_page') }}" class="{% if request.endpoint and (request.endpoint.startswith('security_') or request.endpoint == 'settings_password') %}active{% endif %}">
         <svg viewBox="0 0 24 24"><path d="M12 2 20 5v6c0 5.2-3.4 9.2-8 11-4.6-1.8-8-5.8-8-11V5l8-3Z"/><path d="M9 12l2 2 4-5"/></svg><span>Безопасность</span>
@@ -57,7 +57,7 @@
 
     <div class="sidebar-spacer"></div>
     <div class="sidebar-system">
-      <div class="system-row"><span class="system-dot"></span><span>ЛОКАЛЬНЫЙ РЕЖИМ</span></div>
+      <div class="system-row"><span class="system-dot"></span><span>СОБСТВЕННЫЙ СЕРВЕР</span></div>
       <div class="system-meta"><span>Core</span><strong>v{{ xpanel_version }}</strong></div>
     </div>
     <form method="post" action="{{ url_for('logout') }}" class="logout-form">
@@ -71,7 +71,7 @@
   <main class="content">
     <header class="topbar">
       <div><p class="eyebrow">SG-PANEL / {% block section %}CONTROL{% endblock %}</p><h1>{% block heading %}Панель управления{% endblock %}</h1><p class="page-subtitle">{% block subtitle %}Локальное управление конфигурацией Xray{% endblock %}</p></div>
-      <div class="topbar-badge"><span class="topbar-badge-dot"></span><div><small>ПОДКЛЮЧЕНИЕ</small><strong>ЛОКАЛЬНАЯ СЕТЬ</strong></div></div>
+      <div class="topbar-badge"><span class="topbar-badge-dot"></span><div><small>УПРАВЛЕНИЕ</small><strong>HTTPS-ПАНЕЛЬ</strong></div></div>
     </header>
 
     {% with messages = get_flashed_messages(with_categories=true) %}
@@ -82,7 +82,7 @@
 
     {% block content %}{% endblock %}
 
-    <footer class="app-footer"><span>SG-Panel v{{ xpanel_version }}</span><span>SQLite · Xray Reality · Локальное управление</span></footer>
+    <footer class="app-footer"><span>SG-Panel v{{ xpanel_version }}</span><span>SQLite · Xray · Управление сервером</span></footer>
   </main>
 </div>
 </body>

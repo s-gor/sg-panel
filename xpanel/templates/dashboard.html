@@ -24,7 +24,7 @@
     <a class="ui-status-card ui-status-link" href="{{ url_for('settings_page') }}">
       <span>Inbound</span><strong class="ui-value-compact">{{ status.inbound_profile_label }}</strong><small>{{ status.address }}:{{ status.port }}</small>
     </a>
-    <a class="ui-status-card ui-status-link" href="{{ url_for('outbounds_page') }}">
+    <a class="ui-status-card ui-status-link" href="{{ url_for('routing_page') }}">
       <span>Default Outbound</span><strong class="ui-value-compact">{{ status.default_outbound_tag|upper }}</strong><small>Выход для остального трафика</small>
     </a>
     <a class="ui-status-card ui-status-link" href="{{ url_for('users_page') }}">
