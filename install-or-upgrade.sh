@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-EXPECTED_VERSION="0.9.5"
+EXPECTED_VERSION="0.9.7"
 TARGET="/opt/xpanel-mvp"
 SERVICE="xpanel-web"
 SOURCE_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+cd /
 STAMP="$(date +%Y%m%d-%H%M%S)"
 BACKUP_ROOT="/root/sg-panel-backups/$STAMP"
 ROLLBACK_NEEDED=0
@@ -50,7 +51,8 @@ mkdir -p "$TARGET"
 
 log "Копирую версию $EXPECTED_VERSION"
 rsync -a --delete \
-  --exclude='.venv/' --exclude='data/' --exclude='backups/' \
+  --exclude='.git/' --exclude='.venv/' --exclude='data/' --exclude='backups/' \
+  --exclude='__pycache__/' --exclude='*.pyc' \
   "$SOURCE_DIR/" "$TARGET/"
 mkdir -p "$TARGET/data" "$TARGET/backups"
 if [[ -f "$BACKUP_ROOT/xpanel-mvp/data/panel.db" ]]; then cp -a "$BACKUP_ROOT/xpanel-mvp/data/panel.db" "$TARGET/data/panel.db"; fi

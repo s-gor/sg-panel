@@ -5,6 +5,8 @@ OWNER="${OWNER:-s-gor}"
 REPO="${REPO:-sg-panel}"
 BRANCH="${BRANCH:-main}"
 
+cd /
+
 ARCHIVE="${REPO}-${BRANCH}.zip"
 ARCHIVE_URL="https://github.com/${OWNER}/${REPO}/archive/refs/heads/${BRANCH}.zip"
 WORK="$(mktemp -d /tmp/sg-panel-install.XXXXXX)"
@@ -24,16 +26,16 @@ fail() {
     exit 1
 }
 
-[[ $EUID -eq 0 ]] || fail "Run this script as root"
-command -v curl >/dev/null 2>&1 || fail "curl is not installed"
-command -v unzip >/dev/null 2>&1 || fail "unzip is not installed"
+[[ $EUID -eq 0 ]] || fail "запустите скрипт от root"
+command -v curl >/dev/null 2>&1 || fail "не установлен curl"
+command -v unzip >/dev/null 2>&1 || fail "не установлен unzip"
 
-log "Downloading ${OWNER}/${REPO}, branch ${BRANCH}"
+log "Скачиваю ${OWNER}/${REPO}, ветка ${BRANCH}"
 curl -fL --retry 3 --retry-delay 2 --connect-timeout 15 \
     -o "$WORK/$ARCHIVE" "$ARCHIVE_URL"
 
 mkdir -p "$WORK/extracted"
-log "Extracting repository archive"
+log "Распаковываю архив репозитория"
 unzip -q "$WORK/$ARCHIVE" -d "$WORK/extracted"
 
 INSTALLER="$(
@@ -46,16 +48,16 @@ INSTALLER="$(
 )"
 
 [[ -n "$INSTALLER" && -f "$INSTALLER" ]] || \
-    fail "deploy/ec2-first-install.sh was not found in the repository archive"
+    fail "в архиве репозитория не найден deploy/ec2-first-install.sh"
 
 SOURCE="$(dirname "$(dirname "$INSTALLER")")"
 [[ -f "$SOURCE/install-or-upgrade.sh" ]] || \
-    fail "Unable to determine the SG-Panel project directory"
+    fail "не удалось определить каталог проекта SG-Panel"
 
 # GitHub source archives do not preserve executable bits reliably.
 find "$SOURCE" -type f -name '*.sh' -exec chmod 755 {} +
 
-log "Project directory: $SOURCE"
-log "Starting SG-Panel installation wizard"
+log "Каталог проекта: $SOURCE"
+log "Запускаю установку или обновление SG-Panel"
 cd "$SOURCE"
 bash "$INSTALLER"

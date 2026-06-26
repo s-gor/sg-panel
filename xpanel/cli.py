@@ -651,7 +651,7 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("list-outbounds", help="показать системные и пользовательские outbounds")
     p.set_defaults(func=cmd_list_outbounds)
 
-    p = sub.add_parser("add-vless-outbound", help="добавить VLESS outbound для каскада")
+    p = sub.add_parser("add-vless-outbound", help="добавить пользовательский VLESS-выход")
     p.add_argument("--tag", required=True)
     p.add_argument("--name", required=True)
     p.add_argument("--address", required=True)
@@ -661,7 +661,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--network", choices=("raw", "xhttp"), default="raw")
     p.add_argument("--security", choices=("reality", "tls"), default="reality")
     p.add_argument("--server-name", required=True)
-    p.add_argument("--public-key", default="", help="Reality password/public key второго сервера")
+    p.add_argument("--public-key", default="", help="Reality password/public key удалённого сервера")
     p.add_argument("--short-id", default="")
     p.add_argument("--fingerprint", default="chrome")
     p.add_argument("--spider-x", default="")

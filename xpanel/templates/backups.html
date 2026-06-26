@@ -4,11 +4,19 @@
 {% block heading %}Резервные копии{% endblock %}
 {% block subtitle %}SQLite и текущий Xray config.json{% endblock %}
 {% block content %}
-<section class="panel-card backup-create-card"><div><p class="panel-kicker">MANUAL SNAPSHOT</p><h2>Создать копию сейчас</h2><p class="panel-description">Сохраняются panel.db и текущий config.json. Private Reality key находится внутри базы — храните файл безопасно.</p></div><form method="post" action="{{ url_for('backups_create') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button primary" type="submit">Создать backup</button></form></section>
-<section class="panel-card data-panel">
-  <div class="panel-heading table-heading"><div><p class="panel-kicker">RESTORE POINTS</p><h2>Сохранённые копии</h2></div><span class="count-badge">{{ backups|length }} backups</span></div>
-  {% if backups %}<div class="table-wrap"><table><thead><tr><th>Имя</th><th>Дата UTC</th><th>Размер DB</th><th>Config</th><th>Действия</th></tr></thead><tbody>
-  {% for backup in backups %}<tr><td><code>{{ backup.name }}</code></td><td>{{ backup.created_at[:19]|replace('T',' ') }}</td><td>{{ backup.size_human }}</td><td>{{ 'есть' if backup.has_config else 'нет' }}</td><td><div class="row-actions"><a class="button ghost small" href="{{ url_for('backups_download', name=backup.name, kind='db') }}">Скачать DB</a>{% if backup.has_config %}<a class="button ghost small" href="{{ url_for('backups_download', name=backup.name, kind='config') }}">Скачать JSON</a>{% endif %}<form method="post" action="{{ url_for('backups_restore', name=backup.name) }}" onsubmit="return confirm('Восстановить panel.db из {{ backup.name }}?')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button secondary small" type="submit">Восстановить</button></form><form method="post" action="{{ url_for('backups_delete', name=backup.name) }}" onsubmit="return confirm('Удалить {{ backup.name }}?')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button danger small" type="submit">Удалить</button></form></div></td></tr>{% endfor %}
-  </tbody></table></div>{% else %}<div class="empty-state"><span>DB</span><h3>Копий пока нет</h3><p>Создайте первый snapshot кнопкой выше.</p></div>{% endif %}
-</section>
+<!-- MANUAL SNAPSHOT -->
+<script>document.body.classList.add('ui-standard-page','backups-page');</script>
+<div class="ui-page ui-page-wide">
+  <section class="ui-card backup-action-card">
+    <div><p class="panel-kicker">НОВАЯ КОПИЯ</p><h2>Создать резервную копию</h2><p>Сохраняются panel.db и текущий config.json. Reality private key находится внутри базы, поэтому файл нужно хранить безопасно.</p></div>
+    <form method="post" action="{{ url_for('backups_create') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button primary" type="submit">Создать копию</button></form>
+  </section>
+
+  <section class="ui-card ui-table-card">
+    <header class="ui-card-heading ui-card-heading-row"><div><p class="panel-kicker">ТОЧКИ ВОССТАНОВЛЕНИЯ</p><h2>Сохранённые копии</h2><p>Загрузка, восстановление и удаление резервных файлов.</p></div><span class="ui-counter">{{ backups|length }} {{ 'копия' if backups|length == 1 else 'копий' }}</span></header>
+    {% if backups %}<div class="table-wrap"><table><thead><tr><th>Имя</th><th>Дата UTC</th><th>Размер DB</th><th>Config</th><th>Действия</th></tr></thead><tbody>
+    {% for backup in backups %}<tr><td><code>{{ backup.name }}</code></td><td>{{ backup.created_at[:19]|replace('T',' ') }}</td><td>{{ backup.size_human }}</td><td>{{ 'Есть' if backup.has_config else 'Нет' }}</td><td><div class="row-actions"><a class="button ghost small" href="{{ url_for('backups_download', name=backup.name, kind='db') }}">Скачать DB</a>{% if backup.has_config %}<a class="button ghost small" href="{{ url_for('backups_download', name=backup.name, kind='config') }}">Скачать JSON</a>{% endif %}<form method="post" action="{{ url_for('backups_restore', name=backup.name) }}" onsubmit="return confirm('Восстановить panel.db из {{ backup.name }}?')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button secondary small" type="submit">Восстановить</button></form><form method="post" action="{{ url_for('backups_delete', name=backup.name) }}" onsubmit="return confirm('Удалить {{ backup.name }}?')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button danger small" type="submit">Удалить</button></form></div></td></tr>{% endfor %}
+    </tbody></table></div>{% else %}<div class="ui-empty-compact backup-empty"><strong>Резервных копий пока нет</strong><p>Создайте первую копию кнопкой выше.</p></div>{% endif %}
+  </section>
+</div>
 {% endblock %}

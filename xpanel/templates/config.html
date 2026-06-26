@@ -2,15 +2,39 @@
 {% block title %}Конфигурация — SG-Panel{% endblock %}
 {% block section %}CONFIG PREVIEW{% endblock %}
 {% block heading %}Предварительный просмотр{% endblock %}
-{% block subtitle %}JSON из SQLite и проверка до применения{% endblock %}
+{% block subtitle %}Проверка сформированного config.json перед применением{% endblock %}
 {% block content %}
-<section class="config-layout">
-  <article class="panel-card config-status-card">
-    <div class="panel-heading"><div><p class="panel-kicker">XRAY RUN -TEST</p><h2>{{ 'Конфигурация корректна' if validation.ok else 'Найдена ошибка' }}</h2></div><span class="pill {{ 'enabled' if validation.ok else 'disabled' }}"><i></i>{{ 'OK' if validation.ok else 'ERROR' }}</span></div>
-    <p class="panel-description">В конфигурацию войдут {{ validation.users }} активных пользователей. Эта проверка не заменяет текущий config.json и не перезапускает Xray.</p>
-    {% if validation.detail %}<pre class="terminal-box">{{ validation.detail }}</pre>{% endif %}
-    <div class="actions"><form method="post" action="{{ url_for('config_validate') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button secondary" type="submit">Проверить ещё раз</button></form><form method="post" action="{{ url_for('apply_route') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button primary" type="submit" {% if not validation.ok %}disabled{% endif %}>Apply config</button></form></div>
-  </article>
-  <article class="panel-card json-card"><div class="panel-heading"><div><p class="panel-kicker">GENERATED JSON</p><h2>config.json</h2></div><span class="count-badge">read only</span></div><pre class="json-preview">{{ validation.json }}</pre></article>
-</section>
+<script>document.body.classList.add('ui-standard-page','config-preview-page');</script>
+<div class="ui-page ui-page-wide">
+  <section class="ui-card config-summary-card {{ 'is-ok' if validation.ok else 'is-error' }}">
+    <div class="config-summary-main">
+      <span class="config-result-icon" aria-hidden="true">{{ '✓' if validation.ok else '!' }}</span>
+      <div>
+        <p class="panel-kicker">XRAY RUN -TEST</p>
+        <h2>{{ 'Конфигурация корректна' if validation.ok else 'Найдена ошибка' }}</h2>
+        <p>В конфигурацию войдут {{ validation.users }} активных пользователей. Проверка не заменяет текущий config.json и не перезапускает Xray.</p>
+      </div>
+    </div>
+    <div class="config-summary-actions">
+      <span class="ui-status-text {{ 'is-ok' if validation.ok else 'is-error' }}"><i></i>{{ 'Проверка пройдена' if validation.ok else 'Требуется исправление' }}</span>
+      <div class="ui-actions">
+        <form method="post" action="{{ url_for('config_validate') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button secondary" type="submit">Проверить ещё раз</button></form>
+        <form method="post" action="{{ url_for('apply_route') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button primary" type="submit" {% if not validation.ok %}disabled{% endif %}>Применить конфигурацию</button></form>
+      </div>
+    </div>
+  </section>
+
+  {% if validation.detail %}
+  <section class="ui-card config-test-output">
+    <header class="ui-card-heading"><div><p class="panel-kicker">РЕЗУЛЬТАТ ПРОВЕРКИ</p><h2>Вывод Xray</h2></div></header>
+    <pre class="terminal-box">{{ validation.detail }}</pre>
+  </section>
+  {% endif %}
+
+  <!-- GENERATED JSON -->
+  <section class="ui-card json-card ui-code-card">
+    <header class="ui-card-heading ui-card-heading-row"><div><p class="panel-kicker">СФОРМИРОВАННЫЙ JSON</p><h2>config.json</h2><p>Только для чтения. Данные сформированы из SQLite.</p></div><span class="ui-counter">только чтение</span></header>
+    <pre class="json-preview">{{ validation.json }}</pre>
+  </section>
+</div>
 {% endblock %}

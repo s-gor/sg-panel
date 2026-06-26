@@ -187,16 +187,19 @@ class V06WebTest(WebTest):
         routing = self.client.get("/routing")
         self.assertIn(b"eu-exit", routing.data)
 
-class V092StyleTest(WebTest):
+class V096StyleTest(WebTest):
     def test_versioned_stylesheet_and_compact_actions(self):
         response = self.client.get("/login")
         self.assertEqual(response.status_code, 200)
-        self.assertIn(b"app.css?v=0.9.5", response.data)
+        self.assertIn(b"app.css?v=0.9.7", response.data)
         css = (Path(__file__).parents[1] / "xpanel" / "static" / "app.css").read_text(encoding="utf-8")
         self.assertIn("Calm Slate", css)
-        self.assertIn("v0.9.5 — VLESS outbound transport selector", css)
+        self.assertIn("v0.9.7 — unified readable interface", css)
         self.assertIn(".button.full { width: 100%; }", css)
         self.assertIn("justify-self: start", css)
+        self.assertIn(".outbound-choice-row", css)
+        self.assertIn(".outbound-planned-list", css)
+        self.assertIn("content: \"✓\"", css)
 
 
 
