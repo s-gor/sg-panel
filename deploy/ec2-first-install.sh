@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-EXPECTED_VERSION="0.9.5"
+EXPECTED_VERSION="0.9.7"
 SOURCE_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 XRAY_VERSION="v26.3.27"
 DEFAULT_HTTPS_PORT="61443"
@@ -17,6 +17,35 @@ fail(){ printf '[SG-Panel EC2] ERROR: %s\n' "$*" >&2; exit 1; }
 [[ $EUID -eq 0 ]] || fail "запустите скрипт от root"
 [[ -f "$SOURCE_DIR/xpanel/__init__.py" ]] || fail "не найден каталог проекта"
 grep -q "__version__ = \"$EXPECTED_VERSION\"" "$SOURCE_DIR/xpanel/__init__.py" || fail "исходники не версии $EXPECTED_VERSION"
+
+
+TARGET="/opt/xpanel-mvp"
+SERVICE="xpanel-web"
+
+existing_install_is_complete(){
+  [[ -d "$TARGET/xpanel" ]] &&
+  [[ -x "$TARGET/.venv/bin/python" ]] &&
+  [[ -f /etc/xpanel-mvp/web.env ]] &&
+  [[ -f /etc/systemd/system/xpanel-web.service ]]
+}
+
+if existing_install_is_complete; then
+  CURRENT_VERSION="$(cd "$TARGET" && .venv/bin/python -m xpanel --version 2>/dev/null | awk '{print $2}' || true)"
+  CURRENT_VERSION="${CURRENT_VERSION:-неизвестна}"
+  log "Обнаружена установленная SG-Panel $CURRENT_VERSION"
+  log "Перехожу в режим обновления без изменения домена, сертификата, пароля и настроек Xray"
+  cd /
+  bash "$SOURCE_DIR/install-or-upgrade.sh"
+  NEW_VERSION="$(cd "$TARGET" && .venv/bin/python -m xpanel --version | awk '{print $2}')"
+  [[ "$NEW_VERSION" == "$EXPECTED_VERSION" ]] || fail "после обновления установлена версия $NEW_VERSION"
+  systemctl is-active --quiet "$SERVICE" || fail "служба $SERVICE не active после обновления"
+  log "Обновление завершено: SG-Panel $NEW_VERSION"
+  exit 0
+fi
+
+if [[ -e "$TARGET" || -e /etc/xpanel-mvp/web.env || -e /etc/systemd/system/xpanel-web.service ]]; then
+  fail "обнаружена неполная старая установка; сначала сохраните данные и выполните обычное удаление SG-Panel"
+fi
 
 prompt_value(){
   local var_name="$1" prompt="$2" default="${3:-}" secret="${4:-0}" value=""

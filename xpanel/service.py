@@ -971,8 +971,8 @@ def list_outbounds() -> list[dict[str, object]]:
                 "security_label": security_label,
                 "combination_label": f"VLESS + {transport_label} + {security_label}",
                 "description": (
-                    f"VLESS {transport_label} + {security_label} cascade "
-                    f"to {row['address']}:{row['port']}"
+                    f"VLESS {transport_label} + {security_label}: "
+                    f"{row['address']}:{row['port']}"
                 ),
             }
         )
@@ -1058,13 +1058,13 @@ def validate_vless_outbound_values(
     if not name:
         raise ValueError("название outbound не может быть пустым")
     if not address:
-        raise ValueError("адрес второго Xray-сервера не может быть пустым")
+        raise ValueError("адрес удалённого Xray-сервера не может быть пустым")
     if not 1 <= int(port) <= 65535:
         raise ValueError("порт должен быть от 1 до 65535")
     try:
         uuidlib.UUID(user_uuid.strip())
     except ValueError as exc:
-        raise ValueError("некорректный UUID второго сервера") from exc
+        raise ValueError("некорректный UUID удалённого сервера") from exc
     if flow not in ALLOWED_FLOWS:
         raise ValueError("неподдерживаемый flow")
     if network not in ALLOWED_OUTBOUND_NETWORKS:

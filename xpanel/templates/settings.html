@@ -2,41 +2,73 @@
 {% block title %}Сервер — SG-Panel{% endblock %}
 {% block section %}SERVER SETTINGS{% endblock %}
 {% block heading %}Настройки сервера{% endblock %}
-{% block subtitle %}Reality inbound, статистика, пути и пароль панели{% endblock %}
+{% block subtitle %}Входящее VLESS Reality-подключение, служебные параметры и доступ к панели{% endblock %}
 {% block content %}
-<section class="settings-grid">
-  <article class="panel-card settings-main">
-    <div class="panel-heading"><div><p class="panel-kicker">XRAY REALITY</p><h2>Inbound и клиентская ссылка</h2></div><span class="panel-index">01</span></div>
-    <form method="post" action="{{ url_for('settings_save') }}" class="stack modern-form">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <div class="form-grid"><label><span>Публичный адрес / домен</span><input name="address" value="{{ server.address }}" required></label><label><span>Порт</span><input name="port" type="number" min="1" max="65535" value="{{ server.port }}" required></label></div>
-      <div class="form-grid"><label><span>Listen</span><input name="listen" value="{{ server.listen }}" required></label><label><span>Fingerprint</span><input name="fingerprint" value="{{ server.fingerprint }}" required></label></div>
-      <div class="form-grid"><label><span>Reality target</span><input name="dest" value="{{ server.dest }}" required></label><label><span>Server name / SNI</span><input name="server_name" value="{{ server.server_name }}" required></label></div>
-      <div class="form-grid"><label><span>Flow</span><select name="flow"><option value="" {% if not server.flow %}selected{% endif %}>без flow</option><option value="xtls-rprx-vision" {% if server.flow == 'xtls-rprx-vision' %}selected{% endif %}>xtls-rprx-vision</option><option value="xtls-rprx-vision-udp443" {% if server.flow == 'xtls-rprx-vision-udp443' %}selected{% endif %}>xtls-rprx-vision-udp443</option></select></label><label><span>Log level</span><select name="loglevel">{% for value in ['debug','info','warning','error','none'] %}<option value="{{ value }}" {% if server.loglevel == value %}selected{% endif %}>{{ value }}</option>{% endfor %}</select></label></div>
-      <label><span>Reality private key</span><input id="private-key" name="private_key" type="password" value="{{ server.private_key }}" required></label>
-      <div class="form-grid"><label><span>Reality public key / password</span><input name="public_key" value="{{ server.public_key }}" required></label><label><span>Short ID</span><input name="short_id" value="{{ server.short_id }}" required></label></div>
-      <div class="form-grid"><label><span>Stats API listen</span><input name="api_listen" value="{{ server.api_listen }}" required></label><label class="switch-row compact-switch"><div><strong>Xray statistics</strong><small>Трафик пользователей и inbound/outbound</small></div><input type="checkbox" name="stats_enabled" {% if server.stats_enabled %}checked{% endif %}><span class="switch"></span></label></div>
-      <details class="advanced-box"><summary>Системные пути</summary><div class="stack"><label><span>config.json</span><input name="config_path" value="{{ server.config_path }}" required></label><label><span>Xray binary</span><input name="xray_bin" value="{{ server.xray_bin }}" required></label><label><span>systemd service</span><input name="xray_service" value="{{ server.xray_service }}" required></label></div></details>
-      <div class="actions"><button class="button primary" type="submit">Сохранить настройки</button><button type="button" class="button ghost" onclick="const e=document.getElementById('private-key');e.type=e.type==='password'?'text':'password'">Показать private key</button></div>
-    </form>
-  </article>
+<script>document.body.classList.add('ui-standard-page','server-settings-page');</script>
+<div class="ui-page ui-page-wide">
+  <section class="ui-card server-main-card">
+    <header class="ui-card-heading">
+      <div>
+        <p class="panel-kicker">XRAY REALITY</p>
+        <h2>Входящее подключение</h2>
+        <p>Основные параметры сервера и данные, которые входят в клиентскую ссылку.</p>
+      </div>
+    </header>
 
-  <aside class="settings-side stack">
-    <article class="panel-card">
-      <div class="panel-heading"><div><p class="panel-kicker">KEY MANAGEMENT</p><h2>Reality-ключи</h2></div><span class="panel-index">02</span></div>
-      <p class="panel-description">Генерация заменит private key, public key и Short ID в SQLite. Текущие клиенты продолжат работать до следующего Apply config.</p>
-      <form method="post" action="{{ url_for('settings_generate_reality') }}" onsubmit="return confirm('Сгенерировать новые Reality-ключи? После Apply старые ссылки перестанут работать.')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button danger" type="submit">Сгенерировать новые ключи</button></form>
+    <form method="post" action="{{ url_for('settings_save') }}" class="ui-form server-settings-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+      <section class="ui-form-section">
+        <header><span>1</span><div><h3>Адрес и порт</h3><p>Публичный адрес сервера и локальный интерфейс прослушивания.</p></div></header>
+        <div class="ui-field-grid server-address-grid">
+          <label><span>Публичный адрес / домен</span><input name="address" value="{{ server.address }}" required></label>
+          <label><span>Порт</span><input name="port" type="number" min="1" max="65535" value="{{ server.port }}" required></label>
+          <label><span>Listen</span><input name="listen" value="{{ server.listen }}" required></label>
+          <label><span>Уровень журналирования</span><select name="loglevel">{% for value in ['debug','info','warning','error','none'] %}<option value="{{ value }}" {% if server.loglevel == value %}selected{% endif %}>{{ value }}</option>{% endfor %}</select></label>
+        </div>
+      </section>
+
+      <section class="ui-form-section">
+        <header><span>2</span><div><h3>Reality</h3><p>Маскировочный адрес, имя сервера и параметры клиента.</p></div></header>
+        <div class="ui-field-grid server-reality-grid">
+          <label><span>Reality target</span><input name="dest" value="{{ server.dest }}" required></label>
+          <label><span>Server name / SNI</span><input name="server_name" value="{{ server.server_name }}" required></label>
+          <label><span>Fingerprint</span><input name="fingerprint" value="{{ server.fingerprint }}" required></label>
+          <label><span>Flow</span><select name="flow"><option value="" {% if not server.flow %}selected{% endif %}>без flow</option><option value="xtls-rprx-vision" {% if server.flow == 'xtls-rprx-vision' %}selected{% endif %}>xtls-rprx-vision</option><option value="xtls-rprx-vision-udp443" {% if server.flow == 'xtls-rprx-vision-udp443' %}selected{% endif %}>xtls-rprx-vision-udp443</option></select></label>
+          <label class="ui-field-wide"><span>Reality private key</span><input id="private-key" name="private_key" type="password" value="{{ server.private_key }}" required></label>
+          <label><span>Reality public key / password</span><input name="public_key" value="{{ server.public_key }}" required></label>
+          <label><span>Short ID</span><input name="short_id" value="{{ server.short_id }}" required></label>
+        </div>
+      </section>
+
+      <section class="ui-form-section">
+        <header><span>3</span><div><h3>Статистика и служебные параметры</h3><p>Локальный Stats API и системные пути SG-Panel.</p></div></header>
+        <div class="ui-field-grid server-service-grid">
+          <label><span>Stats API listen</span><input name="api_listen" value="{{ server.api_listen }}" required></label>
+          <label class="ui-toggle-row ui-toggle-compact"><span><strong>Статистика Xray</strong><small>Трафик пользователей, входов и выходов.</small></span><input type="checkbox" name="stats_enabled" {% if server.stats_enabled %}checked{% endif %}><span class="switch" aria-hidden="true"></span></label>
+        </div>
+        <details class="ui-details"><summary>Системные пути</summary><div class="ui-field-grid ui-details-grid"><label><span>config.json</span><input name="config_path" value="{{ server.config_path }}" required></label><label><span>Xray binary</span><input name="xray_bin" value="{{ server.xray_bin }}" required></label><label><span>systemd service</span><input name="xray_service" value="{{ server.xray_service }}" required></label></div></details>
+      </section>
+
+      <div class="ui-actions"><button class="button primary" type="submit">Сохранить настройки</button><button type="button" class="button ghost" onclick="const e=document.getElementById('private-key');e.type=e.type==='password'?'text':'password';this.textContent=e.type==='password'?'Показать private key':'Скрыть private key'">Показать private key</button></div>
+    </form>
+  </section>
+
+  <section class="ui-bottom-grid server-actions-grid">
+    <article class="ui-card ui-action-card">
+      <header class="ui-card-heading"><div><p class="panel-kicker">КЛЮЧИ REALITY</p><h2>Сгенерировать новый комплект</h2><p>Заменяет private key, public key и Short ID в базе данных.</p></div></header>
+      <div class="ui-warning-note"><span>!</span><p>Текущие клиенты продолжат работать до следующего применения конфигурации.</p></div>
+      <form method="post" action="{{ url_for('settings_generate_reality') }}" onsubmit="return confirm('Сгенерировать новые Reality-ключи? После применения конфигурации старые ссылки перестанут работать.')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button danger" type="submit">Сгенерировать новые ключи</button></form>
     </article>
-    <article class="panel-card">
-      <div class="panel-heading"><div><p class="panel-kicker">PANEL ACCESS</p><h2>Сменить пароль</h2></div><span class="panel-index">03</span></div>
-      <form method="post" action="{{ url_for('settings_password') }}" class="stack modern-form">
+
+    <article class="ui-card ui-action-card">
+      <header class="ui-card-heading"><div><p class="panel-kicker">ДОСТУП К ПАНЕЛИ</p><h2>Сменить пароль</h2><p>Новый пароль должен содержать не менее восьми символов.</p></div></header>
+      <form method="post" action="{{ url_for('settings_password') }}" class="ui-form ui-password-form">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <label><span>Текущий пароль</span><input type="password" name="current_password" required></label>
-        <label><span>Новый пароль</span><input type="password" name="new_password" minlength="8" required></label>
-        <label><span>Повторите новый пароль</span><input type="password" name="repeat_password" minlength="8" required></label>
-        <button class="button primary" type="submit">Сменить пароль</button>
+        <div class="ui-field-grid password-grid"><label><span>Текущий пароль</span><input type="password" name="current_password" required></label><label><span>Новый пароль</span><input type="password" name="new_password" minlength="8" required></label><label><span>Повторите новый пароль</span><input type="password" name="repeat_password" minlength="8" required></label></div>
+        <div class="ui-actions"><button class="button primary" type="submit">Сменить пароль</button></div>
       </form>
     </article>
-  </aside>
-</section>
+  </section>
+</div>
 {% endblock %}

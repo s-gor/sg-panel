@@ -2,57 +2,94 @@
 {% block title %}Подписки — SG-Panel{% endblock %}
 {% block section %}SUBSCRIPTIONS{% endblock %}
 {% block heading %}Подписки пользователей{% endblock %}
-{% block subtitle %}Постоянный URL обновляет VLESS-профиль без повторной отправки ссылки{% endblock %}
+{% block subtitle %}Постоянные ссылки для автоматического обновления VLESS-профилей{% endblock %}
 {% block content %}
-<section class="two-column-grid subscription-layout">
-  <article class="panel-card">
-    <div class="panel-heading"><div><p class="panel-kicker">GLOBAL SETTINGS</p><h2>Параметры подписок</h2></div><span class="panel-index">01</span></div>
-    <form method="post" action="{{ url_for('subscriptions_settings_save') }}" class="stack modern-form">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <label class="switch-row"><span><strong>Включить публичные подписки</strong><small>Без этого все URL отвечают 404</small></span><input type="checkbox" name="enabled" {% if settings.enabled %}checked{% endif %}><i></i></label>
-      <label><span>Название профиля</span><input type="text" name="profile_title" maxlength="80" value="{{ settings.profile_title }}" required></label>
-      <label><span>Публичный базовый URL</span><input type="url" name="base_url" value="{{ settings.base_url }}" placeholder="https://panel.example.com"></label>
-      <p class="hint">Если поле пустое, панель использует текущий адрес: <code>{{ fallback_base_url }}</code>. Для удалённых клиентов URL должен быть доступен извне.</p>
-      <button class="button primary" type="submit">Сохранить подписки</button>
-    </form>
-    <div class="info-strip"><span>i</span><p><strong>Apply config не требуется</strong><small>Подписка формируется панелью из актуальных данных SQLite при каждом запросе.</small></p></div>
-  </article>
+<script>document.body.classList.add('ui-standard-page','subscriptions-page');</script>
+<div class="ui-page ui-page-wide">
+  <section class="ui-top-grid subscriptions-top-grid">
+    <article class="ui-card ui-card-form">
+      <header class="ui-card-heading">
+        <div>
+          <p class="panel-kicker">ПАРАМЕТРЫ</p>
+          <h2>Публичные подписки</h2>
+          <p>Настройте название профиля и внешний адрес, который будет получать клиент.</p>
+        </div>
+      </header>
 
-  <article class="panel-card">
-    <div class="panel-heading"><div><p class="panel-kicker">FORMATS</p><h2>Форматы выдачи</h2></div><span class="panel-index">02</span></div>
-    <div class="details-modern subscription-formats">
-      <dl><dt>Base64</dt><dd><code>/sub/TOKEN</code><small>Основной URL для v2rayN, v2rayNG и совместимых клиентов.</small></dd></dl>
-      <dl><dt>Plain</dt><dd><code>/sub/TOKEN?format=plain</code><small>Обычная VLESS-ссылка для проверки.</small></dd></dl>
-      <dl><dt>JSON</dt><dd><code>/sub/TOKEN?format=json</code><small>Структурированный ответ для интеграций.</small></dd></dl>
-    </div>
-    <div class="secure-note"><span>◆</span><p><strong>Token является секретом</strong><small>Перегенерация немедленно отключает старый URL. Не публикуйте подписку открыто.</small></p></div>
-  </article>
-</section>
+      <form method="post" action="{{ url_for('subscriptions_settings_save') }}" class="ui-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
-<section class="panel-card data-panel subscription-users">
-  <div class="panel-heading table-heading"><div><p class="panel-kicker">USER FEEDS</p><h2>Персональные URL</h2></div><span class="count-badge">{{ users|length }} users</span></div>
-  {% if users %}
-  <div class="table-wrap"><table><thead><tr><th>Пользователь</th><th>Состояние</th><th>URL подписки</th><th>Обращения</th><th>Действия</th></tr></thead><tbody>
-  {% for user in users %}
-    <tr>
-      <td><div class="user-cell"><span class="avatar">{{ user.name[:1]|upper }}</span><div><strong>{{ user.name }}</strong><small>#{{ user.id }}</small></div></div></td>
-      <td>
-        {% if not user.enabled or user_is_expired(user) %}<span class="pill disabled"><i></i>user unavailable</span>
-        {% elif user.subscription_enabled %}<span class="pill enabled"><i></i>subscription on</span>
-        {% else %}<span class="pill disabled"><i></i>subscription off</span>{% endif %}
-      </td>
-      <td><div class="subscription-url-cell"><input id="sub-{{ user.id }}" type="text" readonly value="{{ subscription_urls[user.id] }}"><button class="button ghost small" type="button" onclick="copySubscription({{ user.id }}, this)">Копировать</button></div></td>
-      <td><div class="traffic-cell"><strong>{{ user.subscription_access_count }}</strong><small>{% if user.subscription_last_access_at %}{{ user.subscription_last_access_at[:16]|replace('T',' ') }} UTC{% else %}ещё не использовалась{% endif %}</small></div></td>
-      <td><div class="row-actions">
-        <a class="button ghost small" href="{{ url_for('user_link', user_id=user.id) }}">Link / QR</a>
-        <form method="post" action="{{ url_for('user_subscription_toggle', user_id=user.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button secondary small" type="submit">{{ 'Отключить' if user.subscription_enabled else 'Включить' }}</button></form>
-        <form method="post" action="{{ url_for('user_subscription_regenerate', user_id=user.id) }}" onsubmit="return confirm('Старый URL {{ user.name }} перестанет работать. Продолжить?')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button danger small" type="submit">Новый token</button></form>
-      </div></td>
-    </tr>
-  {% endfor %}
-  </tbody></table></div>
-  {% else %}<div class="empty-state"><span>SG</span><h3>Нет пользователей</h3><p>Сначала создайте пользователя.</p></div>{% endif %}
-</section>
+        <label class="ui-toggle-row">
+          <span><strong>Разрешить публичные подписки</strong><small>Когда выключено, все адреса подписок отвечают кодом 404.</small></span>
+          <input type="checkbox" name="enabled" {% if settings.enabled %}checked{% endif %}>
+          <span class="switch" aria-hidden="true"></span>
+        </label>
+
+        <div class="ui-field-grid ui-field-grid-subscriptions">
+          <label><span>Название профиля</span><input type="text" name="profile_title" maxlength="80" value="{{ settings.profile_title }}" required></label>
+          <label class="ui-field-wide"><span>Публичный базовый URL</span><input type="url" name="base_url" value="{{ settings.base_url }}" placeholder="https://panel.example.com"></label>
+        </div>
+
+        <p class="ui-field-note">Если поле URL пустое, панель использует текущий адрес: <code>{{ fallback_base_url }}</code>. Для удалённых клиентов этот адрес должен быть доступен извне.</p>
+
+        <div class="ui-actions"><button class="button primary" type="submit">Сохранить настройки</button></div>
+      </form>
+
+      <div class="ui-info-note"><span>i</span><p><strong>Применять конфигурацию Xray не требуется.</strong> Подписка формируется из актуальных данных SQLite при каждом запросе.</p></div>
+    </article>
+
+    <article class="ui-card subscriptions-formats-card">
+      <header class="ui-card-heading">
+        <div>
+          <p class="panel-kicker">ФОРМАТЫ</p>
+          <h2>Адреса выдачи</h2>
+          <p>Один токен можно использовать в нескольких форматах.</p>
+        </div>
+      </header>
+
+      <div class="ui-code-list">
+        <div><span>Base64</span><code>/sub/TOKEN</code><small>Основной вариант для v2rayN, v2rayNG и совместимых клиентов.</small></div>
+        <div><span>Обычная ссылка</span><code>/sub/TOKEN?format=plain</code><small>VLESS-ссылка без кодирования, удобная для проверки.</small></div>
+        <div><span>JSON</span><code>/sub/TOKEN?format=json</code><small>Структурированный ответ для интеграций.</small></div>
+      </div>
+
+      <div class="ui-warning-note"><span>!</span><p><strong>Токен является секретом.</strong> После его перегенерации прежний адрес сразу перестаёт работать.</p></div>
+    </article>
+  </section>
+
+  <section class="ui-card ui-table-card subscription-users">
+    <header class="ui-card-heading ui-card-heading-row">
+      <div>
+        <p class="panel-kicker">ПОЛЬЗОВАТЕЛИ</p>
+        <h2>Персональные ссылки</h2>
+        <p>Отдельный адрес и состояние подписки для каждого пользователя.</p>
+      </div>
+      <span class="ui-counter">{{ users|length }} {{ 'пользователь' if users|length == 1 else 'пользователей' }}</span>
+    </header>
+
+    {% if users %}
+    <div class="table-wrap"><table><thead><tr><th>Пользователь</th><th>Состояние</th><th>URL подписки</th><th>Обращения</th><th>Действия</th></tr></thead><tbody>
+    {% for user in users %}
+      <tr>
+        <td><div class="user-cell"><span class="avatar">{{ user.name[:1]|upper }}</span><div><strong>{{ user.name }}</strong><small>#{{ user.id }}</small></div></div></td>
+        <td>
+          {% if not user.enabled or user_is_expired(user) %}<span class="pill disabled"><i></i>Недоступна</span>
+          {% elif user.subscription_enabled %}<span class="pill enabled"><i></i>Включена</span>
+          {% else %}<span class="pill disabled"><i></i>Выключена</span>{% endif %}
+        </td>
+        <td><div class="subscription-url-cell"><input id="sub-{{ user.id }}" type="text" readonly value="{{ subscription_urls[user.id] }}"><button class="button ghost small" type="button" onclick="copySubscription({{ user.id }}, this)">Копировать</button></div></td>
+        <td><div class="traffic-cell"><strong>{{ user.subscription_access_count }}</strong><small>{% if user.subscription_last_access_at %}{{ user.subscription_last_access_at[:16]|replace('T',' ') }} UTC{% else %}ещё не использовалась{% endif %}</small></div></td>
+        <td><div class="row-actions">
+          <a class="button ghost small" href="{{ url_for('user_link', user_id=user.id) }}">Ссылка / QR</a>
+          <form method="post" action="{{ url_for('user_subscription_toggle', user_id=user.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button secondary small" type="submit">{{ 'Отключить' if user.subscription_enabled else 'Включить' }}</button></form>
+          <form method="post" action="{{ url_for('user_subscription_regenerate', user_id=user.id) }}" onsubmit="return confirm('Старый URL пользователя {{ user.name }} перестанет работать. Продолжить?')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button danger small" type="submit">Новый токен</button></form>
+        </div></td>
+      </tr>
+    {% endfor %}
+    </tbody></table></div>
+    {% else %}<div class="empty-state"><span>SG</span><h3>Пользователей пока нет</h3><p>Сначала создайте пользователя.</p></div>{% endif %}
+  </section>
+</div>
 <script>
 async function copySubscription(id, button) {
   const field = document.getElementById('sub-' + id);
