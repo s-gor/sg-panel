@@ -49,9 +49,6 @@ class InstallRecoveryTest(unittest.TestCase):
         self.assertIn("--reconfigure", text)
 
 
-if __name__ == "__main__":
-    unittest.main()
-
 class RC5ServicePermissionsTest(unittest.TestCase):
     def test_web_service_can_write_managed_nginx_files(self):
         root = Path(__file__).parents[1]
@@ -64,3 +61,20 @@ class RC5ServicePermissionsTest(unittest.TestCase):
         text = (root / "install-or-upgrade.sh").read_text(encoding="utf-8")
         self.assertIn("deploy/install-wgcf-cli.sh", text)
         self.assertIn("WARNING: wgcf-cli was not installed", text)
+
+class RC8CleanInstallNamespaceTest(unittest.TestCase):
+    def test_service_creates_read_write_paths_before_unit_file(self):
+        root = Path(__file__).parents[1]
+        text = (root / "deploy" / "install-service.sh").read_text(encoding="utf-8")
+
+        mkdir_pos = text.index("mkdir -p")
+        unit_pos = text.index('cat > "$SERVICE_FILE" <<UNIT')
+
+        self.assertLess(mkdir_pos, unit_pos)
+        self.assertIn("/var/www/sg-panel-placeholder", text[mkdir_pos:unit_pos])
+        self.assertIn("/usr/local/etc/xray", text[mkdir_pos:unit_pos])
+        self.assertIn("/etc/nginx", text[mkdir_pos:unit_pos])
+
+
+if __name__ == "__main__":
+    unittest.main()

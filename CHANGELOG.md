@@ -1,4 +1,13 @@
-# SG-Panel 0.10.0-rc7
+# Changelog
+
+## 0.10.0 RC8 — Clean install namespace fix
+
+- исправлена чистая установка: `deploy/install-service.sh` заранее создаёт `/var/www/sg-panel-placeholder` и остальные каталоги из `ReadWritePaths` до запуска `xpanel-web`;
+- устранена ошибка systemd `status=226/NAMESPACE` после полной очистки или на новом EC2;
+- добавлен регрессионный тест, проверяющий порядок создания каталогов до записи unit-файла;
+- функциональность RC7 сохранена без изменений.
+
+## 0.10.0 RC7 — One-click workflow and clear diagnostics
 
 - Dashboard превращён в чистый обзор: состояние Xray, текущий Inbound, Default Outbound, пользователи, трафик и время последнего применения;
 - повторяющиеся кнопки применения, проверки JSON и перезапуска удалены из Dashboard;
@@ -10,8 +19,6 @@
 - создание и пересоздание WARP теперь также сохраняет рабочий IPv4 endpoint;
 - добавлены регрессионные проверки нового workflow, разделения Dashboard/Diagnostics и IPv4 endpoint WARP;
 - полный набор: 139 автоматических тестов.
-
-# Changelog
 
 ## 0.10.0 RC6 — WARP default outbound fix
 

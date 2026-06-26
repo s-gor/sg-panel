@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-EXPECTED_VERSION="0.10.0-rc7"
+EXPECTED_VERSION="0.10.0-rc8"
 SOURCE_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 XRAY_VERSION="v26.3.27"
 DEFAULT_HTTPS_PORT="61443"

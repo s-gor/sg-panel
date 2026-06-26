@@ -4357,7 +4357,7 @@ table td,
   .warp-routing-link { align-items: stretch; flex-direction: column; }
 }
 
-/* v0.10.0 RC7: clean Dashboard, focused Diagnostics and visible feedback */
+/* v0.10.0 RC8: clean Dashboard, focused Diagnostics and visible feedback */
 .flash-stack {
   position: fixed;
   top: 18px;
@@ -4444,3 +4444,5 @@ table td,
   .flash-stack { top: 10px; right: 10px; width: calc(100vw - 20px); }
   .dashboard-path-grid { padding-left: 14px; padding-right: 14px; }
 }
+
+/* v0.10.0 RC8: clean-install systemd namespace fix; UI unchanged */

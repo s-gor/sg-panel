@@ -27,6 +27,17 @@ if [[ ! "$PORT" =~ ^[0-9]+$ ]] || (( PORT < 1 || PORT > 65535 )); then
   exit 1
 fi
 
+# Все пути из ReadWritePaths должны существовать до запуска службы:
+# systemd создаёт mount namespace раньше, чем запускает waitress.
+# Каталог заглушки HTTPS наполняется позже в configure-https.sh.
+mkdir -p \
+  "$PROJECT_DIR/data" \
+  "$PROJECT_DIR/backups" \
+  /usr/local/etc/xray \
+  /etc/nginx \
+  /var/www/sg-panel-placeholder
+chmod 0755 /var/www/sg-panel-placeholder
+
 cat > "$SERVICE_FILE" <<UNIT
 [Unit]
 Description=SG-Panel web interface
