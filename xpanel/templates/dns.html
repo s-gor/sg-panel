@@ -1,15 +1,23 @@
 {% extends "base.html" %}
 {% block title %}DNS — SG-Panel{% endblock %}
-{% block section %}DNS ENGINE{% endblock %}
-{% block heading %}Встроенный DNS{% endblock %}
+{% block section %}NETWORK{% endblock %}
+{% block heading %}Network{% endblock %}
 {% block subtitle %}Upstream-серверы, DoH Local, fallback и статические hosts-записи{% endblock %}
 {% block content %}
 <script>document.body.classList.add('ui-standard-page','dns-page');</script>
 <div class="ui-page ui-page-wide">
+  {% set enabled_servers = servers|selectattr('enabled')|list|length %}
+  <section class="ui-dashboard-metrics page-context-metrics dns-context-metrics">
+    <article class="ui-status-card"><span>Network</span><strong class="{{ 'text-success' if settings.enabled else 'text-warning' }}">{{ 'Включён' if settings.enabled else 'Выключен' }}</strong><small>Раздел dns в config.json</small></article>
+    <article class="ui-status-card"><span>Upstream</span><strong>{{ enabled_servers }} / {{ servers|length }}</strong><small>Включено / всего</small></article>
+    <article class="ui-status-card"><span>Стратегия</span><strong class="ui-value-compact">{{ settings.query_strategy }}</strong><small>IP family для ответов</small></article>
+    <article class="ui-status-card"><span>Hosts</span><strong>{{ hosts|length }}</strong><small>Статические записи</small></article>
+  </section>
+  <div class="ui-page-toolbar"><div><strong>Контекстный JSON DNS</strong><small>Серверы, hosts и глобальные параметры в одном проверяемом документе.</small></div><a class="button secondary" href="{{ url_for('dns_json_page') }}">{ } DNS JSON</a></div>
   <section class="ui-top-grid dns-top-grid">
     <article class="ui-card ui-card-form">
       <header class="ui-card-heading"><div><p class="panel-kicker">ПАРАМЕТРЫ</p><h2>Общие настройки DNS</h2><p>Включение встроенного DNS Xray и базовая стратегия запросов.</p></div></header>
-      <form method="post" action="{{ url_for('dns_settings_save') }}" class="ui-form">
+      <form method="post" action="{{ url_for('dns_settings_save') }}" class="ui-form" data-validated-form>
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <label class="ui-toggle-row"><span><strong>Включить встроенный DNS</strong><small>Добавить раздел dns в генерируемый config.json.</small></span><input type="checkbox" name="enabled" {% if settings.enabled %}checked{% endif %}><span class="switch"></span></label>
         <label><span>Стратегия запросов</span><select name="query_strategy">{% for value in ['UseIP','UseIPv4','UseIPv6','UseSystem'] %}<option value="{{ value }}" {% if settings.query_strategy == value %}selected{% endif %}>{{ value }}</option>{% endfor %}</select><small>На IPv4-сервере обычно используют UseIPv4.</small></label>
@@ -22,12 +30,12 @@
         </div>
         <div class="ui-actions"><button class="button primary" type="submit">Сохранить и применить</button></div>
       </form>
-      <div class="ui-info-note"><span>i</span><p>Маршрутизация сейчас использует <strong>{{ routing.domain_strategy }}</strong>. Встроенный DNS участвует в IP-routing при IPIfNonMatch или IPOnDemand.</p></div>
+      <div class="ui-info-note"><span>i</span><p>Маршрутизация сейчас использует <strong>{{ routing.domain_strategy }}</strong>. Network участвует в IP-routing при IPIfNonMatch или IPOnDemand.</p></div>
     </article>
 
     <article class="ui-card ui-card-form">
       <header class="ui-card-heading"><div><p class="panel-kicker">НОВЫЙ UPSTREAM</p><h2>Добавить DNS-сервер</h2><p>Адрес, приоритет и условия использования нового upstream.</p></div></header>
-      <form method="post" action="{{ url_for('dns_server_add') }}" class="ui-form">
+      <form method="post" action="{{ url_for('dns_server_add') }}" class="ui-form" data-validated-form>
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="ui-field-grid dns-name-grid"><label><span>Название</span><input name="name" required placeholder="Cloudflare DoH"></label><label><span>Приоритет</span><input name="priority" type="number" min="1" max="9999" value="100" required></label></div>
         <label><span>Адрес</span><input name="address" required placeholder="https+local://1.1.1.1/dns-query"><small>Поддерживаются UDP IP, tcp://, tcp+local://, https://, https+local:// и quic+local://.</small></label>
@@ -50,8 +58,8 @@
   <section class="ui-top-grid dns-lower-grid-v10">
     <article class="ui-card ui-card-form">
       <header class="ui-card-heading"><div><p class="panel-kicker">HOSTS</p><h2>Статические записи</h2><p>Локальные переопределения доменов.</p></div></header>
-      <form method="post" action="{{ url_for('dns_host_add') }}" class="ui-form"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><label><span>Домен</span><input name="domain" required placeholder="server.local"></label><label><span>IP или домен</span><textarea name="addresses" rows="2" required placeholder="192.168.1.200"></textarea></label><div class="ui-actions"><button class="button primary" type="submit">Добавить запись</button></div></form>
-      {% if hosts %}<div class="dns-host-list-v10">{% for host in hosts %}<div class="dns-host-item"><form method="post" action="{{ url_for('dns_host_edit', host_id=host.id) }}" class="dns-host-row-v10"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input name="domain" value="{{ host.domain }}" required><input name="addresses" value="{{ host.addresses|replace('\n', ', ') }}" required><button class="button ghost small" type="submit">Сохранить</button></form><div class="row-actions"><span class="pill {{ 'enabled' if host.enabled else 'disabled' }}"><i></i>{{ 'Активна' if host.enabled else 'Отключена' }}</span><form method="post" action="{{ url_for('dns_host_toggle', host_id=host.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button secondary small" type="submit">{{ 'Отключить' if host.enabled else 'Включить' }}</button></form><form method="post" action="{{ url_for('dns_host_delete', host_id=host.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button danger small" type="submit">Удалить</button></form></div></div>{% endfor %}</div>{% endif %}
+      <form method="post" action="{{ url_for('dns_host_add') }}" class="ui-form" data-validated-form><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><label><span>Домен</span><input name="domain" required placeholder="server.local"></label><label><span>IP или домен</span><textarea name="addresses" rows="2" required placeholder="192.168.1.200"></textarea></label><div class="ui-actions"><button class="button primary" type="submit">Добавить запись</button></div></form>
+      {% if hosts %}<div class="dns-host-list-v10">{% for host in hosts %}<div class="dns-host-item"><form method="post" action="{{ url_for('dns_host_edit', host_id=host.id) }}" class="dns-host-row-v10" data-validated-form><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input name="domain" value="{{ host.domain }}" required><input name="addresses" value="{{ host.addresses|replace('\n', ', ') }}" required><button class="button ghost small" type="submit">Сохранить</button></form><div class="row-actions"><span class="pill {{ 'enabled' if host.enabled else 'disabled' }}"><i></i>{{ 'Активна' if host.enabled else 'Отключена' }}</span><form method="post" action="{{ url_for('dns_host_toggle', host_id=host.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button secondary small" type="submit">{{ 'Отключить' if host.enabled else 'Включить' }}</button></form><form method="post" action="{{ url_for('dns_host_delete', host_id=host.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button danger small" type="submit">Удалить</button></form></div></div>{% endfor %}</div>{% endif %}
     </article>
 
     <article class="ui-card ui-code-card">

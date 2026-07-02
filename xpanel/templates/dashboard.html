@@ -1,13 +1,80 @@
 {% extends "base.html" %}
-{% block title %}Обзор — SG-Panel{% endblock %}
-{% block section %}DASHBOARD{% endblock %}
-{% block heading %}Состояние системы{% endblock %}
-{% block subtitle %}Краткий ответ на главный вопрос: всё ли сейчас работает{% endblock %}
+{% block title %}System / Resources — SG-Panel{% endblock %}
+{% block section %}SYSTEM{% endblock %}
+{% block heading %}System{% endblock %}
+{% block subtitle %}Ресурсы, состояние и основные показатели собственного Xray-сервера{% endblock %}
 {% block content %}
-<script>document.body.classList.add('ui-standard-page','dashboard-page','dashboard-clean');</script>
+<script>document.body.classList.add('ui-standard-page','dashboard-page','dashboard-rc11');</script>
 <div class="ui-page ui-page-wide">
 {% if error %}<div class="alert error">{{ error }}</div>{% endif %}
 {% if status %}
+  {% set sys = status.system|default({}) %}
+  {% set cpu = sys.cpu_percent|default(0) %}
+  {% set ram = sys.memory_percent|default(0) %}
+  {% set swap = sys.swap_percent|default(0) %}
+  {% set disk = sys.disk_percent|default(0) %}
+
+  <section class="resource-board resource-board-memory memory-dashboard" aria-labelledby="resources-title">
+    <header class="memory-dashboard-heading">
+      <div>
+        <h2 id="resources-title">Оперативная память</h2>
+        <p>Сколько памяти занимает сама панель, Xray, Nginx, ядро и остальная Ubuntu.</p>
+      </div>
+      <div class="memory-dashboard-summary">
+        <strong>{{ sys.memory_used_human|default('—') }} из {{ sys.memory_total_human|default('—') }}</strong>
+        <span>Доступно {{ sys.memory_available_human|default('—') }}</span>
+        <button class="button ghost small" type="button" onclick="window.location.reload()">Обновить</button>
+        <small>Uptime {{ sys.uptime_human|default('—') }}</small>
+      </div>
+    </header>
+
+    <div class="memory-dashboard-layout">
+      <div class="memory-dial-column">
+        <div class="memory-dial is-{{ sys.memory_status_class|default('normal') }}" style="background: {{ sys.memory_ring_style|default('conic-gradient(#4b9cff 0 0)') }};" role="img" aria-label="Использование оперативной памяти: {{ ram }} процентов">
+          <div class="memory-dial-center">
+            <strong>{{ ram }}%</strong>
+            <span>{{ sys.memory_status_label|default('Память') }}</span>
+          </div>
+        </div>
+        <div class="memory-dial-foot"><span>Swap</span><strong class="{{ 'text-danger' if sys.swap_used|default(0) else 'text-success' }}">{{ sys.swap_used_human|default('0 B') }}</strong></div>
+      </div>
+
+      <div class="memory-legend" aria-label="Расшифровка памяти">
+        {% for segment in sys.memory_segments|default([]) %}
+        <div class="memory-legend-item" data-memory-segment="{{ segment.key }}">
+          <i class="memory-legend-swatch {{ segment.tone }}"></i>
+          <div>
+            <span>{{ segment.label }}</span>
+            {% if segment.key == 'panel' %}<small>Вся служба и дочерние процессы</small>
+            {% elif segment.key == 'xray' %}<small>Служба Xray и дочерние процессы</small>
+            {% elif segment.key == 'free' %}<small>Доступно с учётом кэша: {{ sys.memory_available_human|default('—') }}</small>
+            {% endif %}
+          </div>
+          <strong>{{ segment.human }}</strong>
+          <em>{{ segment.percent }}%</em>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="memory-facts">
+      <div><span>Панель сейчас</span><strong>{{ sys.panel_memory_human|default('—') }}</strong></div>
+      <div><span>Пиковая память панели</span><strong>{{ sys.panel_memory_peak_human|default('—') }}</strong></div>
+      <div><span>Xray сейчас</span><strong>{{ sys.xray_memory_human|default('—') }}</strong></div>
+      <div><span>Nginx сейчас</span><strong>{{ sys.nginx_memory_human|default('—') }}</strong></div>
+      <div><span>Всего доступно</span><strong class="text-success">{{ sys.memory_available_human|default('—') }}</strong></div>
+    </div>
+
+    <details class="memory-method"><summary>Как считается память</summary><p>{{ sys.memory_method|default('Данные получены из Linux и systemd.') }}</p></details>
+  </section>
+
+  <section class="resource-secondary-strip" aria-label="Дополнительные показатели ресурсов">
+    <div><span>CPU LOAD</span><strong>{{ cpu }}%</strong><small>{{ sys.cpu_cores|default(1) }} ядер · load {{ sys.load_1m|default(0) }}</small></div>
+    <div><span>SWAP</span><strong>{{ swap }}%</strong><small>{{ sys.swap_used_human|default('0 B') }} / {{ sys.swap_total_human|default('0 B') }}</small></div>
+    <div><span>DISK</span><strong>{{ disk }}%</strong><small>{{ sys.disk_used_human|default('—') }} / {{ sys.disk_total_human|default('—') }}</small></div>
+    <div><span>LOAD AVERAGE</span><strong>{{ sys.load_1m|default(0) }} · {{ sys.load_5m|default(0) }} · {{ sys.load_15m|default(0) }}</strong><small>1 / 5 / 15 минут</small></div>
+  </section>
+
   <section class="dashboard-health {{ 'is-ok' if status.overall_ok else 'is-error' }}">
     <span class="dashboard-health-dot" aria-hidden="true"></span>
     <div>
@@ -40,7 +107,7 @@
 
   <section class="ui-card dashboard-path-card">
     <header class="ui-card-heading">
-      <div><p class="panel-kicker">БЫСТРЫЙ ПУТЬ</p><h2>Обычная настройка без повторных кнопок</h2><p>Измените нужный раздел и нажмите «Сохранить и применить». Проверка, резервная копия и перезапуск Xray выполняются автоматически.</p></div>
+      <div><p class="panel-kicker">БЫСТРЫЙ ПУТЬ</p><h2>Три уровня настройки</h2><p>Каждый раздел сохраняет изменения, проверяет JSON, создаёт резервную копию и применяет конфигурацию автоматически.</p></div>
     </header>
     <div class="dashboard-path-grid">
       <a href="{{ url_for('settings_page') }}"><span>1</span><strong>Inbound</strong><small>Как клиент подключается к серверу</small></a>

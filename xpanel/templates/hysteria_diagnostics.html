@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Hysteria Diagnostics — SG-Panel{% endblock %}
+{% block section %}XRAY SERVER / HYSTERIA 2{% endblock %}
+{% block heading %}Hysteria Diagnostics{% endblock %}
+{% block subtitle %}Проверка конфигурации, TLS, UDP listener, службы Xray и локальной готовности Hysteria 2{% endblock %}
+{% block content %}
+<script>document.body.classList.add('ui-standard-page','hysteria-diagnostics-page');</script>
+<div class="ui-page ui-page-wide">
+  <section class="hysteria-diagnostic-hero {{ 'is-ok' if report.overall_ok else 'is-error' }}">
+    <div>
+      <p class="panel-kicker">FULL HYSTERIA CHECK</p>
+      <h2>{{ 'Серверная конфигурация готова' if report.overall_ok else 'Обнаружены блокирующие проблемы' }}</h2>
+      <p>{{ report.endpoint }} · проверено {{ report.checked_at }}</p>
+    </div>
+    <div class="hysteria-diagnostic-score">
+      <strong>{{ report.checks|selectattr('level','equalto','ok')|list|length }} / {{ report.checks|length }}</strong>
+      <span>проверок без замечаний</span>
+    </div>
+  </section>
+
+  <section class="ui-card hysteria-diagnostic-card">
+    <header class="ui-card-heading ui-card-heading-row">
+      <div><p class="panel-kicker">RESULTS</p><h2>Результаты проверки</h2><p>Красные пункты блокируют рабочий запуск. Жёлтые требуют внимания. Серый пункт нельзя подтвердить с самого EC2.</p></div>
+      <div class="ui-heading-actions"><a class="button secondary" href="{{ url_for('settings_page') }}">Вернуться в Inbound</a><a class="button ghost" href="{{ url_for('settings_hysteria_diagnostics') }}">Проверить снова</a></div>
+    </header>
+    <div class="hysteria-diagnostic-list">
+      {% for check in report.checks %}
+        <article class="hysteria-diagnostic-row is-{{ check.level }}">
+          <span class="hysteria-diagnostic-dot"></span>
+          <div><strong>{{ check.label }}</strong><small>{{ check.detail }}</small></div>
+          <b>{{ check.status }}</b>
+        </article>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="ui-info-note"><span>i</span><p>SG-Panel честно различает локальную готовность и внешнюю доступность. Состояние Security Group, маршрута провайдера и UDP из конкретной клиентской сети подтверждается только реальным подключением.</p></section>
+</div>
+{% endblock %}

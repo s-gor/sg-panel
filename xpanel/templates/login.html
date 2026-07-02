@@ -1,13 +1,27 @@
 <!doctype html>
-<html lang="ru">
+<html lang="ru" data-theme="system">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#121722">
-  <title>Вход — SG-Panel</title>
+  <meta name="theme-color" content="#121722" id="themeColorMeta">
+  <script>
+    (() => {
+      const saved = localStorage.getItem('sg-panel-theme') || 'system';
+      const dark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+      document.documentElement.dataset.theme = saved;
+      document.documentElement.dataset.resolvedTheme = saved === 'system' ? (dark ? 'dark' : 'light') : saved;
+    })();
+  </script>
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}?v={{ xpanel_version }}">
+  <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='favicon-32.png') }}?v={{ xpanel_version }}">
+  <link rel="icon" type="image/png" sizes="64x64" href="{{ url_for('static', filename='favicon-64.png') }}?v={{ xpanel_version }}">
+  <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}?v={{ xpanel_version }}">
+  <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='apple-touch-icon.png') }}?v={{ xpanel_version }}">
+<title>Вход — SG-Panel</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}?v={{ xpanel_version }}">
 </head>
 <body class="login-body">
+  <div class="login-theme-switch" aria-label="Тема"><button type="button" data-login-theme="system" title="Системная тема">◐</button><button type="button" data-login-theme="light" title="Светлая тема">☀</button><button type="button" data-login-theme="dark" title="Тёмная тема">☾</button></div>
   <div class="login-grid" aria-hidden="true"></div>
   <div class="login-glow login-glow-one" aria-hidden="true"></div>
   <div class="login-glow login-glow-two" aria-hidden="true"></div>
@@ -39,7 +53,7 @@
     {% if login_error %}<div class="alert error login-alert">{{ login_error }}</div>{% endif %}
 
     <section class="login-access">
-      <p class="login-section-label">ЗАЩИЩЁННЫЙ ВХОД</p>
+      <p class="login-section-label">АДМИНИСТРАТИВНЫЙ ВХОД</p>
       <h2>Вход в панель</h2>
       <p class="login-intro">Введите пароль администратора для управления Xray.</p>
 
@@ -56,19 +70,33 @@
         </div>
         <button class="button login-submit full" type="submit" {% if login_block and login_block.blocked %}disabled{% endif %}>
           <span>Войти</span>
-          
+
         </button>
       </form>
     </section>
 
-    <footer class="login-footer">
+    <footer class="login-footer {{ 'is-secure' if request.is_secure else 'is-http' }}">
       <span class="footer-shield" aria-hidden="true">◆</span>
-      Локальное защищённое подключение
+      {% if request.is_secure %}HTTPS-соединение защищено{% else %}HTTP: ограничьте порт панели своим IP{% endif %}
     </footer>
   </main>
 
   <script>
     (() => {
+      const root = document.documentElement;
+      const media = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+      const applyTheme = mode => {
+        const safe = ['system','light','dark'].includes(mode) ? mode : 'system';
+        root.dataset.theme = safe;
+        root.dataset.resolvedTheme = safe === 'system' ? (media && media.matches ? 'dark' : 'light') : safe;
+        localStorage.setItem('sg-panel-theme', safe);
+        document.querySelectorAll('[data-login-theme]').forEach(button => button.classList.toggle('active', button.dataset.loginTheme === safe));
+        const meta = document.getElementById('themeColorMeta');
+        if (meta) meta.content = root.dataset.resolvedTheme === 'dark' ? '#0d131b' : '#eef3f8';
+      };
+      applyTheme(root.dataset.theme || 'system');
+      media?.addEventListener?.('change', () => { if ((root.dataset.theme || 'system') === 'system') applyTheme('system'); });
+      document.querySelectorAll('[data-login-theme]').forEach(button => button.addEventListener('click', () => applyTheme(button.dataset.loginTheme)));
       const toggle = document.querySelector('[data-password-toggle]');
       const input = document.getElementById('admin-password');
       if (!toggle || !input) return;

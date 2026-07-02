@@ -181,17 +181,16 @@ server {
     listen [::]:$HTTPS_PORT ssl;
     server_name $DOMAIN;
 
+    # Nginx uses status 497 when plain HTTP reaches an SSL listener.
+    # Redirect the old http://IP:port address to the canonical HTTPS domain.
+    error_page 497 =308 https://$DOMAIN:$HTTPS_PORT\$request_uri;
+
     ssl_certificate $CERT;
     ssl_certificate_key $KEY;
     ssl_protocols TLSv1.2 TLSv1.3;
     ssl_session_cache shared:SERGPANEL:10m;
     ssl_session_timeout 1d;
     ssl_session_tickets off;
-
-    add_header Strict-Transport-Security "max-age=31536000" always;
-    add_header X-Content-Type-Options nosniff always;
-    add_header X-Frame-Options DENY always;
-    add_header Referrer-Policy no-referrer always;
 
 $LOCATION_BLOCK
 }
@@ -275,6 +274,7 @@ wait_for_https(){
 
 wait_for_backend || exit 1
 wait_for_https || exit 1
+bash /opt/xpanel-mvp/deploy/repair-panel-access.sh
 
 mkdir -p /etc/letsencrypt/renewal-hooks/deploy
 cat > /etc/letsencrypt/renewal-hooks/deploy/reload-sg-panel-nginx.sh <<'EOF_HOOK'

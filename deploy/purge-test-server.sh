@@ -76,6 +76,8 @@ log() {
 log "Останавливаю службы"
 systemctl disable --now xpanel-maintenance.timer 2>/dev/null || true
 systemctl stop xpanel-maintenance.service 2>/dev/null || true
+systemctl disable --now xpanel-traffic.timer 2>/dev/null || true
+systemctl stop xpanel-traffic.service 2>/dev/null || true
 systemctl disable --now xpanel-web.service 2>/dev/null || true
 systemctl disable --now xray.service 2>/dev/null || true
 systemctl disable --now 'xray@.service' 2>/dev/null || true
@@ -91,6 +93,8 @@ rm -rf \
   /etc/systemd/system/xpanel-web.service \
   /etc/systemd/system/xpanel-maintenance.service \
   /etc/systemd/system/xpanel-maintenance.timer \
+  /etc/systemd/system/xpanel-traffic.service \
+  /etc/systemd/system/xpanel-traffic.timer \
   /etc/systemd/system/xray.service \
   /etc/systemd/system/xray@.service \
   /etc/systemd/system/xray.service.d \

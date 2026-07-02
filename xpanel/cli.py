@@ -182,8 +182,8 @@ def cmd_set_server(args: argparse.Namespace) -> int:
             INSERT INTO server_settings (
                 id, address, listen, port, dest, server_name,
                 private_key, public_key, short_id, fingerprint,
-                config_path, xray_bin, xray_service
-            ) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                stats_enabled, config_path, xray_bin, xray_service
+            ) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)
             ON CONFLICT(id) DO UPDATE SET
                 address = excluded.address,
                 listen = excluded.listen,
@@ -387,6 +387,31 @@ def cmd_expire_users(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_collect_traffic(args: argparse.Namespace) -> int:
+    from .service import XPanelError, collect_traffic_snapshot, format_bytes, query_stats
+
+    if bool(args.strict):
+        server = get_server()
+        if not bool(server["stats_enabled"]):
+            return fail("Stats API Xray выключен")
+        try:
+            # Verify the API even when the panel does not have clients yet.
+            query_stats()
+        except (XPanelError, FileNotFoundError) as exc:
+            return fail(f"Stats API Xray недоступен: {exc}")
+
+    stats = collect_traffic_snapshot(include_online=bool(args.online))
+    total = sum(int(item["lifetime_total"]) for item in stats.values())
+    errors = sorted({str(item.get("error") or "") for item in stats.values()} - {""})
+    print(f"Traffic snapshot: users={len(stats)}, all-time={format_bytes(total)}")
+    if errors:
+        message = "; ".join(errors)
+        if bool(args.strict):
+            return fail(message)
+        print("Предупреждение: " + message)
+    return 0
+
+
 def cmd_backup(_args: argparse.Namespace) -> int:
     from .service import create_backup
     result = create_backup()
@@ -555,6 +580,19 @@ def cmd_unlock_admin(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_sync_hysteria_tls(args: argparse.Namespace) -> int:
+    from .service import sync_hysteria_tls_material
+
+    result = sync_hysteria_tls_material(restart=bool(args.restart))
+    if not result.get("active"):
+        print("Hysteria 2 не активна; синхронизация TLS не требуется")
+        return 0
+    print(f"TLS Hysteria 2 синхронизирован: {result['certificate']}")
+    if result.get("restarted"):
+        print("Xray перезапущен")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="xpanel",
@@ -631,12 +669,23 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--apply", action="store_true", help="сразу применить config.json")
     p.set_defaults(func=cmd_expire_users)
 
+    p = sub.add_parser("collect-traffic", help="сохранить текущие счётчики Xray в историю SG-Panel")
+    p.add_argument("--online", action="store_true", help="также опросить online-состояние пользователей")
+    p.add_argument(
+        "--strict", action="store_true",
+        help="завершиться с ошибкой, если Stats API недоступен",
+    )
+    p.set_defaults(func=cmd_collect_traffic)
+
     p = sub.add_parser("backup", help="создать backup panel.db и config.json")
     p.set_defaults(func=cmd_backup)
 
     p = sub.add_parser("diagnostics", help="показать диагностический отчёт")
     p.set_defaults(func=cmd_diagnostics)
 
+    p = sub.add_parser("sync-hysteria-tls", help="обновить управляемую копию TLS для Hysteria 2")
+    p.add_argument("--restart", action="store_true", help="перезапустить Xray после синхронизации")
+    p.set_defaults(func=cmd_sync_hysteria_tls)
 
     p = sub.add_parser("security-status", help="показать настройки безопасности и сессии")
     p.set_defaults(func=cmd_security_status)

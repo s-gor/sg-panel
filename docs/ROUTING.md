@@ -204,7 +204,7 @@ $XRAY_LOCATION_ASSET
 
 ## Проверка результата
 
-Откройте **Обзор** и проверьте Default Outbound.
+Откройте **System → Resources** и проверьте Default Outbound.
 
 Для подробной проверки откройте **Diagnostics**:
 

@@ -98,6 +98,6 @@ ls -ld /root/sg-panel-backups
 Ожидается:
 
 - Xray остаётся `active`;
-- `xpanel-web` больше не существует;
+- `xpanel-web`, `xpanel-maintenance` и `xpanel-traffic` больше не существуют;
 - рабочий `config.json` сохранён;
 - каталог резервных копий сохранён.

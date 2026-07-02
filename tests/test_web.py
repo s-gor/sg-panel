@@ -17,6 +17,7 @@ os.environ.setdefault(
 from werkzeug.security import generate_password_hash
 
 from xpanel.db import connect, init_db
+import xpanel.web as web_module
 from xpanel.web import create_app
 
 
@@ -75,11 +76,29 @@ class WebTest(unittest.TestCase):
         with self.client.session_transaction() as session:
             return session["csrf_token"]
 
+    def validated_post(
+        self, path: str, data: dict[str, object], *, follow_redirects: bool = True
+    ):
+        payload = dict(data)
+        payload["csrf_token"] = self.csrf()
+        validation_payload = dict(payload)
+        validation_payload["action"] = "validate"
+        validation = self.client.post(path, data=validation_payload)
+        self.assertEqual(validation.status_code, 200, validation.data.decode("utf-8", "replace"))
+        body = json.loads(validation.data)
+        self.assertTrue(body.get("ok"), body)
+        self.assertTrue(body.get("token"), body)
+        save_payload = dict(payload)
+        save_payload["validation_token"] = body["token"]
+        return self.client.post(
+            path, data=save_payload, follow_redirects=follow_redirects
+        )
+
     def test_login_uses_ser_g_panel_branding(self):
         response = self.client.get("/login")
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"SG-Panel", response.data)
-        self.assertIn("ЗАЩИЩЁННЫЙ ВХОД".encode("utf-8"), response.data)
+        self.assertIn("АДМИНИСТРАТИВНЫЙ ВХОД".encode("utf-8"), response.data)
 
     def test_login_rejects_wrong_password(self):
         response = self.client.post("/login", data={"password": "wrong"})
@@ -87,7 +106,7 @@ class WebTest(unittest.TestCase):
 
     def test_user_workflow_and_qr(self):
         self.login()
-        response = self.client.post(
+        response = self.validated_post(
             "/users/add",
             data={"name": "Sergey", "csrf_token": self.csrf()},
             follow_redirects=True,
@@ -117,7 +136,7 @@ class WebTest(unittest.TestCase):
         response = self.client.get("/routing")
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"Block BitTorrent", response.data)
-        response = self.client.post(
+        response = self.validated_post(
             "/routing/rules/add",
             data={
                 "csrf_token": self.csrf(),
@@ -137,6 +156,41 @@ class WebTest(unittest.TestCase):
         self.assertIn(b"Block test domain", response.data)
 
 
+class PanelAccessStateTest(unittest.TestCase):
+    def test_live_https_nginx_overrides_stale_http_ip_state(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp) / "panel-access.env"
+            nginx = Path(tmp) / "sg-panel"
+            state.write_text(
+                "PANEL_ACCESS_MODE=http\n"
+                "PANEL_PUBLIC_HOST=203.0.113.10\n"
+                "PANEL_PUBLIC_PORT=61443\n",
+                encoding="utf-8",
+            )
+            nginx.write_text(
+                "server {\n"
+                "    listen 80;\n"
+                "    server_name panel.example.com;\n"
+                "}\n"
+                "server {\n"
+                "    listen 62443 ssl;\n"
+                "    listen [::]:62443 ssl;\n"
+                "    server_name panel.example.com;\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            with patch.object(web_module, "PANEL_ACCESS_STATE_FILE", state), patch.object(
+                web_module, "PANEL_ACCESS_NGINX_CONF", nginx
+            ):
+                current = web_module._panel_access_state("203.0.113.10")
+
+        self.assertEqual(current["mode"], "https")
+        self.assertEqual(current["host"], "panel.example.com")
+        self.assertEqual(current["port"], 62443)
+        self.assertEqual(current["url"], "https://panel.example.com:62443")
+
+
+
 if __name__ == "__main__":
     unittest.main()
 
@@ -152,13 +206,45 @@ class V05WebTest(WebTest):
             self.assertEqual(response.status_code, 200)
             self.assertIn(marker, response.data)
 
+    def test_backup_page_exposes_verified_full_restore(self):
+        from xpanel.service import create_backup
+
+        self.login()
+        backup_root = Path(self.tmp.name) / "backups"
+        os.environ["XPANEL_BACKUP_DIR"] = str(backup_root)
+        try:
+            backup = create_backup()
+            response = self.client.get("/backups")
+            self.assertEqual(response.status_code, 200)
+            self.assertIn("Полное безопасное восстановление".encode("utf-8"), response.data)
+            self.assertIn("Восстановить полностью".encode("utf-8"), response.data)
+            self.assertIn(backup["name"].encode("utf-8"), response.data)
+
+            with patch(
+                "xpanel.web.restore_backup",
+                return_value={
+                    "name": backup["name"],
+                    "safety": "sg-panel-20990101-000000",
+                    "service": "active",
+                },
+            ):
+                restored = self.client.post(
+                    f"/backups/{backup['name']}/restore",
+                    data={"csrf_token": self.csrf()},
+                    follow_redirects=True,
+                )
+            self.assertEqual(restored.status_code, 200)
+            self.assertIn("Полное восстановление".encode("utf-8"), restored.data)
+        finally:
+            os.environ.pop("XPANEL_BACKUP_DIR", None)
+
     def test_user_edit(self):
         self.login()
-        self.client.post(
+        self.validated_post(
             "/users/add",
             data={"name": "EditMe", "csrf_token": self.csrf()},
         )
-        response = self.client.post(
+        response = self.validated_post(
             "/users/1/edit",
             data={
                 "csrf_token": self.csrf(),
@@ -176,7 +262,7 @@ class V05WebTest(WebTest):
 class V06WebTest(WebTest):
     def test_outbound_add_and_routing_selector(self):
         self.login()
-        response = self.client.post(
+        response = self.validated_post(
             "/outbounds/add",
             data={
                 "csrf_token": self.csrf(),
@@ -203,7 +289,8 @@ class V096StyleTest(WebTest):
     def test_versioned_stylesheet_and_compact_actions(self):
         response = self.client.get("/login")
         self.assertEqual(response.status_code, 200)
-        self.assertIn(b"app.css?v=0.10.0-rc9", response.data)
+        self.assertIn(b"app.css?v=0.10.0-rc30", response.data)
+        self.assertIn(b"favicon.svg?v=0.10.0-rc30", response.data)
         css = (Path(__file__).parents[1] / "xpanel" / "static" / "app.css").read_text(encoding="utf-8")
         self.assertIn("Calm Slate", css)
         self.assertIn("v0.9.7 — unified readable interface", css)
@@ -212,6 +299,9 @@ class V096StyleTest(WebTest):
         self.assertIn(".outbound-choice-row", css)
         self.assertIn(".outbound-planned-list", css)
         self.assertIn("content: \"✓\"", css)
+        self.assertIn(".system-gauge", css)
+        self.assertIn(".resource-board", css)
+        self.assertIn(".nav-group-title", css)
 
 
 
@@ -233,6 +323,10 @@ class RC7WorkflowWebTest(WebTest):
         self.assertNotIn(b'action="/apply"', dashboard.data)
         self.assertNotIn(b'action="/restart"', dashboard.data)
         self.assertIn("Всё работает".encode("utf-8"), dashboard.data)
+        self.assertIn(b"resource-board", dashboard.data)
+        self.assertIn(b"memory-dial", dashboard.data)
+        self.assertIn(b"memory-legend", dashboard.data)
+        self.assertIn("Оперативная память".encode("utf-8"), dashboard.data)
 
         diagnostics_data = {
             "os": "Ubuntu", "kernel": "test", "python": "3.13",
@@ -263,7 +357,7 @@ class RC7WorkflowWebTest(WebTest):
 
     def test_routing_change_is_applied_immediately(self):
         self.login()
-        response = self.client.post(
+        response = self.validated_post(
             "/routing/settings",
             data={
                 "csrf_token": self.csrf(),
@@ -283,7 +377,7 @@ class V07DnsWebTest(WebTest):
         response = self.client.get("/dns")
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"Cloudflare DOH Local", response.data)
-        response = self.client.post(
+        response = self.validated_post(
             "/dns/settings",
             data={
                 "csrf_token": self.csrf(),
@@ -298,7 +392,7 @@ class V07DnsWebTest(WebTest):
 
     def test_add_dns_host(self):
         self.login()
-        response = self.client.post(
+        response = self.validated_post(
             "/dns/hosts/add",
             data={
                 "csrf_token": self.csrf(),
@@ -314,7 +408,7 @@ class V07DnsWebTest(WebTest):
 class V08SubscriptionWebTest(WebTest):
     def _create_user_and_enable_global(self):
         self.login()
-        response = self.client.post(
+        response = self.validated_post(
             "/users/add",
             data={"name": "Subscriber", "csrf_token": self.csrf()},
             follow_redirects=True,
@@ -383,11 +477,51 @@ class V09SecurityWebTest(WebTest):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.headers.get("X-Frame-Options"), "DENY")
         self.assertIn("frame-ancestors 'none'", response.headers.get("Content-Security-Policy", ""))
+        self.assertNotIn("Strict-Transport-Security", response.headers)
         self.login()
         response = self.client.get("/security")
         self.assertEqual(response.status_code, 200)
         self.assertIn("Безопасность панели".encode(), response.data)
         self.assertIn(b"ADMIN SESSIONS", response.data)
+        self.assertIn('name="panel_access_mode"'.encode(), response.data)
+        self.assertIn('name="panel_access_host"'.encode(), response.data)
+        self.assertIn('name="panel_access_port"'.encode(), response.data)
+        self.assertIn("HTTP или HTTPS".encode("utf-8"), response.data)
+
+    def test_panel_access_job_can_be_started(self):
+        import xpanel.web as web_module
+
+        self.login()
+        job_dir = Path(self.tmp.name) / "panel-access-jobs"
+        access_script = Path(self.tmp.name) / "configure-panel-access.sh"
+        access_script.write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
+        with (
+            patch.object(web_module, "PANEL_ACCESS_JOB_DIR", job_dir),
+            patch.object(web_module, "PANEL_ACCESS_SCRIPT", access_script),
+            patch("xpanel.web.subprocess.run") as run_mock,
+        ):
+            run_mock.return_value.returncode = 0
+            run_mock.return_value.stdout = ""
+            run_mock.return_value.stderr = ""
+            response = self.client.post(
+                "/security/panel-access",
+                data={
+                    "csrf_token": self.csrf(),
+                    "panel_access_mode": "http",
+                    "panel_access_host": "192.168.1.200",
+                    "panel_access_port": "61443",
+                },
+                follow_redirects=False,
+            )
+            job_page = self.client.get(response.headers["Location"])
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/security/panel-access/jobs/", response.headers["Location"])
+        self.assertEqual(job_page.status_code, 200)
+        self.assertIn(b"window.location.replace", job_page.data)
+        self.assertIn(b"consecutiveFailures >= 3", job_page.data)
+        self.assertIn(b"http://192.168.1.200:61443", job_page.data)
+        self.assertEqual(len(list(job_dir.glob("*.json"))), 1)
+        self.assertEqual(len(list(job_dir.glob("*.sh"))), 1)
 
     def test_login_lockout(self):
         with connect() as con:
@@ -424,7 +558,7 @@ class V09SecurityWebTest(WebTest):
 
     def test_subscription_formats_can_be_disabled(self):
         self.login()
-        self.client.post(
+        self.validated_post(
             "/users/add",
             data={"name": "SecSub", "csrf_token": self.csrf()},
         )
@@ -470,7 +604,7 @@ class V095OutboundWebTest(WebTest):
 
     def test_add_xhttp_tls_outbound(self):
         self.login()
-        response = self.client.post(
+        response = self.validated_post(
             "/outbounds/add",
             data={
                 "csrf_token": self.csrf(),
@@ -501,13 +635,15 @@ class V095OutboundWebTest(WebTest):
         self.assertEqual(row["xhttp_mode"], "stream-up")
 
 class RC5ProfilesAndWarpWebTest(WebTest):
-    def test_settings_shows_three_current_profiles_without_grpc_card(self):
+    def test_settings_shows_supported_profiles_without_deprecated_grpc_card(self):
         self.login()
         response = self.client.get("/settings")
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"RAW/TCP + REALITY", response.data)
         self.assertIn(b"XHTTP + TLS", response.data)
         self.assertIn(b"XHTTP + REALITY", response.data)
+        self.assertIn(b"Hysteria 2 + TLS", response.data)
+        self.assertIn(b"UDP / QUIC", response.data)
         self.assertNotIn(b"<strong>gRPC + TLS</strong>", response.data)
 
     def test_outbounds_page_contains_warp_manager(self):
@@ -576,7 +712,7 @@ class RC5NavigationAndSeparationWebTest(WebTest):
                 "stats_enabled = 0, config_path = '/tmp/kept.json', xray_bin = '/bin/true', "
                 "xray_service = 'kept-xray' WHERE id = 1"
             )
-        response = self.client.post(
+        response = self.validated_post(
             "/settings/server",
             data={
                 "csrf_token": self.csrf(),
@@ -613,7 +749,7 @@ class RC5NavigationAndSeparationWebTest(WebTest):
         self.login()
         with connect() as con:
             before = con.execute("SELECT * FROM server_settings WHERE id = 1").fetchone()
-        response = self.client.post(
+        response = self.validated_post(
             "/config/runtime",
             data={
                 "csrf_token": self.csrf(),

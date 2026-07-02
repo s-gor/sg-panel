@@ -2,20 +2,20 @@
 {% block title %}{{ user.name }} — SG-Panel{% endblock %}
 {% block section %}USERS / ACCESS{% endblock %}
 {% block heading %}Клиентский доступ{% endblock %}
-{% block subtitle %}Прямая VLESS Reality ссылка и постоянная подписка пользователя {{ user.name }}{% endblock %}
+{% block subtitle %}Прямая {{ 'Hysteria 2' if server.inbound_profile == 'hysteria2_tls' else 'VLESS' }}-ссылка и постоянная подписка пользователя {{ user.name }}{% endblock %}
 {% block content %}
 <section class="link-grid">
   <article class="panel-card qr-panel">
     <div class="panel-heading"><div><p class="panel-kicker">DIRECT QR</p><h2>{{ user.name }}</h2></div><span class="pill {{ 'enabled' if user.enabled else 'disabled' }}"><i></i>{{ 'enabled' if user.enabled else 'disabled' }}</span></div>
-    <div class="qr-frame"><img src="data:image/png;base64,{{ qr_data }}" alt="QR VLESS для {{ user.name }}"></div>
+    <div class="qr-frame"><img src="data:image/png;base64,{{ qr_data }}" alt="QR подключения для {{ user.name }}"></div>
     <p class="hint center">Прямая ссылка. При изменении сервера её потребуется импортировать заново.</p>
   </article>
   <article class="panel-card link-panel">
-    <div class="panel-heading"><div><p class="panel-kicker">VLESS REALITY</p><h2>Прямая ссылка</h2></div><span class="panel-index">#{{ user.id }}</span></div>
+    <div class="panel-heading"><div><p class="panel-kicker">{{ 'HYSTERIA 2 / UDP' if server.inbound_profile == 'hysteria2_tls' else 'VLESS / XRAY' }}</p><h2>Прямая ссылка</h2></div><span class="panel-index">#{{ user.id }}</span></div>
     <label class="link-label" for="link">Connection URI</label>
     <textarea id="link" class="link-box" readonly>{{ link }}</textarea>
     <div class="actions"><button class="button primary" type="button" onclick="copyField('link', this)">Скопировать ссылку</button><a class="button secondary" href="{{ url_for('users_page') }}">Назад</a></div>
-    <div class="secure-note"><span>◆</span><p><strong>Персональный UUID</strong><small>Не публикуйте эту ссылку в открытом доступе.</small></p></div>
+    <div class="secure-note"><span>◆</span><p><strong>{{ 'Персональный Hysteria auth' if server.inbound_profile == 'hysteria2_tls' else 'Персональный UUID' }}</strong><small>Не публикуйте эту ссылку в открытом доступе.</small></p></div>
   </article>
 </section>
 
@@ -23,7 +23,7 @@
   <article class="panel-card qr-panel">
     <div class="panel-heading"><div><p class="panel-kicker">SUBSCRIPTION QR</p><h2>Постоянный URL</h2></div><span class="pill {{ 'enabled' if user.subscription_enabled else 'disabled' }}"><i></i>{{ 'enabled' if user.subscription_enabled else 'disabled' }}</span></div>
     <div class="qr-frame"><img src="data:image/png;base64,{{ subscription_qr_data }}" alt="QR подписки для {{ user.name }}"></div>
-    <p class="hint center">Клиент обновляет актуальную VLESS-ссылку по этому адресу.</p>
+    <p class="hint center">Клиент получает по этому адресу актуальную ссылку выбранного Inbound-профиля.</p>
   </article>
   <article class="panel-card link-panel">
     <div class="panel-heading"><div><p class="panel-kicker">BASE64 FEED</p><h2>URL подписки</h2></div><span class="panel-index">SUB</span></div>

@@ -1,22 +1,50 @@
 {% extends "base.html" %}
 {% block title %}Резервные копии — SG-Panel{% endblock %}
-{% block section %}BACKUPS{% endblock %}
-{% block heading %}Резервные копии{% endblock %}
-{% block subtitle %}SQLite и текущий Xray config.json{% endblock %}
+{% block section %}MAINTENANCE{% endblock %}
+{% block heading %}Maintenance{% endblock %}
+{% block subtitle %}Резервные копии, проверка, полное восстановление и автоматический откат{% endblock %}
 {% block content %}
 <!-- MANUAL SNAPSHOT -->
-<script>document.body.classList.add('ui-standard-page','backups-page');</script>
+<script>document.body.classList.add('ui-standard-page','backups-page','backups-rc21');</script>
 <div class="ui-page ui-page-wide">
-  <section class="ui-card backup-action-card">
-    <div><p class="panel-kicker">НОВАЯ КОПИЯ</p><h2>Создать резервную копию</h2><p>Сохраняются panel.db и текущий config.json. Reality private key находится внутри базы, поэтому файл нужно хранить безопасно.</p></div>
+  <section class="ui-card backup-action-card backup-create-card">
+    <div><p class="panel-kicker">НОВАЯ КОПИЯ</p><h2>Создать резервную копию</h2><p>Сохраняются согласованная копия SQLite и текущий рабочий config.json. Reality private key находится в базе, поэтому архивы нужно хранить безопасно.</p></div>
     <form method="post" action="{{ url_for('backups_create') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button primary" type="submit">Создать копию</button></form>
   </section>
 
-  <section class="ui-card ui-table-card">
-    <header class="ui-card-heading ui-card-heading-row"><div><p class="panel-kicker">ТОЧКИ ВОССТАНОВЛЕНИЯ</p><h2>Сохранённые копии</h2><p>Восстановление заменяет panel.db, но не переключает работающий config.json автоматически. После восстановления проверьте настройки и примените конфигурацию.</p></div><span class="ui-counter">{{ backups|length }} {{ 'копия' if backups|length == 1 else 'копий' }}</span></header>
-    {% if backups %}<div class="table-wrap"><table><thead><tr><th>Имя</th><th>Дата UTC</th><th>Размер DB</th><th>Config</th><th>Действия</th></tr></thead><tbody>
-    {% for backup in backups %}<tr><td><code>{{ backup.name }}</code></td><td>{{ backup.created_at[:19]|replace('T',' ') }}</td><td>{{ backup.size_human }}</td><td>{{ 'Есть' if backup.has_config else 'Нет' }}</td><td><div class="row-actions"><a class="button ghost small" href="{{ url_for('backups_download', name=backup.name, kind='db') }}">Скачать DB</a>{% if backup.has_config %}<a class="button ghost small" href="{{ url_for('backups_download', name=backup.name, kind='config') }}">Скачать JSON</a>{% endif %}<form method="post" action="{{ url_for('backups_restore', name=backup.name) }}" onsubmit="return confirm('Восстановить panel.db из {{ backup.name }}?')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button secondary small" type="submit">Восстановить DB</button></form><form method="post" action="{{ url_for('backups_delete', name=backup.name) }}" onsubmit="return confirm('Удалить {{ backup.name }}?')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button danger small" type="submit">Удалить</button></form></div></td></tr>{% endfor %}
-    </tbody></table></div>{% else %}<div class="ui-empty-compact backup-empty"><strong>Резервных копий пока нет</strong><p>Создайте первую копию кнопкой выше.</p></div>{% endif %}
+  <section class="ui-card backup-restore-guide">
+    <header class="ui-card-heading"><div><p class="panel-kicker">ВОССТАНОВЛЕНИЕ</p><h2>Полное безопасное восстановление</h2><p>Панель не просто заменяет файл базы. Перед применением она проверяет копию и сохраняет текущее рабочее состояние.</p></div></header>
+    <div class="backup-restore-flow">
+      <div><span>1</span><strong>Проверка копии</strong><small>SQLite integrity_check и полный xray run -test</small></div>
+      <div><span>2</span><strong>Страховочная копия</strong><small>Текущее состояние сохраняется перед заменой</small></div>
+      <div><span>3</span><strong>Применение</strong><small>Восстанавливаются настройки и создаётся рабочий config.json</small></div>
+      <div><span>4</span><strong>Контроль запуска</strong><small>Xray перезапускается; при ошибке выполняется автоматический откат</small></div>
+    </div>
   </section>
+
+  <section class="ui-card ui-table-card backup-history-card">
+    <header class="ui-card-heading ui-card-heading-row"><div><p class="panel-kicker">ТОЧКИ ВОССТАНОВЛЕНИЯ</p><h2>Сохранённые копии</h2><p>Восстановление доступно только для копии с исправной SQLite и читаемым config.json. Перед запуском выполняется ещё одна полная проверка.</p></div><span class="ui-counter">{{ backups|length }} {{ 'копия' if backups|length == 1 else 'копий' }}</span></header>
+    {% if backups %}
+    <div class="table-wrap"><table class="backup-table"><thead><tr><th>Дата UTC</th><th>Размер</th><th>Содержимое</th><th>Состояние</th><th>Действия</th></tr></thead><tbody>
+    {% for backup in backups %}
+      <tr>
+        <td><strong>{{ backup.created_at[:19]|replace('T',' ') }}</strong><small class="backup-technical-name">{{ backup.name }}</small></td>
+        <td>{{ backup.size_human }}</td>
+        <td><span class="backup-content-list"><b>SQLite</b>{% if backup.has_config %}<b>config.json</b>{% endif %}</span></td>
+        <td>{% if backup.verified %}<span class="pill success">ИСПРАВНА</span><small class="backup-verification-note">SQLite и JSON читаются</small>{% else %}<span class="pill danger">ОШИБКА</span><small class="backup-verification-note">{{ backup.verification_detail }}</small>{% endif %}</td>
+        <td><div class="row-actions backup-row-actions">
+          <a class="button ghost small" href="{{ url_for('backups_download', name=backup.name, kind='db') }}">Скачать DB</a>
+          {% if backup.has_config %}<a class="button ghost small" href="{{ url_for('backups_download', name=backup.name, kind='config') }}">Скачать JSON</a>{% endif %}
+          <form method="post" action="{{ url_for('backups_verify', name=backup.name) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button secondary small" type="submit">Проверить</button></form>
+          <form method="post" action="{{ url_for('backups_restore', name=backup.name) }}" onsubmit="return confirm('Полностью восстановить {{ backup.created_at[:19]|replace('T',' ') }}?\n\nПанель проверит копию, сохранит текущее состояние, восстановит настройки, создаст config.json и перезапустит Xray. При ошибке будет выполнен автоматический откат.')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button primary small" type="submit" {{ 'disabled' if not backup.verified else '' }}>Восстановить полностью</button></form>
+          <form method="post" action="{{ url_for('backups_delete', name=backup.name) }}" onsubmit="return confirm('Удалить резервную копию {{ backup.name }}?')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button danger small" type="submit">Удалить</button></form>
+        </div></td>
+      </tr>
+    {% endfor %}
+    </tbody></table></div>
+    {% else %}<div class="ui-empty-compact backup-empty"><strong>Резервных копий пока нет</strong><p>Создайте первую точку восстановления кнопкой выше.</p></div>{% endif %}
+  </section>
+
+  <details class="ui-card advanced backup-technical-details"><summary>Что именно восстанавливается</summary><div class="backup-technical-grid"><div><span>SQLite</span><strong>Все настройки, пользователи, Outbounds, DNS и Traffic Rules</strong></div><div><span>config.json</span><strong>Создаётся заново из восстановленной базы и проверяется Xray</strong></div><div><span>Служба</span><strong>Xray перезапускается и должен перейти в active</strong></div><div><span>Откат</span><strong>При любой ошибке возвращается состояние до восстановления</strong></div></div></details>
 </div>
 {% endblock %}

@@ -28,7 +28,7 @@ Default Outbound direct
 
 ```text
 443/tcp       Xray
-61443/tcp     Nginx HTTPS панели
+61443/tcp     Nginx HTTP или HTTPS панели
 8080/tcp      SG-Panel на 127.0.0.1
 ```
 
@@ -61,7 +61,7 @@ Default Outbound direct
 ```text
 443/tcp       Nginx
 8443/tcp      Xray только на 127.0.0.1
-61443/tcp     Nginx HTTPS панели
+61443/tcp     Nginx HTTP или HTTPS панели
 8080/tcp      SG-Panel только на 127.0.0.1
 ```
 
@@ -139,7 +139,7 @@ Short ID                     Short ID
 
 ```text
 v2rayN или v2rayNG
-HTTPS-порт SG-Panel
+HTTP/HTTPS-порт SG-Panel
 /sub/персональный-токен
 SG-Panel читает SQLite
 Клиент получает актуальную VLESS-ссылку

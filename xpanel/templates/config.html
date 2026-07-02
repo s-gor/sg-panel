@@ -1,11 +1,12 @@
 {% extends "base.html" %}
 {% block title %}Xray Config — SG-Panel{% endblock %}
-{% block section %}XRAY CONFIG{% endblock %}
-{% block heading %}Xray Config{% endblock %}
+{% block section %}XRAY SERVER{% endblock %}
+{% block heading %}Xray Server{% endblock %}
 {% block subtitle %}Расширенный просмотр, ручное редактирование и проверка итогового config.json{% endblock %}
 {% block content %}
 <script>document.body.classList.add('ui-standard-page','config-preview-page');</script>
 <div class="ui-page ui-page-wide">
+  <nav class="nested-tabs config-json-tabs" aria-label="Xray Config"><a href="{{ url_for('config_json_page') }}">Current JSON</a><a class="active" href="{{ url_for('config_page') }}">Generated Config</a></nav>
   <section class="ui-card config-summary-card {{ 'is-ok' if validation.ok else 'is-error' }}">
     <div class="config-summary-main">
       <span class="config-result-icon" aria-hidden="true">{{ '✓' if validation.ok else '!' }}</span>
@@ -32,7 +33,7 @@
         <p>Журналирование, Stats API, путь к config.json, бинарному файлу и systemd-службе.</p>
       </div>
     </header>
-    <form method="post" action="{{ url_for('config_runtime_save') }}" class="ui-form">
+    <form method="post" action="{{ url_for('config_runtime_save') }}" class="ui-form" data-validated-form>
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="ui-field-grid config-runtime-grid">
         <label><span>Уровень журналирования</span><select name="loglevel">{% for value in ['debug','info','warning','error','none'] %}<option value="{{ value }}" {% if server.loglevel == value %}selected{% endif %}>{{ value }}</option>{% endfor %}</select></label>

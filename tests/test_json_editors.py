@@ -13,12 +13,21 @@ from xpanel.service import (
     add_vless_outbound_json,
     build_config,
     build_outbound_json,
+    dns_json_document,
     find_outbound,
     get_routing_settings,
+    get_server,
+    inbound_json_document,
+    list_dns_hosts,
+    list_dns_servers,
     list_routing_rules,
     routing_json_document,
+    update_dns_json_document,
+    update_inbound_json_document,
     update_routing_json_document,
     update_vless_outbound,
+    update_users_json_document,
+    users_json_document,
 )
 
 
@@ -55,10 +64,75 @@ class JsonEditorsServiceTest(unittest.TestCase):
             outbound_columns = {row["name"] for row in con.execute("PRAGMA table_info(outbounds)")}
             rule_columns = {row["name"] for row in con.execute("PRAGMA table_info(routing_rules)")}
             settings_columns = {row["name"] for row in con.execute("PRAGMA table_info(routing_settings)")}
+            dns_settings_columns = {row["name"] for row in con.execute("PRAGMA table_info(dns_settings)")}
+            dns_server_columns = {row["name"] for row in con.execute("PRAGMA table_info(dns_servers)")}
         self.assertIn("config_json", outbound_columns)
         self.assertIn("config_json", rule_columns)
         self.assertIn("target_type", rule_columns)
         self.assertIn("extra_json", settings_columns)
+        self.assertIn("extra_json", dns_settings_columns)
+        self.assertIn("config_json", dns_server_columns)
+
+    def test_users_context_json_roundtrip_preserves_subscription_and_routes(self):
+        with connect() as con:
+            original = con.execute(
+                "SELECT id, subscription_token FROM users WHERE name = 'Sergey'"
+            ).fetchone()
+            con.execute(
+                """
+                INSERT INTO routing_rules
+                    (name, priority, enabled, outbound_tag, users, config_json)
+                VALUES ('Sergey only', 10, 1, 'direct', 'Sergey', '{}')
+                """
+            )
+        document = json.loads(users_json_document())
+        document["users"][0]["name"] = "Sergey JSON"
+        document["users"][0]["comment"] = "edited as JSON"
+        document["users"].append(
+            {
+                "name": "Irina",
+                "uuid": "99999999-9999-4999-8999-999999999999",
+                "enabled": False,
+                "comment": "disabled device",
+                "expiryAt": None,
+                "subscriptionEnabled": True,
+            }
+        )
+        result = update_users_json_document(json.dumps(document))
+        self.assertEqual(len(result), 2)
+        with connect() as con:
+            renamed = con.execute(
+                "SELECT * FROM users WHERE name = 'Sergey JSON'"
+            ).fetchone()
+            added = con.execute("SELECT * FROM users WHERE name = 'Irina'").fetchone()
+            rule = con.execute(
+                "SELECT users, enabled FROM routing_rules WHERE name = 'Sergey only'"
+            ).fetchone()
+        self.assertEqual(renamed["id"], original["id"])
+        self.assertEqual(renamed["subscription_token"], original["subscription_token"])
+        self.assertEqual(renamed["comment"], "edited as JSON")
+        self.assertFalse(bool(added["enabled"]))
+        self.assertEqual(rule["users"], "Sergey JSON")
+        self.assertTrue(bool(rule["enabled"]))
+
+    def test_users_json_never_broadens_rule_when_user_is_removed(self):
+        with connect() as con:
+            con.execute(
+                """
+                INSERT INTO routing_rules
+                    (name, priority, enabled, outbound_tag, users, config_json)
+                VALUES ('Only user', 10, 1, 'direct', 'Sergey', '{}')
+                """
+            )
+        update_users_json_document(json.dumps({"users": []}))
+        with connect() as con:
+            count = con.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+            rule = con.execute(
+                "SELECT users, enabled FROM routing_rules WHERE name = 'Only user'"
+            ).fetchone()
+        self.assertEqual(count, 0)
+        self.assertEqual(rule["users"], "")
+        self.assertFalse(bool(rule["enabled"]))
 
     def test_outbound_json_preserves_unknown_fields_after_form_edit(self):
         document = {
@@ -148,6 +222,46 @@ class JsonEditorsServiceTest(unittest.TestCase):
         self.assertEqual(config["routing"]["balancers"][0]["tag"], "europe")
         self.assertEqual(config["routing"]["rules"][1]["balancerTag"], "europe")
         self.assertNotIn("_sgPanel", config["routing"]["rules"][0])
+
+
+    def test_inbound_context_json_roundtrip(self):
+        document = json.loads(inbound_json_document())
+        self.assertEqual(document["tag"], "vless-reality-in")
+        document["port"] = 8443
+        document["streamSettings"]["realitySettings"]["serverNames"] = [
+            "www.example.com"
+        ]
+        document["streamSettings"]["realitySettings"]["dest"] = (
+            "www.example.com:443"
+        )
+        result = update_inbound_json_document(json.dumps(document))
+        server = get_server()
+        self.assertEqual(server["port"], 8443)
+        self.assertEqual(server["server_name"], "www.example.com")
+        self.assertEqual(server["dest"], "www.example.com:443")
+        self.assertEqual(result["users"], 1)
+
+    def test_dns_context_json_roundtrip(self):
+        document = json.loads(dns_json_document())
+        document["_sgPanel"]["enabled"] = True
+        document["queryStrategy"] = "UseIP"
+        document["clientIp"] = "203.0.113.10"
+        document["servers"][0]["customOption"] = {"keep": True}
+        document["hosts"] = {
+            "router.local": "192.168.1.1",
+            "cluster.local": ["192.168.1.10", "192.168.1.11"],
+        }
+        result = update_dns_json_document(json.dumps(document))
+        self.assertTrue(result["enabled"])
+        self.assertGreaterEqual(result["servers"], 1)
+        self.assertEqual(result["hosts"], 2)
+        exported = json.loads(dns_json_document())
+        self.assertEqual(exported["queryStrategy"], "UseIP")
+        self.assertEqual(exported["clientIp"], "203.0.113.10")
+        self.assertEqual(exported["servers"][0]["customOption"], {"keep": True})
+        self.assertEqual(exported["hosts"]["router.local"], "192.168.1.1")
+        self.assertEqual(len(list_dns_hosts(enabled_only=True)), 2)
+        self.assertGreaterEqual(len(list_dns_servers(enabled_only=True)), 1)
 
     def test_country_policy_creates_separate_domain_and_ip_rules(self):
         rows = add_geo_policy(

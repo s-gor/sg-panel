@@ -1,56 +1,88 @@
 {% extends "base.html" %}
-{% block title %}Diagnostics — SG-Panel{% endblock %}
-{% block section %}DIAGNOSTICS{% endblock %}
-{% block heading %}Diagnostics{% endblock %}
-{% block subtitle %}Проверки, службы, WARP, сеть и журналы для поиска неисправностей{% endblock %}
+{% set diagnostics_tab = request.args.get('tab', 'status') %}
+{% block title %}{{ 'Logs & Diagnostics' if diagnostics_tab == 'logs' else 'Status & Services' }} — SG-Panel{% endblock %}
+{% block section %}SYSTEM{% endblock %}
+{% block heading %}{{ 'Logs & Diagnostics' if diagnostics_tab == 'logs' else 'Status & Services' }}{% endblock %}
+{% block subtitle %}{{ 'Служебные сообщения Xray, Nginx, SG-Panel и сетевых компонентов' if diagnostics_tab == 'logs' else 'Состояние Xray, Nginx, SG-Panel и рабочей конфигурации' }}{% endblock %}
 {% block content %}
-<script>document.body.classList.add('ui-standard-page','diagnostics-page');</script>
+<script>document.body.classList.add('ui-standard-page','diagnostics-page','diagnostics-rc15');</script>
 <div class="ui-page ui-page-wide">
+{% if diagnostics_tab != 'logs' %}
   <section class="ui-diagnostics-summary diagnostics-core-grid">
-    <article class="ui-status-card"><span>Xray service</span><strong class="{{ 'text-success' if diagnostics.xray_service == 'active' else 'text-danger' }}">{{ diagnostics.xray_service or 'unknown' }}</strong><small>{{ diagnostics.xray_version }}</small></article>
-    <article class="ui-status-card"><span>Nginx service</span><strong class="{{ 'text-success' if diagnostics.nginx_service == 'active' else 'text-danger' }}">{{ diagnostics.nginx_service or 'unknown' }}</strong><small>TLS и XHTTP transport</small></article>
-    <article class="ui-status-card"><span>SG-Panel service</span><strong class="{{ 'text-success' if diagnostics.panel_service == 'active' else 'text-danger' }}">{{ diagnostics.panel_service or 'unknown' }}</strong><small>Веб-интерфейс</small></article>
+    <article class="ui-status-card"><span>Xray</span><strong class="{{ 'text-success' if diagnostics.xray_service == 'active' else 'text-danger' }}">{{ diagnostics.xray_service or 'unknown' }}</strong><small>{{ diagnostics.xray_version }}</small></article>
+    <article class="ui-status-card"><span>Nginx</span><strong class="{{ 'text-success' if diagnostics.nginx_service == 'active' else 'text-danger' }}">{{ diagnostics.nginx_service or 'unknown' }}</strong><small>Публичный доступ панели</small></article>
+    <article class="ui-status-card"><span>SG-Panel</span><strong class="{{ 'text-success' if diagnostics.panel_service == 'active' else 'text-danger' }}">{{ diagnostics.panel_service or 'unknown' }}</strong><small>Backend 127.0.0.1</small></article>
     <article class="ui-status-card"><span>config.json</span><strong class="{{ 'text-success' if diagnostics.config_validation.ok else 'text-danger' }}">{{ 'OK' if diagnostics.config_validation.ok else 'ERROR' }}</strong><small>{{ diagnostics.config_validation.users }} активных пользователей</small></article>
-    <article class="ui-status-card"><span>WARP</span><strong class="{{ 'text-success' if diagnostics.warp.last_test_state in ['on','plus'] else ('text-danger' if diagnostics.warp.last_test_state == 'error' else '') }}">{% if not diagnostics.warp.configured %}не настроен{% elif not diagnostics.warp.enabled %}отключён{% elif diagnostics.warp.last_test_state in ['on','plus'] %}работает{% else %}проверка нужна{% endif %}</strong><small>{% if diagnostics.warp.last_test_ip %}IP {{ diagnostics.warp.last_test_ip }}{% else %}Последняя проверка: {{ diagnostics.warp.last_test_at or 'не выполнялась' }}{% endif %}</small></article>
-    <article class="ui-status-card"><span>Ресурсы</span><strong>{{ diagnostics.memory_used_percent }}% RAM</strong><small>{{ diagnostics.disk_free }} свободно на диске</small></article>
   </section>
 
   <section class="ui-card diagnostics-controls-card">
-    <header class="ui-card-heading"><div><p class="panel-kicker">УПРАВЛЕНИЕ СЛУЖБАМИ</p><h2>Проверки и перезапуск</h2><p>Эти действия нужны только при диагностике. Обычные настройки применяются на своих страницах одной кнопкой.</p></div></header>
-    <div class="ui-actions diagnostics-actions">
-      <form method="post" action="{{ url_for('diagnostics_restart_service', service_name='xray') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button secondary" type="submit">Перезапустить Xray</button></form>
-      <form method="post" action="{{ url_for('diagnostics_restart_service', service_name='nginx') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button secondary" type="submit">Перезапустить Nginx</button></form>
-      <form method="post" action="{{ url_for('diagnostics_restart_service', service_name='panel') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button secondary" type="submit">Перезапустить SG-Panel</button></form>
-      {% if diagnostics.warp.configured and diagnostics.warp.enabled %}<form method="post" action="{{ url_for('warp_test') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="next" value="diagnostics"><button class="button primary" type="submit">Проверить WARP</button></form>{% endif %}
-      <a class="button ghost" href="{{ url_for('diagnostics_download') }}">Скачать отчёт</a>
-      <a class="button ghost" href="{{ url_for('diagnostics_page') }}">Обновить данные</a>
+    <header class="ui-card-heading ui-card-heading-row"><div><p class="panel-kicker">ОСНОВНЫЕ СЛУЖБЫ</p><h2>Управляемые компоненты</h2><p>Перезапуск нужен только при диагностике. Обычные изменения применяются на своих страницах.</p></div><a class="button ghost" href="{{ url_for('diagnostics_page') }}?tab=status">Обновить данные</a></header>
+    <div class="service-list awg-service-list">
+      <div><span><i class="status-dot {{ 'is-off' if diagnostics.xray_service != 'active' }}"></i><b>Xray</b><small>Основной {{ 'Hysteria 2 / UDP' if diagnostics.inbound_profile == 'hysteria2_tls' else 'VLESS / TCP' }}</small></span><strong class="{{ 'text-success' if diagnostics.xray_service == 'active' else 'text-danger' }}">{{ diagnostics.xray_service }}</strong><form method="post" action="{{ url_for('diagnostics_restart_service', service_name='xray') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button ghost small" type="submit">Перезапустить Xray</button></form></div>
+      <div><span><i class="status-dot {{ 'is-off' if diagnostics.nginx_service != 'active' }}"></i><b>Nginx</b><small>HTTP/HTTPS панели</small></span><strong class="{{ 'text-success' if diagnostics.nginx_service == 'active' else 'text-danger' }}">{{ diagnostics.nginx_service }}</strong><form method="post" action="{{ url_for('diagnostics_restart_service', service_name='nginx') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button ghost small" type="submit">Перезапустить Nginx</button></form></div>
+      <div><span><i class="status-dot {{ 'is-off' if diagnostics.panel_service != 'active' }}"></i><b>SG-Panel</b><small>Административный backend</small></span><strong class="{{ 'text-success' if diagnostics.panel_service == 'active' else 'text-danger' }}">{{ diagnostics.panel_service }}</strong><form method="post" action="{{ url_for('diagnostics_restart_service', service_name='panel') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button ghost small" type="submit">Перезапустить SG-Panel</button></form></div>
     </div>
   </section>
 
   <section class="ui-card diagnostics-facts-card">
-    <header class="ui-card-heading"><div><p class="panel-kicker">ТЕКУЩАЯ СХЕМА</p><h2>Сеть и маршрутизация</h2><p>Технические значения, которые помогают понять, куда идёт трафик.</p></div></header>
+    <header class="ui-card-heading"><div><p class="panel-kicker">РАБОЧАЯ СХЕМА</p><h2>Сервер и конфигурация</h2><p>Только значения, нужные для повседневной проверки.</p></div></header>
     <dl class="ui-details-list diagnostics-facts-list">
-      <div><dt>Публичный адрес</dt><dd><code>{{ diagnostics.server_address }}:{{ diagnostics.server_port }}</code></dd></div>
+      <div><dt>Публичная точка Xray</dt><dd><code>{{ diagnostics.transport_protocol }} {{ diagnostics.server_address }}:{{ diagnostics.server_port }}</code></dd></div>
       <div><dt>Default Outbound</dt><dd><code>{{ diagnostics.default_outbound_tag }}</code></dd></div>
-      <div><dt>WARP endpoint</dt><dd><code>{{ diagnostics.warp_endpoint or 'не настроен' }}</code></dd></div>
       <div><dt>Системный DNS</dt><dd class="{{ 'text-success' if diagnostics.dns_test.ok else 'text-danger' }}">{% if diagnostics.dns_test.ok %}OK, {{ diagnostics.dns_test.latency_ms }} мс{% else %}{{ diagnostics.dns_test.detail }}{% endif %}</dd></div>
-      <div><dt>Операционная система</dt><dd>{{ diagnostics.os }}</dd></div>
-      <div><dt>Kernel / Python</dt><dd><code>{{ diagnostics.kernel }} / {{ diagnostics.python }}</code></dd></div>
+      <div><dt>Ресурсы</dt><dd>{{ diagnostics.memory_used_percent }}% RAM · {{ diagnostics.disk_free }} свободно</dd></div>
     </dl>
+    <details class="advanced technical-details"><summary>Все технические сведения</summary><dl class="ui-details-list diagnostics-facts-list"><div><dt>WARP</dt><dd>{{ 'не настроен' if not diagnostics.warp.configured else ('отключён' if not diagnostics.warp.enabled else diagnostics.warp.last_test_state) }}</dd></div><div><dt>WARP endpoint</dt><dd><code>{{ diagnostics.warp_endpoint or 'не настроен' }}</code></dd></div><div><dt>Операционная система</dt><dd>{{ diagnostics.os }}</dd></div><div><dt>Kernel / Python</dt><dd><code>{{ diagnostics.kernel }} / {{ diagnostics.python }}</code></dd></div></dl></details>
+  </section>
+{% else %}
+  <section class="diagnostic-result-card diagnostics-log-summary {{ 'is-ok' if diagnostics.config_validation.ok else 'is-error' }}">
+    <div class="diagnostic-result-head"><span class="status-dot {{ 'is-off' if not diagnostics.config_validation.ok }}"></span><div><p class="panel-kicker">ИТОГ ПРОВЕРКИ</p><h2>{{ 'Система работает нормально' if diagnostics.config_validation.ok else 'Конфигурация требует внимания' }}</h2><p>Откройте только нужный журнал. Все разделы закрыты по умолчанию и не занимают страницу.</p></div></div>
+    <div class="ui-actions"><a class="button ghost" href="{{ url_for('diagnostics_page') }}?tab=logs">Обновить данные</a><a class="button secondary" href="{{ url_for('diagnostics_download') }}">Скачать отчёт</a><a class="button secondary" href="{{ url_for('diagnostics_page') }}?tab=status">Открыть службы</a></div>
   </section>
 
-  {% if diagnostics.config_validation.detail %}
-  <section class="ui-card config-test-output">
-    <header class="ui-card-heading"><div><p class="panel-kicker">XRAY RUN -TEST</p><h2>Результат проверки config.json</h2></div></header>
-    <pre class="terminal-box">{{ diagnostics.config_validation.detail }}</pre>
+  <section class="ui-card diagnostics-log-console diagnostics-log-accordion">
+    <header class="ui-card-heading"><div><p class="panel-kicker">ЖУРНАЛЫ</p><h2>Служебные сообщения</h2><p>Разверните нужный компонент. Внутри доступна прокрутка и отдельное копирование.</p></div></header>
+    <div class="diagnostic-log-accordion-list">
+      <details class="diagnostic-log-panel">
+        <summary><span><i class="status-dot {{ 'is-off' if diagnostics.xray_service != 'active' }}"></i><b>Xray</b><small>Служба Xray и ошибки запуска</small></span><strong>Открыть</strong></summary>
+        <div class="diagnostic-log-panel-body"><div class="diagnostic-log-toolbar"><button class="button ghost small" type="button" data-copy-log="diagnostic-log-xray">Копировать</button></div><pre class="terminal-box diagnostic-log-output" id="diagnostic-log-xray">{{ diagnostics.xray_logs }}</pre></div>
+      </details>
+      <details class="diagnostic-log-panel">
+        <summary><span><i class="status-dot {{ 'is-off' if diagnostics.nginx_service != 'active' }}"></i><b>Nginx</b><small>HTTPS, доступ к панели и транспорт Xray</small></span><strong>Открыть</strong></summary>
+        <div class="diagnostic-log-panel-body"><div class="diagnostic-log-toolbar"><button class="button ghost small" type="button" data-copy-log="diagnostic-log-nginx">Копировать</button></div><pre class="terminal-box diagnostic-log-output" id="diagnostic-log-nginx">{{ diagnostics.nginx_logs }}</pre></div>
+      </details>
+      <details class="diagnostic-log-panel">
+        <summary><span><i class="status-dot {{ 'is-off' if diagnostics.panel_service != 'active' }}"></i><b>SG-Panel</b><small>Web-панель, backend и прикладные ошибки</small></span><strong>Открыть</strong></summary>
+        <div class="diagnostic-log-panel-body"><div class="diagnostic-log-toolbar"><button class="button ghost small" type="button" data-copy-log="diagnostic-log-panel">Копировать</button></div><pre class="terminal-box diagnostic-log-output" id="diagnostic-log-panel">{{ diagnostics.panel_logs }}</pre></div>
+      </details>
+      <details class="diagnostic-log-panel">
+        <summary><span><i class="status-dot"></i><b>TCP и UDP-порты</b><small>Слушающие сокеты и процессы</small></span><strong>Открыть</strong></summary>
+        <div class="diagnostic-log-panel-body"><div class="diagnostic-log-toolbar"><button class="button ghost small" type="button" data-copy-log="diagnostic-log-ports">Копировать</button></div><pre class="terminal-box diagnostic-log-output" id="diagnostic-log-ports">{{ diagnostics.ports }}</pre></div>
+      </details>
+      <details class="diagnostic-log-panel">
+        <summary><span><i class="status-dot {{ 'is-off' if not diagnostics.config_validation.ok }}"></i><b>Проверка config.json</b><small>Полный вывод команды xray run -test</small></span><strong>Открыть</strong></summary>
+        <div class="diagnostic-log-panel-body"><div class="diagnostic-log-toolbar"><button class="button ghost small" type="button" data-copy-log="diagnostic-log-config">Копировать</button></div><pre class="terminal-box diagnostic-log-output" id="diagnostic-log-config">{{ diagnostics.config_validation.detail or 'Configuration OK' }}</pre></div>
+      </details>
+    </div>
   </section>
-  {% endif %}
-
-  <section class="ui-log-grid diagnostics-log-grid">
-    <article class="ui-card ui-log-card"><header class="ui-card-heading"><div><p class="panel-kicker">СЕТЬ</p><h2>TCP-порты</h2><p>Активные слушающие сокеты и процессы.</p></div></header><pre class="terminal-box tall">{{ diagnostics.ports }}</pre></article>
-    <article class="ui-card ui-log-card"><header class="ui-card-heading"><div><p class="panel-kicker">XRAY</p><h2>Журнал Xray</h2><p>Последние сообщения службы.</p></div></header><pre class="terminal-box tall">{{ diagnostics.xray_logs }}</pre></article>
-    <article class="ui-card ui-log-card"><header class="ui-card-heading"><div><p class="panel-kicker">NGINX</p><h2>Журнал Nginx</h2><p>Ошибки TLS, XHTTP и конфигурации.</p></div></header><pre class="terminal-box tall">{{ diagnostics.nginx_logs }}</pre></article>
-    <article class="ui-card ui-log-card"><header class="ui-card-heading"><div><p class="panel-kicker">SG-PANEL</p><h2>Журнал панели</h2><p>Веб-служба и операции применения.</p></div></header><pre class="terminal-box tall">{{ diagnostics.panel_logs }}</pre></article>
-  </section>
+{% endif %}
 </div>
+{% if diagnostics_tab == 'logs' %}<script>
+(() => {
+  document.querySelectorAll('[data-copy-log]').forEach(button => {
+    button.addEventListener('click', async () => {
+      const target = document.getElementById(button.dataset.copyLog || '');
+      if (!target) return;
+      const original = button.textContent;
+      try {
+        await navigator.clipboard.writeText(target.innerText);
+        button.textContent = 'Скопировано';
+      } catch (_) {
+        button.textContent = 'Выделите вручную';
+      }
+      window.setTimeout(() => { button.textContent = original; }, 1800);
+    });
+  });
+})();
+</script>{% endif %}
 {% endblock %}

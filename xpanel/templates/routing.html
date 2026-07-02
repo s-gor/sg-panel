@@ -1,14 +1,21 @@
 {% extends "base.html" %}
 {% block title %}Routing — SG-Panel{% endblock %}
-{% block section %}ROUTING{% endblock %}
-{% block heading %}Routing{% endblock %}
+{% block section %}NETWORK{% endblock %}
+{% block heading %}Network{% endblock %}
 {% block subtitle %}Правила направления трафика по системным и пользовательским выходам{% endblock %}
 {% block content %}
 <script>document.body.classList.add('ui-standard-page','routing-page');</script>
 <div class="ui-page ui-page-wide">
+  {% set enabled_rules = rules|selectattr('enabled')|list|length %}
+  <section class="ui-dashboard-metrics page-context-metrics routing-context-metrics">
+    <article class="ui-status-card"><span>Default Outbound</span><strong class="ui-value-compact">{{ settings.default_outbound_tag|upper }}</strong><small>Используется последним</small></article>
+    <article class="ui-status-card"><span>Правила</span><strong>{{ enabled_rules }} / {{ rules|length }}</strong><small>Включено / всего</small></article>
+    <article class="ui-status-card"><span>Sniffing</span><strong class="{{ 'text-success' if settings.sniffing_enabled else 'text-warning' }}">{{ 'Включён' if settings.sniffing_enabled else 'Выключен' }}</strong><small>{{ 'Route only' if settings.sniffing_route_only else 'Подмена destination' }}</small></article>
+    <article class="ui-status-card"><span>WARP mode</span><strong class="ui-value-compact">{{ warp.route_mode|upper }}</strong><small>{{ 'Outbound активен' if warp.enabled else 'Outbound не активен' }}</small></article>
+  </section>
   <section class="ui-card routing-settings-card">
     <header class="ui-card-heading ui-card-heading-row"><div><p class="panel-kicker">ОСНОВНЫЕ ПАРАМЕТРЫ</p><h2>Обработка трафика</h2><p>Выход по умолчанию, стратегия доменов и распознавание протоколов.</p></div><a class="button secondary" href="{{ url_for('routing_json_page') }}">{ } JSON routing</a></header>
-    <form method="post" action="{{ url_for('routing_settings_save') }}" class="ui-form routing-settings-form">
+    <form method="post" action="{{ url_for('routing_settings_save') }}" class="ui-form routing-settings-form" data-validated-form>
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="routing-settings-grid">
         <label><span>Выход по умолчанию</span><select name="default_outbound_tag">{% for tag in outbound_tags %}{% if tag != 'blocked' %}<option value="{{ tag }}" {% if settings.default_outbound_tag == tag %}selected{% endif %}>{{ tag }}</option>{% endif %}{% endfor %}</select><small>Используется, когда ни одно правило не совпало. Выбор <code>warp</code> синхронизирует режим «Весь трафик» ниже.</small></label>
@@ -43,7 +50,7 @@
       <a class="button primary" href="{{ url_for('outbounds_page') }}">Открыть Outbounds</a>
     </div>
     {% else %}
-    <form method="post" action="{{ url_for('warp_routing') }}" class="warp-routing-form">
+    <form method="post" action="{{ url_for('warp_routing') }}" class="warp-routing-form" data-validated-form>
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="warp-route-options">
         <label><input type="radio" name="route_mode" value="off" {% if warp.route_mode == 'off' %}checked{% endif %}><span><strong>Не использовать WARP</strong><small>Outbound остаётся доступным, но автоматическая маршрутизация выключена.</small></span></label>
@@ -69,7 +76,7 @@
         {% endfor %}
       </div>
     </header>
-    <form method="post" action="{{ url_for('routing_geo_preset_add') }}" class="ui-form geo-policy-form">
+    <form method="post" action="{{ url_for('routing_geo_preset_add') }}" class="ui-form geo-policy-form" data-validated-form>
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="ui-field-grid geo-policy-grid">
         <label><span>Шаблон</span><select name="kind" data-geo-kind><option value="ads">Блокировать рекламу</option><option value="private">Локальные сети</option><option value="country">Страна: домены + IP</option><option value="geosite">Категория geosite</option></select></label>
@@ -108,7 +115,7 @@
 
     <div class="routing-add-editor" id="routing-add-form" hidden>
       <header><div><p class="panel-kicker">НОВОЕ ПРАВИЛО</p><h2>Добавить правило</h2><p>Заполняйте только те условия, которые должны участвовать в совпадении.</p></div></header>
-      <form method="post" action="{{ url_for('routing_rule_add') }}" class="ui-form routing-rule-form">
+      <form method="post" action="{{ url_for('routing_rule_add') }}" class="ui-form routing-rule-form" data-validated-form>
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <input type="hidden" name="target_type" value="outbound">
         <div class="ui-field-grid rule-main-grid"><label><span>Название</span><input name="name" required placeholder="Блокировка рекламы"></label><label><span>Приоритет</span><input name="priority" type="number" min="1" max="9999" value="100" required></label><label><span>Выход</span><select name="outbound_tag">{% for tag in outbound_tags %}<option value="{{ tag }}">{{ tag }}</option>{% endfor %}</select></label></div>

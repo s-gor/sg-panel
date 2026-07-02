@@ -64,5 +64,17 @@ ReadWritePaths=$PROJECT_DIR/data $PROJECT_DIR/backups /etc/xpanel-mvp /usr/local
 WantedBy=multi-user.target
 UNIT
 
+mkdir -p /etc/letsencrypt/renewal-hooks/deploy
+cat > /etc/letsencrypt/renewal-hooks/deploy/sync-sg-panel-hysteria-tls.sh <<'EOF_HOOK'
+#!/usr/bin/env bash
+set -Eeuo pipefail
+PROJECT_DIR="/opt/xpanel-mvp"
+[[ -x "$PROJECT_DIR/.venv/bin/python" ]] || exit 0
+[[ -f "$PROJECT_DIR/data/panel.db" ]] || exit 0
+cd "$PROJECT_DIR"
+exec .venv/bin/python -m xpanel sync-hysteria-tls --restart
+EOF_HOOK
+chmod 0755 /etc/letsencrypt/renewal-hooks/deploy/sync-sg-panel-hysteria-tls.sh
+
 systemctl daemon-reload
 systemctl enable xpanel-web >/dev/null

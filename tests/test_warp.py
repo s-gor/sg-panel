@@ -13,11 +13,15 @@ from xpanel.db import connect, init_db
 from xpanel import service
 from xpanel.service import (
     build_config,
+    build_warp_outbound,
     configure_warp_routing,
     create_warp,
+    delete_warp,
     get_routing_settings,
     get_warp_overview,
     list_outbound_tags,
+    update_warp_json_document,
+    warp_json_document,
     set_warp_enabled,
     update_routing_settings,
 )
@@ -103,6 +107,32 @@ class WarpServiceTest(unittest.TestCase):
         self.assertEqual(warp["settings"]["mtu"], 1280)
         self.assertIn("warp", list_outbound_tags(enabled_only=True))
 
+
+    def test_warp_context_json_roundtrip(self):
+        self.enable_sample()
+        document = json.loads(warp_json_document())
+        document["_sgPanel"]["enabled"] = True
+        document["_sgPanel"]["routeMode"] = "selected"
+        document["_sgPanel"]["selectedDomains"] = [
+            "domain:example.com",
+            "geosite:spotify",
+        ]
+        document["settings"]["mtu"] = 1360
+        result = update_warp_json_document(json.dumps(document))
+        self.assertTrue(result["enabled"])
+        self.assertEqual(result["route_mode"], "selected")
+        self.assertIn("domain:example.com", result["selected_domains"])
+        outbound = build_warp_outbound()
+        self.assertEqual(outbound["settings"]["mtu"], 1360)
+        config, _server, _users = build_config()
+        rule = next(
+            item for item in config["routing"]["rules"]
+            if item.get("outboundTag") == "warp"
+        )
+        self.assertEqual(
+            rule["domain"], ["domain:example.com", "geosite:spotify"]
+        )
+
     def test_selected_domains_create_managed_rule(self):
         self.enable_sample()
         configure_warp_routing(
@@ -187,6 +217,56 @@ class WarpServiceTest(unittest.TestCase):
         self.assertEqual(get_routing_settings()["default_outbound_tag"], "direct")
         self.assertNotIn("warp", list_outbound_tags(enabled_only=True))
 
+    def test_create_warp_does_not_save_when_exact_candidate_fails_validation(self):
+        binary = self.root / "wgcf-cli"
+        binary.write_text("fake", encoding="utf-8")
+        binary.chmod(0o755)
+        warp_dir = self.root / "warp"
+
+        def fake_run(args, *, timeout=15, cwd=None):
+            if args[-1] == "register":
+                workdir = Path(cwd)
+                (workdir / "wgcf.json").write_text('{"account":"secret"}', encoding="utf-8")
+            elif args[-2:] == ["generate", "--xray"]:
+                workdir = Path(cwd)
+                (workdir / "wgcf.xray.json").write_text(json.dumps(SAMPLE_WARP), encoding="utf-8")
+            return subprocess.CompletedProcess(args, 0, "", "")
+
+        with patch.object(service, "WARP_DIR", warp_dir), \
+             patch.object(service, "_warp_binary", return_value=binary), \
+             patch.object(service, "_run", side_effect=fake_run), \
+             patch.object(service, "validate_generated_config", return_value={
+                 "ok": False, "detail": "candidate rejected", "users": 0, "json": "{}"
+             }), \
+             patch.object(service, "require_root"):
+            with self.assertRaisesRegex(service.XPanelError, "candidate rejected"):
+                create_warp()
+
+        self.assertFalse((warp_dir / "wgcf.json").exists())
+        overview = get_warp_overview()
+        self.assertFalse(overview["configured"])
+        self.assertFalse(overview["enabled"])
+
+    def test_delete_warp_does_not_change_live_state_when_candidate_fails(self):
+        self.enable_sample()
+        warp_dir = self.root / "warp"
+        warp_dir.mkdir(parents=True)
+        account = warp_dir / "wgcf.json"
+        account.write_text("secret", encoding="utf-8")
+
+        with patch.object(service, "WARP_DIR", warp_dir), \
+             patch.object(service, "validate_generated_config", return_value={
+                 "ok": False, "detail": "delete rejected", "users": 0, "json": "{}"
+             }), \
+             patch.object(service, "require_root"):
+            with self.assertRaisesRegex(service.XPanelError, "delete rejected"):
+                delete_warp()
+
+        self.assertTrue(account.exists())
+        overview = get_warp_overview()
+        self.assertTrue(overview["configured"])
+        self.assertTrue(overview["enabled"])
+
     def test_create_warp_uses_generated_xray_json_and_protects_account(self):
         binary = self.root / "wgcf-cli"
         binary.write_text("fake", encoding="utf-8")
@@ -194,11 +274,12 @@ class WarpServiceTest(unittest.TestCase):
         warp_dir = self.root / "warp"
 
         def fake_run(args, *, timeout=15, cwd=None):
-            cwd = Path(cwd)
             if args[-1] == "register":
-                (cwd / "wgcf.json").write_text('{"account":"secret"}', encoding="utf-8")
+                workdir = Path(cwd)
+                (workdir / "wgcf.json").write_text('{"account":"secret"}', encoding="utf-8")
             elif args[-2:] == ["generate", "--xray"]:
-                (cwd / "wgcf.xray.json").write_text(json.dumps(SAMPLE_WARP), encoding="utf-8")
+                workdir = Path(cwd)
+                (workdir / "wgcf.xray.json").write_text(json.dumps(SAMPLE_WARP), encoding="utf-8")
             return subprocess.CompletedProcess(args, 0, "", "")
 
         with patch.object(service, "WARP_DIR", warp_dir), \

@@ -1,11 +1,19 @@
 {% extends "base.html" %}
+{% from '_fingerprint_select.html' import fingerprint_select %}
 {% block title %}Outbounds — SG-Panel{% endblock %}
-{% block section %}OUTBOUNDS{% endblock %}
-{% block heading %}Outbounds{% endblock %}
+{% block section %}NETWORK{% endblock %}
+{% block heading %}Network{% endblock %}
 {% block subtitle %}Системные и пользовательские выходы Xray{% endblock %}
 {% block content %}
 <script>document.body.classList.add('outbounds-page');</script>
 <div class="ob-page">
+  {% set custom_count = outbounds|rejectattr('system')|list|length %}
+  <section class="ui-dashboard-metrics page-context-metrics outbound-context-metrics">
+    <article class="ui-status-card"><span>Выход по умолчанию</span><strong class="ui-value-compact">{{ default_outbound_tag|upper }}</strong><small>Для трафика без совпавшего правила</small></article>
+    <article class="ui-status-card"><span>Системные</span><strong>2</strong><small>direct и blocked</small></article>
+    <article class="ui-status-card"><span>Пользовательские</span><strong>{{ custom_count }}</strong><small>Дополнительные VLESS-выходы</small></article>
+    <article class="ui-status-card"><span>Cloudflare WARP</span><strong class="{{ 'text-success' if warp.enabled else 'text-warning' }}">{{ 'Активен' if warp.enabled else ('Готов' if warp.configured else 'Не настроен') }}</strong><small>Native WireGuard outbound</small></article>
+  </section>
   <section class="ob-system-panel" aria-labelledby="ob-system-title">
     <header class="ob-section-heading">
       <div>
@@ -79,6 +87,7 @@
     </div>
 
     <div class="warp-actions">
+      <a class="button secondary" href="{{ url_for('warp_json_page') }}">{ } WARP JSON</a>
       <form method="post" action="{{ url_for('warp_test') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button secondary" type="submit" {% if not warp.enabled %}disabled{% endif %}>Проверить WARP</button></form>
       <form method="post" action="{{ url_for('warp_toggle') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button secondary" type="submit">{{ 'Отключить' if warp.enabled else 'Включить' }}</button></form>
       <form method="post" action="{{ url_for('warp_regenerate') }}" onsubmit="return confirm('Пересоздать учётные данные WARP? После применения старый выход будет заменён.')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button ghost" type="submit">Пересоздать</button></form>
@@ -171,7 +180,7 @@
       <span class="ob-form-badge">VLESS</span>
     </header>
 
-    <form method="post" action="{{ url_for('outbound_add') }}" class="ob-form outbound-dynamic-form" data-mode="create">
+    <form method="post" action="{{ url_for('outbound_add') }}" class="ob-form outbound-dynamic-form" data-mode="create" data-validated-form>
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <input type="hidden" name="protocol" value="vless">
 
@@ -258,7 +267,7 @@
           </header>
           <div class="ob-fields ob-fields-security">
             <label><span>Server name / SNI</span><input name="server_name" required placeholder="www.bing.com"></label>
-            <label><span>Fingerprint</span><input name="fingerprint" value="chrome" required></label>
+            <label><span>Fingerprint браузера</span>{{ fingerprint_select('chrome') }}</label>
           </div>
 
           <div class="ob-conditional" data-reality-fields>

@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block title %}Настройка доступа — SG-Panel{% endblock %}
+{% block section %}SECURITY & ACCESS{% endblock %}
+{% block heading %}Переключение доступа{% endblock %}
+{% block subtitle %}DNS, сертификат, Nginx и безопасный переход на новый адрес{% endblock %}
+{% block content %}
+<script>document.body.classList.add('ui-standard-page','panel-access-job-page');</script>
+<div class="ui-page ui-page-wide">
+  <section class="ui-card panel-access-progress-card">
+    <header class="ui-card-heading ui-card-heading-row">
+      <div><p class="panel-kicker">ЖИВОЙ ЖУРНАЛ</p><h2 id="job-title">Подготовка {{ job.mode|upper }}</h2><p>Целевой адрес: <code>{{ job.target_url }}</code></p></div>
+      <span class="pill warning" id="job-status"><i></i>{{ job.status }}</span>
+    </header>
+    <div class="access-switch-state" id="switch-state"><span class="access-spinner" aria-hidden="true"></span><div><strong>Настройка выполняется</strong><p>Не закрывайте вкладку. После переключения SG-Panel автоматически откроет новый адрес.</p></div></div>
+    <pre class="terminal-box tall" id="job-log">{{ job.log or 'Задача поставлена в очередь…' }}</pre>
+    <div class="ui-actions">
+      <a class="button primary" id="target-link" href="{{ job.target_url }}">Открыть новый адрес вручную</a>
+      <a class="button ghost" href="{{ url_for('security_page') }}">Вернуться в Безопасность</a>
+    </div>
+  </section>
+</div>
+<script>
+(() => {
+  const statusUrl = {{ url_for('panel_access_job_status', job_id=job.job_id)|tojson }};
+  const targetUrl = {{ job.target_url|tojson }};
+  const statusNode = document.getElementById('job-status');
+  const logNode = document.getElementById('job-log');
+  const stateNode = document.getElementById('switch-state');
+  const targetLink = document.getElementById('target-link');
+  let finished = false;
+  let hadSuccessfulPoll = false;
+  let redirectScheduled = false;
+  let consecutiveFailures = 0;
+
+  targetLink.href = targetUrl;
+
+  function targetLoginUrl() {
+    return targetUrl.replace(/\/$/, '') + '/login?panel_access_switched=1';
+  }
+
+  function scheduleRedirect(message, delay = 1400) {
+    if (redirectScheduled) return;
+    redirectScheduled = true;
+    finished = true;
+    statusNode.textContent = 'готово';
+    statusNode.className = 'pill enabled';
+    stateNode.className = 'access-switch-state is-success';
+    stateNode.innerHTML = '<span class="access-success-mark">✓</span><div><strong>' + message + '</strong><p>Открываю новый адрес панели…</p></div>';
+    window.setTimeout(() => window.location.replace(targetLoginUrl()), delay);
+  }
+
+  async function poll() {
+    if (finished) return;
+    try {
+      const response = await fetch(statusUrl, {cache: 'no-store'});
+      if (!response.ok) throw new Error('HTTP ' + response.status);
+      hadSuccessfulPoll = true;
+      consecutiveFailures = 0;
+      const data = await response.json();
+      statusNode.textContent = data.status;
+      statusNode.className = 'pill ' + (data.status === 'success' ? 'enabled' : data.status === 'failed' ? 'disabled' : 'warning');
+      logNode.textContent = data.log || 'Ожидание вывода…';
+      logNode.scrollTop = logNode.scrollHeight;
+      if (data.status === 'success') {
+        scheduleRedirect('Доступ успешно переключён');
+        return;
+      }
+      if (data.status === 'failed') {
+        finished = true;
+        stateNode.className = 'access-switch-state is-failed';
+        stateNode.innerHTML = '<span class="access-failed-mark">!</span><div><strong>Настройка не завершена</strong><p>Предыдущий адрес восстановлен. Проверьте журнал выше.</p></div>';
+        return;
+      }
+    } catch (error) {
+      consecutiveFailures += 1;
+      statusNode.textContent = 'соединение переключается';
+      if (hadSuccessfulPoll || consecutiveFailures >= 3) {
+        scheduleRedirect('Nginx уже перешёл на новый адрес', 1100);
+        return;
+      }
+    }
+    window.setTimeout(poll, 1000);
+  }
+  poll();
+})();
+</script>
+{% endblock %}

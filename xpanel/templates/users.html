@@ -1,42 +1,210 @@
 {% extends "base.html" %}
-{% block title %}Пользователи — SG-Panel{% endblock %}
-{% block section %}USERS{% endblock %}
-{% block heading %}Пользователи{% endblock %}
-{% block subtitle %}UUID, срок действия, трафик, ссылки и доступ{% endblock %}
+{% block title %}Clients — SG-Panel{% endblock %}
+{% block section %}CLIENTS{% endblock %}
+{% block heading %}Clients & Traffic Studio{% endblock %}
+{% block subtitle %}Пользователи Xray, готовые конфигурации текущего Inbound и долговременная статистика трафика{% endblock %}
 {% block content %}
-<script>document.body.classList.add('ui-standard-page','users-page');</script>
-<div class="ui-page ui-page-wide">
-  <section class="ui-top-grid users-top-grid">
-    <article class="ui-card ui-card-form">
-      <header class="ui-card-heading"><div><p class="panel-kicker">НОВЫЙ ПОЛЬЗОВАТЕЛЬ</p><h2>Добавить пользователя</h2><p>UUID создаётся автоматически. Имя и комментарий используются только для управления в панели.</p></div></header>
-      <form method="post" action="{{ url_for('users_add') }}" class="ui-form">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <div class="ui-field-grid users-create-grid"><label><span>Имя пользователя</span><input type="text" name="name" maxlength="80" required placeholder="Например, Irina"></label><label><span>Срок действия, UTC</span><input type="datetime-local" name="expiry_at"></label></div>
-        <label><span>Комментарий</span><input type="text" name="comment" maxlength="500" placeholder="Устройство, назначение или примечание"></label>
-        <div class="ui-actions"><button class="button primary" type="submit">Создать пользователя</button></div>
-      </form>
-      <div class="ui-info-note"><span>i</span><p>Новый пользователь будет сразу добавлен в рабочую конфигурацию Xray.</p></div>
-    </article>
+<script>document.body.classList.add('clients-studio-page');</script>
 
-    <article class="ui-card users-summary-card">
-      <header class="ui-card-heading"><div><p class="panel-kicker">СТАТИСТИКА</p><h2>База пользователей</h2><p>Записи SQLite и счётчики Xray.</p></div></header>
-      <div class="users-summary-number"><strong>{{ users|length }}</strong><span>{{ 'пользователь' if users|length == 1 else 'пользователей' }}</span></div>
-      <form method="post" action="{{ url_for('stats_reset') }}" onsubmit="return confirm('Сбросить все счётчики трафика Xray?')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button ghost" type="submit">Сбросить статистику</button></form>
-    </article>
-  </section>
-
-  <section class="ui-card ui-table-card">
-    <header class="ui-card-heading ui-card-heading-row"><div><p class="panel-kicker">СПИСОК</p><h2>Пользователи и трафик</h2><p>Состояние, срок действия и индивидуальные действия.</p></div><span class="ui-counter">{{ users|length }} {{ 'запись' if users|length == 1 else 'записей' }}</span></header>
-    {% if users %}<div class="table-wrap"><table><thead><tr><th>ID</th><th>Пользователь</th><th>Статус</th><th>Трафик</th><th>Срок</th><th>UUID</th><th>Действия</th></tr></thead><tbody>
-    {% for user in users %}{% set st = stats.get(user.id, {}) %}<tr>
-      <td><span class="table-id">#{{ user.id }}</span></td>
-      <td><div class="user-cell"><span class="avatar">{{ user.name[:1]|upper }}</span><div><strong>{{ user.name }}</strong>{% if user.comment %}<small>{{ user.comment }}</small>{% endif %}</div></div></td>
-      <td>{% if user_is_expired(user) %}<span class="pill disabled"><i></i>Истёк</span>{% else %}<span class="pill {{ 'enabled' if user.enabled else 'disabled' }}"><i></i>{{ 'Активен' if user.enabled else 'Отключён' }}</span>{% endif %}{% if st.online is sameas true %}<span class="online-dot" title="online"></span>{% endif %}</td>
-      <td><div class="traffic-cell"><strong>{{ format_bytes(st.total|default(0)) }}</strong><small>↑ {{ format_bytes(st.uplink|default(0)) }} · ↓ {{ format_bytes(st.downlink|default(0)) }}</small></div></td>
-      <td>{% if user.expiry_at %}<code>{{ user.expiry_at[:16]|replace('T',' ') }}</code>{% else %}<span class="muted">Без срока</span>{% endif %}</td>
-      <td><code class="uuid-code">{{ user.uuid }}</code></td>
-      <td><div class="row-actions"><a class="button ghost small" href="{{ url_for('user_edit_page', user_id=user.id) }}">Изменить</a><a class="button ghost small" href="{{ url_for('user_link', user_id=user.id) }}">Ссылка / QR</a><form method="post" action="{{ url_for('users_toggle', user_id=user.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button secondary small" type="submit">{{ 'Отключить' if user.enabled else 'Включить' }}</button></form><form method="post" action="{{ url_for('users_delete', user_id=user.id) }}" onsubmit="return confirm('Удалить пользователя {{ user.name }}?')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button danger small" type="submit">Удалить</button></form></div></td>
-    </tr>{% endfor %}</tbody></table></div>{% else %}<div class="ui-empty-compact"><strong>Пользователей пока нет</strong><p>Создайте первую запись в форме выше.</p></div>{% endif %}
-  </section>
+<div class="clients-studio-toolbar">
+  <div class="clients-studio-toolbar-copy">
+    <span class="clients-live-dot"></span>
+    <span>Трафик и online-состояние обновляются каждую минуту и сохраняются после перезапуска Xray.</span>
+  </div>
+  <div class="clients-studio-toolbar-actions">
+    <a class="button ghost" href="{{ url_for('users_json_page') }}">{ } Пользователи JSON</a>
+    <form method="post" action="{{ url_for('stats_reset') }}" onsubmit="return confirm('Сбросить накопленный трафик всех клиентов? Пользователи, ссылки и конфигурации останутся без изменений.')">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button class="button danger-outline" type="submit">Сбросить весь трафик</button>
+    </form>
+    <button class="button primary" type="button" onclick="document.getElementById('add-client-dialog').showModal()">＋ Добавить клиента</button>
+  </div>
 </div>
+
+<section class="clients-summary-grid">
+  <a class="clients-summary-card" href="{{ url_for('settings_page') }}">
+    <span>Xray Server</span>
+    <strong class="{{ 'summary-ok' if global_system_ok else 'summary-bad' }}">{{ 'Работает' if global_system_ok else 'Требует проверки' }}</strong>
+    <small>{{ profile_label }} · {{ server.address }}:{{ server.port }}</small>
+    <em>Открыть Inbound</em>
+  </a>
+  <article class="clients-summary-card">
+    <span>Активные клиенты</span>
+    <strong>{{ client_stats.active }} / {{ client_stats.total }}</strong>
+    <small>Онлайн по последней проверке: {{ client_stats.online }} · Истекают: {{ client_stats.expiring }}</small>
+  </article>
+  <article class="clients-summary-card traffic-summary-card">
+    <span>Общий трафик</span>
+    <strong>{{ format_bytes(client_stats.lifetime_total) }}</strong>
+    <small><b class="traffic-down">↓ {{ format_bytes(client_stats.lifetime_downlink) }}</b><b class="traffic-up">↑ {{ format_bytes(client_stats.lifetime_uplink) }}</b></small>
+  </article>
+  <article class="clients-summary-card">
+    <span>Текущая скорость</span>
+    <strong>{{ format_bytes(client_stats.speed) }}/с</strong>
+    <small>Суммарно по последнему измеренному интервалу</small>
+    <em>Коллектор: 60 секунд</em>
+  </article>
+</section>
+
+{% if stats_errors %}
+<div class="clients-stats-warning">
+  <div><strong>Статистика Xray недоступна</strong><span>{{ stats_errors|join('; ') }}. Трафик, прошедший до включения Stats API, восстановить нельзя.</span></div>
+  <a class="button small secondary" href="{{ url_for('settings_page') }}">Настроить Stats API</a>
+</div>
+{% endif %}
+
+<section class="clients-filter-panel">
+  <form method="get" action="{{ url_for('users_page') }}">
+    <input type="search" name="q" value="{{ query }}" placeholder="Поиск по имени, UUID или комментарию">
+    <select name="status" aria-label="Состояние клиента">
+      <option value="all" {% if status_filter == 'all' %}selected{% endif %}>Все клиенты</option>
+      <option value="active" {% if status_filter == 'active' %}selected{% endif %}>Активные</option>
+      <option value="online" {% if status_filter == 'online' %}selected{% endif %}>Онлайн</option>
+      <option value="expiring" {% if status_filter == 'expiring' %}selected{% endif %}>Истекают в течение 7 дней</option>
+      <option value="expired" {% if status_filter == 'expired' %}selected{% endif %}>Просроченные</option>
+      <option value="disabled" {% if status_filter == 'disabled' %}selected{% endif %}>Отключённые</option>
+      <option value="unlimited" {% if status_filter == 'unlimited' %}selected{% endif %}>Без срока</option>
+    </select>
+    <select name="sort" aria-label="Сортировка">
+      <option value="created" {% if sort_mode == 'created' %}selected{% endif %}>Сначала новые</option>
+      <option value="name" {% if sort_mode == 'name' %}selected{% endif %}>По имени</option>
+      <option value="activity" {% if sort_mode == 'activity' %}selected{% endif %}>По активности</option>
+      <option value="traffic" {% if sort_mode == 'traffic' %}selected{% endif %}>По трафику</option>
+      <option value="expiry" {% if sort_mode == 'expiry' %}selected{% endif %}>По сроку</option>
+    </select>
+    <button class="button secondary" type="submit">Показать</button>
+    {% if query or status_filter != 'all' or sort_mode != 'created' %}<a class="button ghost" href="{{ url_for('users_page') }}">Сбросить</a>{% endif %}
+  </form>
+</section>
+
+<div class="clients-studio-layout">
+  <div class="clients-list-column">
+    <section class="clients-table-card">
+      {% if users %}
+      <div class="table-wrap">
+        <table class="clients-studio-table">
+          <thead><tr><th>Клиент</th><th>Состояние</th><th>Последняя активность</th><th>Трафик за всё время</th><th>Срок</th><th class="right">Действия</th></tr></thead>
+          <tbody>
+          {% for user in users %}{% set st = user.stats %}
+          <tr class="{{ 'selected' if selected_user and selected_user.id == user.id else '' }}" onclick="window.location='{{ url_for('users_page', client=user.id, q=query, status=status_filter, sort=sort_mode) }}'">
+            <td>
+              <div class="client-identity-cell">
+                <i class="client-state-dot {{ 'online' if user.online else 'active' if user.effective_enabled else 'off' }}"></i>
+                <span class="client-avatar">{{ user.name[:1]|upper }}</span>
+                <div><strong>{{ user.name }}</strong><small>{{ user.comment or 'Без комментария' }}</small><em class="client-profile-mini">{{ profile_label }}</em><code>{{ user.uuid[:8] }}…{{ user.uuid[-4:] }}</code></div>
+              </div>
+            </td>
+            <td>
+              {% if user.expired %}<span class="client-status-badge expired">Истёк</span>
+              {% elif not user.enabled %}<span class="client-status-badge off">Отключён</span>
+              {% elif user.online %}<span class="client-status-badge online">Онлайн</span>
+              {% else %}<span class="client-status-badge active">Активен</span>{% endif %}
+              {% if user.expiring_soon %}<small class="client-expiring-note">Скоро истекает</small>{% endif %}
+            </td>
+            <td><strong class="client-activity">{{ user.activity_text }}</strong><small>{{ format_bytes(st.total_bps|default(0)) }}/с</small></td>
+            <td><div class="client-traffic-pair"><strong>{{ format_bytes(st.lifetime_total|default(0)) }}</strong><small><b class="traffic-down">↓ {{ format_bytes(st.lifetime_downlink|default(0)) }}</b><b class="traffic-up">↑ {{ format_bytes(st.lifetime_uplink|default(0)) }}</b></small></div></td>
+            <td>{% if user.expiry_at %}<strong>{{ user.expiry_at[:10] }}</strong><small>{{ user.expiry_at[11:16] }} UTC</small>{% else %}<span class="muted">Без срока</span>{% endif %}</td>
+            <td class="right" onclick="event.stopPropagation()"><div class="clients-row-actions"><a class="client-action primary" href="{{ url_for('user_link', user_id=user.id) }}">Конфиг</a><a class="client-action" href="{{ url_for('user_edit_page', user_id=user.id) }}">Изменить</a></div></td>
+          </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <footer class="clients-table-footer">Показано: {{ users|length }} · Всего: {{ client_stats.total }} · Онлайн: {{ client_stats.online }}</footer>
+      {% else %}
+      <div class="clients-empty-state"><strong>Подходящих клиентов нет</strong><p>Измените фильтр или создайте нового пользователя.</p><button class="button primary" type="button" onclick="document.getElementById('add-client-dialog').showModal()">Добавить клиента</button></div>
+      {% endif %}
+    </section>
+  </div>
+
+  <aside class="client-detail-card">
+    {% if selected_user %}{% set st = selected_user.stats %}
+    <header class="client-detail-header">
+      <div class="client-detail-name"><i class="client-state-dot {{ 'online' if selected_user.online else 'active' if selected_user.effective_enabled else 'off' }}"></i><div><span>CLIENT #{{ selected_user.id }}</span><h2>{{ selected_user.name }}</h2><p>{{ profile_label }}</p></div></div>
+      {% if selected_user.online %}<span class="client-status-badge online">ONLINE</span>{% elif selected_user.effective_enabled %}<span class="client-status-badge active">ACTIVE</span>{% else %}<span class="client-status-badge off">OFF</span>{% endif %}
+    </header>
+
+    <div class="client-detail-activity"><span>Последняя активность</span><strong>{{ selected_user.activity_text }}</strong><small>{% if st.last_collected_at %}Счётчики обновлены {{ st.last_collected_at[:16]|replace('T',' ') }} UTC{% else %}Ожидается первое измерение{% endif %}</small></div>
+
+    <div class="client-traffic-grid">
+      <article><span>Текущая сессия Xray</span><strong>{{ format_bytes(st.session_total|default(0)) }}</strong><small>↓ {{ format_bytes(st.session_downlink|default(0)) }} · ↑ {{ format_bytes(st.session_uplink|default(0)) }}</small></article>
+      <article><span>Сегодня</span><strong>{{ format_bytes(st.today_total|default(0)) }}</strong><small>↓ {{ format_bytes(st.today_downlink|default(0)) }} · ↑ {{ format_bytes(st.today_uplink|default(0)) }}</small></article>
+      <article><span>Текущий месяц</span><strong>{{ format_bytes(st.month_total|default(0)) }}</strong><small>↓ {{ format_bytes(st.month_downlink|default(0)) }} · ↑ {{ format_bytes(st.month_uplink|default(0)) }}</small></article>
+      <article class="client-traffic-lifetime"><span>За всё время</span><strong>{{ format_bytes(st.lifetime_total|default(0)) }}</strong><small>↓ {{ format_bytes(st.lifetime_downlink|default(0)) }} · ↑ {{ format_bytes(st.lifetime_uplink|default(0)) }}</small></article>
+    </div>
+
+    <section class="client-history-block">
+      <div class="client-history-heading"><div><strong>Последние 14 дней</strong><small>Дневной суммарный трафик</small></div><span>{{ format_bytes(st.total_bps|default(0)) }}/с</span></div>
+      <div class="client-history-chart" aria-label="Трафик за 14 дней">
+        {% for point in selected_history %}<div class="client-history-column" title="{{ point.day }}: {{ format_bytes(point.total) }}"><i style="height: {{ [point.percent, 4]|max }}%"></i><span>{{ point.label if loop.index in [1,5,9,14] else '' }}</span></div>{% endfor %}
+      </div>
+    </section>
+
+    <dl class="client-detail-list">
+      <div><dt>Срок действия</dt><dd>{% if selected_user.expiry_at %}{{ selected_user.expiry_at[:16]|replace('T',' ') }} UTC{% else %}Без ограничения{% endif %}</dd></div>
+      <div><dt>Подписка</dt><dd>{{ 'Включена' if selected_user.subscription_enabled else 'Отключена' }} · открытий: {{ selected_user.subscription_access_count }}</dd></div>
+      <div><dt>Комментарий</dt><dd>{{ selected_user.comment or 'Нет комментария' }}</dd></div>
+    </dl>
+
+    <div class="client-detail-actions">
+      <a class="button primary" href="{{ url_for('user_link', user_id=selected_user.id) }}">Ссылка, QR и подписка</a>
+      <a class="button secondary" href="{{ url_for('user_edit_page', user_id=selected_user.id) }}">Изменить клиента</a>
+      <a class="button ghost" href="{{ url_for('users_json_page') }}">Открыть JSON пользователей</a>
+      <form method="post" action="{{ url_for('user_traffic_reset', user_id=selected_user.id) }}" onsubmit="return confirm('Сбросить накопленный трафик клиента {{ selected_user.name }}? Клиент, ссылка и конфигурация останутся без изменений.')">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button class="button danger-outline" type="submit">Сбросить трафик клиента</button>
+      </form>
+      <form method="post" action="{{ url_for('users_toggle', user_id=selected_user.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button ghost" type="submit">{{ 'Отключить доступ' if selected_user.enabled else 'Включить доступ' }}</button></form>
+    </div>
+
+    <details class="client-technical-details">
+      <summary>Технические данные и обслуживание</summary>
+      <dl><div><dt>UUID / Auth</dt><dd><code>{{ selected_user.uuid }}</code></dd></div><div><dt>Создан</dt><dd>{{ selected_user.created_at }}</dd></div><div><dt>Последний сброс трафика</dt><dd>{{ st.reset_at or 'Никогда' }}</dd></div></dl>
+    </details>
+    {% else %}
+    <div class="client-detail-empty"><strong>Выберите клиента</strong><p>Здесь появятся его состояние, трафик и быстрые действия.</p></div>
+    {% endif %}
+  </aside>
+</div>
+
+<section class="clients-maintenance-strip">
+  <div><strong>Долговременная статистика SG-Panel</strong><span>Кнопки сброса очищают историю «сегодня / месяц / всё время», но не удаляют клиентов, ссылки или конфигурации. Текущие счётчики Xray используются как новая точка отсчёта.</span></div>
+</section>
+
+<dialog id="add-client-dialog" class="clients-dialog" aria-labelledby="add-client-title">
+  <header><div><p class="panel-kicker">CLIENTS / CREATE</p><h2 id="add-client-title">Добавить клиента</h2><p>Создайте отдельный доступ для одного устройства. UUID/Auth формируется автоматически.</p></div><button type="button" class="clients-dialog-close" onclick="this.closest('dialog').close()" aria-label="Закрыть">×</button></header>
+  <form method="post" action="{{ url_for('users_add') }}" class="clients-dialog-form" data-validated-form data-expiry-form>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="form-grid"><label><span>Имя клиента</span><input type="text" name="name" maxlength="80" required placeholder="Например, Irina Phone"></label><label><span>Комментарий</span><input type="text" name="comment" maxlength="500" placeholder="Устройство или назначение"></label></div>
+    <fieldset class="client-expiry-fieldset"><legend>Срок действия</legend><div class="client-expiry-modes">
+      <label><input type="radio" name="expiration_mode" value="unlimited" checked><span><strong>Без срока</strong><small>До ручного отключения.</small></span></label>
+      <label><input type="radio" name="expiration_mode" value="period"><span><strong>На период</strong><small>1, 7, 30, 90 или 365 дней.</small></span></label>
+      <label><input type="radio" name="expiration_mode" value="date"><span><strong>До даты</strong><small>Точная дата и время UTC.</small></span></label>
+    </div></fieldset>
+    <div class="client-expiry-extra" data-expiry-period hidden><label><span>Период</span><select name="duration_days"><option value="1">1 день</option><option value="7">7 дней</option><option value="30" selected>30 дней</option><option value="90">90 дней</option><option value="365">365 дней</option></select></label></div>
+    <div class="client-expiry-extra" data-expiry-date hidden><label><span>Окончание доступа, UTC</span><input type="datetime-local" name="expiry_at"></label></div>
+    <div class="clients-create-result"><strong>После создания</strong><span>Откроется готовая страница с прямой ссылкой, QR-кодом и постоянной подпиской.</span></div>
+    <div class="ui-actions"><button class="button primary" type="submit">Создать и применить</button><button class="button ghost" type="button" data-skip-validation onclick="this.closest('dialog').close()">Отмена</button></div>
+  </form>
+</dialog>
+
+<script>
+(() => {
+  const dialog = document.getElementById('add-client-dialog');
+  dialog?.addEventListener('click', (event) => { if (event.target === dialog) dialog.close(); });
+  const form = document.querySelector('[data-expiry-form]');
+  if (!form) return;
+  const period = form.querySelector('[data-expiry-period]');
+  const date = form.querySelector('[data-expiry-date]');
+  const dateInput = form.querySelector('input[name="expiry_at"]');
+  const sync = () => {
+    const mode = form.querySelector('input[name="expiration_mode"]:checked')?.value || 'unlimited';
+    period.hidden = mode !== 'period';
+    date.hidden = mode !== 'date';
+    if (dateInput) dateInput.required = mode === 'date';
+  };
+  form.querySelectorAll('input[name="expiration_mode"]').forEach(item => item.addEventListener('change', sync));
+  sync();
+})();
+</script>
 {% endblock %}

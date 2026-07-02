@@ -1,51 +1,19 @@
 {% extends "base.html" %}
-{% block title %}JSON маршрутизации — SG-Panel{% endblock %}
-{% block section %}ROUTING / JSON{% endblock %}
-{% block heading %}JSON маршрутизации{% endblock %}
-{% block subtitle %}Правила, балансировщики и расширенные параметры routing в одном документе{% endblock %}
+{% block title %}Traffic Rules / JSON — SG-Panel{% endblock %}
+{% block section %}NETWORK{% endblock %}
+{% block heading %}Network{% endblock %}
+{% block subtitle %}Traffic Rules, балансировщики и расширенные параметры routing{% endblock %}
 {% block content %}
 <script>document.body.classList.add('ui-standard-page','json-workbench-page');</script>
-<div class="ui-page json-workbench">
-  <section class="ui-card">
-    <header class="ui-card-heading ui-card-heading-row">
-      <div>
-        <p class="panel-kicker">КОНСТРУКТОР + JSON</p>
-        <h2>Объект routing</h2>
-        <p>Это второй редактор тех же данных. После сохранения правила сразу появятся в графическом конструкторе.</p>
-      </div>
-      <span class="json-mode-badge">{ } JSON</span>
-    </header>
-
-    <div class="json-warning">
-      <strong>Сохранение заменяет текущий набор правил маршрутизации.</strong>
-      <span>Перед изменением SG-Panel проверяет структуру, выходы и balancerTag. Применение к Xray выполняется отдельно.</span>
-    </div>
-
-    <div class="json-info-grid">
-      <div><strong>rules</strong><span>Все правила в реальном порядке выполнения.</span></div>
-      <div><strong>balancers</strong><span>Можно добавлять расширенные балансировщики Xray.</span></div>
-      <div><strong>_sgPanel</strong><span>Хранит имена, приоритеты и включённое состояние правил.</span></div>
-    </div>
-
-    <form method="post" action="{{ url_for('routing_json_save') }}" class="json-editor-form">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <label class="json-editor-label" for="json_config">Полный объект routing</label>
-      <textarea id="json_config" name="json_config" class="json-editor json-editor-tall" spellcheck="false">{{ routing_json }}</textarea>
-      <div class="json-editor-actions">
-        <a class="button secondary" href="{{ url_for('routing_page') }}">Вернуться к конструктору</a>
-        <button class="button ghost" type="button" data-format-json>Форматировать</button>
-        <button class="button primary" type="submit">Сохранить в панели</button>
-      </div>
-    </form>
-  </section>
-</div>
-<script>
-(() => {
-  const editor = document.getElementById('json_config');
-  document.querySelector('[data-format-json]')?.addEventListener('click', () => {
-    try { editor.value = JSON.stringify(JSON.parse(editor.value), null, 2) + '\n'; }
-    catch (error) { alert('JSON содержит ошибку: ' + error.message); }
-  });
-})();
-</script>
+<div class="ui-page json-workbench"><section class="ui-card">
+<header class="ui-card-heading ui-card-heading-row"><div><p class="panel-kicker">TRAFFIC RULES</p><h2>Current JSON</h2><p>Тот же объект routing, который редактируется формами. Порядок rules является реальным порядком выполнения Xray.</p></div><span class="json-mode-badge">{ } JSON</span></header>
+<div class="json-callout validation-policy-callout"><strong>Проверяются rules, balancers, outboundTag и balancerTag</strong><span>После успешной проверки JSON сохраняется в SQLite. Итоговая конфигурация Xray проверяется целиком.</span></div>
+<form method="post" action="{{ url_for('routing_json_save') }}" class="json-editor-form" data-validated-form>
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+<div class="editor-toolbar"><div><b>Current JSON</b><span>Основной экспертный инструмент</span></div><div class="editor-toolbar-actions" data-validation-toolbar><button class="button ghost small" type="button" data-format-json>Форматировать</button><button class="button ghost small" type="button" data-sync-json>Синхронизировать</button></div></div>
+<label class="json-editor-label" for="json_config">Полный объект routing</label><textarea id="json_config" name="json_config" class="json-editor json-editor-tall" spellcheck="false">{{ routing_json }}</textarea>
+<div class="editor-status" data-editor-status><span class="is-synced">✓ JSON синхронизирован с Traffic Rules</span><span>Изменение требует новой проверки</span></div>
+<div class="json-editor-actions"><a class="button secondary" href="{{ url_for('routing_page') }}">Вернуться к правилам</a><button class="button primary" type="submit">Сохранить в панели</button></div>
+</form></section></div>
+<script>(()=>{const editor=document.getElementById('json_config');document.querySelector('[data-format-json]')?.addEventListener('click',()=>{try{editor.value=JSON.stringify(JSON.parse(editor.value),null,2)+'\n';editor.dispatchEvent(new Event('input',{bubbles:true}));}catch(error){alert('JSON содержит ошибку: '+error.message);}});document.querySelector('[data-sync-json]')?.addEventListener('click',()=>{if(confirm('Заменить несохранённый текст актуальным JSON из панели?'))location.reload();});})();</script>
 {% endblock %}

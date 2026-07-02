@@ -4,11 +4,13 @@ import os
 import secrets
 import sqlite3
 from contextlib import contextmanager
+from contextvars import ContextVar
 from pathlib import Path
 from typing import Iterator
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_DB_PATH = PROJECT_ROOT / "data" / "panel.db"
+_DB_PATH_OVERRIDE: ContextVar[Path | None] = ContextVar("xpanel_db_path_override", default=None)
 
 SCHEMA = """
 PRAGMA foreign_keys = ON;
@@ -27,7 +29,7 @@ CREATE TABLE IF NOT EXISTS server_settings (
     flow TEXT NOT NULL DEFAULT '',
     loglevel TEXT NOT NULL DEFAULT 'warning',
     api_listen TEXT NOT NULL DEFAULT '127.0.0.1:10085',
-    stats_enabled INTEGER NOT NULL DEFAULT 0 CHECK (stats_enabled IN (0, 1)),
+    stats_enabled INTEGER NOT NULL DEFAULT 1 CHECK (stats_enabled IN (0, 1)),
     config_path TEXT NOT NULL DEFAULT '/usr/local/etc/xray/config.json',
     xray_bin TEXT NOT NULL DEFAULT '/usr/local/bin/xray',
     xray_service TEXT NOT NULL DEFAULT 'xray',
@@ -38,7 +40,32 @@ CREATE TABLE IF NOT EXISTS server_settings (
     xhttp_mode TEXT NOT NULL DEFAULT 'auto',
     grpc_service_name TEXT NOT NULL DEFAULT 'sg-grpc',
     tls_cert_path TEXT NOT NULL DEFAULT '',
-    tls_key_path TEXT NOT NULL DEFAULT ''
+    tls_key_path TEXT NOT NULL DEFAULT '',
+    hysteria_udp_idle_timeout INTEGER NOT NULL DEFAULT 60 CHECK (hysteria_udp_idle_timeout BETWEEN 10 AND 3600),
+    hysteria_masquerade_type TEXT NOT NULL DEFAULT '' CHECK (hysteria_masquerade_type IN ('', 'string', 'proxy')),
+    hysteria_masquerade_url TEXT NOT NULL DEFAULT '',
+    hysteria_masquerade_content TEXT NOT NULL DEFAULT '',
+    hysteria_masquerade_status INTEGER NOT NULL DEFAULT 404 CHECK (hysteria_masquerade_status BETWEEN 200 AND 599),
+    hysteria_masquerade_dir TEXT NOT NULL DEFAULT '',
+    hysteria_masquerade_rewrite_host INTEGER NOT NULL DEFAULT 1 CHECK (hysteria_masquerade_rewrite_host IN (0, 1)),
+    hysteria_masquerade_insecure INTEGER NOT NULL DEFAULT 0 CHECK (hysteria_masquerade_insecure IN (0, 1)),
+    hysteria_masquerade_headers TEXT NOT NULL DEFAULT '{}',
+    hysteria_performance_profile TEXT NOT NULL DEFAULT 'auto' CHECK (hysteria_performance_profile IN ('auto', 'mobile', 'speed', 'limited', 'custom')),
+    hysteria_congestion TEXT NOT NULL DEFAULT 'brutal' CHECK (hysteria_congestion IN ('reno', 'bbr', 'brutal', 'force-brutal')),
+    hysteria_bbr_profile TEXT NOT NULL DEFAULT 'standard' CHECK (hysteria_bbr_profile IN ('conservative', 'standard', 'aggressive')),
+    hysteria_brutal_up TEXT NOT NULL DEFAULT '0',
+    hysteria_brutal_down TEXT NOT NULL DEFAULT '0',
+    hysteria_quic_debug INTEGER NOT NULL DEFAULT 0 CHECK (hysteria_quic_debug IN (0, 1)),
+    hysteria_max_idle_timeout INTEGER NOT NULL DEFAULT 30 CHECK (hysteria_max_idle_timeout BETWEEN 4 AND 120),
+    hysteria_keepalive_period INTEGER NOT NULL DEFAULT 0 CHECK (hysteria_keepalive_period = 0 OR hysteria_keepalive_period BETWEEN 2 AND 60),
+    hysteria_disable_pmtud INTEGER NOT NULL DEFAULT 0 CHECK (hysteria_disable_pmtud IN (0, 1)),
+    hysteria_max_incoming_streams INTEGER NOT NULL DEFAULT 1024 CHECK (hysteria_max_incoming_streams >= 8),
+    hysteria_udp_hop_ports TEXT NOT NULL DEFAULT '',
+    hysteria_udp_hop_interval TEXT NOT NULL DEFAULT '30',
+    hysteria_init_stream_receive_window INTEGER NOT NULL DEFAULT 8388608,
+    hysteria_max_stream_receive_window INTEGER NOT NULL DEFAULT 8388608,
+    hysteria_init_connection_receive_window INTEGER NOT NULL DEFAULT 20971520,
+    hysteria_max_connection_receive_window INTEGER NOT NULL DEFAULT 20971520
 );
 
 CREATE TABLE IF NOT EXISTS users (
@@ -55,6 +82,35 @@ CREATE TABLE IF NOT EXISTS users (
     subscription_access_count INTEGER NOT NULL DEFAULT 0,
     subscription_last_access_at TEXT
 );
+
+CREATE TABLE IF NOT EXISTS user_traffic_totals (
+    user_id INTEGER PRIMARY KEY,
+    uplink_total INTEGER NOT NULL DEFAULT 0 CHECK (uplink_total >= 0),
+    downlink_total INTEGER NOT NULL DEFAULT 0 CHECK (downlink_total >= 0),
+    last_raw_uplink INTEGER NOT NULL DEFAULT 0 CHECK (last_raw_uplink >= 0),
+    last_raw_downlink INTEGER NOT NULL DEFAULT 0 CHECK (last_raw_downlink >= 0),
+    session_uplink INTEGER NOT NULL DEFAULT 0 CHECK (session_uplink >= 0),
+    session_downlink INTEGER NOT NULL DEFAULT 0 CHECK (session_downlink >= 0),
+    uplink_bps INTEGER NOT NULL DEFAULT 0 CHECK (uplink_bps >= 0),
+    downlink_bps INTEGER NOT NULL DEFAULT 0 CHECK (downlink_bps >= 0),
+    online_state INTEGER NOT NULL DEFAULT -1 CHECK (online_state IN (-1, 0, 1)),
+    last_seen_at TEXT,
+    last_collected_at TEXT,
+    reset_at TEXT,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS user_traffic_daily (
+    user_id INTEGER NOT NULL,
+    day TEXT NOT NULL,
+    uplink INTEGER NOT NULL DEFAULT 0 CHECK (uplink >= 0),
+    downlink INTEGER NOT NULL DEFAULT 0 CHECK (downlink >= 0),
+    PRIMARY KEY (user_id, day),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_traffic_daily_day
+    ON user_traffic_daily(day);
 
 CREATE TABLE IF NOT EXISTS subscription_settings (
     id INTEGER PRIMARY KEY CHECK (id = 1),
@@ -95,7 +151,8 @@ CREATE TABLE IF NOT EXISTS dns_settings (
     disable_fallback_if_match INTEGER NOT NULL DEFAULT 0 CHECK (disable_fallback_if_match IN (0, 1)),
     enable_parallel_query INTEGER NOT NULL DEFAULT 0 CHECK (enable_parallel_query IN (0, 1)),
     use_system_hosts INTEGER NOT NULL DEFAULT 1 CHECK (use_system_hosts IN (0, 1)),
-    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    extra_json TEXT NOT NULL DEFAULT '{}'
 );
 
 CREATE TABLE IF NOT EXISTS dns_servers (
@@ -112,6 +169,7 @@ CREATE TABLE IF NOT EXISTS dns_servers (
     skip_fallback INTEGER NOT NULL DEFAULT 0 CHECK (skip_fallback IN (0, 1)),
     final_query INTEGER NOT NULL DEFAULT 0 CHECK (final_query IN (0, 1)),
     timeout_ms INTEGER NOT NULL DEFAULT 4000 CHECK (timeout_ms BETWEEN 100 AND 60000),
+    config_json TEXT NOT NULL DEFAULT '{}',
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -256,8 +314,22 @@ fe80::/10"""
 
 
 def db_path() -> Path:
+    override = _DB_PATH_OVERRIDE.get()
+    if override is not None:
+        return override
     value = os.environ.get("XPANEL_DB")
     return Path(value).expanduser().resolve() if value else DEFAULT_DB_PATH
+
+
+@contextmanager
+def use_db_path(path: str | Path) -> Iterator[Path]:
+    """Temporarily route DB access in the current context to another SQLite file."""
+    resolved = Path(path).expanduser().resolve()
+    token = _DB_PATH_OVERRIDE.set(resolved)
+    try:
+        yield resolved
+    finally:
+        _DB_PATH_OVERRIDE.reset(token)
 
 
 @contextmanager
@@ -288,7 +360,28 @@ def _migrate(con: sqlite3.Connection) -> None:
     _ensure_column(con, "server_settings", "flow", "TEXT NOT NULL DEFAULT ''")
     _ensure_column(con, "server_settings", "loglevel", "TEXT NOT NULL DEFAULT 'warning'")
     _ensure_column(con, "server_settings", "api_listen", "TEXT NOT NULL DEFAULT '127.0.0.1:10085'")
-    _ensure_column(con, "server_settings", "stats_enabled", "INTEGER NOT NULL DEFAULT 0")
+    _ensure_column(con, "server_settings", "stats_enabled", "INTEGER NOT NULL DEFAULT 1")
+
+    # v0.10 RC29: Clients & Traffic Studio depends on the local Xray Stats API.
+    # Enable it once for existing installations. A migration marker prevents a
+    # later init-db call from overriding an administrator who disables it again.
+    con.execute(
+        """
+        CREATE TABLE IF NOT EXISTS schema_migrations (
+            name TEXT PRIMARY KEY,
+            applied_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+    migration_name = "rc29-enable-xray-stats"
+    applied = con.execute(
+        "SELECT 1 FROM schema_migrations WHERE name = ?", (migration_name,)
+    ).fetchone()
+    if applied is None:
+        con.execute("UPDATE server_settings SET stats_enabled = 1")
+        con.execute(
+            "INSERT INTO schema_migrations (name) VALUES (?)", (migration_name,)
+        )
 
     # v0.10 RC3 inbound profiles
     _ensure_column(con, "server_settings", "inbound_profile", "TEXT NOT NULL DEFAULT 'raw_reality'")
@@ -299,6 +392,54 @@ def _migrate(con: sqlite3.Connection) -> None:
     _ensure_column(con, "server_settings", "grpc_service_name", "TEXT NOT NULL DEFAULT 'sg-grpc'")
     _ensure_column(con, "server_settings", "tls_cert_path", "TEXT NOT NULL DEFAULT ''")
     _ensure_column(con, "server_settings", "tls_key_path", "TEXT NOT NULL DEFAULT ''")
+
+    # v0.10 RC22 native Hysteria 2 inbound
+    _ensure_column(con, "server_settings", "hysteria_udp_idle_timeout", "INTEGER NOT NULL DEFAULT 60")
+    _ensure_column(con, "server_settings", "hysteria_masquerade_type", "TEXT NOT NULL DEFAULT ''")
+    _ensure_column(con, "server_settings", "hysteria_masquerade_url", "TEXT NOT NULL DEFAULT ''")
+    _ensure_column(con, "server_settings", "hysteria_masquerade_content", "TEXT NOT NULL DEFAULT ''")
+    _ensure_column(con, "server_settings", "hysteria_masquerade_status", "INTEGER NOT NULL DEFAULT 404")
+    con.execute("UPDATE server_settings SET hysteria_udp_idle_timeout=60 WHERE hysteria_udp_idle_timeout IS NULL OR hysteria_udp_idle_timeout < 10")
+    con.execute("UPDATE server_settings SET hysteria_masquerade_type='' WHERE hysteria_masquerade_type IS NULL OR hysteria_masquerade_type NOT IN ('', 'string', 'proxy')")
+    con.execute("UPDATE server_settings SET hysteria_masquerade_url='' WHERE hysteria_masquerade_url IS NULL")
+    con.execute("UPDATE server_settings SET hysteria_masquerade_content='' WHERE hysteria_masquerade_content IS NULL")
+    con.execute("UPDATE server_settings SET hysteria_masquerade_status=404 WHERE hysteria_masquerade_status IS NULL OR hysteria_masquerade_status < 200 OR hysteria_masquerade_status > 599")
+
+    # v0.10 RC26 Hysteria Studio
+    _ensure_column(con, "server_settings", "hysteria_masquerade_dir", "TEXT NOT NULL DEFAULT ''")
+    _ensure_column(con, "server_settings", "hysteria_masquerade_rewrite_host", "INTEGER NOT NULL DEFAULT 1")
+    _ensure_column(con, "server_settings", "hysteria_masquerade_insecure", "INTEGER NOT NULL DEFAULT 0")
+    _ensure_column(con, "server_settings", "hysteria_masquerade_headers", "TEXT NOT NULL DEFAULT '{}'")
+    _ensure_column(con, "server_settings", "hysteria_performance_profile", "TEXT NOT NULL DEFAULT 'auto'")
+    _ensure_column(con, "server_settings", "hysteria_congestion", "TEXT NOT NULL DEFAULT 'brutal'")
+    _ensure_column(con, "server_settings", "hysteria_bbr_profile", "TEXT NOT NULL DEFAULT 'standard'")
+    _ensure_column(con, "server_settings", "hysteria_brutal_up", "TEXT NOT NULL DEFAULT '0'")
+    _ensure_column(con, "server_settings", "hysteria_brutal_down", "TEXT NOT NULL DEFAULT '0'")
+    _ensure_column(con, "server_settings", "hysteria_quic_debug", "INTEGER NOT NULL DEFAULT 0")
+    _ensure_column(con, "server_settings", "hysteria_max_idle_timeout", "INTEGER NOT NULL DEFAULT 30")
+    _ensure_column(con, "server_settings", "hysteria_keepalive_period", "INTEGER NOT NULL DEFAULT 0")
+    _ensure_column(con, "server_settings", "hysteria_disable_pmtud", "INTEGER NOT NULL DEFAULT 0")
+    _ensure_column(con, "server_settings", "hysteria_max_incoming_streams", "INTEGER NOT NULL DEFAULT 1024")
+    _ensure_column(con, "server_settings", "hysteria_udp_hop_ports", "TEXT NOT NULL DEFAULT ''")
+    _ensure_column(con, "server_settings", "hysteria_udp_hop_interval", "TEXT NOT NULL DEFAULT '30'")
+    _ensure_column(con, "server_settings", "hysteria_init_stream_receive_window", "INTEGER NOT NULL DEFAULT 8388608")
+    _ensure_column(con, "server_settings", "hysteria_max_stream_receive_window", "INTEGER NOT NULL DEFAULT 8388608")
+    _ensure_column(con, "server_settings", "hysteria_init_connection_receive_window", "INTEGER NOT NULL DEFAULT 20971520")
+    _ensure_column(con, "server_settings", "hysteria_max_connection_receive_window", "INTEGER NOT NULL DEFAULT 20971520")
+    con.execute("UPDATE server_settings SET hysteria_masquerade_headers='{}' WHERE hysteria_masquerade_headers IS NULL OR hysteria_masquerade_headers=''")
+    con.execute("UPDATE server_settings SET hysteria_performance_profile='auto' WHERE hysteria_performance_profile IS NULL OR hysteria_performance_profile NOT IN ('auto','mobile','speed','limited','custom')")
+    con.execute("UPDATE server_settings SET hysteria_congestion='brutal' WHERE hysteria_congestion IS NULL OR hysteria_congestion NOT IN ('reno','bbr','brutal','force-brutal')")
+    con.execute("UPDATE server_settings SET hysteria_bbr_profile='standard' WHERE hysteria_bbr_profile IS NULL OR hysteria_bbr_profile NOT IN ('conservative','standard','aggressive')")
+    con.execute("UPDATE server_settings SET hysteria_brutal_up='0' WHERE hysteria_brutal_up IS NULL OR hysteria_brutal_up=''")
+    con.execute("UPDATE server_settings SET hysteria_brutal_down='0' WHERE hysteria_brutal_down IS NULL OR hysteria_brutal_down=''")
+    con.execute("UPDATE server_settings SET hysteria_max_idle_timeout=30 WHERE hysteria_max_idle_timeout IS NULL OR hysteria_max_idle_timeout < 4 OR hysteria_max_idle_timeout > 120")
+    con.execute("UPDATE server_settings SET hysteria_keepalive_period=0 WHERE hysteria_keepalive_period IS NULL OR (hysteria_keepalive_period != 0 AND (hysteria_keepalive_period < 2 OR hysteria_keepalive_period > 60))")
+    con.execute("UPDATE server_settings SET hysteria_max_incoming_streams=1024 WHERE hysteria_max_incoming_streams IS NULL OR hysteria_max_incoming_streams < 8")
+    con.execute("UPDATE server_settings SET hysteria_udp_hop_interval='30' WHERE hysteria_udp_hop_interval IS NULL OR hysteria_udp_hop_interval=''")
+    con.execute("UPDATE server_settings SET hysteria_init_stream_receive_window=8388608 WHERE hysteria_init_stream_receive_window IS NULL OR hysteria_init_stream_receive_window < 65536")
+    con.execute("UPDATE server_settings SET hysteria_max_stream_receive_window=8388608 WHERE hysteria_max_stream_receive_window IS NULL OR hysteria_max_stream_receive_window < 65536")
+    con.execute("UPDATE server_settings SET hysteria_init_connection_receive_window=20971520 WHERE hysteria_init_connection_receive_window IS NULL OR hysteria_init_connection_receive_window < 65536")
+    con.execute("UPDATE server_settings SET hysteria_max_connection_receive_window=20971520 WHERE hysteria_max_connection_receive_window IS NULL OR hysteria_max_connection_receive_window < 65536")
     con.execute("UPDATE server_settings SET inbound_profile='raw_reality' WHERE inbound_profile IS NULL OR inbound_profile=''")
     con.execute("UPDATE server_settings SET transport_listen='127.0.0.1' WHERE transport_listen IS NULL OR transport_listen=''")
     con.execute("UPDATE server_settings SET transport_port=8443 WHERE transport_port IS NULL OR transport_port=0")
@@ -317,6 +458,12 @@ def _migrate(con: sqlite3.Connection) -> None:
     _ensure_column(con, "routing_rules", "users", "TEXT NOT NULL DEFAULT ''")
 
     # v0.7 DNS tables are created by SCHEMA.
+
+    # v0.10 RC12 contextual DNS JSON preserves fields unknown to the forms.
+    _ensure_column(con, "dns_settings", "extra_json", "TEXT NOT NULL DEFAULT '{}'")
+    _ensure_column(con, "dns_servers", "config_json", "TEXT NOT NULL DEFAULT '{}'")
+    con.execute("UPDATE dns_settings SET extra_json = '{}' WHERE extra_json IS NULL OR extra_json = ''")
+    con.execute("UPDATE dns_servers SET config_json = '{}' WHERE config_json IS NULL OR config_json = ''")
 
     # v0.9.5 VLESS outbound transports and TLS options
     _ensure_column(con, "outbounds", "network", "TEXT NOT NULL DEFAULT 'raw'")

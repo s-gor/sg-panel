@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from xpanel.db import connect, init_db
+from xpanel.db import connect, db_path, init_db, use_db_path
 from xpanel.service import add_user, apply_config, make_link
 
 
@@ -48,6 +48,25 @@ class ServiceTest(unittest.TestCase):
         self.tmp.cleanup()
         os.environ.pop("XPANEL_DB", None)
 
+
+    def test_db_override_is_isolated_and_restored(self):
+        live_path = db_path()
+        candidate = Path(self.tmp.name) / "candidate.db"
+        with use_db_path(candidate):
+            self.assertEqual(db_path(), candidate.resolve())
+            init_db()
+            with connect() as con:
+                con.execute(
+                    "INSERT INTO users (name, uuid) VALUES (?, ?)",
+                    ("Candidate", "44444444-4444-4444-8444-444444444444"),
+                )
+                count = con.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+            self.assertEqual(count, 1)
+        self.assertEqual(db_path(), live_path)
+        with connect() as con:
+            names = [row["name"] for row in con.execute("SELECT name FROM users")]
+        self.assertEqual(names, ["Sergey"])
+
     def test_link(self):
         link = make_link(self.user["id"])
         self.assertTrue(link.startswith("vless://"))
@@ -67,6 +86,50 @@ class ServiceTest(unittest.TestCase):
         result = apply_config()
         self.assertEqual(result["service"], "active")
         self.assertTrue(self.config.exists())
+
+    @patch("xpanel.service.os.geteuid", return_value=0)
+    @patch("xpanel.service.os.chown")
+    @patch("xpanel.service._xray_service_identity", return_value=(65534, 65534))
+    @patch("xpanel.service.subprocess.run")
+    def test_hysteria_apply_uses_managed_private_tls_copy(self, run, _identity, _chown, _geteuid):
+        from xpanel.service import update_server_settings
+
+        root = Path(self.tmp.name)
+        cert = root / "fullchain.pem"
+        key = root / "privkey.pem"
+        cert.write_text("certificate", encoding="utf-8")
+        key.write_text("private-key", encoding="utf-8")
+        runtime_tls = root / "runtime-tls"
+        os.environ["XPANEL_HYSTERIA_TLS_DIR"] = str(runtime_tls)
+        try:
+            update_server_settings(
+                address="vpn.example.com", listen="0.0.0.0", port=443,
+                dest="www.bing.com:443", server_name="vpn.example.com",
+                private_key="private", public_key="public", short_id="0011223344556677",
+                fingerprint="chrome", flow="", loglevel="warning",
+                api_listen="127.0.0.1:10085", stats_enabled=False,
+                config_path=str(self.config), xray_bin=str(self.xray), xray_service="xray",
+                inbound_profile="hysteria2_tls", transport_listen="127.0.0.1",
+                transport_port=8443, xhttp_path="/sg", xhttp_mode="auto",
+                grpc_service_name="sg-grpc", tls_cert_path=str(cert), tls_key_path=str(key),
+                hysteria_udp_idle_timeout=60, hysteria_masquerade_type="",
+                hysteria_masquerade_url="", hysteria_masquerade_content="",
+                hysteria_masquerade_status=404,
+            )
+
+            def side_effect(args, **kwargs):
+                return FakeCompleted()
+
+            run.side_effect = side_effect
+            result = apply_config()
+            self.assertEqual(result["profile"], "hysteria2_tls")
+            payload = __import__("json").loads(self.config.read_text(encoding="utf-8"))
+            tls = payload["inbounds"][0]["streamSettings"]["tlsSettings"]["certificates"][0]
+            self.assertEqual(tls["certificateFile"], str(runtime_tls / "fullchain.pem"))
+            self.assertEqual(tls["keyFile"], str(runtime_tls / "privkey.pem"))
+            self.assertEqual((runtime_tls / "privkey.pem").stat().st_mode & 0o777, 0o640)
+        finally:
+            os.environ.pop("XPANEL_HYSTERIA_TLS_DIR", None)
 
 
 if __name__ == "__main__":
@@ -162,7 +225,38 @@ class V05ServiceTest(unittest.TestCase):
         self.assertEqual(updated["comment"], "new")
         created = create_backup()
         self.assertTrue(created["name"].startswith("sg-panel-"))
-        self.assertEqual(len(list_backups()), 1)
+        self.assertTrue(created["verified"])
+        backups = list_backups()
+        self.assertEqual(len(backups), 1)
+        self.assertTrue(backups[0]["verified"])
+
+    @patch("xpanel.service.require_root")
+    @patch("xpanel.service.apply_config")
+    def test_full_restore_replaces_database_and_applies_config(self, apply_mock, _require_root):
+        from xpanel.service import add_user, create_backup, restore_backup, update_user
+
+        apply_mock.return_value = {
+            "config_path": str(Path(self.tmp.name) / "config.json"),
+            "service": "active",
+        }
+        user = add_user("Original")
+        backup = create_backup()
+        update_user(
+            user["id"],
+            name="Changed",
+            user_uuid=user["uuid"],
+            comment="",
+            expiry_at=None,
+        )
+
+        result = restore_backup(backup["name"])
+
+        with connect() as con:
+            names = [row["name"] for row in con.execute("SELECT name FROM users ORDER BY id")]
+        self.assertEqual(names, ["Original"])
+        self.assertEqual(result["service"], "active")
+        self.assertNotEqual(result["safety"], backup["name"])
+        apply_mock.assert_called_once()
 
 
 class V06OutboundTest(unittest.TestCase):
@@ -537,3 +631,58 @@ class V095OutboundMigrationTest(unittest.TestCase):
                 self.assertFalse(bool(row["allow_insecure"]))
             finally:
                 os.environ.pop("XPANEL_DB", None)
+
+class RC11SystemResourceTest(unittest.TestCase):
+    def test_resource_overview_reports_memory_processes_and_disk(self):
+        from collections import namedtuple
+        from xpanel.service import _system_resource_overview
+
+        usage = namedtuple("usage", "total used free")(1000, 400, 600)
+        with (
+            patch(
+                "xpanel.service._read_meminfo_bytes",
+                return_value={
+                    "MemTotal": 2000,
+                    "MemAvailable": 500,
+                    "SwapTotal": 1000,
+                    "SwapFree": 750,
+                },
+            ),
+            patch("xpanel.service.shutil.disk_usage", return_value=usage),
+            patch("xpanel.service.os.getloadavg", return_value=(0.5, 0.25, 0.1)),
+            patch("xpanel.service.os.cpu_count", return_value=2),
+            patch(
+                "xpanel.service._service_memory_snapshot",
+                side_effect=[
+                    {"current": 256, "peak": 300, "file": 0, "kernel": 0},
+                    {"current": 128, "peak": 140, "file": 0, "kernel": 0},
+                    {"current": 64, "peak": 80, "file": 0, "kernel": 0},
+                ],
+            ),
+        ):
+            result = _system_resource_overview("xray")
+
+        self.assertEqual(result["memory_percent"], 75.0)
+        self.assertEqual(result["swap_percent"], 25)
+        self.assertEqual(result["disk_percent"], 40)
+        self.assertEqual(result["cpu_percent"], 25)
+        self.assertEqual(result["xray_memory_human"], "128 B")
+        self.assertEqual(result["panel_memory_human"], "256 B")
+        self.assertEqual(result["nginx_memory_human"], "64 B")
+        self.assertEqual(sum(item["value"] for item in result["memory_segments"]), 2000)
+        self.assertEqual(result["memory_segments"][-1]["end_percent"], 100.0)
+
+    def test_resource_overview_survives_unavailable_disk_metrics(self):
+        from xpanel.service import _system_resource_overview
+
+        with (
+            patch("xpanel.service._read_meminfo_bytes", return_value={}),
+            patch("xpanel.service.shutil.disk_usage", side_effect=OSError("unavailable")),
+            patch("xpanel.service.os.getloadavg", side_effect=OSError("unavailable")),
+            patch("xpanel.service._service_memory_snapshot", return_value={"current": 0, "peak": 0, "file": 0, "kernel": 0}),
+        ):
+            result = _system_resource_overview("xray")
+
+        self.assertEqual(result["disk_percent"], 0)
+        self.assertEqual(result["memory_percent"], 0)
+        self.assertEqual(result["cpu_percent"], 0)

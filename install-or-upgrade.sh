@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-EXPECTED_VERSION="0.10.0-rc9"
+EXPECTED_VERSION="0.10.0-rc30"
 TARGET="/opt/xpanel-mvp"
 SERVICE="xpanel-web"
 SOURCE_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
@@ -10,6 +10,7 @@ STAMP="$(date +%Y%m%d-%H%M%S)"
 BACKUP_ROOT="/root/sg-panel-backups/$STAMP"
 ROLLBACK_NEEDED=0
 OLD_EXISTS=0
+OLD_XRAY_CONFIG_EXISTS=0
 
 log(){ printf '[SG-Panel] %s\n' "$*"; }
 fail(){ printf '[SG-Panel] ERROR: %s\n' "$*" >&2; exit 1; }
@@ -26,8 +27,13 @@ if [[ -d "$TARGET" ]]; then
   cp -a "$TARGET" "$BACKUP_ROOT/xpanel-mvp"
 fi
 [[ -f /etc/xpanel-mvp/web.env ]] && cp -a /etc/xpanel-mvp/web.env "$BACKUP_ROOT/web.env"
+[[ -f /etc/xpanel-mvp/panel-access.env ]] && cp -a /etc/xpanel-mvp/panel-access.env "$BACKUP_ROOT/panel-access.env"
+[[ -f /etc/xpanel-mvp/install-complete.env ]] && cp -a /etc/xpanel-mvp/install-complete.env "$BACKUP_ROOT/install-complete.env"
 [[ -f /etc/systemd/system/xpanel-web.service ]] && cp -a /etc/systemd/system/xpanel-web.service "$BACKUP_ROOT/xpanel-web.service"
-[[ -f /usr/local/etc/xray/config.json ]] && cp -a /usr/local/etc/xray/config.json "$BACKUP_ROOT/xray-config.json"
+if [[ -f /usr/local/etc/xray/config.json ]]; then
+  OLD_XRAY_CONFIG_EXISTS=1
+  cp -a /usr/local/etc/xray/config.json "$BACKUP_ROOT/xray-config.json"
+fi
 [[ -d /etc/xpanel-mvp/warp ]] && cp -a /etc/xpanel-mvp/warp "$BACKUP_ROOT/warp"
 
 rollback(){
@@ -38,13 +44,22 @@ rollback(){
     rm -rf "$TARGET"
     if [[ $OLD_EXISTS -eq 1 && -d "$BACKUP_ROOT/xpanel-mvp" ]]; then cp -a "$BACKUP_ROOT/xpanel-mvp" "$TARGET"; fi
     if [[ -f "$BACKUP_ROOT/web.env" ]]; then mkdir -p /etc/xpanel-mvp; cp -a "$BACKUP_ROOT/web.env" /etc/xpanel-mvp/web.env; fi
+    if [[ -f "$BACKUP_ROOT/panel-access.env" ]]; then mkdir -p /etc/xpanel-mvp; cp -a "$BACKUP_ROOT/panel-access.env" /etc/xpanel-mvp/panel-access.env; fi
+    if [[ -f "$BACKUP_ROOT/install-complete.env" ]]; then mkdir -p /etc/xpanel-mvp; cp -a "$BACKUP_ROOT/install-complete.env" /etc/xpanel-mvp/install-complete.env; fi
     if [[ -f "$BACKUP_ROOT/xpanel-web.service" ]]; then cp -a "$BACKUP_ROOT/xpanel-web.service" /etc/systemd/system/xpanel-web.service; fi
     if [[ -d "$BACKUP_ROOT/warp" ]]; then
       rm -rf /etc/xpanel-mvp/warp
       mkdir -p /etc/xpanel-mvp
       cp -a "$BACKUP_ROOT/warp" /etc/xpanel-mvp/warp
     fi
+    if [[ -f "$BACKUP_ROOT/xray-config.json" ]]; then
+      mkdir -p /usr/local/etc/xray
+      cp -a "$BACKUP_ROOT/xray-config.json" /usr/local/etc/xray/config.json
+    elif [[ $OLD_XRAY_CONFIG_EXISTS -eq 0 ]]; then
+      rm -f /usr/local/etc/xray/config.json
+    fi
     systemctl daemon-reload || true
+    systemctl restart xray 2>/dev/null || true
     systemctl restart "$SERVICE" 2>/dev/null || true
   fi
   exit "$rc"
@@ -72,6 +87,17 @@ fi
 .venv/bin/pip install --no-cache-dir -q -r requirements.txt
 .venv/bin/python -m xpanel init-db
 
+SERVER_COUNT="$(.venv/bin/python - <<'PY_SERVER_COUNT'
+from xpanel.db import connect
+with connect() as con:
+    print(con.execute("SELECT COUNT(*) FROM server_settings").fetchone()[0])
+PY_SERVER_COUNT
+)"
+if [[ "$SERVER_COUNT" != "0" ]]; then
+  log "Включаю Stats API и безопасно применяю конфигурацию Xray"
+  .venv/bin/python -m xpanel apply
+fi
+
 if [[ ! -f /etc/xpanel-mvp/web.env ]]; then
   log "Первая установка GUI: потребуется пароль администратора"
   bash deploy/install-gui.sh
@@ -98,11 +124,19 @@ PY
   bash deploy/install-maintenance.sh
   systemctl restart "$SERVICE"
 fi
+if [[ "$SERVER_COUNT" != "0" ]]; then
+  .venv/bin/python -m xpanel collect-traffic --online --strict
+fi
 sleep 3
 
 CLI_VERSION="$(cd "$TARGET" && .venv/bin/python -m xpanel --version | awk '{print $2}')"
 [[ "$CLI_VERSION" == "$EXPECTED_VERSION" ]] || fail "CLI сообщает версию $CLI_VERSION"
 systemctl is-active --quiet "$SERVICE" || fail "служба $SERVICE не active"
+systemctl is-active --quiet xpanel-traffic.timer || fail "служба xpanel-traffic.timer не active"
+
+if ! bash deploy/repair-panel-access.sh; then
+  log "WARNING: автоматическое исправление публичного адреса не выполнено; текущий доступ оставлен без изменений"
+fi
 
 BIND="$(grep -E '^XPANEL_BIND_ADDRESS=' /etc/xpanel-mvp/web.env | tail -1 | cut -d= -f2- || true)"
 PORT="$(grep -E '^XPANEL_PORT=' /etc/xpanel-mvp/web.env | tail -1 | cut -d= -f2- || true)"

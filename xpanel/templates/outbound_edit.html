@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from '_fingerprint_select.html' import fingerprint_select %}
 {% block title %}Изменить выход — SG-Panel{% endblock %}
 {% block section %}OUTBOUNDS / EDIT{% endblock %}
 {% block heading %}Изменение выхода{% endblock %}
@@ -19,7 +20,7 @@
       </div>
     </header>
 
-    <form method="post" action="{{ url_for('outbound_edit', outbound_id=outbound.id) }}" class="ob-form outbound-dynamic-form" data-mode="edit">
+    <form method="post" action="{{ url_for('outbound_edit', outbound_id=outbound.id) }}" class="ob-form outbound-dynamic-form" data-mode="edit" data-validated-form>
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <input type="hidden" name="protocol" value="vless">
 
@@ -88,7 +89,7 @@
           <header class="ob-step-header"><span>4</span><div><h3>Защита соединения</h3><p>Параметры должны совпадать с настройками защиты удалённого inbound.</p></div></header>
           <div class="ob-fields ob-fields-security">
             <label><span>Server name / SNI</span><input name="server_name" value="{{ outbound.server_name }}" required></label>
-            <label><span>Fingerprint</span><input name="fingerprint" value="{{ outbound.fingerprint }}" required></label>
+            <label><span>Fingerprint браузера</span>{{ fingerprint_select(outbound.fingerprint) }}</label>
           </div>
 
           <div class="ob-conditional" data-reality-fields {% if outbound.security != 'reality' %}hidden{% endif %}>

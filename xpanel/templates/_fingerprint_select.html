@@ -1,0 +1,27 @@
+{% macro fingerprint_select(value='chrome', name='fingerprint') -%}
+{% set known = ['chrome','brave','edge','firefox','safari','ios','android','opera','vivaldi','360','qq','random','randomized','unsafe'] %}
+<select name="{{ name }}" required class="fingerprint-select">
+  <optgroup label="Браузеры">
+    <option value="chrome" {% if value == 'chrome' %}selected{% endif %}>Google Chrome</option>
+    <option value="brave" {% if value == 'brave' %}selected{% endif %}>Brave (технически Chrome)</option>
+    <option value="edge" {% if value == 'edge' %}selected{% endif %}>Microsoft Edge</option>
+    <option value="firefox" {% if value == 'firefox' %}selected{% endif %}>Mozilla Firefox</option>
+    <option value="safari" {% if value == 'safari' %}selected{% endif %}>Apple Safari</option>
+    <option value="ios" {% if value == 'ios' %}selected{% endif %}>iPhone / iPad (iOS)</option>
+    <option value="android" {% if value == 'android' %}selected{% endif %}>Android</option>
+    <option value="opera" {% if value == 'opera' %}selected{% endif %}>Opera (технически Chrome)</option>
+    <option value="vivaldi" {% if value == 'vivaldi' %}selected{% endif %}>Vivaldi (технически Chrome)</option>
+    <option value="360" {% if value == '360' %}selected{% endif %}>360 Browser</option>
+    <option value="qq" {% if value == 'qq' %}selected{% endif %}>QQ Browser</option>
+  </optgroup>
+  <optgroup label="Автоматический выбор">
+    <option value="random" {% if value == 'random' %}selected{% endif %}>Random — случайный современный браузер</option>
+    <option value="randomized" {% if value == 'randomized' %}selected{% endif %}>Randomized — полностью случайный</option>
+  </optgroup>
+  <optgroup label="Расширенные">
+    <option value="unsafe" {% if value == 'unsafe' %}selected{% endif %}>Go TLS без эмуляции (unsafe)</option>
+    {% if value not in known %}<option value="{{ value }}" selected>Другое текущее значение: {{ value }}</option>{% endif %}
+  </optgroup>
+</select>
+<small>Brave, Opera и Vivaldi используют совместимый технический профиль Chrome.</small>
+{%- endmacro %}

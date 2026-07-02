@@ -1,11 +1,14 @@
 {% extends "base.html" %}
 {% block title %}Подписки — SG-Panel{% endblock %}
-{% block section %}SUBSCRIPTIONS{% endblock %}
-{% block heading %}Подписки пользователей{% endblock %}
-{% block subtitle %}Постоянные ссылки для автоматического обновления VLESS-профилей{% endblock %}
+{% block section %}CLIENTS{% endblock %}
+{% block heading %}Clients{% endblock %}
+{% block subtitle %}Постоянные ссылки для автоматического обновления текущего Inbound-профиля{% endblock %}
 {% block content %}
 <script>document.body.classList.add('ui-standard-page','subscriptions-page');</script>
 <div class="ui-page ui-page-wide">
+  {% if panel_access_global.mode != 'https' %}
+  <div class="ui-warning-note subscription-http-warning"><span>!</span><p><strong>Панель сейчас работает по HTTP.</strong> Токены подписок передаются без TLS. Для публичного сервера сначала включите HTTPS в разделе «Безопасность → Доступ к панели» либо используйте подписки только через доверенную локальную сеть или SSH-туннель.</p></div>
+  {% endif %}
   <section class="ui-top-grid subscriptions-top-grid">
     <article class="ui-card ui-card-form">
       <header class="ui-card-heading">
@@ -49,7 +52,7 @@
 
       <div class="ui-code-list">
         <div><span>Base64</span><code>/sub/TOKEN</code><small>Основной вариант для v2rayN, v2rayNG и совместимых клиентов.</small></div>
-        <div><span>Обычная ссылка</span><code>/sub/TOKEN?format=plain</code><small>VLESS-ссылка без кодирования, удобная для проверки.</small></div>
+        <div><span>Обычная ссылка</span><code>/sub/TOKEN?format=plain</code><small>Текущая прямая ссылка без кодирования, удобная для проверки.</small></div>
         <div><span>JSON</span><code>/sub/TOKEN?format=json</code><small>Структурированный ответ для интеграций.</small></div>
       </div>
 

@@ -56,7 +56,7 @@ class InboundProfilesTest(unittest.TestCase):
             listen="0.0.0.0",
             port=443,
             dest="www.bing.com:443",
-            server_name="vpn.example.com" if profile in {"xhttp_tls", "grpc_tls"} else "www.bing.com",
+            server_name="vpn.example.com" if profile in {"xhttp_tls", "grpc_tls", "hysteria2_tls"} else "www.bing.com",
             private_key="private",
             public_key="public",
             short_id="0011223344556677",
@@ -76,6 +76,11 @@ class InboundProfilesTest(unittest.TestCase):
             grpc_service_name="sg-grpc",
             tls_cert_path=str(self.cert_path),
             tls_key_path=str(self.key_path),
+            hysteria_udp_idle_timeout=60,
+            hysteria_masquerade_type="",
+            hysteria_masquerade_url="",
+            hysteria_masquerade_content="",
+            hysteria_masquerade_status=404,
         )
 
     def test_raw_reality_profile(self):
@@ -137,6 +142,77 @@ class InboundProfilesTest(unittest.TestCase):
         self.assertIn("security=tls", link)
         self.assertIn("serviceName=sg-grpc", link)
 
+
+
+    def test_hysteria2_tls_profile(self):
+        server = self.switch("hysteria2_tls")
+        self.assertEqual(server["flow"], "")
+        config, _server, _users = build_config()
+        inbound = config["inbounds"][0]
+        self.assertEqual(inbound["protocol"], "hysteria")
+        self.assertEqual(inbound["listen"], "0.0.0.0")
+        self.assertEqual(inbound["port"], 443)
+        self.assertEqual(inbound["settings"]["version"], 2)
+        self.assertEqual(inbound["settings"]["users"][0]["auth"], self.user["uuid"])
+        self.assertEqual(inbound["settings"]["users"][0]["email"], "Sergey")
+        stream = inbound["streamSettings"]
+        self.assertEqual(stream["network"], "hysteria")
+        self.assertEqual(stream["security"], "tls")
+        self.assertEqual(stream["hysteriaSettings"]["version"], 2)
+        self.assertEqual(stream["hysteriaSettings"]["udpIdleTimeout"], 60)
+        self.assertEqual(stream["hysteriaSettings"]["masquerade"], {"type": ""})
+        tls = stream["tlsSettings"]
+        self.assertEqual(tls["serverName"], "vpn.example.com")
+        self.assertEqual(tls["certificates"][0]["certificateFile"], str(self.cert_path))
+        self.assertEqual(tls["certificates"][0]["keyFile"], str(self.key_path))
+        link = make_link(self.user["id"])
+        self.assertTrue(link.startswith(f"hysteria2://{self.user['uuid']}@vpn.example.com:443/"))
+        self.assertIn("sni=vpn.example.com", link)
+        self.assertIn("insecure=0", link)
+
+    def test_hysteria2_string_masquerade(self):
+        self.switch("hysteria2_tls")
+        update_server_settings(
+            address="vpn.example.com", listen="0.0.0.0", port=443,
+            dest="www.bing.com:443", server_name="vpn.example.com",
+            private_key="private", public_key="public", short_id="0011223344556677",
+            fingerprint="chrome", flow="", loglevel="warning",
+            api_listen="127.0.0.1:10085", stats_enabled=False,
+            config_path=str(Path(self.tmp.name) / "config.json"), xray_bin="/bin/true",
+            xray_service="xray", inbound_profile="hysteria2_tls",
+            transport_listen="127.0.0.1", transport_port=8443,
+            xhttp_path="/sg-test-path", xhttp_mode="auto", grpc_service_name="sg-grpc",
+            tls_cert_path=str(self.cert_path), tls_key_path=str(self.key_path),
+            hysteria_udp_idle_timeout=90, hysteria_masquerade_type="string",
+            hysteria_masquerade_content="<h1>Not Found</h1>",
+            hysteria_masquerade_status=404,
+        )
+        config, _server, _users = build_config()
+        hysteria = config["inbounds"][0]["streamSettings"]["hysteriaSettings"]
+        self.assertEqual(hysteria["udpIdleTimeout"], 90)
+        self.assertEqual(hysteria["masquerade"]["type"], "string")
+        self.assertEqual(hysteria["masquerade"]["content"], "<h1>Not Found</h1>")
+        self.assertEqual(hysteria["masquerade"]["statusCode"], 404)
+
+    def test_hysteria2_json_round_trip_and_switch_back_to_vless(self):
+        self.switch("hysteria2_tls")
+        document = json.loads(config_json_document())
+        inbound = document["inbounds"][0]
+        self.assertEqual(inbound["_sgPanel"]["profile"], "hysteria2_tls")
+        self.assertIn("users", inbound["settings"])
+        result = update_config_json_document(json.dumps(document))
+        self.assertEqual(result["users"], 1)
+        config, server, _users = build_config()
+        self.assertEqual(server["inbound_profile"], "hysteria2_tls")
+        self.assertEqual(config["inbounds"][0]["protocol"], "hysteria")
+
+        self.switch("raw_reality")
+        config, _server, _users = build_config()
+        inbound = config["inbounds"][0]
+        self.assertEqual(inbound["protocol"], "vless")
+        self.assertIn("clients", inbound["settings"])
+        self.assertNotIn("users", inbound["settings"])
+        self.assertNotIn("hysteriaSettings", inbound["streamSettings"])
 
     def test_xhttp_tls_nginx_config(self):
         server = self.switch("xhttp_tls")

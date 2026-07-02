@@ -1,6 +1,7 @@
 __pycache__/
 *.py[cod]
 .venv/
+.testvenv/
 .pytest_cache/
 *.log
 *.tmp

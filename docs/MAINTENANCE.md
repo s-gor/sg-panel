@@ -12,22 +12,27 @@ sudo apt-get update && sudo apt-get install -y curl ca-certificates unzip && cur
 
 Перед заменой файлов создаётся резервная копия.
 
-## Перенастройка домена или порта
+## Изменение HTTP/HTTPS, домена или порта панели
 
-```bash
-sudo bash /tmp/install-sg-panel.sh --reconfigure
+Откройте:
+
+```text
+Безопасность → Доступ к панели
 ```
 
-Пользователи, UUID, Reality-ключи и база сохраняются.
+Здесь можно:
 
-После смены домена:
+- оставить HTTP для локальной VM или SSH-туннеля;
+- включить HTTPS + Let's Encrypt;
+- изменить IP/hostname или домен;
+- изменить публичный порт панели;
+- вернуться с HTTPS на HTTP.
 
-- обновите A-запись;
-- дождитесь правильного DNS;
-- проверьте новый сертификат;
-- обновите клиентские ссылки или подписки.
+Параметр установщика `--reconfigure` используется только для адреса Xray и Reality target/SNI. Он больше не меняет доступ к панели.
 
 ## Сертификат Let's Encrypt
+
+Этот раздел нужен только после включения HTTPS в «Безопасность → Доступ к панели».
 
 Проверка автоматического продления:
 
@@ -60,15 +65,15 @@ sudo cp /var/www/sg-panel-placeholder/index.default.html /var/www/sg-panel-place
 sudo nginx -t && sudo systemctl reload nginx
 ```
 
-Доступность:
+Доступность после включения HTTPS панели:
 
 ```text
-HTTP 80              во всех профилях
-HTTPS 443            только при XHTTP + TLS
-HTTPS-порт панели    во всех профилях
+HTTP 80              HTTP-01 и страница-заглушка
+выбранный порт        HTTPS-панель
+HTTPS 443             только при XHTTP + TLS
 ```
 
-В профилях REALITY порт `443` занимает Xray, поэтому обычная HTTPS-заглушка на `443` недоступна.
+В профилях REALITY порт `443` занимает Xray. Административная панель всегда остаётся на отдельном выбранном порту.
 
 ## Оптимизация небольшого EC2
 
@@ -100,6 +105,7 @@ systemctl is-active xpanel-web
 systemctl is-active xray
 systemctl is-active nginx
 systemctl is-active xpanel-maintenance.timer
+systemctl is-active xpanel-traffic.timer
 ```
 
 Перезапуск служб для диагностики доступен на странице **Diagnostics**.
@@ -129,3 +135,25 @@ sudo bash deploy/purge-test-server.sh --destroy-test-server
 ```text
 DELETE ALL
 ```
+
+
+## Сбор долговременной статистики трафика
+
+Таймер `xpanel-traffic.timer` запускает коллектор примерно раз в минуту.
+
+Проверка:
+
+```bash
+systemctl status xpanel-traffic.timer --no-pager
+systemctl status xpanel-traffic.service --no-pager
+journalctl -u xpanel-traffic.service -n 50 --no-pager
+```
+
+Ручной запуск:
+
+```bash
+cd /opt/xpanel-mvp
+sudo .venv/bin/python -m xpanel collect-traffic --online
+```
+
+Коллектор не изменяет конфигурацию Xray и не перезапускает службу. Он только читает локальный Stats API и сохраняет прирост в `panel.db`.

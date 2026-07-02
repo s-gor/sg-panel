@@ -128,7 +128,7 @@ print_plan() {
   cat <<'PLAN'
 Будут удалены:
   - SG-Panel, её база из рабочего каталога и виртуальное окружение;
-  - службы xpanel-web и xpanel-maintenance;
+  - службы xpanel-web, xpanel-maintenance и xpanel-traffic;
   - конфигурация Nginx и страница-заглушка SG-Panel;
   - резервирование внешнего порта панели.
 PLAN
@@ -173,12 +173,16 @@ make_final_backup
 log "Останавливаю службы SG-Panel"
 systemctl disable --now xpanel-maintenance.timer 2>/dev/null || true
 systemctl stop xpanel-maintenance.service 2>/dev/null || true
+systemctl disable --now xpanel-traffic.timer 2>/dev/null || true
+systemctl stop xpanel-traffic.service 2>/dev/null || true
 systemctl disable --now xpanel-web.service 2>/dev/null || true
 
 rm -f \
   /etc/systemd/system/xpanel-web.service \
   /etc/systemd/system/xpanel-maintenance.service \
-  /etc/systemd/system/xpanel-maintenance.timer
+  /etc/systemd/system/xpanel-maintenance.timer \
+  /etc/systemd/system/xpanel-traffic.service \
+  /etc/systemd/system/xpanel-traffic.timer
 
 if [[ $REMOVE_XRAY -eq 1 ]]; then
   log "Удаляю Xray по явному параметру --remove-xray"
@@ -218,6 +222,7 @@ rm -f \
   /etc/nginx/sites-available/sg-panel \
   /etc/nginx/sites-available/sg-panel-acme \
   /etc/letsencrypt/renewal-hooks/deploy/reload-sg-panel-nginx.sh
+  /etc/letsencrypt/renewal-hooks/deploy/sync-sg-panel-hysteria-tls.sh
 rm -rf /var/www/sg-panel-placeholder
 
 log "Удаляю резервирование порта SG-Panel"

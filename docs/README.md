@@ -4,9 +4,10 @@
 
 ## Первый запуск
 
-1. [Чистая установка](INSTALLATION.md)
+1. [Установка по IP и позднее включение HTTPS](INSTALLATION.md)
 2. [С чего начать и карта панели](START-HERE.md)
-3. [Пользователи, ссылки и подписки](USERS-AND-SUBSCRIPTIONS.md)
+3. [Clients & Traffic Studio](CLIENTS-TRAFFIC-STUDIO.md)
+4. [Пользователи, ссылки и подписки](USERS-AND-SUBSCRIPTIONS.md)
 
 ## Подключение и движение трафика
 

@@ -94,13 +94,14 @@ Configuration OK.
 ## Проверка служб
 
 ```bash
-systemctl --no-pager --full status xpanel-web xray nginx
+systemctl --no-pager --full status xpanel-web xray nginx xpanel-traffic.timer
 ```
 
 Короткая проверка:
 
 ```bash
 systemctl is-active xpanel-web
+systemctl is-active xpanel-traffic.timer
 systemctl is-active xray
 systemctl is-active nginx
 ```
@@ -111,6 +112,7 @@ SG-Panel:
 
 ```bash
 journalctl -u xpanel-web -n 100 --no-pager
+journalctl -u xpanel-traffic.service -n 100 --no-pager
 ```
 
 Xray:
@@ -144,6 +146,8 @@ curl -sS -o /dev/null -w 'Backend HTTP: %{http_code}\n' http://127.0.0.1:8080/lo
 HTTPS через Nginx:
 
 ```bash
+curl -sS -o /dev/null -w 'HTTP: %{http_code}\n' http://127.0.0.1:61443/login
+# После включения HTTPS:
 curl -k -sS -o /dev/null -w 'HTTPS: %{http_code}\n' https://127.0.0.1:61443/login -H 'Host: ВАШ-ДОМЕН'
 ```
 
@@ -195,7 +199,7 @@ Routing — Не использовать WARP — Сохранить и при�
 ```text
 Outbounds — WARP включён
 Routing — Весь трафик через WARP
-Обзор — Default Outbound WARP
+System → Resources — Default Outbound WARP
 ```
 
 Если используются выборочные домены, IP AWS для остальных сайтов является нормальным.
@@ -204,7 +208,7 @@ Routing — Весь трафик через WARP
 
 Проверьте:
 
-- URL начинается с `https://`, а не с `vless://`;
+- URL начинается с `http://` или `https://`, а не с `vless://`;
 - глобальная выдача подписок включена;
 - подписка конкретного пользователя включена;
 - токен не был заменён кнопкой **«Новый токен»**;
@@ -222,3 +226,7 @@ Routing — Весь трафик через WARP
 - private key REALITY;
 - WARP private key;
 - полные URL подписок.
+
+## Диагностика Hysteria 2
+
+При выбранном профиле Hysteria 2 раздел портов показывает и TCP, и UDP listeners. Основной listener должен присутствовать в выводе `ss -lnup` на публичном порту. Отсутствие UDP-правила в AWS Security Group не видно изнутри сервера, поэтому после успешного `xray run -test` требуется отдельный тест внешним клиентом.

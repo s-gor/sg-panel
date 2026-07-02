@@ -1,8 +1,8 @@
 {% extends "base.html" %}
 {% block title %}Безопасность — SG-Panel{% endblock %}
-{% block section %}SECURITY & ACCESS{% endblock %}
-{% block heading %}Безопасность панели{% endblock %}
-{% block subtitle %}Сессии, защита входа, IP allowlist и доступ к подпискам{% endblock %}
+{% block section %}SECURITY{% endblock %}
+{% block heading %}Security{% endblock %}
+{% block subtitle %}Безопасность панели: доступ, сессии, IP allowlist и подписки{% endblock %}
 {% block content %}
 <!-- ADMIN SESSIONS -->
 <script>document.body.classList.add('ui-standard-page','security-page');</script>
@@ -10,9 +10,71 @@
   <section class="ui-security-summary">
     <article class="ui-status-card"><span>Активные сессии</span><strong>{{ overview.active_sessions }}</strong><small>Текущая отмечена в таблице</small></article>
     <article class="ui-status-card"><span>Ошибки входа, 24 ч</span><strong>{{ overview.failed_logins_24h }}</strong><small>Блокировка работает по IP</small></article>
-    <article class="ui-status-card"><span>HTTPS</span><strong class="{% if request_is_secure %}text-success{% else %}text-warning{% endif %}">{{ 'Включён' if request_is_secure else 'Выключен' }}</strong><small>Secure cookie: {{ 'включена' if secure_cookies else 'выключена' }}</small></article>
-    <article class="ui-status-card"><span>Listen панели</span><strong class="ui-value-compact mono">{{ panel_bind }}:{{ panel_port }}</strong><small>Текущий IP: {{ current_ip }}</small></article>
+    <article class="ui-status-card"><span>Публичный доступ</span><strong class="{{ 'text-success' if panel_access.mode == 'https' else 'text-warning' }}">{{ panel_access.mode|upper }}</strong><small>{{ panel_access.host }}:{{ panel_access.port }}</small></article>
+    <article class="ui-status-card"><span>Backend панели</span><strong class="ui-value-compact mono">{{ panel_bind }}:{{ panel_port }}</strong><small>Текущий IP: {{ current_ip }}</small></article>
   </section>
+
+  <section class="ui-card ui-action-card panel-access-card">
+    <header class="ui-card-heading ui-card-heading-row">
+      <div>
+        <p class="panel-kicker">ДОСТУП К ПАНЕЛИ</p>
+        <h2>HTTP или HTTPS</h2>
+        <p>Начальная установка работает по HTTP. Домен и сертификат можно добавить позже, когда сервер уже проверен.</p>
+      </div>
+      <span class="pill {{ 'enabled' if panel_access.mode == 'https' else 'warning' }}"><i></i>{{ panel_access.mode|upper }}</span>
+    </header>
+    <div class="panel-access-current">
+      <span>Текущий адрес</span>
+      <a class="mono" href="{{ panel_access.url }}">{{ panel_access.url }}</a>
+      <small>Backend остаётся на 127.0.0.1:{{ panel_port }} и напрямую наружу не публикуется.</small>
+    </div>
+    <form method="post" action="{{ url_for('panel_access_start') }}" class="ui-form" id="panel-access-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="ui-field-grid security-fields">
+        <label><span>Режим</span>
+          <select name="panel_access_mode" id="panel-access-mode">
+            <option value="http" {% if panel_access.mode == 'http' %}selected{% endif %}>HTTP — первоначальная проверка</option>
+            <option value="https" {% if panel_access.mode == 'https' %}selected{% endif %}>HTTPS + Let's Encrypt</option>
+          </select>
+        </label>
+        <label><span id="panel-access-host-label">{{ 'Домен панели' if panel_access.mode == 'https' else 'IP или имя сервера' }}</span>
+          <input name="panel_access_host" id="panel-access-host" value="{{ panel_access.host }}" required>
+          <small id="panel-access-host-help">{{ 'A-запись должна указывать на публичный IP сервера.' if panel_access.mode == 'https' else 'Например: 192.168.1.200 или публичный IP EC2.' }}</small>
+        </label>
+        <label><span>Публичный TCP-порт панели</span>
+          <input type="number" min="49152" max="65535" name="panel_access_port" value="{{ panel_access.port }}" required>
+          <small>Откройте этот порт только для своего IP или локальной сети.</small>
+        </label>
+      </div>
+      <div class="ui-warning-note" id="panel-access-https-note">
+        <span>!</span><p>Для Let's Encrypt заранее откройте TCP 80. Порт 443 остаётся у Xray; HTTPS-панель продолжит работать на выбранном отдельном порту.</p>
+      </div>
+      <div class="ui-actions"><button class="button primary" type="submit">Сохранить и применить</button></div>
+    </form>
+  </section>
+  <script>
+  (() => {
+    const mode = document.getElementById('panel-access-mode');
+    const label = document.getElementById('panel-access-host-label');
+    const help = document.getElementById('panel-access-host-help');
+    const note = document.getElementById('panel-access-https-note');
+    const hostInput = document.getElementById('panel-access-host');
+    const httpDefaultHost = {{ xray_address|tojson }};
+    const initialMode = {{ panel_access.mode|tojson }};
+    const initialHost = {{ panel_access.host|tojson }};
+    function refreshPanelAccessForm(fromUser = false) {
+      const https = mode.value === 'https';
+      label.textContent = https ? 'Домен панели' : 'IP или имя сервера';
+      help.textContent = https ? 'A-запись должна указывать на публичный IP сервера.' : 'Лучше использовать IP или локальное имя. Это также обходит старую HSTS-запись домена.';
+      note.style.display = https ? '' : 'none';
+      if (fromUser && !https && initialMode === 'https' && hostInput.value.trim() === initialHost) {
+        hostInput.value = httpDefaultHost;
+      }
+    }
+    mode.addEventListener('change', () => refreshPanelAccessForm(true));
+    refreshPanelAccessForm();
+  })();
+  </script>
 
   <section class="ui-card ui-action-card security-password-card">
     <header class="ui-card-heading"><div><p class="panel-kicker">ДОСТУП К ПАНЕЛИ</p><h2>Сменить пароль</h2><p>После смены пароля все административные сессии будут завершены.</p></div></header>
@@ -55,13 +117,13 @@
     <aside class="ui-card security-status-card">
       <header class="ui-card-heading"><div><p class="panel-kicker">СОСТОЯНИЕ</p><h2>Текущие предупреждения</h2><p>Проверка основных параметров доступа.</p></div></header>
       <div class="security-checks">
-        <div class="security-check {% if request_is_secure %}ok{% else %}warn{% endif %}"><strong>HTTPS</strong><span>{{ 'Соединение защищено' if request_is_secure else 'Панель открыта по HTTP' }}</span></div>
+        <div class="security-check {% if panel_access.mode == 'https' %}ok{% else %}warn{% endif %}"><strong>Публичный режим</strong><span>{{ panel_access.mode|upper }} · {{ panel_access.host }}:{{ panel_access.port }}</span></div>
         <div class="security-check {% if settings.allowlist_enabled %}ok{% else %}warn{% endif %}"><strong>IP allowlist</strong><span>{{ 'Включён' if settings.allowlist_enabled else 'Выключен' }}</span></div>
         <div class="security-check {% if panel_bind in ['127.0.0.1','::1'] %}ok{% else %}warn{% endif %}"><strong>Listen</strong><span>{{ panel_bind }}:{{ panel_port }}</span></div>
         <div class="security-check {% if secure_cookies %}ok{% else %}warn{% endif %}"><strong>Secure cookie</strong><span>{{ 'Включена' if secure_cookies else 'Выключена для HTTP' }}</span></div>
       </div>
-      <div class="ui-warning-note"><span>!</span><p>Для удалённого управления безопаснее использовать SSH-туннель или отдельный HTTPS-порт.</p></div>
-      <pre class="command-box">ssh -L 8080:127.0.0.1:8080 user@SERVER_IP</pre>
+      <div class="ui-warning-note"><span>!</span><p>HTTP подходит для локальной VM или доступа через SSH-туннель. Для публичного сервера включите HTTPS либо ограничьте порт своим IP.</p></div>
+      <pre class="command-box">ssh -L {{ panel_access.port }}:127.0.0.1:{{ panel_access.port }} user@SERVER_IP</pre>
     </aside>
   </section>
 

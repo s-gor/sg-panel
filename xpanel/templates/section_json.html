@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}{{ page_title }} — SG-Panel{% endblock %}
+{% block section %}{{ page_section }}{% endblock %}
+{% block heading %}{{ page_heading }}{% endblock %}
+{% block subtitle %}{{ page_subtitle }}{% endblock %}
+{% block content %}
+<script>document.body.classList.add('ui-standard-page','json-workbench-page','validated-json-page');</script>
+<div class="ui-page json-workbench">
+  <section class="ui-card json-workbench-card">
+    <header class="ui-card-heading ui-card-heading-row"><div><p class="panel-kicker">{{ kicker }}</p><h2>{{ card_title }}</h2><p>{{ description }}</p></div><span class="json-mode-badge">{ } JSON</span></header>
+
+    <div class="json-callout validation-policy-callout"><strong>Сначала проверка, только затем сохранение</strong><span>Черновик применяется к временной копии SQLite, из неё создаётся полный config.json и выполняется <code>xray run -test</code>. Рабочая конфигурация во время проверки не меняется.</span></div>
+
+    <form method="post" action="{{ form_action }}" class="json-editor-form" data-validated-form>
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="editor-toolbar"><div><b>Current JSON</b><span>Основной экспертный инструмент</span></div><div class="editor-toolbar-actions" data-validation-toolbar><button class="button ghost small" type="button" data-format-json>Форматировать</button><button class="button ghost small" type="button" data-sync-json>Синхронизировать</button></div></div>
+      <label class="json-editor-label" for="json_config">{{ json_label }}</label>
+      <textarea id="json_config" name="json_config" class="json-editor json-editor-tall" spellcheck="false">{{ json_config }}</textarea>
+      <div class="editor-status" data-editor-status><span class="is-synced">✓ JSON синхронизирован с текущим состоянием</span><span>Любое изменение требует новой проверки</span></div>
+      <div class="json-editor-actions"><a class="button secondary" href="{{ back_url }}">Назад</a><button class="button primary" type="submit">Сохранить и применить</button></div>
+    </form>
+  </section>
+</div>
+<script>
+(() => {
+  const editor = document.getElementById('json_config');
+  document.querySelector('[data-format-json]')?.addEventListener('click', () => {
+    try { editor.value = JSON.stringify(JSON.parse(editor.value), null, 2) + '\n'; editor.dispatchEvent(new Event('input', {bubbles: true})); }
+    catch (error) { alert('JSON содержит ошибку: ' + error.message); }
+  });
+  document.querySelector('[data-sync-json]')?.addEventListener('click', () => {
+    if (confirm('Заменить несохранённый текст актуальным JSON из панели?')) location.reload();
+  });
+})();
+</script>
+{% endblock %}
