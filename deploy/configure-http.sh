@@ -8,6 +8,8 @@ NGINX_CONF="/etc/nginx/sites-available/sg-panel"
 NGINX_LINK="/etc/nginx/sites-enabled/sg-panel"
 STATE_FILE="/etc/xpanel-mvp/panel-access.env"
 INSTALL_MARKER="/etc/xpanel-mvp/install-complete.env"
+PLACEHOLDER_SOURCE="/opt/xpanel-mvp/assets/placeholders/sg-dark/index.html"
+PLACEHOLDER_ROOT="/var/www/sg-panel-placeholder"
 BACKUP_DIR=""
 COMMITTED=0
 
@@ -134,9 +136,30 @@ reserve_port
 BACKEND_PORT="$(grep -E '^XPANEL_PORT=' "$ENV_FILE" | tail -1 | cut -d= -f2- || true)"
 BACKEND_PORT="${BACKEND_PORT:-8080}"
 
-log "Настраиваю Nginx: HTTP :$PUBLIC_PORT -> 127.0.0.1:$BACKEND_PORT"
-mkdir -p /etc/nginx/sites-available /etc/nginx/sites-enabled
+log "Настраиваю Nginx: заглушка :80 и панель :$PUBLIC_PORT -> 127.0.0.1:$BACKEND_PORT"
+mkdir -p /etc/nginx/sites-available /etc/nginx/sites-enabled "$PLACEHOLDER_ROOT"
+[[ -f "$PLACEHOLDER_SOURCE" ]] || fail "не найден шаблон страницы-заглушки: $PLACEHOLDER_SOURCE"
+install -m 0644 "$PLACEHOLDER_SOURCE" "$PLACEHOLDER_ROOT/index.default.html"
+if [[ ! -f "$PLACEHOLDER_ROOT/index.html" ]]; then
+  install -m 0644 "$PLACEHOLDER_SOURCE" "$PLACEHOLDER_ROOT/index.html"
+fi
 cat > "$NGINX_CONF" <<EOF_NGINX
+server {
+    listen 80;
+    listen [::]:80;
+    server_name _;
+
+    location / {
+        root $PLACEHOLDER_ROOT;
+        index index.html;
+        try_files \$uri \$uri/ /index.html;
+        add_header Cache-Control "no-cache" always;
+        add_header X-Content-Type-Options nosniff always;
+        add_header X-Frame-Options DENY always;
+        add_header Referrer-Policy no-referrer always;
+    }
+}
+
 server {
     listen $PUBLIC_PORT;
     listen [::]:$PUBLIC_PORT;
@@ -231,9 +254,11 @@ for _ in {1..30}; do
   sleep 1
 done
 curl -fsS --max-time 5 -H "Host: $HOST" "http://127.0.0.1:$PUBLIC_PORT/login" >/dev/null
+curl -fsS --max-time 5 -H "Host: $HOST" "http://127.0.0.1/" | grep -q "SG Digital Systems"
 
 COMMITTED=1
 trap - ERR INT TERM
 rm -rf "$BACKUP_DIR"
 log "HTTP настроен: http://$HOST:$PUBLIC_PORT"
+log "Страница-заглушка: http://$HOST"
 log "Backend: 127.0.0.1:$BACKEND_PORT"

@@ -117,7 +117,7 @@ rm -rf \
 
 packages=()
 for package in \
-  nginx nginx-common nginx-core nginx-full nginx-light \
+  nginx nginx-common nginx-core nginx-full nginx-light libnginx-mod-stream \
   certbot python3-certbot python3-certbot-nginx python3-acme; do
   if dpkg-query -W -f='${db:Status-Abbrev}' "$package" 2>/dev/null | grep -q '^ii'; then
     packages+=("$package")

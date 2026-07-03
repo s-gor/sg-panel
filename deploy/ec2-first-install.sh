@@ -418,7 +418,7 @@ install_system_packages(){
     curl ca-certificates unzip rsync zstd \
     python3 python3-venv python3-pip \
     sqlite3 jq iproute2 dnsutils \
-    nginx certbot openssl
+    nginx libnginx-mod-stream certbot openssl
 }
 
 install_xray_stage(){

@@ -11,6 +11,7 @@ NGINX_CONF="/etc/nginx/sites-available/sg-panel"
 ACME_ROOT="/var/www/letsencrypt"
 PLACEHOLDER_SOURCE="/opt/xpanel-mvp/assets/placeholders/sg-dark/index.html"
 PLACEHOLDER_ROOT="/var/www/sg-panel-placeholder"
+REALITY_EDGE_STATE="/etc/xpanel-mvp/reality-edge.env"
 
 usage(){
   cat <<'USAGE'
@@ -20,9 +21,9 @@ usage(){
     --key /etc/letsencrypt/live/panel.example.com/privkey.pem \
     [--port 61443] [--mode full|subscriptions-only]
 
-Порт 443 остаётся у Xray Reality. Для панели по умолчанию используется
-private/dynamic порт 61443. Скрипт резервирует выбранный порт в Linux,
-переводит backend на 127.0.0.1 и настраивает Nginx.
+Публичный порт 443 остаётся точкой входа клиентов. Для REALITY Nginx
+маршрутизирует клиентский SNI к локальному Xray, а обычный HTTPS — к
+странице-заглушке. Панель использует отдельный выбранный порт.
 USAGE
 }
 
@@ -52,6 +53,10 @@ done
 [[ -f "$CERT" ]] || { echo "Не найден сертификат: $CERT" >&2; exit 1; }
 [[ -f "$KEY" ]] || { echo "Не найден ключ: $KEY" >&2; exit 1; }
 command -v nginx >/dev/null || { echo "Сначала установите nginx" >&2; exit 1; }
+if ! dpkg-query -W -f='${Status}' libnginx-mod-stream 2>/dev/null | grep -q 'install ok installed'; then
+  apt-get update
+  DEBIAN_FRONTEND=noninteractive apt-get install -y libnginx-mod-stream
+fi
 
 case "$HTTPS_PORT" in
   22|80|443|8080) echo "Порт $HTTPS_PORT зарезервирован для другого назначения" >&2; exit 1 ;;
@@ -238,6 +243,29 @@ PYSEC
 bash /opt/xpanel-mvp/deploy/install-service.sh
 systemctl restart xpanel-web
 
+CURRENT_PROFILE="$(sqlite3 /opt/xpanel-mvp/data/panel.db 'SELECT inbound_profile FROM server_settings WHERE id=1;' 2>/dev/null || true)"
+REALITY_SNI="$(sqlite3 /opt/xpanel-mvp/data/panel.db 'SELECT server_name FROM server_settings WHERE id=1;' 2>/dev/null || true)"
+if [[ "$CURRENT_PROFILE" == "raw_reality" || "$CURRENT_PROFILE" == "xhttp_reality" ]]; then
+  if [[ "${REALITY_SNI,,}" == "${DOMAIN,,}" ]]; then
+    echo "Reality SNI должен отличаться от домена локальной HTTPS-заглушки" >&2
+    exit 1
+  fi
+fi
+mkdir -p "$(dirname "$REALITY_EDGE_STATE")"
+cat > "$REALITY_EDGE_STATE" <<EOF_EDGE
+ENABLED=1
+DOMAIN=$DOMAIN
+CERT=$CERT
+KEY=$KEY
+XRAY_PORT=8444
+WEB_PORT=9443
+UPDATED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+EOF_EDGE
+chmod 600 "$REALITY_EDGE_STATE"
+
+cd /opt/xpanel-mvp
+.venv/bin/python -m xpanel apply >/dev/null
+
 wait_for_backend(){
   local attempt
   log_prefix='[SG-Panel HTTPS]'
@@ -272,8 +300,25 @@ wait_for_https(){
   return 1
 }
 
+wait_for_fallback(){
+  local attempt
+  printf '%s %s\n' '[SG-Panel HTTPS]' "Проверяю локальную HTTPS-заглушку https://$DOMAIN/"
+  for ((attempt=1; attempt<=15; attempt++)); do
+    if curl -kfsS --max-time 5 \
+      --resolve "$DOMAIN:443:127.0.0.1" \
+      "https://$DOMAIN/" | grep -q 'SG Digital Systems'; then
+      return 0
+    fi
+    sleep 1
+  done
+  printf '%s %s\n' '[SG-Panel HTTPS]' "ERROR: HTTPS-заглушка на TCP 443 не стала доступна" >&2
+  nginx -T >&2 2>/dev/null || true
+  return 1
+}
+
 wait_for_backend || exit 1
 wait_for_https || exit 1
+wait_for_fallback || exit 1
 bash /opt/xpanel-mvp/deploy/repair-panel-access.sh
 
 mkdir -p /etc/letsencrypt/renewal-hooks/deploy
@@ -287,5 +332,5 @@ echo "HTTPS настроен: https://$DOMAIN:$HTTPS_PORT"
 echo "Backend: 127.0.0.1:$BACKEND_PORT"
 echo "Режим: $MODE"
 echo "Порт $HTTPS_PORT зарезервирован в net.ipv4.ip_local_reserved_ports"
-echo "Страница-заглушка: http://$DOMAIN"
+echo "Страница-заглушка: http://$DOMAIN и https://$DOMAIN"
 echo "Файл страницы: $PLACEHOLDER_ROOT/index.html"

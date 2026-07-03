@@ -1,232 +1,161 @@
-# Diagnostics и поиск неисправностей
-
-## Обзор и Diagnostics выполняют разные задачи
-
-### Обзор
-
-Отвечает на вопрос:
-
-```text
-Всё ли сейчас работает?
-```
-
-Показывает краткое состояние и не содержит служебных операций.
-
-### Diagnostics
-
-Отвечает на вопрос:
-
-```text
-Почему не работает и где искать причину?
-```
-
-Содержит подробные проверки, журналы и перезапуск служб.
+# Диагностика и поиск неисправностей
 
 ## Что проверять сначала
 
-Откройте **Diagnostics** и проверьте:
+1. `System → Status & Services`;
+2. `System → Logs & Diagnostics`;
+3. результат `xray run -test`;
+4. активный Inbound-профиль;
+5. клиентскую ссылку после последнего изменения;
+6. Security Group/firewall;
+7. реальное соединение одного клиента.
 
-```text
-Xray service       active
-Nginx service      active
-SG-Panel service   active
-config.json        OK
-```
-
-Если WARP используется:
-
-```text
-WARP               работает
-Default Outbound   warp
-```
-
-## Проверка после изменения Inbound
-
-### RAW/TCP + REALITY
-
-```bash
-ss -ltnp | grep ':443'
-```
-
-Ожидается Xray на `443`.
-
-### XHTTP + TLS
-
-```bash
-ss -ltnp | grep -E ':443|:8443'
-```
-
-Ожидается:
-
-```text
-Nginx на 443
-Xray на 127.0.0.1:8443
-```
-
-### XHTTP + REALITY
-
-```bash
-ss -ltnp | grep ':443'
-```
-
-Ожидается Xray на `443`.
-
-## Проверка config.json
-
-Через интерфейс:
-
-```text
-Xray Config — Проверить JSON
-```
-
-Через SSH:
-
-```bash
-/usr/local/bin/xray run -test -config /usr/local/etc/xray/config.json
-```
-
-Ожидается:
-
-```text
-Configuration OK.
-```
-
-## Проверка служб
-
-```bash
-systemctl --no-pager --full status xpanel-web xray nginx xpanel-traffic.timer
-```
-
-Короткая проверка:
+## Команды базовой проверки
 
 ```bash
 systemctl is-active xpanel-web
-systemctl is-active xpanel-traffic.timer
 systemctl is-active xray
 systemctl is-active nginx
+systemctl is-active xpanel-traffic.timer
+curl -fsS http://127.0.0.1:8080/login >/dev/null
+sudo /usr/local/bin/xray run -test -config /usr/local/etc/xray/config.json
 ```
 
-## Журналы
-
-SG-Panel:
+## Порты
 
 ```bash
-journalctl -u xpanel-web -n 100 --no-pager
-journalctl -u xpanel-traffic.service -n 100 --no-pager
+sudo ss -lntup
 ```
 
-Xray:
+Ожидайте:
 
-```bash
-journalctl -u xray -n 100 --no-pager
-```
+- backend SG-Panel на `127.0.0.1:8080`;
+- панель/Nginx на выбранном публичном порту;
+- активную точку Xray или Nginx на TCP `443`;
+- UDP `443` при активной Hysteria 2;
+- локальный `127.0.0.1:8443` для XHTTP/gRPC TLS.
 
-Nginx:
-
-```bash
-journalctl -u nginx -n 100 --no-pager
-```
-
-Дополнительный журнал ошибок Nginx:
-
-```bash
-tail -n 100 /var/log/nginx/error.log
-```
-
-## Проверка панели
-
-Backend:
-
-```bash
-curl -sS -o /dev/null -w 'Backend HTTP: %{http_code}\n' http://127.0.0.1:8080/login
-```
-
-Ожидается HTTP-код `200`.
-
-HTTPS через Nginx:
-
-```bash
-curl -sS -o /dev/null -w 'HTTP: %{http_code}\n' http://127.0.0.1:61443/login
-# После включения HTTPS:
-curl -k -sS -o /dev/null -w 'HTTPS: %{http_code}\n' https://127.0.0.1:61443/login -H 'Host: ВАШ-ДОМЕН'
-```
-
-Код `502` означает, что Nginx работает, но backend `127.0.0.1:8080` не отвечает.
-
-## Проверка WARP
-
-Нажмите:
-
-```text
-Diagnostics — Проверить WARP
-```
-
-или:
-
-```text
-Outbounds — Проверить WARP
-```
-
-Ожидается:
-
-```text
-WARP on, IP ...
-```
-
-Если тест зависает и завершается timeout:
-
-1. проверьте endpoint в Diagnostics;
-2. рабочее значение для EC2 без IPv6-маршрута: `162.159.192.1:2408`;
-3. проверьте исходящий UDP;
-4. не включайте WARP в Routing, пока отдельный тест не проходит.
-
-## Сайты не открываются после включения WARP
-
-Верните рабочий маршрут через панель:
-
-```text
-Routing — Не использовать WARP — Сохранить и применить
-```
-
-После восстановления проверьте WARP отдельно.
-
-Не удаляйте профиль WARP до получения результата теста.
-
-## Клиент показывает IP AWS вместо WARP
+## RAW/TCP + REALITY не подключается
 
 Проверьте:
 
-```text
-Outbounds — WARP включён
-Routing — Весь трафик через WARP
-System → Resources — Default Outbound WARP
+- TCP `443` открыт;
+- Reality private/public key соответствуют друг другу;
+- short ID совпадает;
+- SNI и fingerprint совпадают с клиентом;
+- target доступен с сервера;
+- после включения fallback клиент использует актуальный адрес и SNI.
+
+## XHTTP + REALITY не подключается
+
+Дополнительно проверьте:
+
+- path совпадает;
+- `mode: auto` сохранён;
+- клиент поддерживает используемую реализацию XHTTP;
+- fallback не направляет Reality SNI в обычную заглушку.
+
+## XHTTP + TLS или gRPC + TLS не подключается
+
+Проверьте:
+
+- сертификат действителен;
+- домен указывает на сервер;
+- Nginx слушает TCP `443`;
+- Xray слушает локальный `8443`;
+- path или service name совпадает;
+- HTTP/2 включён для gRPC;
+- обычный `curl https://DOMAIN/` показывает заглушку.
+
+## Hysteria 2 не подключается
+
+Проверьте:
+
+- UDP `443` или выбранный порт открыт;
+- клиент поддерживает Hysteria 2;
+- TLS domain/SNI совпадают;
+- сертификат действителен;
+- auth соответствует клиенту;
+- port hopping диапазон одинаков на сервере, клиенте и firewall;
+- ручная проверка Hysteria Studio прошла.
+
+## Панель не открывается
+
+На сервере:
+
+```bash
+systemctl status xpanel-web --no-pager
+systemctl status nginx --no-pager
+curl -I http://127.0.0.1:8080/login
+sudo nginx -t
 ```
 
-Если используются выборочные домены, IP AWS для остальных сайтов является нормальным.
+Проверьте правильный HTTP/HTTPS URL и порт в `/etc/xpanel-mvp/panel-access.env`.
+
+## Ошибка после включения HTTPS
+
+Проверьте:
+
+```bash
+dig +short panel.example.com
+sudo certbot certificates
+sudo nginx -t
+sudo journalctl -u nginx -n 100 --no-pager
+```
+
+TCP `80` должен быть доступен для HTTP-01.
+
+## WARP не работает
+
+Проверьте:
+
+1. WARP-профиль существует и включён;
+2. тест WARP проходит;
+3. режим выбран в Traffic Rules;
+4. `warp` является целью правила или Default Outbound;
+5. сервер имеет доступ к endpoint WARP.
+
+Создание WARP без изменения маршрутизации не меняет внешний IP клиента.
+
+## Traffic Rule не срабатывает
+
+Проверьте:
+
+- порядок правил;
+- формат `domain:`, `full:`, `geosite:` или CIDR;
+- Sniffing и Route only;
+- `domainStrategy`;
+- наличие geoip/geosite файлов;
+- ожидаемый Outbound включён.
+
+## Трафик клиента равен нулю
+
+```bash
+systemctl is-active xpanel-traffic.timer
+cd /opt/xpanel-mvp
+sudo .venv/bin/python -m xpanel collect-traffic --online --strict
+```
+
+Убедитесь, что клиент действительно передал данные после последнего измерения.
 
 ## Подписка не обновляется
 
-Проверьте:
+- проверьте, что подписка включена;
+- убедитесь, что используется текущий token;
+- проверьте HTTPS и allowlist подписок;
+- вручную откройте URL в браузере;
+- обновите подписку в клиенте, а не только перезапустите соединение.
 
-- URL начинается с `http://` или `https://`, а не с `vless://`;
-- глобальная выдача подписок включена;
-- подписка конкретного пользователя включена;
-- токен не был заменён кнопкой **«Новый токен»**;
-- порт панели доступен клиенту;
-- subscription allowlist разрешает IP клиента.
+## Журналы
+
+```bash
+sudo journalctl -u xpanel-web -n 200 --no-pager
+sudo journalctl -u xray -n 200 --no-pager
+sudo journalctl -u nginx -n 200 --no-pager
+```
+
+Не публикуйте полный `config.json`, private keys, UUID, subscription tokens и резервные копии.
 
 ## Диагностический отчёт
 
-На странице **Diagnostics** нажмите **«Скачать отчёт»**.
-
-Перед публикацией отчёта проверьте его содержимое. Не добавляйте к нему:
-
-- резервные копии;
-- `panel.db`;
-- private key REALITY;
-- WARP private key;
-- полные URL подписок.
-
-## Диагностика Hysteria 2
-
-При выбранном профиле Hysteria 2 раздел портов показывает и TCP, и UDP listeners. Основной listener должен присутствовать в выводе `ss -lnup` на публичном порту. Отсутствие UDP-правила в AWS Security Group не видно изнутри сервера, поэтому после успешного `xray run -test` требуется отдельный тест внешним клиентом.
+Скачайте отчёт из `System → Logs & Diagnostics`. Перед отправкой проверьте его на наличие адресов и других данных, которые вы не хотите публиковать.

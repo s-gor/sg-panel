@@ -18,7 +18,7 @@
   <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}?v={{ xpanel_version }}">
   <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='apple-touch-icon.png') }}?v={{ xpanel_version }}">
 <title>Вход — SG-Panel</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}?v={{ xpanel_version }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}?v={{ xpanel_version }}-rc30hf7-ui">
 </head>
 <body class="login-body">
   <div class="login-theme-switch" aria-label="Тема"><button type="button" data-login-theme="system" title="Системная тема">◐</button><button type="button" data-login-theme="light" title="Светлая тема">☀</button><button type="button" data-login-theme="dark" title="Тёмная тема">☾</button></div>
@@ -33,8 +33,7 @@
       <div class="login-logo" aria-hidden="true">
         <svg viewBox="0 0 64 64" role="img">
           <path d="M32 4 54 16v32L32 60 10 48V16L32 4Z" class="logo-hex"/>
-          <path d="M40.5 20.5H27.2c-4.6 0-7.2 2.5-7.2 6.2 0 3.4 2.2 5.2 6.4 6l8.5 1.2c2 .3 2.9 1.1 2.9 2.4 0 1.6-1.2 2.6-3.5 2.6H20.5v5h14.2c5.6 0 8.8-2.8 8.8-7.1 0-3.8-2.4-5.8-7.2-6.5l-8.1-1.2c-1.8-.3-2.6-.9-2.6-2.1 0-1.4 1.1-2.3 3.1-2.3h11.8v-4.2Z" class="logo-s"/>
-          <path d="M45.5 29.8h-9v4.4h4.1v5.1c-1.6.7-3.4 1-5.3 1-5.1 0-8.5-3.1-8.5-8.3 0-4.9 3.2-8.2 8.3-8.2 2.4 0 4.5.7 6.4 2l2.6-4.2c-2.7-1.8-5.7-2.7-9.2-2.7-8.3 0-14 5.3-14 13.2 0 8 5.5 13 14.2 13 4.1 0 7.6-1 10.4-2.7V29.8Z" class="logo-g"/>
+          <text x="32" y="39" text-anchor="middle" class="logo-sg">SG</text>
         </svg>
       </div>
       <div class="login-brand-copy">

@@ -1,148 +1,146 @@
 # Схемы движения трафика
 
-Эта страница показывает, где начинается соединение, какие службы его принимают и через какой Outbound оно выходит.
-
 ## Общая схема
 
 ```text
-Клиент — Inbound — Xray — Routing — Outbound — Интернет
+Клиент → Inbound → Xray → Traffic Rules → Outbound → Интернет
 ```
 
-Inbound и Outbound не являются взаимоисключающими настройками:
+- **Inbound** принимает соединение клиента;
+- **Traffic Rules** выбирают маршрут;
+- **Outbound** определяет дальнейший выход.
 
-- Inbound отвечает за вход клиента на сервер;
-- Outbound отвечает за дальнейший выход трафика;
-- Routing связывает их.
+## RAW/TCP + REALITY
 
-## RAW/TCP + REALITY и direct
+Без fallback:
 
 ```text
 Клиент VLESS
-Публичный TCP 443
+    ↓ TCP 443
 Xray RAW/TCP + REALITY
-Default Outbound direct
-Интернет через публичный IP EC2
+    ↓
+direct / warp / пользовательский Outbound
 ```
 
-На сервере:
+После настройки домена и fallback:
 
 ```text
-443/tcp       Xray
-61443/tcp     Nginx HTTP или HTTPS панели
-8080/tcp      SG-Panel на 127.0.0.1
+TCP 443 → Nginx stream SNI-router
+          ├─ Reality SNI → Xray на локальном runtime-порту
+          └─ собственный домен → локальная HTTPS-заглушка
 ```
 
-## RAW/TCP + REALITY и WARP
+## XHTTP + REALITY
 
 ```text
-Клиент VLESS
-Публичный TCP 443
-Xray RAW/TCP + REALITY
-Default Outbound warp
-Cloudflare WARP
-Интернет через IP Cloudflare
+Клиент VLESS XHTTP REALITY, mode auto
+    ↓ TCP 443
+Nginx stream SNI-router при включённом fallback
+    ├─ Reality SNI → Xray XHTTP + REALITY
+    └─ собственный домен → локальная HTTPS-заглушка
 ```
 
-WARP не создаёт системный интерфейс Ubuntu. WireGuard работает внутри Xray.
+Без настроенного домена Xray может принимать публичный TCP `443` напрямую.
 
-## XHTTP + TLS и direct
+## XHTTP + TLS
 
 ```text
 Клиент VLESS XHTTP TLS
-Публичный TCP 443
+    ↓ TCP 443
 Nginx TLS
-Xray XHTTP на 127.0.0.1:8443
-Default Outbound direct
-Интернет через публичный IP EC2
+    ├─ клиентский path → Xray 127.0.0.1:8443
+    └─ другие запросы → локальная SG-заглушка
 ```
 
-На сервере:
+SNI клиента должен соответствовать сертификату.
+
+## gRPC + TLS
 
 ```text
-443/tcp       Nginx
-8443/tcp      Xray только на 127.0.0.1
-61443/tcp     Nginx HTTP или HTTPS панели
-8080/tcp      SG-Panel только на 127.0.0.1
+Клиент VLESS gRPC TLS
+    ↓ TCP 443, HTTP/2
+Nginx TLS
+    ├─ gRPC service → Xray 127.0.0.1:8443
+    └─ другие запросы → локальная SG-заглушка
 ```
 
-SNI клиента должен совпадать с доменом сертификата Let's Encrypt.
-
-## XHTTP + REALITY и direct
+## Hysteria 2 + TLS
 
 ```text
-Клиент VLESS XHTTP REALITY
-Публичный TCP 443
-Xray XHTTP + REALITY
-Default Outbound direct
-Интернет через публичный IP EC2
+Клиент Hysteria 2
+    ↓ UDP 443 или port hopping
+Xray Hysteria 2
+    ↓
+direct / warp / пользовательский Outbound
 ```
 
-Nginx не участвует в передаче XHTTP и не занимает `443`.
-
-## Выборочный WARP
+Одновременно:
 
 ```text
-Обычные сайты        direct
-Выбранные домены     warp
-Заблокированные      blocked
+Браузер → TCP 443 → Nginx → локальная SG-заглушка
 ```
 
-Routing проверяет правила по приоритету. Например:
+TCP и UDP используют разные сокеты и не конфликтуют.
+
+## Direct
 
 ```text
-10  BitTorrent              blocked
-20  Реклама                 blocked
-40  Выбранные сайты         warp
-остальной трафик            direct
+Клиент → Xray → direct → Интернет через публичный IP сервера
 ```
 
 ## Весь трафик через WARP
 
 ```text
-Явные правила блокировки    blocked
-Остальной трафик            warp
+Явные правила блокировки → block
+Остальной трафик         → warp → Cloudflare → Интернет
 ```
 
-В этом режиме отдельное правило `warp` может не отображаться в таблице: `warp` становится Default Outbound.
+WARP становится Default Outbound.
+
+## Выборочный WARP
+
+```text
+Выбранные домены → warp
+Остальные        → direct или другой Default Outbound
+```
 
 ## Пользовательский Outbound
 
 ```text
 Клиент
-Первый SG-Panel/Xray
-Routing
-Пользовательский VLESS Outbound
+    ↓
+Первый SG-Panel / Xray
+    ↓ Traffic Rule
+VLESS Outbound
+    ↓
 Второй Xray-сервер
+    ↓
 Интернет через IP второго сервера
 ```
 
-В Outbound первого сервера указываются клиентские параметры Inbound второго сервера.
+Параметры Outbound первого сервера должны совпадать с Inbound второго сервера.
 
-Пример соответствия:
+## Подписка
 
-```text
-Inbound второго сервера     Outbound первого сервера
-домен                        Address
-порт                         Port
-UUID пользователя            UUID
-transport                    Network
-security                     Security
-SNI                          Server name
-XHTTP Path                   Path
-Reality public key           Public key
-Short ID                     Short ID
-```
-
-## Подписка пользователя
-
-Подписка не передаёт пользовательский трафик. Она только выдаёт клиентскую конфигурацию.
+Подписка не передаёт пользовательский трафик:
 
 ```text
-v2rayN или v2rayNG
-HTTP/HTTPS-порт SG-Panel
-/sub/персональный-токен
-SG-Panel читает SQLite
-Клиент получает актуальную VLESS-ссылку
+Клиентское приложение
+    ↓ HTTP/HTTPS
+/sub/персональный-token
+    ↓
+SG-Panel формирует актуальную ссылку текущего Inbound
 ```
 
-После смены Inbound клиент обновляет подписку и получает новые transport-параметры с тем же UUID.
+После смены Inbound приложение обновляет подписку и получает новые transport-параметры.
+
+## Служебные порты
+
+```text
+127.0.0.1:8080   backend SG-Panel
+127.0.0.1:8443   Xray для XHTTP/gRPC TLS
+PUBLIC:61443     публичный порт панели
+PUBLIC:80        SG-заглушка и HTTP-01
+PUBLIC:443/tcp   VLESS или HTTPS/fallback
+PUBLIC:443/udp   Hysteria 2
+```

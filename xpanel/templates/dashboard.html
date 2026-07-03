@@ -30,13 +30,17 @@
 
     <div class="memory-dashboard-layout">
       <div class="memory-dial-column">
-        <div class="memory-dial is-{{ sys.memory_status_class|default('normal') }}" style="background: {{ sys.memory_ring_style|default('conic-gradient(#4b9cff 0 0)') }};" role="img" aria-label="Использование оперативной памяти: {{ ram }} процентов">
+        <div class="memory-dial is-{{ sys.memory_status_class|default('normal') }}" style="background: {{ sys.memory_ring_style|default('conic-gradient(#4b9cff 0 0)') }};" role="img" aria-label="SG-Panel использует {{ sys.panel_memory_human|default('—') }}. Доступно {{ sys.memory_available_human|default('—') }} оперативной памяти">
           <div class="memory-dial-center">
-            <strong>{{ ram }}%</strong>
-            <span>{{ sys.memory_status_label|default('Память') }}</span>
+            <span class="memory-dial-product">SG-Panel</span>
+            <strong>{{ sys.panel_memory_human|default('—') }}</strong>
+            <span class="memory-dial-status">{{ sys.memory_status_label|default('Памяти достаточно') }}</span>
           </div>
         </div>
-        <div class="memory-dial-foot"><span>Swap</span><strong class="{{ 'text-danger' if sys.swap_used|default(0) else 'text-success' }}">{{ sys.swap_used_human|default('0 B') }}</strong></div>
+        <div class="memory-dial-foot">
+          <span>Доступно <strong class="text-success">{{ sys.memory_available_human|default('—') }}</strong></span>
+          <span>Swap <strong class="{{ 'text-warning' if sys.swap_used|default(0) else 'text-success' }}">{{ sys.swap_used_human|default('0 B') }}</strong></span>
+        </div>
       </div>
 
       <div class="memory-legend" aria-label="Расшифровка памяти">

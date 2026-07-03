@@ -1,103 +1,77 @@
-# Безопасное удаление SG-Panel
+# Удаление SG-Panel
 
-Обычное удаление SG-Panel безопасно по умолчанию.
+Есть два разных сценария.
 
-Команда без дополнительных параметров удаляет только панель и связанные с ней службы. Xray, его рабочая конфигурация и резервные копии сохраняются.
+## Обычное удаление панели
 
-## Что сохраняется при обычном удалении
-
-- Xray и его systemd-служба;
-- `/usr/local/etc/xray/config.json`;
-- резервные копии `/root/sg-panel-backups`;
-- Nginx и Certbot;
-- сертификаты Let's Encrypt;
-- системные пакеты;
-- `/swapfile`.
-
-Перед удалением панель дополнительно сохраняет текущую SQLite-базу, конфигурацию Xray, `web.env` и ссылку первого пользователя в каталог:
-
-```text
-/root/sg-panel-backups/uninstall-ДАТА_UTC
-```
-
-Эта копия содержит чувствительные данные. Не публикуйте её и не меняйте права доступа.
-
-## Удалить только SG-Panel
+Обычный uninstall удаляет SG-Panel и её службы, но по умолчанию сохраняет Xray, Nginx, сертификаты и резервные копии.
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/s-gor/sg-panel/main/deploy/uninstall.sh -o /tmp/uninstall-sg-panel.sh && bash -n /tmp/uninstall-sg-panel.sh && chmod 700 /tmp/uninstall-sg-panel.sh && sudo bash /tmp/uninstall-sg-panel.sh
 ```
 
-Скрипт покажет точный план и потребует ввести:
+Следуйте вопросам мастера и внимательно читайте, какие дополнительные компоненты предлагается удалить.
+
+## Что обычно сохраняется
+
+- `/usr/local/bin/xray`;
+- `/usr/local/etc/xray/config.json`;
+- Nginx;
+- Certbot и сертификаты;
+- резервные копии;
+- SSH и сеть Ubuntu;
+- пользовательские файлы `/home`.
+
+Конкретный результат зависит от выбранных ответов мастера.
+
+## Полная очистка тестового сервера
+
+Используйте только на отдельном сервере, где перечисленные компоненты не обслуживают другие проекты:
+
+```bash
+sudo bash /opt/xpanel-mvp/FULL-UNINSTALL-SG-PANEL.sh --yes
+```
+
+Полный скрипт удаляет:
+
+- SG-Panel и SQLite;
+- Xray и конфигурацию;
+- WARP/wgcf;
+- Nginx и SG fallback;
+- Certbot и сертификаты Let's Encrypt;
+- резервные копии SG-Panel;
+- созданный панелью swap.
+
+Не изменяются:
+
+- SSH;
+- сеть Ubuntu;
+- Security Group EC2;
+- пользовательские файлы в `/home`.
+
+## Перед удалением
+
+Скачайте нужные резервные копии и сохраните:
 
 ```text
-УДАЛИТЬ ПАНЕЛЬ
+/opt/xpanel-mvp/data/panel.db
+/usr/local/etc/xray/config.json
+/root/sg-panel-backups/
 ```
 
-Для автоматического запуска без вопроса:
+## Проверка после удаления
 
 ```bash
-sudo bash /tmp/uninstall-sg-panel.sh --yes
-```
-
-## Дополнительно удалить Xray
-
-```bash
-sudo bash /tmp/uninstall-sg-panel.sh --remove-xray
-```
-
-Удаляются бинарный файл Xray, systemd-служба, `/usr/local/etc/xray`, журналы Xray и файл первой VLESS-ссылки.
-
-## Дополнительно удалить резервные копии
-
-```bash
-sudo bash /tmp/uninstall-sg-panel.sh --remove-backups
-```
-
-## Удалить панель, Xray и резервные копии
-
-```bash
-sudo bash /tmp/uninstall-sg-panel.sh --remove-xray --remove-backups
-```
-
-Nginx, Certbot, сертификаты и swap всё равно сохраняются.
-
-## Полная очистка одноразового тестового сервера
-
-Полная очистка вынесена из обычного деинсталлятора в отдельный файл:
-
-```text
-deploy/purge-test-server.sh
-```
-
-Она удаляет весь Nginx, все сертификаты Let's Encrypt, Xray, SG-Panel, swap и резервные копии. Такой режим подходит только для одноразового тестового EC2, на котором нет других сайтов и сертификатов.
-
-Сначала прочитайте справку:
-
-```bash
-sudo bash deploy/purge-test-server.sh --help
-```
-
-Запуск требует явного параметра:
-
-```bash
-sudo bash deploy/purge-test-server.sh --destroy-test-server
-```
-
-Старый параметр `uninstall.sh --purge-all` больше не поддерживается и завершается отказом без удаления файлов.
-
-## Проверка после обычного удаления
-
-```bash
-systemctl is-active xray
 systemctl status xpanel-web --no-pager
-ls -lh /usr/local/etc/xray/config.json
-ls -ld /root/sg-panel-backups
+systemctl status xray --no-pager
+systemctl status nginx --no-pager
+sudo ss -lntup
 ```
 
-Ожидается:
+Для полной очистки службы и порты SG-Panel/Xray/Nginx должны отсутствовать.
 
-- Xray остаётся `active`;
-- `xpanel-web`, `xpanel-maintenance` и `xpanel-traffic` больше не существуют;
-- рабочий `config.json` сохранён;
-- каталог резервных копий сохранён.
+После полного удаления рекомендуется перезагрузить сервер:
+
+```bash
+sudo reboot
+```

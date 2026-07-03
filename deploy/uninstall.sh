@@ -219,9 +219,14 @@ log "Удаляю только конфигурацию Nginx, созданну�
 rm -f \
   /etc/nginx/sites-enabled/sg-panel \
   /etc/nginx/sites-enabled/sg-panel-acme \
+  /etc/nginx/sites-enabled/sg-panel-xray-transport \
+  /etc/nginx/sites-enabled/sg-panel-reality-placeholder \
   /etc/nginx/sites-available/sg-panel \
   /etc/nginx/sites-available/sg-panel-acme \
-  /etc/letsencrypt/renewal-hooks/deploy/reload-sg-panel-nginx.sh
+  /etc/nginx/sites-available/sg-panel-xray-transport \
+  /etc/nginx/sites-available/sg-panel-reality-placeholder \
+  /etc/nginx/modules-enabled/90-sg-panel-reality-edge.conf \
+  /etc/letsencrypt/renewal-hooks/deploy/reload-sg-panel-nginx.sh \
   /etc/letsencrypt/renewal-hooks/deploy/sync-sg-panel-hysteria-tls.sh
 rm -rf /var/www/sg-panel-placeholder
 

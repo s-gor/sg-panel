@@ -50,19 +50,21 @@
   </section>
 
   <section class="inbound-detection-card {{ 'is-ready' if inbound_recommendations.certificate_found else 'needs-attention' }}" aria-labelledby="inbound-detection-title">
-    <div class="inbound-detection-copy">
-      <p class="panel-kicker">AUTO DETECTION</p>
-      <h2 id="inbound-detection-title">Обнаружено автоматически</h2>
-      <p>SG-Panel использует уже настроенные домен, сертификат и сетевые параметры как безопасные значения по умолчанию.</p>
+    <div class="inbound-detection-header">
+      <div class="inbound-detection-copy">
+        <p class="panel-kicker">AUTO DETECTION</p>
+        <h2 id="inbound-detection-title">Обнаружено автоматически</h2>
+        <p>SG-Panel использует уже настроенные домен, сертификат и сетевые параметры как безопасные значения по умолчанию.</p>
+      </div>
+      <button class="button secondary" type="button" id="apply-inbound-recommendations">Подставить рекомендуемые значения</button>
     </div>
     <div class="inbound-detection-grid">
-      <div><span>Домен</span><strong>{{ inbound_recommendations.domain or 'не найден' }}</strong></div>
+      <div class="inbound-detection-domain"><span>Домен</span><strong>{{ inbound_recommendations.domain or 'не найден' }}</strong></div>
       <div><span>Сертификат</span><strong class="{{ 'text-success' if inbound_recommendations.certificate_found else 'text-warning' }}">{{ 'найден' if inbound_recommendations.certificate_found else 'не найден' }}</strong></div>
       <div><span>TCP 443</span><strong>{{ inbound_recommendations.tcp_443 }}</strong></div>
       <div><span>UDP 443</span><strong>{{ inbound_recommendations.udp_443 }}</strong></div>
       <div><span>Xray для теста</span><strong>{{ inbound_recommendations.xray_recommended_version }}</strong></div>
     </div>
-    <button class="button secondary" type="button" id="apply-inbound-recommendations">Подставить рекомендуемые значения</button>
   </section>
 
   <section class="ui-card server-main-card inbound-main-card">
@@ -86,7 +88,7 @@
             <span class="profile-card-body">
               <span class="profile-card-status-row"><span class="profile-card-active-state">Активен сейчас</span><span class="profile-card-draft-state">Выбрано для настройки</span></span>
               <span class="profile-card-top"><strong>RAW/TCP + REALITY</strong><b>Рекомендуется</b></span>
-              <small>Xray принимает соединение напрямую на 443. Используется Vision и маскировка REALITY.</small>
+              <small>До настройки собственного домена Xray слушает TCP 443 напрямую. После настройки HTTPS SNI-маршрутизация сохраняет REALITY, а обычному браузеру показывает локальную заглушку.</small>
             </span>
           </label>
           <label class="inbound-profile-card {% if server.inbound_profile == 'xhttp_tls' %}is-active{% endif %}">
@@ -102,7 +104,7 @@
             <span class="profile-card-body">
               <span class="profile-card-status-row"><span class="profile-card-active-state">Активен сейчас</span><span class="profile-card-draft-state">Выбрано для настройки</span></span>
               <span class="profile-card-top"><strong>XHTTP + REALITY</strong><b>Расширенный</b></span>
-              <small>XHTTP без сертификата Let’s Encrypt. Xray принимает соединение напрямую.</small>
+              <small>XHTTP работает через REALITY без сертификата Let’s Encrypt. После настройки HTTPS SNI-маршрутизация отделяет клиентский трафик от обычного сайта.</small>
             </span>
           </label>
           <label class="inbound-profile-card {% if server.inbound_profile == 'hysteria2_tls' %}is-active{% endif %}">
@@ -110,7 +112,7 @@
             <span class="profile-card-body">
               <span class="profile-card-status-row"><span class="profile-card-active-state">Активен сейчас</span><span class="profile-card-draft-state">Выбрано для настройки</span></span>
               <span class="profile-card-top"><strong>Hysteria 2 + TLS</strong><b>UDP / QUIC</b></span>
-              <small>Нативный Hysteria 2 inbound Xray: QUIC/UDP, TLS и отдельный auth для каждого пользователя.</small>
+              <small>Нативный Hysteria 2 использует UDP 443. На TCP 443 Nginx одновременно может показывать локальную HTTPS-заглушку.</small>
             </span>
           </label>
         </div>

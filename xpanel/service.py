@@ -65,6 +65,9 @@ WARP_IPV4_ENDPOINT = "162.159.192.1:2408"
 WARP_RULE_NAME = "Cloudflare WARP"
 WARP_DIR = Path(os.environ.get("XPANEL_WARP_DIR", "/etc/xpanel-mvp/warp"))
 HYSTERIA_TLS_DIR = Path(os.environ.get("XPANEL_HYSTERIA_TLS_DIR", "/usr/local/etc/xray/sg-panel-tls"))
+REALITY_EDGE_STATE = Path(os.environ.get("XPANEL_REALITY_EDGE_STATE", "/etc/xpanel-mvp/reality-edge.env"))
+REALITY_EDGE_XRAY_PORT = 8444
+REALITY_EDGE_WEB_PORT = 9443
 WARP_DEFAULT_DOMAINS = """domain:google.com
 domain:googleapis.com
 domain:gstatic.com
@@ -2787,6 +2790,38 @@ def _read_simple_env(path: Path) -> dict[str, str]:
     return values
 
 
+def _reality_edge_settings(server: sqlite3.Row | None = None) -> dict[str, object]:
+    values = _read_simple_env(REALITY_EDGE_STATE)
+    if values.get("ENABLED") != "1":
+        return {"enabled": False}
+    domain = _hostname_candidate(values.get("DOMAIN", ""))
+    cert = Path(values.get("CERT", ""))
+    key = Path(values.get("KEY", ""))
+    try:
+        xray_port = int(values.get("XRAY_PORT", str(REALITY_EDGE_XRAY_PORT)))
+        web_port = int(values.get("WEB_PORT", str(REALITY_EDGE_WEB_PORT)))
+    except ValueError:
+        return {"enabled": False}
+    if not domain or not cert.is_file() or not key.is_file():
+        return {"enabled": False}
+    if not (1 <= xray_port <= 65535 and 1 <= web_port <= 65535):
+        return {"enabled": False}
+    reality_name = ""
+    if server is not None:
+        reality_name = _hostname_candidate(str(server["server_name"] or ""))
+        if not reality_name or reality_name == domain:
+            return {"enabled": False}
+    return {
+        "enabled": True,
+        "domain": domain,
+        "cert": str(cert),
+        "key": str(key),
+        "xray_port": xray_port,
+        "web_port": web_port,
+        "reality_name": reality_name,
+    }
+
+
 def _hostname_candidate(value: str) -> str:
     candidate = (value or "").strip().lower().rstrip(".")
     if not candidate:
@@ -2862,7 +2897,6 @@ def get_inbound_recommendations() -> dict[str, object]:
         _hostname_candidate(str(install_state.get("PANEL_DOMAIN", ""))),
         _nginx_panel_domain(),
         _hostname_candidate(str(server["address"] or "")),
-        _hostname_candidate(str(server["server_name"] or "")),
     ]
     preferred_domains = [item for item in preferred_domains if item]
     certificate = None
@@ -3271,6 +3305,12 @@ def validate_server_values(
     if profile == "grpc_tls":
         _validate_grpc_service_name(grpc_service_name)
 
+    if profile == "hysteria2_tls" and not _hostname_candidate(server_name):
+        raise ValueError(
+            "Hysteria 2 требует ваш реальный домен и TLS-сертификат. "
+            "Сначала настройте домен и HTTPS панели, затем выберите Hysteria 2."
+        )
+
     if profile in CERTIFICATE_INBOUND_PROFILES:
         if not server_name or not server_name.strip():
             raise ValueError("для TLS укажите Server name / SNI")
@@ -3296,6 +3336,17 @@ def validate_server_values(
             raise ValueError("локальный порт Xray должен быть от 1 до 65535")
 
     if profile == "hysteria2_tls":
+        cert_file = Path(tls_cert_path)
+        key_file = Path(tls_key_path)
+        if not cert_file.is_file() or not key_file.is_file():
+            missing = []
+            if not cert_file.is_file():
+                missing.append(str(cert_file))
+            if not key_file.is_file():
+                missing.append(str(key_file))
+            raise ValueError(
+                "Hysteria 2: не найдены файлы TLS-сертификата: " + ", ".join(missing)
+            )
         try:
             direct_ip = ipaddress.ip_address(listen.strip())
         except ValueError as exc:
@@ -3411,7 +3462,7 @@ def update_server_settings(
     if profile != previous_profile:
         previous_name = str(current["server_name"] or "").strip()
         if profile in CERTIFICATE_INBOUND_PROFILES and normalized_server_name in {"", previous_name, reality_name}:
-            normalized_server_name = address.strip()
+            normalized_server_name = _hostname_candidate(address)
         elif profile in REALITY_INBOUND_PROFILES and normalized_server_name in {"", previous_name, address.strip()}:
             normalized_server_name = reality_name
     local_listen = (transport_listen or current["transport_listen"] or "127.0.0.1").strip()
@@ -3419,7 +3470,11 @@ def update_server_settings(
     path = (xhttp_path or current["xhttp_path"] or "/sg-xhttp").strip()
     mode = (xhttp_mode or current["xhttp_mode"] or "auto").strip()
     service_name = (grpc_service_name or current["grpc_service_name"] or "sg-grpc").strip()
-    default_cert, default_key = _default_tls_paths(address)
+    tls_domain = _hostname_candidate(normalized_server_name) or _hostname_candidate(address)
+    if tls_domain:
+        default_cert, default_key = _default_tls_paths(tls_domain)
+    else:
+        default_cert, default_key = "", ""
     cert_path = (tls_cert_path if tls_cert_path is not None else current["tls_cert_path"]).strip() or default_cert
     key_path = (tls_key_path if tls_key_path is not None else current["tls_key_path"]).strip() or default_key
     hy_idle = int(hysteria_udp_idle_timeout if hysteria_udp_idle_timeout is not None else current["hysteria_udp_idle_timeout"] or 60)
@@ -3963,6 +4018,14 @@ def _build_primary_inbound(server: sqlite3.Row, clients: list[dict[str, object]]
     if profile in TLS_INBOUND_PROFILES:
         inbound["listen"] = server["transport_listen"]
         inbound["port"] = server["transport_port"]
+    elif profile in REALITY_INBOUND_PROFILES:
+        edge = _reality_edge_settings(server)
+        if edge.get("enabled"):
+            inbound["listen"] = "127.0.0.1"
+            inbound["port"] = int(edge["xray_port"])
+        else:
+            inbound["listen"] = server["listen"]
+            inbound["port"] = server["port"]
     else:
         inbound["listen"] = server["listen"]
         inbound["port"] = server["port"]
@@ -4672,6 +4735,11 @@ def _parse_full_config_server(
         listen = str(current["listen"] or "0.0.0.0")
         transport_listen = inbound_listen
         transport_port = inbound_port
+    elif profile in REALITY_INBOUND_PROFILES and _reality_edge_settings(current).get("enabled"):
+        listen = str(current["listen"] or "0.0.0.0")
+        transport_listen = str(meta.get("transportListen") or current["transport_listen"] or "127.0.0.1")
+        transport_port = int(meta.get("transportPort") or current["transport_port"] or 8443)
+        public_port = int(meta.get("publicPort") or current["port"] or 443)
     else:
         listen = inbound_listen
         transport_listen = str(meta.get("transportListen") or current["transport_listen"] or "127.0.0.1")
@@ -5391,9 +5459,37 @@ def _nginx_transport_paths() -> tuple[Path, Path]:
     return available, enabled
 
 
+def _nginx_reality_edge_paths() -> tuple[Path, Path, Path]:
+    stream_conf = Path(os.environ.get(
+        "XPANEL_NGINX_REALITY_STREAM_CONF",
+        "/etc/nginx/modules-enabled/90-sg-panel-reality-edge.conf",
+    ))
+    available = Path(os.environ.get(
+        "XPANEL_NGINX_REALITY_WEB_CONF",
+        "/etc/nginx/sites-available/sg-panel-reality-placeholder",
+    ))
+    enabled = Path(os.environ.get(
+        "XPANEL_NGINX_REALITY_WEB_LINK",
+        "/etc/nginx/sites-enabled/sg-panel-reality-placeholder",
+    ))
+    return stream_conf, available, enabled
+
+
+def _nginx_placeholder_block() -> str:
+    return '''    location / {
+        root /var/www/sg-panel-placeholder;
+        index index.html;
+        try_files $uri $uri/ /index.html;
+        add_header Cache-Control "no-cache" always;
+        add_header X-Content-Type-Options nosniff always;
+        add_header X-Frame-Options DENY always;
+        add_header Referrer-Policy no-referrer always;
+    }'''
+
+
 def _nginx_transport_config(server: sqlite3.Row) -> str:
     profile = str(server["inbound_profile"])
-    if profile not in TLS_INBOUND_PROFILES:
+    if profile not in CERTIFICATE_INBOUND_PROFILES:
         raise ValueError("Nginx transport нужен только для TLS-профиля")
     cert = Path(str(server["tls_cert_path"]))
     key = Path(str(server["tls_key_path"]))
@@ -5402,13 +5498,18 @@ def _nginx_transport_config(server: sqlite3.Row) -> str:
     if not key.is_file():
         raise XPanelError(f"не найден TLS private key: {key}")
     public_port = int(server["port"])
-    target_host = str(server["transport_listen"])
-    if ":" in target_host and not target_host.startswith("["):
-        target_host = f"[{target_host}]"
-    target = f"{target_host}:{server['transport_port']}"
-    if profile == "xhttp_tls":
-        path = str(server["xhttp_path"]).rstrip("/") + "/"
-        proxy_block = f'''    location {path} {{
+    placeholder = _nginx_placeholder_block()
+    proxy_block = ""
+    http2 = ""
+    if profile in TLS_INBOUND_PROFILES:
+        target_host = str(server["transport_listen"])
+        if ":" in target_host and not target_host.startswith("["):
+            target_host = f"[{target_host}]"
+        target = f"{target_host}:{server['transport_port']}"
+        http2 = " http2"
+        if profile == "xhttp_tls":
+            path = str(server["xhttp_path"]).rstrip("/") + "/"
+            proxy_block = f'''    location {path} {{
         grpc_socket_keepalive on;
         grpc_read_timeout 1h;
         grpc_send_timeout 1h;
@@ -5421,10 +5522,12 @@ def _nginx_transport_config(server: sqlite3.Row) -> str:
         grpc_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         grpc_set_header X-Forwarded-Proto $scheme;
         grpc_pass grpc://{target};
-    }}'''
-    else:
-        service = str(server["grpc_service_name"]).strip("/")
-        proxy_block = f'''    location /{service} {{
+    }}
+
+'''
+        else:
+            service = str(server["grpc_service_name"]).strip("/")
+            proxy_block = f'''    location /{service} {{
         grpc_socket_keepalive on;
         grpc_read_timeout 1h;
         grpc_send_timeout 1h;
@@ -5433,11 +5536,13 @@ def _nginx_transport_config(server: sqlite3.Row) -> str:
         grpc_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         grpc_set_header X-Forwarded-Proto $scheme;
         grpc_pass grpc://{target};
-    }}'''
+    }}
+
+'''
     return f'''# Managed by SG-Panel. Manual changes may be overwritten.
 server {{
-    listen {public_port} ssl http2;
-    listen [::]:{public_port} ssl http2;
+    listen {public_port} ssl{http2};
+    listen [::]:{public_port} ssl{http2};
     server_name {server['server_name']};
 
     ssl_certificate {cert};
@@ -5447,19 +5552,58 @@ server {{
     ssl_session_timeout 1d;
     ssl_session_tickets off;
 
-{proxy_block}
+{proxy_block}{placeholder}
+}}
+'''
 
-    location / {{
-        root /var/www/sg-panel-placeholder;
-        index index.html;
-        try_files $uri $uri/ /index.html;
-        add_header Cache-Control "no-cache" always;
-        add_header X-Content-Type-Options nosniff always;
-        add_header X-Frame-Options DENY always;
-        add_header Referrer-Policy no-referrer always;
+
+def _nginx_reality_edge_configs(server: sqlite3.Row) -> tuple[str, str]:
+    edge = _reality_edge_settings(server)
+    if not edge.get("enabled"):
+        raise XPanelError(
+            "HTTPS fallback для REALITY не готов: настройте собственный домен и HTTPS панели"
+        )
+    domain = str(edge["domain"])
+    reality_name = str(edge["reality_name"])
+    cert = str(edge["cert"])
+    key = str(edge["key"])
+    xray_port = int(edge["xray_port"])
+    web_port = int(edge["web_port"])
+    stream = f'''# Managed by SG-Panel. Top-level Nginx stream router for TCP 443.
+stream {{
+    map $ssl_preread_server_name $sg_panel_443_backend {{
+        hostnames;
+        {reality_name} 127.0.0.1:{xray_port};
+        default 127.0.0.1:{web_port};
+    }}
+
+    server {{
+        listen 443;
+        listen [::]:443;
+        proxy_pass $sg_panel_443_backend;
+        ssl_preread on;
+        proxy_connect_timeout 5s;
+        proxy_timeout 1h;
     }}
 }}
 '''
+    placeholder = _nginx_placeholder_block()
+    web = f'''# Managed by SG-Panel. Local HTTPS placeholder behind the TCP 443 router.
+server {{
+    listen 127.0.0.1:{web_port} ssl;
+    server_name {domain};
+
+    ssl_certificate {cert};
+    ssl_certificate_key {key};
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_session_cache shared:SGFALLBACK:10m;
+    ssl_session_timeout 1d;
+    ssl_session_tickets off;
+
+{placeholder}
+}}
+'''
+    return stream, web
 
 
 def _nginx_test_reload() -> None:
@@ -5478,52 +5622,116 @@ def _nginx_test_reload() -> None:
         raise XPanelError("после reload служба Nginx не активна")
 
 
+def _write_atomic_text(path: Path, text: str, mode: int = 0o644) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temp = path.with_name(path.name + ".tmp")
+    temp.write_text(text, encoding="utf-8")
+    os.chmod(temp, mode)
+    os.replace(temp, path)
+
+
 def _enable_nginx_transport(server: sqlite3.Row) -> None:
     available, enabled = _nginx_transport_paths()
-    available.parent.mkdir(parents=True, exist_ok=True)
+    _write_atomic_text(available, _nginx_transport_config(server))
     enabled.parent.mkdir(parents=True, exist_ok=True)
-    temp = available.with_name(available.name + ".tmp")
-    temp.write_text(_nginx_transport_config(server), encoding="utf-8")
-    os.chmod(temp, 0o644)
-    os.replace(temp, available)
     enabled.unlink(missing_ok=True)
     enabled.symlink_to(available)
     _nginx_test_reload()
 
 
-def _disable_nginx_transport() -> bool:
+def _disable_nginx_transport(*, reload: bool = True) -> bool:
     _available, enabled = _nginx_transport_paths()
     if not enabled.exists() and not enabled.is_symlink():
         return False
     enabled.unlink(missing_ok=True)
-    _nginx_test_reload()
+    if reload:
+        _nginx_test_reload()
     return True
 
 
-def _snapshot_nginx_transport() -> dict[str, object]:
-    available, enabled = _nginx_transport_paths()
+def _enable_reality_edge(server: sqlite3.Row) -> None:
+    stream_text, web_text = _nginx_reality_edge_configs(server)
+    stream_conf, available, enabled = _nginx_reality_edge_paths()
+    module_dir = Path("/etc/nginx/modules-enabled")
+    if not module_dir.is_dir() or not any(module_dir.glob("*mod-stream*.conf")):
+        raise XPanelError("не установлен модуль Nginx stream: установите libnginx-mod-stream")
+    _write_atomic_text(stream_conf, stream_text)
+    _write_atomic_text(available, web_text)
+    enabled.parent.mkdir(parents=True, exist_ok=True)
+    enabled.unlink(missing_ok=True)
+    enabled.symlink_to(available)
+    _nginx_test_reload()
+
+
+def _disable_reality_edge(*, reload: bool = True) -> bool:
+    stream_conf, _available, enabled = _nginx_reality_edge_paths()
+    changed = False
+    if enabled.exists() or enabled.is_symlink():
+        enabled.unlink(missing_ok=True)
+        changed = True
+    if stream_conf.exists():
+        stream_conf.unlink(missing_ok=True)
+        changed = True
+    if changed and reload:
+        _nginx_test_reload()
+    return changed
+
+
+def _snapshot_path(path: Path) -> dict[str, object]:
     return {
-        "available_exists": available.exists(),
-        "available_text": available.read_text(encoding="utf-8") if available.exists() else "",
-        "enabled": enabled.exists() or enabled.is_symlink(),
+        "exists": path.exists(),
+        "is_symlink": path.is_symlink(),
+        "target": os.readlink(path) if path.is_symlink() else "",
+        "text": path.read_text(encoding="utf-8") if path.exists() and not path.is_symlink() else "",
     }
 
 
-def _restore_nginx_transport(snapshot: dict[str, object]) -> None:
-    available, enabled = _nginx_transport_paths()
-    available.parent.mkdir(parents=True, exist_ok=True)
-    enabled.parent.mkdir(parents=True, exist_ok=True)
-    enabled.unlink(missing_ok=True)
-    if snapshot.get("available_exists"):
-        available.write_text(str(snapshot.get("available_text", "")), encoding="utf-8")
-        os.chmod(available, 0o644)
+def _restore_path_snapshot(path: Path, snapshot: dict[str, object]) -> None:
+    path.unlink(missing_ok=True)
+    if not snapshot.get("exists") and not snapshot.get("is_symlink"):
+        return
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if snapshot.get("is_symlink"):
+        path.symlink_to(str(snapshot.get("target", "")))
     else:
-        available.unlink(missing_ok=True)
-    if snapshot.get("enabled") and available.exists():
-        enabled.symlink_to(available)
+        path.write_text(str(snapshot.get("text", "")), encoding="utf-8")
+        os.chmod(path, 0o644)
+
+
+def _snapshot_nginx_frontends() -> dict[str, object]:
+    transport_available, transport_enabled = _nginx_transport_paths()
+    stream_conf, edge_available, edge_enabled = _nginx_reality_edge_paths()
+    paths = [transport_available, transport_enabled, stream_conf, edge_available, edge_enabled]
+    return {str(path): _snapshot_path(path) for path in paths}
+
+
+def _restore_nginx_frontends(snapshot: dict[str, object]) -> None:
+    transport_available, transport_enabled = _nginx_transport_paths()
+    stream_conf, edge_available, edge_enabled = _nginx_reality_edge_paths()
+    for path in (transport_enabled, stream_conf, edge_enabled):
+        path.unlink(missing_ok=True)
+    for path in (transport_available, transport_enabled, stream_conf, edge_available, edge_enabled):
+        _restore_path_snapshot(path, dict(snapshot.get(str(path), {})))
     if shutil.which("nginx") is not None:
         _nginx_test_reload()
 
+
+def _prepare_nginx_frontend() -> None:
+    changed = _disable_nginx_transport(reload=False)
+    changed = _disable_reality_edge(reload=False) or changed
+    if changed:
+        _nginx_test_reload()
+
+
+def _activate_nginx_frontend(server: sqlite3.Row) -> str:
+    profile = str(server["inbound_profile"] or "raw_reality")
+    if profile in TLS_INBOUND_PROFILES or profile == "hysteria2_tls":
+        _enable_nginx_transport(server)
+        return "tls-placeholder" if profile == "hysteria2_tls" else "tls-transport"
+    if profile in REALITY_INBOUND_PROFILES and _reality_edge_settings(server).get("enabled"):
+        _enable_reality_edge(server)
+        return "reality-sni-edge"
+    return "direct"
 
 def apply_config() -> dict[str, object]:
     require_root()
@@ -5535,7 +5743,7 @@ def apply_config() -> dict[str, object]:
     )
     temp_path = Path(temp_name)
     backup_path: Path | None = None
-    nginx_snapshot = _snapshot_nginx_transport()
+    nginx_snapshot = _snapshot_nginx_frontends()
     previous_config: bytes | None = config_path.read_bytes() if config_path.exists() else None
     profile = str(server["inbound_profile"] or "raw_reality")
     hysteria_tls_snapshot = _snapshot_hysteria_tls_material() if profile == "hysteria2_tls" else None
@@ -5555,15 +5763,16 @@ def apply_config() -> dict[str, object]:
             detail = (test.stderr or test.stdout).strip()
             raise XPanelError(f"новый config.json не прошёл xray run -test:\n{detail}")
 
-        if profile in TLS_INBOUND_PROFILES:
+        if profile in TLS_INBOUND_PROFILES or profile == "hysteria2_tls":
             _nginx_transport_config(server)
+        elif profile in REALITY_INBOUND_PROFILES and _reality_edge_settings(server).get("enabled"):
+            _nginx_reality_edge_configs(server)
         if config_path.exists():
             stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
             backup_path = config_path.with_name(f"{config_path.name}.bak-{stamp}")
             shutil.copy2(config_path, backup_path)
 
-        if profile not in TLS_INBOUND_PROFILES:
-            _disable_nginx_transport()
+        _prepare_nginx_frontend()
 
         os.replace(temp_path, config_path)
         restart = _run(["systemctl", "restart", server["xray_service"]], timeout=30)
@@ -5573,8 +5782,7 @@ def apply_config() -> dict[str, object]:
         if _run(["systemctl", "is-active", "--quiet", server["xray_service"]]).returncode != 0:
             raise XPanelError("после перезапуска служба Xray не активна")
 
-        if profile in TLS_INBOUND_PROFILES:
-            _enable_nginx_transport(server)
+        frontend = _activate_nginx_frontend(server)
 
         return {
             "config_path": str(config_path),
@@ -5584,6 +5792,7 @@ def apply_config() -> dict[str, object]:
             "service": "active",
             "profile": profile,
             "nginx_transport": profile in TLS_INBOUND_PROFILES,
+            "nginx_frontend": frontend,
         }
     except Exception:
         try:
@@ -5592,10 +5801,14 @@ def apply_config() -> dict[str, object]:
             else:
                 config_path.write_bytes(previous_config)
                 os.chmod(config_path, 0o644)
-            _restore_nginx_transport(nginx_snapshot)
+            _disable_nginx_transport(reload=False)
+            _disable_reality_edge(reload=False)
+            if shutil.which("nginx") is not None:
+                _nginx_test_reload()
             if hysteria_tls_snapshot is not None:
                 _restore_hysteria_tls_material(hysteria_tls_snapshot)
             _run(["systemctl", "restart", server["xray_service"]], timeout=30)
+            _restore_nginx_frontends(nginx_snapshot)
         except Exception:
             pass
         raise
@@ -6160,14 +6373,20 @@ def _format_uptime(seconds: float) -> str:
     return f"{minutes} мин"
 
 
-def _memory_status(used_percent: float, swap_used: int) -> tuple[str, str]:
-    if swap_used > 0 or used_percent >= 95:
-        return "critical", "Критическая нагрузка"
-    if used_percent >= 85:
-        return "high", "Памяти осталось мало"
-    if used_percent >= 70:
-        return "warning", "Нагрузка повышена"
-    return "normal", "Память в норме"
+def _memory_status(available_percent: float) -> tuple[str, str]:
+    """Describe real memory headroom using Linux MemAvailable.
+
+    Page cache is intentionally treated as reclaimable. Existing swap usage by
+    itself is not a current-pressure signal and must not turn a healthy small
+    server red.
+    """
+    if available_percent <= 8:
+        return "critical", "Критически мало памяти"
+    if available_percent <= 15:
+        return "high", "Мало доступной памяти"
+    if available_percent <= 25:
+        return "warning", "Запас памяти снижается"
+    return "normal", "Памяти достаточно"
 
 
 def _build_memory_segments(
@@ -6268,13 +6487,19 @@ def _build_memory_segments(
 
     used = max(0, total - available)
     used_percent = round((used / total * 100.0), 1) if total else 0.0
-    status_class, status_label = _memory_status(used_percent, swap_used)
+    available_percent = round((available / total * 100.0), 1) if total else 0.0
+    status_class, status_label = (
+        _memory_status(available_percent)
+        if total
+        else ("normal", "Нет данных о памяти")
+    )
     return {
         "total": total,
         "used": used,
         "available": available,
         "free": free,
         "used_percent": used_percent,
+        "available_percent": available_percent,
         "status_class": status_class,
         "status_label": status_label,
         "segments": segments,
@@ -6292,9 +6517,9 @@ def _build_memory_segments(
         "swap_total": swap_total,
         "swap_used": swap_used,
         "method": (
-            "SG-Panel, Xray и Nginx считаются по systemd cgroup вместе с дочерними "
-            "процессами. Ядро и файловый кэш берутся из /proc/meminfo. "
-            "Доступная память соответствует MemAvailable."
+            "Состояние оценивается по Linux MemAvailable: файловый кэш считается "
+            "освобождаемым и сам по себе не является дефицитом памяти. SG-Panel, "
+            "Xray и Nginx считаются по systemd cgroup вместе с дочерними процессами."
         ),
     }
 
@@ -6343,6 +6568,7 @@ def _system_resource_overview(xray_service: str) -> dict[str, object]:
         "memory_total": memory_total,
         "memory_used": memory_used,
         "memory_percent": memory["used_percent"],
+        "memory_available_percent": memory["available_percent"],
         "memory_total_human": format_bytes(memory_total),
         "memory_used_human": format_bytes(memory_used),
         "memory_available_human": format_bytes(memory_available),

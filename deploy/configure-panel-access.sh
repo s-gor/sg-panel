@@ -92,6 +92,13 @@ backup_path /etc/nginx/sites-enabled/sg-panel-acme acme-link
 backup_path /etc/xpanel-mvp/web.env web.env
 backup_path "$STATE_FILE" panel-access.env
 backup_path "$INSTALL_MARKER" install-complete.env
+backup_path /etc/nginx/sites-available/sg-panel-xray-transport xray-transport-conf
+backup_path /etc/nginx/sites-enabled/sg-panel-xray-transport xray-transport-link
+backup_path /etc/nginx/modules-enabled/90-sg-panel-reality-edge.conf reality-stream-conf
+backup_path /etc/nginx/sites-available/sg-panel-reality-placeholder reality-web-conf
+backup_path /etc/nginx/sites-enabled/sg-panel-reality-placeholder reality-web-link
+backup_path /etc/xpanel-mvp/reality-edge.env reality-edge.env
+backup_path /usr/local/etc/xray/config.json xray-config.json
 if [[ -f /opt/xpanel-mvp/data/panel.db ]]; then
   cp -a /opt/xpanel-mvp/data/panel.db "$BACKUP_DIR/panel.db"
 fi
@@ -101,7 +108,11 @@ rollback(){
   if [[ $COMMITTED -eq 0 ]]; then
     log "HTTPS не настроен, восстанавливаю предыдущий доступ"
     rm -f /etc/nginx/sites-available/sg-panel /etc/nginx/sites-enabled/sg-panel \
-      /etc/nginx/sites-available/sg-panel-acme /etc/nginx/sites-enabled/sg-panel-acme
+      /etc/nginx/sites-available/sg-panel-acme /etc/nginx/sites-enabled/sg-panel-acme \
+      /etc/nginx/sites-available/sg-panel-xray-transport /etc/nginx/sites-enabled/sg-panel-xray-transport \
+      /etc/nginx/modules-enabled/90-sg-panel-reality-edge.conf \
+      /etc/nginx/sites-available/sg-panel-reality-placeholder \
+      /etc/nginx/sites-enabled/sg-panel-reality-placeholder
     restore_path "$BACKUP_DIR/nginx-conf" /etc/nginx/sites-available/sg-panel
     restore_path "$BACKUP_DIR/nginx-link" /etc/nginx/sites-enabled/sg-panel
     restore_path "$BACKUP_DIR/acme-conf" /etc/nginx/sites-available/sg-panel-acme
@@ -110,7 +121,16 @@ rollback(){
     rm -f "$STATE_FILE" "$INSTALL_MARKER"
     restore_path "$BACKUP_DIR/panel-access.env" "$STATE_FILE"
     restore_path "$BACKUP_DIR/install-complete.env" "$INSTALL_MARKER"
+    rm -f /etc/xpanel-mvp/reality-edge.env /usr/local/etc/xray/config.json
+    restore_path "$BACKUP_DIR/reality-edge.env" /etc/xpanel-mvp/reality-edge.env
+    restore_path "$BACKUP_DIR/xray-config.json" /usr/local/etc/xray/config.json
+    restore_path "$BACKUP_DIR/xray-transport-conf" /etc/nginx/sites-available/sg-panel-xray-transport
+    restore_path "$BACKUP_DIR/xray-transport-link" /etc/nginx/sites-enabled/sg-panel-xray-transport
+    restore_path "$BACKUP_DIR/reality-stream-conf" /etc/nginx/modules-enabled/90-sg-panel-reality-edge.conf
+    restore_path "$BACKUP_DIR/reality-web-conf" /etc/nginx/sites-available/sg-panel-reality-placeholder
+    restore_path "$BACKUP_DIR/reality-web-link" /etc/nginx/sites-enabled/sg-panel-reality-placeholder
     restore_path "$BACKUP_DIR/panel.db" /opt/xpanel-mvp/data/panel.db
+    systemctl restart xray >/dev/null 2>&1 || true
     nginx -t >/dev/null 2>&1 && systemctl reload nginx >/dev/null 2>&1 || true
     systemctl restart xpanel-web >/dev/null 2>&1 || true
   fi

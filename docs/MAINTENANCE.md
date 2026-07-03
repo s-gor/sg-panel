@@ -1,114 +1,86 @@
-# Обслуживание сервера
+# Maintenance и резервные копии
+
+## Когда создавать копию
+
+Создавайте резервную копию перед:
+
+- сменой Inbound-профиля;
+- крупной правкой Traffic Rules или DNS;
+- восстановлением другой копии;
+- обновлением;
+- ручной работой с полным JSON.
+
+SG-Panel также создаёт автоматические точки отката перед опасными операциями.
+
+## Что сохраняется
+
+Копия содержит как минимум:
+
+- SQLite `panel.db`;
+- снимок итогового `config.json`;
+- метаданные и контрольные суммы.
+
+SQLite хранит клиентов, UUID/Auth, серверные настройки, правила, Outbounds, DNS, WARP, подписки, статистику и параметры безопасности панели.
+
+Системные пакеты Ubuntu и внешние файлы провайдера не являются частью SQLite-копии.
+
+## Создание
+
+Откройте `Maintenance` и нажмите **«Создать резервную копию»**.
+
+После создания используйте **«Проверить»**. Копия с ошибкой проверки не должна использоваться для восстановления.
+
+## Скачивание
+
+Скачайте SQLite и config snapshot на локальный компьютер. Не храните единственную копию на том же сервере.
+
+Файлы могут содержать приватные ключи, UUID, токены и сетевую конфигурацию.
+
+## Восстановление
+
+1. выберите проверенную копию;
+2. подтвердите восстановление;
+3. панель вернёт SQLite;
+4. заново сформирует рабочий `config.json`;
+5. выполнит `xray run -test`;
+6. перезапустит Xray;
+7. проверит активное состояние.
+
+После восстановления проверьте клиента и Network-маршруты.
 
 ## Обновление SG-Panel
 
-Повторно запустите установочную команду из GitHub:
+Повторно запустите установочную команду или установщик из нового ZIP.
+
+Обновление сохраняет:
+
+- базу SQLite;
+- клиентов и статистику;
+- текущий HTTP/HTTPS режим;
+- домен и порт панели;
+- рабочую Xray-конфигурацию до подтверждения новой.
+
+При ошибке installer возвращает прежние файлы, SQLite и конфигурацию Xray.
+
+## Сертификаты
+
+Let's Encrypt продлевается системным Certbot. После продления deploy-hook обновляет runtime-копии, необходимые Xray TLS/Hysteria.
+
+Проверка:
 
 ```bash
-sudo apt-get update && sudo apt-get install -y curl ca-certificates unzip && curl -fsSL https://raw.githubusercontent.com/s-gor/sg-panel/main/install-from-github.sh -o /tmp/install-sg-panel.sh && bash -n /tmp/install-sg-panel.sh && chmod 700 /tmp/install-sg-panel.sh && sudo bash /tmp/install-sg-panel.sh
+sudo certbot certificates
+systemctl list-timers | grep -i certbot
 ```
 
-Установщик обнаружит существующую панель и перейдёт в режим обновления.
-
-Перед заменой файлов создаётся резервная копия.
-
-## Изменение HTTP/HTTPS, домена или порта панели
-
-Откройте:
-
-```text
-Безопасность → Доступ к панели
-```
-
-Здесь можно:
-
-- оставить HTTP для локальной VM или SSH-туннеля;
-- включить HTTPS + Let's Encrypt;
-- изменить IP/hostname или домен;
-- изменить публичный порт панели;
-- вернуться с HTTPS на HTTP.
-
-Параметр установщика `--reconfigure` используется только для адреса Xray и Reality target/SNI. Он больше не меняет доступ к панели.
-
-## Сертификат Let's Encrypt
-
-Этот раздел нужен только после включения HTTPS в «Безопасность → Доступ к панели».
-
-Проверка автоматического продления:
+## Службы
 
 ```bash
-sudo certbot renew --dry-run
+systemctl status xpanel-web
+systemctl status xray
+systemctl status nginx
+systemctl status xpanel-traffic.timer
 ```
-
-Ожидается успешное завершение dry-run.
-
-Для HTTP-01 порт `80/tcp` должен быть доступен из интернета.
-
-## Страница-заглушка
-
-Рабочий файл:
-
-```text
-/var/www/sg-panel-placeholder/index.html
-```
-
-Эталонная копия:
-
-```text
-/var/www/sg-panel-placeholder/index.default.html
-```
-
-Восстановление стандартной страницы:
-
-```bash
-sudo cp /var/www/sg-panel-placeholder/index.default.html /var/www/sg-panel-placeholder/index.html
-sudo nginx -t && sudo systemctl reload nginx
-```
-
-Доступность после включения HTTPS панели:
-
-```text
-HTTP 80              HTTP-01 и страница-заглушка
-выбранный порт        HTTPS-панель
-HTTPS 443             только при XHTTP + TLS
-```
-
-В профилях REALITY порт `443` занимает Xray. Административная панель всегда остаётся на отдельном выбранном порту.
-
-## Оптимизация небольшого EC2
-
-Для сервера с `1 ГиБ` RAM установщик:
-
-- создаёт swap `2 ГиБ`;
-- запускает Waitress с ограниченным числом потоков;
-- оставляет Stats API выключенным по умолчанию;
-- выполняет периодическое обслуживание.
-
-Для личного сервера и небольшого количества пользователей такой конфигурации обычно достаточно.
-
-Проверка памяти:
-
-```bash
-free -h
-```
-
-Проверка диска:
-
-```bash
-df -h /
-```
-
-## Основные службы
-
-```bash
-systemctl is-active xpanel-web
-systemctl is-active xray
-systemctl is-active nginx
-systemctl is-active xpanel-maintenance.timer
-systemctl is-active xpanel-traffic.timer
-```
-
-Перезапуск служб для диагностики доступен на странице **Diagnostics**.
 
 ## Основные пути
 
@@ -117,43 +89,25 @@ systemctl is-active xpanel-traffic.timer
 /opt/xpanel-mvp/data/panel.db
 /usr/local/etc/xray/config.json
 /etc/xpanel-mvp/web.env
-/etc/xpanel-mvp/warp
+/etc/xpanel-mvp/panel-access.env
 /root/sg-panel-backups
-/var/www/sg-panel-placeholder
 ```
 
-## Полная очистка тестового EC2
+## Небольшой сервер
 
-Используется только на одноразовом сервере без других сайтов и сертификатов:
+На машине с 1 ГиБ RAM файловый кэш может занимать значительную часть памяти — это нормально. Оценивайте `MemAvailable`, swap activity и состояние процессов.
 
-```bash
-sudo bash deploy/purge-test-server.sh --destroy-test-server
-```
+Не очищайте Linux cache по расписанию: это обычно ухудшает работу.
 
-Скрипт требует подтверждение:
+## Коллектор трафика
 
-```text
-DELETE ALL
-```
-
-
-## Сбор долговременной статистики трафика
-
-Таймер `xpanel-traffic.timer` запускает коллектор примерно раз в минуту.
+Timer раз в минуту сохраняет прирост Xray Stats API в SQLite.
 
 Проверка:
 
 ```bash
-systemctl status xpanel-traffic.timer --no-pager
-systemctl status xpanel-traffic.service --no-pager
-journalctl -u xpanel-traffic.service -n 50 --no-pager
-```
-
-Ручной запуск:
-
-```bash
+systemctl is-active xpanel-traffic.timer
+systemctl list-timers xpanel-traffic.timer
 cd /opt/xpanel-mvp
-sudo .venv/bin/python -m xpanel collect-traffic --online
+sudo .venv/bin/python -m xpanel collect-traffic --online --strict
 ```
-
-Коллектор не изменяет конфигурацию Xray и не перезапускает службу. Он только читает локальный Stats API и сохраняет прирост в `panel.db`.
