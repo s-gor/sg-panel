@@ -35,6 +35,12 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 from . import __version__
 from .db import connect, db_path, init_db, use_db_path
+from .update_manager import (
+    check_for_updates,
+    get_update_status,
+    start_panel_update,
+    update_in_progress,
+)
 from .security import (
     create_admin_session,
     get_security_settings,
@@ -655,7 +661,7 @@ def create_app(test_config: dict | None = None) -> Flask:
     def protect_requests():
         g.client_ip = client_ip()
         endpoint = request.endpoint or ""
-        if endpoint == "static":
+        if endpoint in {"static", "health"}:
             return None
         settings = get_security_settings()
 
@@ -724,6 +730,15 @@ def create_app(test_config: dict | None = None) -> Flask:
             except Exception:
                 pass
         return response
+
+    @app.get("/health")
+    def health():
+        if getattr(g, "client_ip", client_ip()) not in {"127.0.0.1", "::1"}:
+            abort(404)
+        return Response(
+            json.dumps({"ok": True}, ensure_ascii=False),
+            content_type="application/json; charset=utf-8",
+        )
 
     @app.get("/login")
     def login():
@@ -1921,6 +1936,95 @@ def create_app(test_config: dict | None = None) -> Flask:
         except ValueError as exc:
             flash(str(exc), "error")
         return redirect(url_for("backups_page"))
+
+    @app.get("/updates")
+    @login_required
+    def updates_page():
+        update_info = check_for_updates(
+            force=False, allow_network=not bool(app.config.get("TESTING"))
+        )
+        update_status = get_update_status()
+        labels = {
+            "idle": "НЕ ЗАПУСКАЛОСЬ",
+            "starting": "ПОДГОТОВКА",
+            "downloading": "ЗАГРУЗКА",
+            "verifying": "ПРОВЕРКА",
+            "backing_up": "РЕЗЕРВНАЯ КОПИЯ",
+            "installing": "УСТАНОВКА",
+            "validating": "КОНТРОЛЬ",
+            "success": "ГОТОВО",
+            "rollback": "ОТКАТ",
+            "rolled_back": "ВОССТАНОВЛЕНО",
+            "error": "ОШИБКА",
+            "unknown": "НЕИЗВЕСТНО",
+        }
+        state = str(update_status.get("state") or "idle")
+        state_class = (
+            "success" if state == "success"
+            else "danger" if state in {"error", "rolled_back"}
+            else "warning" if state in {
+                "starting", "downloading", "verifying", "backing_up",
+                "installing", "validating", "rollback",
+            }
+            else ""
+        )
+        return render_template(
+            "updates.html",
+            update_info=update_info,
+            update_status=update_status,
+            update_running=update_in_progress(),
+            update_state_label=labels.get(state, state.upper()),
+            update_state_class=state_class,
+        )
+
+    @app.post("/updates/check")
+    @login_required
+    def updates_check():
+        try:
+            info = check_for_updates(force=True, allow_network=True)
+            if info.get("error"):
+                raise XPanelError(str(info["error"]))
+            if info.get("available"):
+                flash(f"Доступна версия {info['latest']}", "success")
+            else:
+                flash("Установлена актуальная версия SG-Panel", "success")
+        except (OSError, ValueError, XPanelError) as exc:
+            flash(f"Не удалось проверить обновления: {exc}", "error")
+        return redirect(url_for("updates_page"))
+
+    @app.post("/updates/start")
+    @login_required
+    def updates_start():
+        try:
+            info = check_for_updates(force=True, allow_network=True)
+            if info.get("error"):
+                raise XPanelError(str(info["error"]))
+            version = request.form.get("version", "").strip()
+            ref = request.form.get("ref", "").strip()
+            if (
+                not info.get("available")
+                or version != str(info.get("latest") or "")
+                or ref != str(info.get("latest_ref") or "")
+            ):
+                raise ValueError(
+                    "Данные о версии изменились. Нажмите «Проверить сейчас» и повторите обновление"
+                )
+            result = start_panel_update(version, ref)
+            flash(
+                f"Обновление до {result['version']} запущено. Следите за живым журналом.",
+                "success",
+            )
+        except (OSError, ValueError, PermissionError, XPanelError) as exc:
+            flash(str(exc), "error")
+        return redirect(url_for("updates_page", watch="1"))
+
+    @app.get("/updates/status")
+    @login_required
+    def updates_status():
+        return Response(
+            json.dumps(get_update_status(), ensure_ascii=False),
+            content_type="application/json; charset=utf-8",
+        )
 
     @app.get("/diagnostics")
     @login_required

@@ -6486,3 +6486,40 @@ html[data-resolved-theme="light"] .memory-dial-center .memory-dial-status { colo
   .link-grid .qr-frame { width: min(205px, 100%); }
 }
 
+
+/* RC34 Updates: safe in-panel updater with live progress */
+.updates-page .update-page { display: grid; gap: 16px; }
+.update-summary-grid { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 12px; }
+.update-metric-card { min-width: 0; padding: 18px 20px; }
+.update-metric-card span,.update-metric-card strong,.update-metric-card small { display: block; }
+.update-metric-card span { color: var(--muted); font-size: 9px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+.update-metric-card strong { margin-top: 8px; color: var(--text); font-size: 18px; overflow-wrap: anywhere; }
+.update-metric-card small { margin-top: 5px; color: var(--muted); font-size: 10px; line-height: 1.45; }
+.update-protection-card strong { color: #66d99a; }
+.update-action-card { display: flex; align-items: center; justify-content: space-between; gap: 28px; padding: 22px; }
+.update-action-copy { max-width: 780px; }
+.update-action-copy h2 { margin: 4px 0 8px; }
+.update-action-copy > p:last-of-type { margin: 0; color: var(--muted); line-height: 1.55; }
+.update-action-buttons { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 10px; }
+.update-action-buttons form { margin: 0; }
+.update-safety-flow { display: grid; grid-template-columns: repeat(5,minmax(0,1fr)); gap: 10px; padding: 0 20px 20px; }
+.update-safety-flow > div { min-width: 0; padding: 15px; border: 1px solid var(--line); border-radius: 10px; background: rgba(255,255,255,.018); }
+.update-safety-flow span { display: inline-grid; width: 25px; height: 25px; place-items: center; border-radius: 50%; background: rgba(102,217,154,.13); color: #66d99a; font-size: 11px; font-weight: 800; }
+.update-safety-flow strong,.update-safety-flow small { display: block; }
+.update-safety-flow strong { margin-top: 10px; color: var(--text); font-size: 12px; }
+.update-safety-flow small { margin-top: 6px; color: var(--muted); font-size: 10px; line-height: 1.5; }
+.update-live-line { display: flex; align-items: center; gap: 10px; margin: 0 20px 12px; padding: 11px 14px; border: 1px solid var(--line); border-radius: 9px; background: rgba(255,255,255,.018); }
+.update-live-line strong { color: var(--text); font-size: 11px; }
+.update-live-line small { margin-left: auto; color: var(--muted); font-size: 10px; }
+.update-spinner { display: block; width: 15px; height: 15px; border: 2px solid rgba(102,217,154,.25); border-top-color: #66d99a; border-radius: 50%; opacity: .35; }
+.update-live-line.is-running .update-spinner { opacity: 1; animation: update-spin .8s linear infinite; }
+@keyframes update-spin { to { transform: rotate(360deg); } }
+.update-log { min-height: 220px; max-height: 460px; margin: 0 20px 20px; padding: 16px; overflow: auto; border: 1px solid var(--line); border-radius: 9px; background: #080d13; color: #b9c7d6; font: 10.5px/1.6 ui-monospace,SFMono-Regular,Consolas,monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
+.update-result-actions { padding: 0 20px 20px; }
+.update-manual-card .advanced-body { padding: 0 20px 20px; }
+.update-manual-card pre { overflow: auto; }
+html[data-resolved-theme="light"] .update-safety-flow > div,html[data-resolved-theme="light"] .update-live-line { background: #f7f9fc; }
+html[data-resolved-theme="light"] .update-log { background: #111923; color: #d9e3ee; }
+@media(max-width:1250px){.update-summary-grid{grid-template-columns:repeat(2,minmax(0,1fr));}.update-safety-flow{grid-template-columns:repeat(3,minmax(0,1fr));}}
+@media(max-width:820px){.update-action-card{align-items:stretch;flex-direction:column;}.update-action-buttons,.update-action-buttons form,.update-action-buttons .button{width:100%;}.update-safety-flow{grid-template-columns:1fr 1fr;}}
+@media(max-width:600px){.update-summary-grid,.update-safety-flow{grid-template-columns:1fr;}.update-log{min-height:180px;margin-left:14px;margin-right:14px}.update-live-line{margin-left:14px;margin-right:14px;align-items:flex-start;flex-wrap:wrap}.update-live-line small{width:100%;margin-left:25px}}

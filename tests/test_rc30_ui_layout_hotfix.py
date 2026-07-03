@@ -40,7 +40,7 @@ def test_hysteria_heading_uses_full_width_and_keeps_actions_on_left():
 def test_stylesheet_cache_key_is_updated_everywhere():
     for name in ("base.html", "login.html"):
         template = (ROOT / "xpanel/templates" / name).read_text(encoding="utf-8")
-        assert "?v={{ xpanel_version }}-rc30hf7-ui" in template
+        assert "?v={{ xpanel_version }}-rc34-updates-ui" in template
 
 
 def test_network_status_cards_use_one_desktop_row_with_existing_responsive_fallbacks():

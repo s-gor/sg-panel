@@ -19,7 +19,7 @@
   <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}?v={{ xpanel_version }}">
   <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='apple-touch-icon.png') }}?v={{ xpanel_version }}">
 <title>{% block title %}SG-Panel{% endblock %}</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}?v={{ xpanel_version }}-rc30hf7-ui">
+  <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}?v={{ xpanel_version }}-rc34-updates-ui">
 </head>
 <body class="app-body ui-v097-standard rc20-awg-shell">
 {% set endpoint = request.endpoint or '' %}
@@ -28,7 +28,7 @@
 {% set is_xray = endpoint.startswith('settings_') or endpoint == 'settings_page' or endpoint.startswith('config_') or endpoint == 'config_page' %}
 {% set is_network = endpoint.startswith('routing_') or endpoint == 'routing_page' or endpoint.startswith('outbound_') or endpoint == 'outbounds_page' or endpoint.startswith('warp_') or endpoint.startswith('dns_') or endpoint == 'dns_page' %}
 {% set is_security = endpoint.startswith('security_') or endpoint == 'security_page' or endpoint.startswith('panel_access_') %}
-{% set is_maintenance = endpoint.startswith('backups_') or endpoint == 'backups_page' %}
+{% set is_maintenance = endpoint.startswith('backups_') or endpoint == 'backups_page' or endpoint.startswith('updates_') or endpoint == 'updates_page' %}
 <div class="app-grid" aria-hidden="true"></div>
 <div class="shell">
   <aside class="sidebar" id="sidebar">
@@ -62,7 +62,7 @@
       </a>
       <a href="{{ url_for('backups_page') }}" class="{% if is_maintenance %}active{% endif %}">
         <svg viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v7c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12v7c0 1.7 3.6 3 8 3s8-1.3 8-3v-7"/></svg>
-        <span><b>Maintenance</b><small>Копии и обслуживание</small></span>
+        <span><b>Maintenance</b><small>Копии и обновления</small></span>
       </a>
     </nav>
     {# Stable technical workflow markers retained for compatibility and automated audits. #}
@@ -124,7 +124,8 @@
       {% elif is_security %}
         <a class="active" href="{{ url_for('security_page') }}">Panel Access &amp; Security</a>
       {% elif is_maintenance %}
-        <a class="active" href="{{ url_for('backups_page') }}">Backups</a>
+        <a class="{% if endpoint.startswith('backups_') or endpoint == 'backups_page' %}active{% endif %}" href="{{ url_for('backups_page') }}">Backups</a>
+        <a class="{% if endpoint.startswith('updates_') or endpoint == 'updates_page' %}active{% endif %}" href="{{ url_for('updates_page') }}">Updates</a>
       {% endif %}
     </nav>
 

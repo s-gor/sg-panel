@@ -35,8 +35,10 @@ mkdir -p \
   "$PROJECT_DIR/backups" \
   /usr/local/etc/xray \
   /etc/nginx \
-  /var/www/sg-panel-placeholder
+  /var/www/sg-panel-placeholder \
+  /var/lib/sg-panel-update
 chmod 0755 /var/www/sg-panel-placeholder
+chmod 0700 /var/lib/sg-panel-update
 
 cat > "$SERVICE_FILE" <<UNIT
 [Unit]
@@ -58,7 +60,7 @@ NoNewPrivileges=false
 PrivateTmp=true
 ProtectHome=true
 ProtectSystem=full
-ReadWritePaths=$PROJECT_DIR/data $PROJECT_DIR/backups /etc/xpanel-mvp /usr/local/etc/xray /etc/nginx /var/www/sg-panel-placeholder
+ReadWritePaths=$PROJECT_DIR/data $PROJECT_DIR/backups /etc/xpanel-mvp /usr/local/etc/xray /etc/nginx /var/www/sg-panel-placeholder /var/lib/sg-panel-update
 
 [Install]
 WantedBy=multi-user.target

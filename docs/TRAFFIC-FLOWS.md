@@ -132,6 +132,6 @@ SG-Panel формирует актуальную ссылку текущего I
 127.0.0.1:8443   внутренний Xray для XHTTP + TLS
 PUBLIC:61443     публичный порт панели
 PUBLIC:80        SG-заглушка и HTTP-01
-PUBLIC:443/tcp   VLESS или HTTPS/fallback
+PUBLIC:443/tcp   VLESS и обычный HTTPS/fallback на локальную SG-заглушку
 PUBLIC:443/udp   Hysteria 2
 ```

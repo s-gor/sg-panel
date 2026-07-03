@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+{% block title %}Обновления — SG-Panel{% endblock %}
+{% block section %}MAINTENANCE{% endblock %}
+{% block heading %}Maintenance{% endblock %}
+{% block subtitle %}Проверка версии, безопасное обновление и автоматический откат{% endblock %}
+{% block content %}
+<script>document.body.classList.add('ui-standard-page','updates-page');</script>
+<div class="ui-page ui-page-wide update-page" data-update-state="{{ update_status.state }}">
+  <section class="update-summary-grid">
+    <article class="ui-card update-metric-card">
+      <span>Установлена</span>
+      <strong>{{ update_info.current }}</strong>
+      <small>Текущая версия SG-Panel</small>
+    </article>
+    <article class="ui-card update-metric-card">
+      <span>Последняя версия</span>
+      <strong>{{ update_info.latest or 'Не определена' }}</strong>
+      <small>{{ update_info.checked_at or 'Проверка ещё не выполнялась' }}</small>
+    </article>
+    <article class="ui-card update-metric-card">
+      <span>Последняя операция</span>
+      <strong data-update-state-label>{{ update_state_label }}</strong>
+      <small data-update-state-time>{{ update_status.updatedAt or 'Обновление ещё не запускалось' }}</small>
+    </article>
+    <article class="ui-card update-metric-card update-protection-card">
+      <span>Защита обновления</span>
+      <strong>Автоматический откат</strong>
+      <small>Перед изменением создаётся полная страховочная копия</small>
+    </article>
+  </section>
+
+  <section class="ui-card update-action-card">
+    <div class="update-action-copy">
+      <p class="panel-kicker">ПРОВЕРКА ВЕРСИИ</p>
+      <h2>{{ 'Доступна новая версия' if update_info.available else 'SG-Panel обновлена' }}</h2>
+      <p>Проверка выполняется по опубликованным тегам официального репозитория SG-Panel. Установка запускается отдельной системной операцией и не зависит от открытой страницы браузера.</p>
+      {% if update_info.error %}<div class="alert error"><span>{{ update_info.error }}</span></div>{% endif %}
+    </div>
+    <div class="update-action-buttons">
+      <form method="post" action="{{ url_for('updates_check') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button class="button secondary" type="submit" {% if update_running %}disabled{% endif %}>Проверить сейчас</button>
+      </form>
+      {% if update_info.available %}
+      <form method="post" action="{{ url_for('updates_start') }}" onsubmit="return confirm('Обновить SG-Panel до {{ update_info.latest }}?\n\nПеред установкой будет создана полная страховочная копия. При любой ошибке предыдущая рабочая версия восстановится автоматически.')">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="version" value="{{ update_info.latest }}">
+        <input type="hidden" name="ref" value="{{ update_info.latest_ref }}">
+        <button class="button primary" type="submit" {% if update_running %}disabled{% endif %}>Обновить до {{ update_info.latest }}</button>
+      </form>
+      {% else %}
+      <button class="button primary" type="button" disabled>Новая версия не обнаружена</button>
+      {% endif %}
+    </div>
+  </section>
+
+  <section class="ui-card update-safety-card">
+    <header class="ui-card-heading"><div><p class="panel-kicker">БЕЗОПАСНЫЙ ПРОЦЕСС</p><h2>Что происходит во время обновления</h2><p>Пользовательские настройки не создаются заново. Updater сохраняет текущее рабочее состояние и возвращает его при любой ошибке.</p></div></header>
+    <div class="update-safety-flow">
+      <div><span>1</span><strong>Проверка кандидата</strong><small>Версия, Python, Jinja и shell-скрипты проверяются до остановки панели</small></div>
+      <div><span>2</span><strong>Полная копия</strong><small>SQLite, Xray, WARP, Nginx, HTTPS, заглушка, сертификаты и systemd</small></div>
+      <div><span>3</span><strong>Установка</strong><small>Обновляются файлы приложения и зависимости, данные сохраняются</small></div>
+      <div><span>4</span><strong>Контроль</strong><small>Локальный health, xray run -test, Xray, Nginx и таймеры</small></div>
+      <div><span>5</span><strong>Rollback</strong><small>При ошибке автоматически возвращается предыдущая рабочая версия</small></div>
+    </div>
+  </section>
+
+  <section class="ui-card update-progress-card" data-update-progress>
+    <header class="ui-card-heading ui-card-heading-row">
+      <div><p class="panel-kicker">ЖИВОЙ ЖУРНАЛ</p><h2 data-update-title>{{ update_status.message or 'Обновление ещё не запускалось' }}</h2><p>Во время перезапуска панели соединение с этой страницей может кратковременно пропасть. Журнал продолжит обновляться после восстановления службы.</p></div>
+      <span class="pill {{ update_state_class }}" data-update-badge>{{ update_state_label }}</span>
+    </header>
+    <div class="update-live-line {{ 'is-running' if update_running else '' }}" data-update-live-line>
+      <span class="update-spinner" aria-hidden="true"></span>
+      <strong data-update-live-message>{{ update_status.message or 'Ожидание операции' }}</strong>
+      <small data-update-elapsed></small>
+    </div>
+    <pre class="update-log" data-update-log>{{ update_status.log or '[SG-Panel Update] Журнал появится после запуска обновления.' }}</pre>
+    <div class="ui-actions update-result-actions" data-update-result-actions hidden>
+      <a class="button primary" href="{{ url_for('updates_page') }}">Обновить данные страницы</a>
+    </div>
+  </section>
+
+  <details class="ui-card advanced update-manual-card">
+    <summary>Запасной ручной способ</summary>
+    <div class="advanced-body">
+      <p>Если веб-интерфейс недоступен, распакуйте новый проверенный ZIP и запустите updater из корня нового исходного кода:</p>
+      <pre><code>cd /home/ubuntu/sg-panel-main
+sudo bash deploy/update-from-local-source.sh</code></pre>
+      <p>Ручной запуск использует тот же механизм страховочной копии, проверок и автоматического отката.</p>
+    </div>
+  </details>
+</div>
+<script>
+(() => {
+  const root = document.querySelector('[data-update-progress]');
+  if (!root) return;
+  const badge = root.querySelector('[data-update-badge]');
+  const title = root.querySelector('[data-update-title]');
+  const log = root.querySelector('[data-update-log]');
+  const line = root.querySelector('[data-update-live-line]');
+  const message = root.querySelector('[data-update-live-message]');
+  const elapsed = root.querySelector('[data-update-elapsed]');
+  const actions = root.querySelector('[data-update-result-actions]');
+  const labels = {
+    idle: 'НЕ ЗАПУСКАЛОСЬ', starting: 'ПОДГОТОВКА', downloading: 'ЗАГРУЗКА',
+    verifying: 'ПРОВЕРКА', backing_up: 'РЕЗЕРВНАЯ КОПИЯ', installing: 'УСТАНОВКА',
+    validating: 'КОНТРОЛЬ', success: 'ГОТОВО', rollback: 'ОТКАТ',
+    rolled_back: 'ВОССТАНОВЛЕНО', error: 'ОШИБКА', unknown: 'НЕИЗВЕСТНО'
+  };
+  const running = new Set(['starting','downloading','verifying','backing_up','installing','validating','rollback']);
+  const startedAt = Date.now();
+  let timer = null;
+  const render = (data) => {
+    const state = String(data.state || 'unknown');
+    const text = String(data.message || labels[state] || state);
+    badge.textContent = labels[state] || state.toUpperCase();
+    badge.className = 'pill ' + (state === 'success' ? 'success' : (state === 'rolled_back' || state === 'error' ? 'danger' : (running.has(state) ? 'warning' : '')));
+    title.textContent = text;
+    message.textContent = text;
+    log.textContent = data.log || '[SG-Panel Update] Журнал пока пуст.';
+    log.scrollTop = log.scrollHeight;
+    line.classList.toggle('is-running', running.has(state));
+    actions.hidden = running.has(state) || state === 'idle';
+    if (running.has(state)) {
+      elapsed.textContent = Math.max(0, Math.floor((Date.now() - startedAt) / 1000)) + ' сек';
+    } else {
+      elapsed.textContent = '';
+    }
+    return running.has(state);
+  };
+  const poll = async () => {
+    try {
+      const response = await fetch('{{ url_for('updates_status') }}', {cache: 'no-store'});
+      if (!response.ok) throw new Error('HTTP ' + response.status);
+      const data = await response.json();
+      const keep = render(data);
+      if (!keep && timer) { clearInterval(timer); timer = null; }
+    } catch (error) {
+      line.classList.add('is-running');
+      message.textContent = 'Панель перезапускается. Ожидаю восстановление соединения…';
+    }
+  };
+  const initialState = '{{ update_status.state }}';
+  if (running.has(initialState)) {
+    timer = window.setInterval(poll, 1500);
+    poll();
+  }
+})();
+</script>
+{% endblock %}
