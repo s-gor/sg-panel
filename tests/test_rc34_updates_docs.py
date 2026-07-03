@@ -17,7 +17,7 @@ def test_rc34_documentation_describes_real_update_workflow():
     maintenance = (ROOT / "docs" / "MAINTENANCE.md").read_text(encoding="utf-8")
     release = (ROOT / "RELEASE-NOTES-RC34.md").read_text(encoding="utf-8")
 
-    assert "v0.10.0-rc34" in readme
+    assert "v0.10.0-rc35" in readme
     assert "Maintenance → Updates" in readme
     assert "Проверить сейчас" in readme
     assert "автоматический rollback" in readme
@@ -54,7 +54,7 @@ def test_all_relative_markdown_links_resolve_and_fences_are_balanced():
 def test_current_user_docs_do_not_reintroduce_old_profile_count_or_fixed_xhttp_mode():
     current = "\n".join(
         (ROOT / name).read_text(encoding="utf-8")
-        for name in ("README.md", "RELEASE-NOTES-RC34.md")
+        for name in ("README.md", "RELEASE-NOTES-RC34.md", "RELEASE-NOTES-RC35.md")
     ) + "\n" + "\n".join(
         path.read_text(encoding="utf-8") for path in (ROOT / "docs").glob("*.md")
     )

@@ -254,7 +254,12 @@ for _ in {1..30}; do
   sleep 1
 done
 curl -fsS --max-time 5 -H "Host: $HOST" "http://127.0.0.1:$PUBLIC_PORT/login" >/dev/null
-curl -fsS --max-time 5 -H "Host: $HOST" "http://127.0.0.1/" | grep -q "SG Digital Systems"
+PLACEHOLDER_CHECK="$BACKUP_DIR/placeholder-check.html"
+curl -fsS --max-time 5 -H "Host: $HOST" \
+  --output "$PLACEHOLDER_CHECK" \
+  "http://127.0.0.1/"
+grep -Fq "SG Digital Systems" "$PLACEHOLDER_CHECK" || \
+  fail "локальная HTTP-заглушка не прошла проверку"
 
 COMMITTED=1
 trap - ERR INT TERM

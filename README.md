@@ -2,7 +2,7 @@
 
 Система развёртывания и обслуживания собственного Xray-сервера с веб-панелью управления.
 
-![Version](https://img.shields.io/badge/version-v0.10.0--rc34-3974c6)
+![Version](https://img.shields.io/badge/version-v0.10.0--rc35-3974c6)
 ![Ubuntu](https://img.shields.io/badge/Ubuntu-24.04-E95420?logo=ubuntu&logoColor=white)
 ![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)
 ![Xray](https://img.shields.io/badge/Xray-v26.5.9-5b8def)
@@ -22,7 +22,7 @@ SG-Panel / Xray Server
     +-- Outbound ------> Интернет через другой Xray-сервер
 ```
 
-> Текущая версия приложения: `v0.10.0-rc34`.
+> Текущая версия приложения: `v0.10.0-rc35`.
 
 ## Что делает SG-Panel
 
@@ -279,6 +279,10 @@ sudo bash /opt/xpanel-mvp/FULL-UNINSTALL-SG-PANEL.sh --yes
 ```
 
 Скрипт удаляет SG-Panel, Xray, WARP, Nginx, Certbot, сертификаты, fallback/заглушку, резервные копии и swap. SSH, сеть Ubuntu, пользовательские файлы в `/home` и Security Group EC2 не изменяются.
+
+## Исправление RC35
+
+RC35 исправляет ложное падение первичной HTTP-установки на этапе проверки локальной SG-заглушки. Ошибка `curl: (23) Failed writing body` возникала из-за сочетания `set -o pipefail` и раннего завершения `grep -q`, а не из-за Reality target или SNI. Проверка HTTP- и HTTPS-заглушек теперь сначала сохраняет ответ во временный файл и только затем проверяет его содержимое.
 
 ## Новое в RC34
 

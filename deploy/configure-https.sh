@@ -302,11 +302,13 @@ wait_for_https(){
 
 wait_for_fallback(){
   local attempt
+  local body_file="$BACKUP_DIR/fallback-check.html"
   printf '%s %s\n' '[SG-Panel HTTPS]' "Проверяю локальную HTTPS-заглушку https://$DOMAIN/"
   for ((attempt=1; attempt<=15; attempt++)); do
     if curl -kfsS --max-time 5 \
       --resolve "$DOMAIN:443:127.0.0.1" \
-      "https://$DOMAIN/" | grep -q 'SG Digital Systems'; then
+      --output "$body_file" \
+      "https://$DOMAIN/" && grep -Fq 'SG Digital Systems' "$body_file"; then
       return 0
     fi
     sleep 1
