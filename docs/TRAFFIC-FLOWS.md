@@ -33,7 +33,7 @@ TCP 443 → Nginx stream SNI-router
 ## XHTTP + REALITY
 
 ```text
-Клиент VLESS XHTTP REALITY, mode auto
+Клиент VLESS XHTTP REALITY, выбранный XHTTP mode
     ↓ TCP 443
 Nginx stream SNI-router при включённом fallback
     ├─ Reality SNI → Xray XHTTP + REALITY
@@ -54,15 +54,6 @@ Nginx TLS
 
 SNI клиента должен соответствовать сертификату.
 
-## gRPC + TLS
-
-```text
-Клиент VLESS gRPC TLS
-    ↓ TCP 443, HTTP/2
-Nginx TLS
-    ├─ gRPC service → Xray 127.0.0.1:8443
-    └─ другие запросы → локальная SG-заглушка
-```
 
 ## Hysteria 2 + TLS
 
@@ -138,7 +129,7 @@ SG-Panel формирует актуальную ссылку текущего I
 
 ```text
 127.0.0.1:8080   backend SG-Panel
-127.0.0.1:8443   Xray для XHTTP/gRPC TLS
+127.0.0.1:8443   внутренний Xray для XHTTP + TLS
 PUBLIC:61443     публичный порт панели
 PUBLIC:80        SG-заглушка и HTTP-01
 PUBLIC:443/tcp   VLESS или HTTPS/fallback

@@ -3,7 +3,7 @@
 В SG-Panel есть три разных понятия, которые важно не смешивать:
 
 1. HTTPS самой веб-панели;
-2. TLS для `XHTTP + TLS`, `gRPC + TLS` и Hysteria 2;
+2. TLS для `XHTTP + TLS` и Hysteria 2;
 3. fallback обычного браузерного HTTPS на локальный Nginx.
 
 ## HTTPS панели
@@ -60,11 +60,11 @@ Hysteria 2 получает отдельную runtime-копию закрыто
 
 Публичный адрес клиента остаётся `DOMAIN_OR_IP:443`.
 
-### XHTTP + TLS и gRPC + TLS
+### XHTTP + TLS
 
 Nginx сам принимает TLS на `443/tcp`:
 
-- клиентский path или gRPC service передаётся в Xray на `127.0.0.1:8443`;
+- клиентский XHTTP path передаётся в Xray на `127.0.0.1:8443`;
 - все остальные запросы получают локальную заглушку.
 
 ### Hysteria 2

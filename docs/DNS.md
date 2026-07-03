@@ -7,7 +7,7 @@
 Встроенный DNS полезен для:
 
 - разных upstream для разных доменов;
-- DoH, DoQ, TCP или UDP DNS;
+- UDP/TCP DNS, DoH и DoQ Local;
 - статических hosts-записей;
 - маршрутизации по `geoip` после разрешения домена;
 - исключения системного DNS провайдера.
@@ -60,6 +60,8 @@ https://1.1.1.1/dns-query
 https+local://1.1.1.1/dns-query
 quic+local://dns.example.com
 ```
+
+Обычный IP-адрес без схемы используется как UDP DNS. `https://` и `https+local://` задают DoH; `quic+local://` — DoQ Local. Отдельный DNS-over-TLS (`tls://`, DoT) текущая форма SG-Panel не принимает.
 
 Для каждого upstream можно задать:
 
