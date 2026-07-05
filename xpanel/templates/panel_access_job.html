@@ -11,10 +11,12 @@
       <div><p class="panel-kicker">ЖИВОЙ ЖУРНАЛ</p><h2 id="job-title">Подготовка {{ job.mode|upper }}</h2><p>Целевой адрес: <code>{{ job.target_url }}</code></p></div>
       <span class="pill warning" id="job-status"><i></i>{{ job.status }}</span>
     </header>
-    <div class="access-switch-state" id="switch-state"><span class="access-spinner" aria-hidden="true"></span><div><strong>Настройка выполняется</strong><p>Не закрывайте вкладку. После переключения SG-Panel автоматически откроет новый адрес.</p></div></div>
+    <div class="access-switch-state" id="switch-state"><span class="access-spinner" aria-hidden="true"></span><div><strong>Настройка выполняется</strong><p>Не закрывайте вкладку. После переключения SG-Panel автоматически перейдёт на новый адрес в этой же вкладке.</p></div></div>
     <pre class="terminal-box tall" id="job-log">{{ job.log or 'Задача поставлена в очередь…' }}</pre>
+    <div class="ui-warning-note"><span>i</span><p>Новое окно не открывается: автоматический переход выполняется в этой вкладке. Если JavaScript или расширение браузера помешает переходу, нажмите кнопку ниже. Старый HTTP-адрес после переключения также отвечает перенаправлением 308 на HTTPS.</p></div>
+    <noscript><div class="alert warning"><span>JavaScript отключён. Дождитесь завершения настройки и перейдите по новому адресу вручную.</span></div></noscript>
     <div class="ui-actions">
-      <a class="button primary" id="target-link" href="{{ job.target_url }}">Открыть новый адрес вручную</a>
+      <a class="button primary" id="target-link" href="{{ job.target_url }}" target="_self">Перейти на новый адрес вручную</a>
       <a class="button ghost" href="{{ url_for('security_page') }}">Вернуться в Безопасность</a>
     </div>
   </section>
@@ -45,7 +47,7 @@
     statusNode.textContent = 'готово';
     statusNode.className = 'pill enabled';
     stateNode.className = 'access-switch-state is-success';
-    stateNode.innerHTML = '<span class="access-success-mark">✓</span><div><strong>' + message + '</strong><p>Открываю новый адрес панели…</p></div>';
+    stateNode.innerHTML = '<span class="access-success-mark">✓</span><div><strong>' + message + '</strong><p>Перехожу на новый адрес в этой вкладке…</p></div>';
     window.setTimeout(() => window.location.replace(targetLoginUrl()), delay);
   }
 

@@ -14,7 +14,7 @@
     <article class="ui-status-card"><span>WARP mode</span><strong class="ui-value-compact">{{ warp.route_mode|upper }}</strong><small>{{ 'Outbound активен' if warp.enabled else 'Outbound не активен' }}</small></article>
   </section>
   <section class="ui-card routing-settings-card">
-    <header class="ui-card-heading ui-card-heading-row"><div><p class="panel-kicker">ОСНОВНЫЕ ПАРАМЕТРЫ</p><h2>Обработка трафика</h2><p>Выход по умолчанию, стратегия доменов и распознавание протоколов.</p></div><a class="button secondary" href="{{ url_for('routing_json_page') }}">{ } JSON routing</a></header>
+    <header class="ui-card-heading ui-card-heading-row"><div><p class="panel-kicker">ОСНОВНЫЕ ПАРАМЕТРЫ</p><h2>Обработка трафика <a class="context-help-link" href="{{ url_for('help_page') }}#network" title="Справка о маршрутизации" aria-label="Справка о маршрутизации">?</a></h2><p>Выход по умолчанию, стратегия доменов и распознавание протоколов.</p></div><a class="button secondary" href="{{ url_for('routing_json_page') }}">{ } JSON routing</a></header>
     <form method="post" action="{{ url_for('routing_settings_save') }}" class="ui-form routing-settings-form" data-validated-form>
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="routing-settings-grid">

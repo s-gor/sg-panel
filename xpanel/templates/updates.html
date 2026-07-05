@@ -2,60 +2,183 @@
 {% block title %}Обновления — SG-Panel{% endblock %}
 {% block section %}MAINTENANCE{% endblock %}
 {% block heading %}Maintenance{% endblock %}
-{% block subtitle %}Проверка версии, безопасное обновление и автоматический откат{% endblock %}
+{% block subtitle %}Раздельное безопасное обновление SG-Panel и Xray Core{% endblock %}
 {% block content %}
 <script>document.body.classList.add('ui-standard-page','updates-page');</script>
 <div class="ui-page ui-page-wide update-page" data-update-state="{{ update_status.state }}">
   <section class="update-summary-grid">
     <article class="ui-card update-metric-card">
-      <span>Установлена</span>
+      <span>SG-Panel</span>
       <strong>{{ update_info.current }}</strong>
-      <small>Текущая версия SG-Panel</small>
+      <small>Установленная версия панели</small>
     </article>
     <article class="ui-card update-metric-card">
-      <span>Последняя версия</span>
+      <span>Последняя SG-Panel</span>
       <strong>{{ update_info.latest or 'Не определена' }}</strong>
       <small>{{ update_info.checked_at or 'Проверка ещё не выполнялась' }}</small>
     </article>
     <article class="ui-card update-metric-card">
-      <span>Последняя операция</span>
-      <strong data-update-state-label>{{ update_state_label }}</strong>
-      <small data-update-state-time>{{ update_status.updatedAt or 'Обновление ещё не запускалось' }}</small>
+      <span>Xray Core</span>
+      <strong>{{ xray_stable_info.current or 'Не определена' }}</strong>
+      <small>Установленный серверный движок</small>
     </article>
     <article class="ui-card update-metric-card update-protection-card">
-      <span>Защита обновления</span>
+      <span>Защита обновлений</span>
       <strong>Автоматический откат</strong>
-      <small>Перед изменением создаётся полная страховочная копия</small>
+      <small>SG-Panel и Xray обновляются раздельно</small>
     </article>
   </section>
 
   <section class="ui-card update-action-card">
     <div class="update-action-copy">
-      <p class="panel-kicker">ПРОВЕРКА ВЕРСИИ</p>
-      <h2>{{ 'Доступна новая версия' if update_info.available else 'SG-Panel обновлена' }}</h2>
-      <p>Проверка выполняется по опубликованным тегам официального репозитория SG-Panel. Установка запускается отдельной системной операцией и не зависит от открытой страницы браузера.</p>
+      <p class="panel-kicker">SG-PANEL</p>
+      <h2>{{ 'Доступна новая версия панели' if update_info.available else 'Панель обновлена' }}</h2>
+      <p>Проверка выполняется по опубликованным тегам официального репозитория SG-Panel. Обновление запускается отдельной системной операцией и не зависит от открытой страницы браузера.</p>
       {% if update_info.error %}<div class="alert error"><span>{{ update_info.error }}</span></div>{% endif %}
     </div>
     <div class="update-action-buttons">
       <form method="post" action="{{ url_for('updates_check') }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <button class="button secondary" type="submit" {% if update_running %}disabled{% endif %}>Проверить сейчас</button>
+        <button class="button secondary" type="submit" {% if any_update_running %}disabled{% endif %}>Проверить SG-Panel</button>
       </form>
       {% if update_info.available %}
-      <form method="post" action="{{ url_for('updates_start') }}" onsubmit="return confirm('Обновить SG-Panel до {{ update_info.latest }}?\n\nПеред установкой будет создана полная страховочная копия. При любой ошибке предыдущая рабочая версия восстановится автоматически.')">
+      <form method="post" action="{{ url_for('updates_start') }}" data-inline-confirm data-confirm-title="Обновить SG-Panel до {{ update_info.latest }}?" data-confirm-message="Перед установкой будет создана полная страховочная копия. При любой ошибке предыдущая рабочая версия восстановится автоматически.">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <input type="hidden" name="version" value="{{ update_info.latest }}">
         <input type="hidden" name="ref" value="{{ update_info.latest_ref }}">
-        <button class="button primary" type="submit" {% if update_running %}disabled{% endif %}>Обновить до {{ update_info.latest }}</button>
+        <button class="button primary" type="submit" {% if any_update_running %}disabled{% endif %}>Обновить SG-Panel</button>
       </form>
       {% else %}
-      <button class="button primary" type="button" disabled>Новая версия не обнаружена</button>
+      <button class="button primary" type="button" disabled>Обновление не требуется</button>
       {% endif %}
     </div>
   </section>
 
+  <section class="ui-card xray-update-card">
+    <header class="ui-card-heading">
+      <div>
+        <p class="panel-kicker">XRAY CORE</p>
+        <h2>Обновление серверного Xray <a class="context-help-link" href="{{ url_for('help_page') }}#updates" title="Справка об обновлениях" aria-label="Справка об обновлениях">?</a></h2>
+        <p>Обновляется только бинарник Xray. База SG-Panel, пользователи, ссылки, три Hysteria Inbound, Nginx, HTTPS и сертификаты не изменяются.</p>
+      </div>
+      <span class="pill {{ xray_update_state_class }}">{{ xray_update_state_label }}</span>
+    </header>
+
+    <div class="xray-channel-grid">
+      <article class="xray-channel-card {{ 'is-selected' if request.args.get('xray_channel', 'stable') == 'stable' else '' }}">
+        <div class="xray-channel-heading">
+          <div>
+            <span class="xray-channel-label">STABLE</span>
+            <h3>Стабильная версия</h3>
+          </div>
+          <strong>{{ xray_stable_info.latest or 'Не определена' }}</strong>
+        </div>
+        <p>Обычный рекомендуемый канал. Предварительные релизы полностью игнорируются.</p>
+        {% if xray_stable_info.error %}
+          <div class="alert error"><span>{{ xray_stable_info.error }}</span></div>
+        {% elif xray_stable_info.available %}
+          <div class="xray-version-result success">Доступно обновление с {{ xray_stable_info.current }} до {{ xray_stable_info.latest }}</div>
+        {% elif xray_stable_info.installed_newer %}
+          <div class="xray-version-result neutral">Установленная версия {{ xray_stable_info.current }} новее стабильной {{ xray_stable_info.latest }}. Понижение заблокировано.</div>
+        {% else %}
+          <div class="xray-version-result neutral">Обновление стабильной версии не требуется.</div>
+        {% endif %}
+        <div class="xray-channel-actions">
+          <form method="post" action="{{ url_for('xray_updates_check') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="channel" value="stable">
+            <button class="button secondary" type="submit" {% if any_update_running %}disabled{% endif %}>Проверить</button>
+          </form>
+          {% if xray_stable_info.available %}
+          <form method="post" action="{{ url_for('xray_updates_start') }}" data-inline-confirm data-confirm-title="Обновить Xray с {{ xray_stable_info.current }} до стабильной {{ xray_stable_info.latest }}?" data-confirm-message="Сначала будет проверен SHA-256 и действующий config.json. При ошибке прежний Xray восстановится автоматически.">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="channel" value="stable">
+            <input type="hidden" name="version" value="{{ xray_stable_info.latest }}">
+            <button class="button primary" type="submit" {% if any_update_running %}disabled{% endif %}>Обновить Xray</button>
+          </form>
+          {% else %}
+          <button class="button primary" type="button" disabled>Обновлять нечего</button>
+          {% endif %}
+        </div>
+        <small>Последняя проверка: {{ xray_stable_info.checked_at or 'не выполнялась' }}</small>
+      </article>
+
+      <article class="xray-channel-card xray-prerelease-card {{ 'is-selected' if request.args.get('xray_channel') == 'prerelease' else '' }}">
+        <div class="xray-channel-heading">
+          <div>
+            <span class="xray-channel-label warning">PRE-RELEASE</span>
+            <h3>Предварительная версия</h3>
+          </div>
+          <strong>{{ xray_prerelease_info.latest or 'Не определена' }}</strong>
+        </div>
+        <p>Только для осознанного теста новых функций. Этот канал никогда не выбирается автоматически.</p>
+        {% if xray_prerelease_info.error %}
+          <div class="alert error"><span>{{ xray_prerelease_info.error }}</span></div>
+        {% elif xray_prerelease_info.available %}
+          <div class="xray-version-result warning">Можно протестировать обновление с {{ xray_prerelease_info.current }} до {{ xray_prerelease_info.latest }}.</div>
+        {% elif xray_prerelease_info.installed_newer %}
+          <div class="xray-version-result neutral">Установленная версия новее найденного предварительного релиза. Понижение заблокировано.</div>
+        {% else %}
+          <div class="xray-version-result neutral">Установлена эта или более новая версия.</div>
+        {% endif %}
+        <div class="xray-channel-actions">
+          <form method="post" action="{{ url_for('xray_updates_check') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="channel" value="prerelease">
+            <button class="button secondary" type="submit" {% if any_update_running %}disabled{% endif %}>Проверить</button>
+          </form>
+          {% if xray_prerelease_info.available %}
+          <form method="post" action="{{ url_for('xray_updates_start') }}" data-inline-confirm data-confirm-title="Установить предварительную версию Xray {{ xray_prerelease_info.latest }}?" data-confirm-message="Это тестовый канал. SG-Panel сохранит текущий бинарник и автоматически вернёт его, если новый Xray не пройдёт проверку или не запустит Inbound.">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="channel" value="prerelease">
+            <input type="hidden" name="version" value="{{ xray_prerelease_info.latest }}">
+            <button class="button warning" type="submit" {% if any_update_running %}disabled{% endif %}>Установить для теста</button>
+          </form>
+          {% else %}
+          <button class="button warning" type="button" disabled>Обновлять нечего</button>
+          {% endif %}
+        </div>
+        <small>Последняя проверка: {{ xray_prerelease_info.checked_at or 'не выполнялась' }}</small>
+      </article>
+    </div>
+
+    <div class="xray-update-guards">
+      <span>SHA-256 из официального `.dgst`</span>
+      <span>Проверка нового бинарника</span>
+      <span>`xray run -test` до установки</span>
+      <span>Контроль всех активных Inbound</span>
+      <span>Автоматический откат</span>
+    </div>
+  </section>
+
+  <section class="ui-card update-progress-card" data-update-progress data-update-endpoint="{{ url_for('xray_updates_status') }}" data-update-kind="xray">
+    <header class="ui-card-heading ui-card-heading-row">
+      <div>
+        <p class="panel-kicker">ЖУРНАЛ XRAY</p>
+        <h2 data-update-title>{{ xray_update_status.message or 'Обновление Xray ещё не запускалось' }}</h2>
+        <p>После запуска журнал обновляется автоматически. Краткий перезапуск Xray ожидаем и занимает только время запуска службы.</p>
+      </div>
+      <span class="pill {{ xray_update_state_class }}" data-update-badge>{{ xray_update_state_label }}</span>
+    </header>
+    <div class="update-live-line {{ 'is-running' if xray_update_running else '' }}" data-update-live-line>
+      <span class="update-spinner" aria-hidden="true"></span>
+      <strong data-update-live-message>{{ xray_update_status.message or 'Ожидание операции' }}</strong>
+      <small data-update-elapsed></small>
+    </div>
+    <pre class="update-log" data-update-log>{{ xray_update_status.log or '[Xray Update] Журнал появится после запуска обновления.' }}</pre>
+    <div class="ui-actions update-result-actions" data-update-result-actions hidden>
+      <a class="button primary" href="{{ url_for('updates_page') }}">Обновить данные страницы</a>
+    </div>
+  </section>
+
   <section class="ui-card update-safety-card">
-    <header class="ui-card-heading"><div><p class="panel-kicker">БЕЗОПАСНЫЙ ПРОЦЕСС</p><h2>Что происходит во время обновления</h2><p>Пользовательские настройки не создаются заново. Updater сохраняет текущее рабочее состояние и возвращает его при любой ошибке.</p></div></header>
+    <header class="ui-card-heading">
+      <div>
+        <p class="panel-kicker">БЕЗОПАСНЫЙ ПРОЦЕСС SG-PANEL</p>
+        <h2>Что происходит при обновлении панели</h2>
+        <p>Пользовательские настройки не создаются заново. Updater сохраняет текущее рабочее состояние и возвращает его при любой ошибке.</p>
+      </div>
+    </header>
     <div class="update-safety-flow">
       <div><span>1</span><strong>Проверка кандидата</strong><small>Версия, Python, Jinja и shell-скрипты проверяются до остановки панели</small></div>
       <div><span>2</span><strong>Полная копия</strong><small>SQLite, Xray, WARP, Nginx, HTTPS, заглушка, сертификаты и systemd</small></div>
@@ -65,9 +188,13 @@
     </div>
   </section>
 
-  <section class="ui-card update-progress-card" data-update-progress>
+  <section class="ui-card update-progress-card" data-update-progress data-update-endpoint="{{ url_for('updates_status') }}" data-update-kind="panel">
     <header class="ui-card-heading ui-card-heading-row">
-      <div><p class="panel-kicker">ЖИВОЙ ЖУРНАЛ</p><h2 data-update-title>{{ update_status.message or 'Обновление ещё не запускалось' }}</h2><p>Во время перезапуска панели соединение с этой страницей может кратковременно пропасть. Журнал продолжит обновляться после восстановления службы.</p></div>
+      <div>
+        <p class="panel-kicker">ЖУРНАЛ SG-PANEL</p>
+        <h2 data-update-title>{{ update_status.message or 'Обновление панели ещё не запускалось' }}</h2>
+        <p>Во время перезапуска панели соединение с этой страницей может кратковременно пропасть. Журнал продолжит обновляться после восстановления службы.</p>
+      </div>
       <span class="pill {{ update_state_class }}" data-update-badge>{{ update_state_label }}</span>
     </header>
     <div class="update-live-line {{ 'is-running' if update_running else '' }}" data-update-live-line>
@@ -82,7 +209,7 @@
   </section>
 
   <details class="ui-card advanced update-manual-card">
-    <summary>Запасной ручной способ</summary>
+    <summary>Запасной ручной способ обновления SG-Panel</summary>
     <div class="advanced-body">
       <p>Если веб-интерфейс недоступен, распакуйте новый проверенный ZIP и запустите updater из корня нового исходного кода:</p>
       <pre><code>cd /home/ubuntu/sg-panel-main
@@ -90,18 +217,59 @@ sudo bash deploy/update-from-local-source.sh</code></pre>
       <p>Ручной запуск использует тот же механизм страховочной копии, проверок и автоматического отката.</p>
     </div>
   </details>
+
+  <section id="update-inline-confirm" class="ui-card update-inline-confirm" hidden aria-live="polite">
+    <div>
+      <p class="panel-kicker">ПОДТВЕРЖДЕНИЕ</p>
+      <h2 id="update-confirm-title">Подтвердите обновление</h2>
+      <p id="update-confirm-message" class="update-confirm-message"></p>
+    </div>
+    <div class="ui-actions">
+      <button class="button primary" type="button" data-confirm-continue>Подтвердить обновление</button>
+      <button class="button ghost" type="button" data-confirm-cancel>Отмена</button>
+    </div>
+  </section>
 </div>
 <script>
 (() => {
-  const root = document.querySelector('[data-update-progress]');
-  if (!root) return;
-  const badge = root.querySelector('[data-update-badge]');
-  const title = root.querySelector('[data-update-title]');
-  const log = root.querySelector('[data-update-log]');
-  const line = root.querySelector('[data-update-live-line]');
-  const message = root.querySelector('[data-update-live-message]');
-  const elapsed = root.querySelector('[data-update-elapsed]');
-  const actions = root.querySelector('[data-update-result-actions]');
+  const confirmPanel = document.getElementById('update-inline-confirm');
+  const confirmTitle = document.getElementById('update-confirm-title');
+  const confirmMessage = document.getElementById('update-confirm-message');
+  const confirmContinue = confirmPanel?.querySelector('[data-confirm-continue]');
+  const confirmCancel = confirmPanel?.querySelector('[data-confirm-cancel]');
+  let pendingConfirmForm = null;
+
+  const hideConfirmation = () => {
+    pendingConfirmForm = null;
+    if (confirmPanel) confirmPanel.hidden = true;
+  };
+
+  document.querySelectorAll('form[data-inline-confirm]').forEach((form) => {
+    form.addEventListener('submit', (event) => {
+      if (form.dataset.confirmApproved === '1') {
+        delete form.dataset.confirmApproved;
+        return;
+      }
+      event.preventDefault();
+      pendingConfirmForm = form;
+      confirmTitle.textContent = form.dataset.confirmTitle || 'Подтвердите обновление';
+      confirmMessage.textContent = form.dataset.confirmMessage || '';
+      confirmPanel.hidden = false;
+      confirmPanel.scrollIntoView({behavior: 'smooth', block: 'center'});
+    });
+  });
+
+  confirmCancel?.addEventListener('click', hideConfirmation);
+
+  confirmContinue?.addEventListener('click', () => {
+    if (!pendingConfirmForm) return;
+    const form = pendingConfirmForm;
+    pendingConfirmForm = null;
+    confirmPanel.hidden = true;
+    form.dataset.confirmApproved = '1';
+    form.requestSubmit();
+  });
+
   const labels = {
     idle: 'НЕ ЗАПУСКАЛОСЬ', starting: 'ПОДГОТОВКА', downloading: 'ЗАГРУЗКА',
     verifying: 'ПРОВЕРКА', backing_up: 'РЕЗЕРВНАЯ КОПИЯ', installing: 'УСТАНОВКА',
@@ -109,43 +277,51 @@ sudo bash deploy/update-from-local-source.sh</code></pre>
     rolled_back: 'ВОССТАНОВЛЕНО', error: 'ОШИБКА', unknown: 'НЕИЗВЕСТНО'
   };
   const running = new Set(['starting','downloading','verifying','backing_up','installing','validating','rollback']);
-  const startedAt = Date.now();
-  let timer = null;
-  const render = (data) => {
-    const state = String(data.state || 'unknown');
-    const text = String(data.message || labels[state] || state);
-    badge.textContent = labels[state] || state.toUpperCase();
-    badge.className = 'pill ' + (state === 'success' ? 'success' : (state === 'rolled_back' || state === 'error' ? 'danger' : (running.has(state) ? 'warning' : '')));
-    title.textContent = text;
-    message.textContent = text;
-    log.textContent = data.log || '[SG-Panel Update] Журнал пока пуст.';
-    log.scrollTop = log.scrollHeight;
-    line.classList.toggle('is-running', running.has(state));
-    actions.hidden = running.has(state) || state === 'idle';
-    if (running.has(state)) {
-      elapsed.textContent = Math.max(0, Math.floor((Date.now() - startedAt) / 1000)) + ' сек';
-    } else {
-      elapsed.textContent = '';
+
+  document.querySelectorAll('[data-update-progress]').forEach((root) => {
+    const badge = root.querySelector('[data-update-badge]');
+    const title = root.querySelector('[data-update-title]');
+    const log = root.querySelector('[data-update-log]');
+    const line = root.querySelector('[data-update-live-line]');
+    const message = root.querySelector('[data-update-live-message]');
+    const elapsed = root.querySelector('[data-update-elapsed]');
+    const actions = root.querySelector('[data-update-result-actions]');
+    const endpoint = root.dataset.updateEndpoint;
+    const startedAt = Date.now();
+    let timer = null;
+
+    const render = (data) => {
+      const state = String(data.state || 'unknown');
+      const text = String(data.message || labels[state] || state);
+      badge.textContent = labels[state] || state.toUpperCase();
+      badge.className = 'pill ' + (state === 'success' ? 'success' : (state === 'rolled_back' || state === 'error' ? 'danger' : (running.has(state) ? 'warning' : '')));
+      title.textContent = text;
+      message.textContent = text;
+      log.textContent = data.log || '[Update] Журнал пока пуст.';
+      log.scrollTop = log.scrollHeight;
+      line.classList.toggle('is-running', running.has(state));
+      actions.hidden = running.has(state) || state === 'idle';
+      elapsed.textContent = running.has(state) ? Math.max(0, Math.floor((Date.now() - startedAt) / 1000)) + ' сек' : '';
+      return running.has(state);
+    };
+
+    const poll = async () => {
+      try {
+        const response = await fetch(endpoint, {cache: 'no-store'});
+        if (!response.ok) throw new Error('HTTP ' + response.status);
+        const keep = render(await response.json());
+        if (!keep && timer) { window.clearInterval(timer); timer = null; }
+      } catch (error) {
+        line.classList.add('is-running');
+        message.textContent = 'Ожидаю восстановления соединения…';
+      }
+    };
+
+    if (line.classList.contains('is-running')) {
+      timer = window.setInterval(poll, 1500);
+      poll();
     }
-    return running.has(state);
-  };
-  const poll = async () => {
-    try {
-      const response = await fetch('{{ url_for('updates_status') }}', {cache: 'no-store'});
-      if (!response.ok) throw new Error('HTTP ' + response.status);
-      const data = await response.json();
-      const keep = render(data);
-      if (!keep && timer) { clearInterval(timer); timer = null; }
-    } catch (error) {
-      line.classList.add('is-running');
-      message.textContent = 'Панель перезапускается. Ожидаю восстановление соединения…';
-    }
-  };
-  const initialState = '{{ update_status.state }}';
-  if (running.has(initialState)) {
-    timer = window.setInterval(poll, 1500);
-    poll();
-  }
+  });
 })();
 </script>
 {% endblock %}

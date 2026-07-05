@@ -32,13 +32,14 @@ def test_sidebar_footer_and_topbar_follow_awg_panel_pattern() -> None:
     assert "data-account-button" in html
 
 
-def test_theme_switch_has_system_light_and_dark_modes() -> None:
+def test_theme_switch_has_only_graphite_and_light_modes() -> None:
     html = _read("base.html")
-    assert 'data-theme-choice="system"' in html
+    assert 'data-theme-choice="graphite"' in html
     assert 'data-theme-choice="light"' in html
-    assert 'data-theme-choice="dark"' in html
+    assert 'data-theme-choice="system"' not in html
+    assert 'data-theme-choice="dark"' not in html
     assert "sg-panel-theme" in html
-    assert "prefers-color-scheme: dark" in html
+    assert "prefers-color-scheme: dark" not in html
 
 
 def test_json_workbenches_have_format_validate_and_sync_flow() -> None:

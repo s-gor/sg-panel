@@ -258,7 +258,7 @@ DOMAIN=$DOMAIN
 CERT=$CERT
 KEY=$KEY
 XRAY_PORT=8444
-WEB_PORT=9443
+WEB_PORT=10443
 UPDATED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 EOF_EDGE
 chmod 600 "$REALITY_EDGE_STATE"
@@ -302,17 +302,26 @@ wait_for_https(){
 
 wait_for_fallback(){
   local attempt
-  local body_file="$BACKUP_DIR/fallback-check.html"
+  local body_file
+
+  if ! body_file="$(mktemp "${TMPDIR:-/tmp}/sg-panel-fallback-check.XXXXXX")"; then
+    printf '%s %s\n' '[SG-Panel HTTPS]' "ERROR: не удалось создать временный файл проверки" >&2
+    return 1
+  fi
+
   printf '%s %s\n' '[SG-Panel HTTPS]' "Проверяю локальную HTTPS-заглушку https://$DOMAIN/"
   for ((attempt=1; attempt<=15; attempt++)); do
     if curl -kfsS --max-time 5 \
       --resolve "$DOMAIN:443:127.0.0.1" \
       --output "$body_file" \
       "https://$DOMAIN/" && grep -Fq 'SG Digital Systems' "$body_file"; then
+      rm -f "$body_file"
       return 0
     fi
     sleep 1
   done
+
+  rm -f "$body_file"
   printf '%s %s\n' '[SG-Panel HTTPS]' "ERROR: HTTPS-заглушка на TCP 443 не стала доступна" >&2
   nginx -T >&2 2>/dev/null || true
   return 1

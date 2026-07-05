@@ -1,15 +1,16 @@
 <!doctype html>
-<html lang="ru" data-theme="system">
+<html lang="ru" data-theme="graphite">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#121722" id="themeColorMeta">
   <script>
     (() => {
-      const saved = localStorage.getItem('sg-panel-theme') || 'system';
-      const dark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const stored = localStorage.getItem('sg-panel-theme');
+      const saved = stored === 'light' ? 'light' : 'graphite';
       document.documentElement.dataset.theme = saved;
-      document.documentElement.dataset.resolvedTheme = saved === 'system' ? (dark ? 'dark' : 'light') : saved;
+      document.documentElement.dataset.resolvedTheme = saved === 'light' ? 'light' : 'dark';
+      if (stored !== saved) localStorage.setItem('sg-panel-theme', saved);
     })();
   </script>
     <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}?v={{ xpanel_version }}">
@@ -18,10 +19,10 @@
   <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}?v={{ xpanel_version }}">
   <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='apple-touch-icon.png') }}?v={{ xpanel_version }}">
 <title>Вход — SG-Panel</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}?v={{ xpanel_version }}-rc34-updates-ui">
+  <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}?v={{ xpanel_version }}">
 </head>
 <body class="login-body">
-  <div class="login-theme-switch" aria-label="Тема"><button type="button" data-login-theme="system" title="Системная тема">◐</button><button type="button" data-login-theme="light" title="Светлая тема">☀</button><button type="button" data-login-theme="dark" title="Тёмная тема">☾</button></div>
+  <div class="login-theme-switch" aria-label="Тема"><button type="button" data-login-theme="graphite" title="Тема Графит">◒</button><button type="button" data-login-theme="light" title="Светлая тема">☀</button></div>
   <div class="login-grid" aria-hidden="true"></div>
   <div class="login-glow login-glow-one" aria-hidden="true"></div>
   <div class="login-glow login-glow-two" aria-hidden="true"></div>
@@ -83,18 +84,16 @@
   <script>
     (() => {
       const root = document.documentElement;
-      const media = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
       const applyTheme = mode => {
-        const safe = ['system','light','dark'].includes(mode) ? mode : 'system';
+        const safe = mode === 'light' ? 'light' : 'graphite';
         root.dataset.theme = safe;
-        root.dataset.resolvedTheme = safe === 'system' ? (media && media.matches ? 'dark' : 'light') : safe;
+        root.dataset.resolvedTheme = safe === 'light' ? 'light' : 'dark';
         localStorage.setItem('sg-panel-theme', safe);
         document.querySelectorAll('[data-login-theme]').forEach(button => button.classList.toggle('active', button.dataset.loginTheme === safe));
         const meta = document.getElementById('themeColorMeta');
-        if (meta) meta.content = root.dataset.resolvedTheme === 'dark' ? '#0d131b' : '#eef3f8';
+        if (meta) meta.content = safe === 'graphite' ? '#0E1723' : '#edf1f2';
       };
-      applyTheme(root.dataset.theme || 'system');
-      media?.addEventListener?.('change', () => { if ((root.dataset.theme || 'system') === 'system') applyTheme('system'); });
+      applyTheme(root.dataset.theme || 'graphite');
       document.querySelectorAll('[data-login-theme]').forEach(button => button.addEventListener('click', () => applyTheme(button.dataset.loginTheme)));
       const toggle = document.querySelector('[data-password-toggle]');
       const input = document.getElementById('admin-password');

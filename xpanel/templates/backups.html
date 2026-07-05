@@ -8,7 +8,7 @@
 <script>document.body.classList.add('ui-standard-page','backups-page','backups-rc21');</script>
 <div class="ui-page ui-page-wide">
   <section class="ui-card backup-action-card backup-create-card">
-    <div><p class="panel-kicker">НОВАЯ КОПИЯ</p><h2>Создать резервную копию</h2><p>Сохраняются согласованная копия SQLite и текущий рабочий config.json. Reality private key находится в базе, поэтому архивы нужно хранить безопасно.</p></div>
+    <div><p class="panel-kicker">НОВАЯ КОПИЯ</p><h2>Создать резервную копию <a class="context-help-link" href="{{ url_for('help_page') }}#backups" title="Справка о резервных копиях" aria-label="Справка о резервных копиях">?</a></h2><p>Сохраняются согласованная копия SQLite и текущий рабочий config.json. Reality private key находится в базе, поэтому архивы нужно хранить безопасно.</p></div>
     <form method="post" action="{{ url_for('backups_create') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button primary" type="submit">Создать копию</button></form>
   </section>
 

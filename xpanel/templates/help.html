@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+{% block title %}Справка — SG-Panel{% endblock %}
+{% block section %}HELP{% endblock %}
+{% block heading %}Справка SG-Panel{% endblock %}
+{% block subtitle %}Профили подключения, клиентские ссылки, сеть, безопасность и обслуживание{% endblock %}
+{% block content %}
+<script>document.body.classList.add('ui-standard-page','help-page');</script>
+<div class="ui-page ui-page-wide help-layout">
+  <aside class="ui-card help-toc" aria-label="Разделы справки">
+    <p class="panel-kicker">РАЗДЕЛЫ</p>
+    <nav>
+      <a href="#start">Как устроена панель</a>
+      <a href="#profiles">Пять профилей</a>
+      <a href="#reality-vision">REALITY и XTLS Vision</a>
+      <a href="#xhttp-tls">XHTTP-TLS</a>
+      <a href="#xhttp-reality">XHTTP-REALITY</a>
+      <a href="#hysteria2">Hysteria 2</a>
+      <a href="#mixed">Смешанный профиль</a>
+      <a href="#clients-links">Клиенты и подписки</a>
+      <a href="#tls-https">TLS и HTTPS панели</a>
+      <a href="#network">Network: Routing, Outbounds, DNS</a>
+      <a href="#backups">Резервные копии</a>
+      <a href="#updates">Обновления</a>
+      <a href="#diagnostics">Диагностика</a>
+    </nav>
+  </aside>
+
+  <div class="help-content">
+    <section class="ui-card help-section" id="start">
+      <header class="ui-card-heading"><div><p class="panel-kicker">ОСНОВА</p><h2>Профиль, Inbound и точка входа</h2><p>Три похожих термина обозначают разные уровни настройки.</p></div></header>
+      <div class="help-definition-grid">
+        <article><strong>Профиль</strong><p>Серверная схема, которую SG-Panel применяет целиком. Одновременно выбран один профиль.</p></article>
+        <article><strong>Inbound</strong><p>Реальный входящий обработчик Xray внутри выбранного профиля.</p></article>
+        <article><strong>Точка входа</strong><p>Публичная комбинация адреса, порта и параметров, по которой подключается клиент.</p></article>
+      </div>
+      <div class="ui-info-note"><span>i</span><p>Сначала измените настройки, затем нажмите <strong>«Проверить конфигурацию»</strong>. Кнопка применения становится доступна только после успешного теста временной копии базы и итогового <code>config.json</code>.</p></div>
+    </section>
+
+    <section class="ui-card help-section" id="profiles">
+      <header class="ui-card-heading"><div><p class="panel-kicker">INBOUND</p><h2>Пять профилей SG-Panel</h2><p>Названия показывают протокол и способ защиты. XTLS Vision является параметром REALITY, а не отдельным шестым профилем.</p></div></header>
+      <div class="help-profile-families">
+        <section><span class="help-chip">REALITY · без сертификата</span><p>Здесь находятся две схемы с маскировкой REALITY: обычный TCP и XHTTP.</p></section>
+        <section><span class="help-chip is-accent">TLS · нужен сертификат</span><p>Здесь находятся XHTTP через Nginx, Hysteria 2 и их совместный режим.</p></section>
+      </div>
+      <div class="help-profile-list">
+        <article><div><strong>VLESS REALITY</strong><small>TCP · сертификат не требуется</small></div><p>Прямой VLESS с маскировкой REALITY. Поддерживает до трёх точек и режим XTLS Vision.</p></article>
+        <article><div><strong>VLESS XHTTP-REALITY</strong><small>XHTTP · сертификат не требуется</small></div><p>XHTTP защищён REALITY и сейчас использует одну публичную точку и один Path.</p></article>
+        <article><div><strong>VLESS XHTTP-TLS</strong><small>TCP/443 · TLS-сертификат</small></div><p>XHTTP проходит через Nginx. До трёх уникальных Path направляются на отдельные локальные Inbound Xray.</p></article>
+        <article><div><strong>Hysteria 2</strong><small>UDP/QUIC · TLS-сертификат</small></div><p>До трёх независимых UDP Inbound с отдельными портами и auth для каждого клиента.</p></article>
+        <article><div><strong>XHTTP-TLS + Hysteria 2</strong><small>TCP + UDP · общий сертификат</small></div><p>Одновременно запускает включённые XHTTP-TLS и Hysteria 2. Их настройки и ссылки остаются раздельными.</p></article>
+      </div>
+      <p class="help-note"><strong>Цвет состояния:</strong> зелёная метка означает профиль, который работает на сервере сейчас. Янтарная карточка означает выбранный черновик; сервер переключится только после проверки и применения.</p>
+    </section>
+
+    <section class="ui-card help-section" id="reality-vision">
+      <header class="ui-card-heading"><div><p class="panel-kicker">VLESS REALITY</p><h2>REALITY и XTLS Vision</h2><p>REALITY отвечает за внешнюю защиту и маскировку, Vision — за режим обработки VLESS-потока.</p></div></header>
+      <div class="help-compare-grid">
+        <article><span class="help-chip">Без Vision</span><h3>До трёх отдельных Inbound</h3><p>Primary, Backup и Alt создаются как самостоятельные Xray Inbound со своими TCP-портами и Short ID.</p></article>
+        <article><span class="help-chip is-accent">XTLS Vision</span><h3>Один общий Inbound, до трёх точек</h3><p>Клиент получает три отдельные ссылки и Short ID, но Xray обрабатывает их одним общим REALITY/Vision Inbound для стабильной работы.</p></article>
+      </div>
+      <p class="help-note"><strong>Что выбрать:</strong> Vision — основной современный режим для совместимого клиента. «Без Vision» остаётся для совместимости, диагностики и отдельных Inbound.</p>
+    </section>
+
+    <section class="ui-card help-section" id="xhttp-tls">
+      <header class="ui-card-heading"><div><p class="panel-kicker">VLESS XHTTP-TLS</p><h2>До трёх Path через один TCP/443</h2><p>Nginx принимает TLS на публичном порту и направляет каждый Path на собственный локальный TCP-listener Xray.</p></div></header>
+      <div class="help-flow"><code>TCP/443</code><span>→</span><code>Nginx + TLS</code><span>→</span><code>Path 1 / Path 2 / Path 3</code><span>→</span><code>Xray</code></div>
+      <p class="help-note">Локальные порты XHTTP не нужно открывать в Security Group. Наружу открывается только публичный TCP-порт, обычно <code>443</code>.</p>
+    </section>
+
+    <section class="ui-card help-section" id="xhttp-reality">
+      <header class="ui-card-heading"><div><p class="panel-kicker">VLESS XHTTP-REALITY</p><h2>XHTTP с защитой REALITY</h2><p>Этот профиль не использует обычный TLS-сертификат и не смешивается с Hysteria 2.</p></div></header>
+      <p>В текущей версии профиль использует одну публичную точку и один Path. Настройки других профилей сохраняются, но не входят в активный <code>config.json</code>.</p>
+    </section>
+
+    <section class="ui-card help-section" id="hysteria2">
+      <header class="ui-card-heading"><div><p class="panel-kicker">HYSTERIA 2</p><h2>До трёх UDP/QUIC Inbound</h2><p>Каждый включённый экземпляр получает собственный UDP-порт, tag, клиентский auth, ссылку и QR-код.</p></div></header>
+      <div class="help-port-grid"><span><b>Primary</b><code>UDP/443</code></span><span><b>Backup</b><code>UDP/8443</code></span><span><b>Alt</b><code>UDP/9443</code></span></div>
+      <p class="help-note">Все используемые UDP-порты должны быть открыты в AWS Security Group. TLS-домен и сертификат общие для всех экземпляров.</p>
+    </section>
+
+    <section class="ui-card help-section" id="mixed">
+      <header class="ui-card-heading"><div><p class="panel-kicker">MIXED</p><h2>XHTTP-TLS + Hysteria 2</h2><p>TCP и UDP работают одновременно и не конфликтуют, даже если номер порта совпадает.</p></div></header>
+      <div class="help-compare-grid">
+        <article><span class="help-chip">TCP</span><h3>XHTTP-TLS</h3><p>До трёх Path через Nginx и один публичный TCP/443.</p></article>
+        <article><span class="help-chip">UDP</span><h3>Hysteria 2</h3><p>До трёх прямых UDP-портов: 443, 8443 и 9443.</p></article>
+      </div>
+    </section>
+
+    <section class="ui-card help-section" id="clients-links">
+      <header class="ui-card-heading"><div><p class="panel-kicker">CLIENTS</p><h2>Активные и сохранённые ссылки</h2><p>Переключение серверного профиля не удаляет ранее созданные параметры подключения.</p></div></header>
+      <div class="help-status-list">
+        <div><span class="status-dot"></span><p><strong>Активные сейчас</strong><small>Работают на сервере и входят в подписку.</small></p></div>
+        <div><span class="status-dot is-off"></span><p><strong>Сохранённые, но неактивные</strong><small>Остаются видимыми и доступными для копирования, но не работают до активации соответствующего профиля.</small></p></div>
+      </div>
+      <p class="help-note">Имена Multi-Inbound формируются компактно: <code>Имя/Primary</code>, <code>Имя/Backup</code>, <code>Имя/Alt</code>. Протокол SG Client показывает отдельно.</p>
+    </section>
+
+    <section class="ui-card help-section" id="tls-https">
+      <header class="ui-card-heading"><div><p class="panel-kicker">SECURITY</p><h2>TLS профилей и HTTPS панели</h2><p>Это связанные, но разные задачи.</p></div></header>
+      <div class="help-definition-grid help-definition-grid-2">
+        <article><strong>TLS профиля</strong><p>Нужен для XHTTP-TLS и Hysteria 2. Сертификат участвует в клиентском соединении.</p></article>
+        <article><strong>HTTPS панели</strong><p>Защищает вход администратора, сессии и URL подписок. После переключения панель открывается в текущей вкладке.</p></article>
+      </div>
+      <p class="help-note">REALITY и XHTTP-REALITY используют собственную схему защиты и не требуют обычного TLS-сертификата для клиентского соединения.</p>
+    </section>
+
+    <section class="ui-card help-section" id="network">
+      <header class="ui-card-heading"><div><p class="panel-kicker">NETWORK</p><h2>Traffic Rules, Outbounds и DNS</h2><p>Три раздела формируют единую серверную маршрутизацию Xray.</p></div></header>
+      <div class="help-definition-grid">
+        <article><strong>Traffic Rules</strong><p>Определяют, какой трафик отправлять через конкретный Outbound, напрямую или в блокировку.</p></article>
+        <article><strong>Outbounds</strong><p>Описывают реальные выходы: AWG-Gateway здесь не используется; доступны direct, block, WARP и пользовательские узлы Xray.</p></article>
+        <article><strong>DNS</strong><p>Разрешает домены для правил и задаёт upstream-серверы, hosts и стратегию запросов.</p></article>
+      </div>
+      <div class="ui-warning-note"><span>!</span><p>Серверная маршрутизация SG-Panel не заменяет клиентские GeoSite/GeoIP-правила SG Client. Это два разных уровня.</p></div>
+    </section>
+
+    <section class="ui-card help-section" id="backups">
+      <header class="ui-card-heading"><div><p class="panel-kicker">MAINTENANCE</p><h2>Резервные копии</h2><p>Копия панели содержит SQLite и рабочий <code>config.json</code>.</p></div></header>
+      <p>После создания обязательно выполните проверку копии и скачайте DB и JSON на другой компьютер. Полный образ EC2/AMI дополнительно сохраняет Ubuntu, Nginx, сертификаты и службы.</p>
+    </section>
+
+    <section class="ui-card help-section" id="updates">
+      <header class="ui-card-heading"><div><p class="panel-kicker">MAINTENANCE</p><h2>Обновление SG-Panel и Xray</h2><p>Это две независимые операции с отдельными журналами и блокировками.</p></div></header>
+      <div class="help-definition-grid help-definition-grid-2">
+        <article><strong>SG-Panel</strong><p>Обновляет приложение и миграции, сохраняя базу, пользователей, профили и установленный более новый Xray.</p></article>
+        <article><strong>Xray Core</strong><p>Проверяет официальный архив и SHA-256, тестирует текущий config, сохраняет старый бинарник и выполняет автоматический откат при ошибке.</p></article>
+      </div>
+    </section>
+
+    <section class="ui-card help-section" id="diagnostics">
+      <header class="ui-card-heading"><div><p class="panel-kicker">SYSTEM</p><h2>Диагностика</h2><p>Проверяйте состояние до ручного редактирования файлов или перезапуска служб.</p></div></header>
+      <ol class="help-steps">
+        <li>Откройте <strong>Status &amp; Services</strong> и проверьте Xray, Nginx, SG-Panel и <code>config.json</code>.</li>
+        <li>В <strong>Logs &amp; Diagnostics</strong> раскройте только нужный журнал.</li>
+        <li>Проверьте TCP/UDP-listener и вывод <code>xray run -test</code>.</li>
+        <li>При необходимости скачайте диагностический отчёт.</li>
+      </ol>
+      <div class="ui-actions"><a class="button primary" href="{{ url_for('diagnostics_page') }}?tab=status">Открыть диагностику</a><a class="button secondary" href="{{ url_for('settings_page') }}">Вернуться к Inbound</a></div>
+    </section>
+  </div>
+</div>
+{% endblock %}

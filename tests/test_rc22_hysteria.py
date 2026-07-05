@@ -12,8 +12,8 @@ def _read(name: str) -> str:
 def test_hysteria_profile_is_exposed_in_inbound_ui() -> None:
     html = _read("settings.html")
     assert 'value="hysteria2_tls"' in html
-    assert "Hysteria 2 + TLS" in html
-    assert "UDP / QUIC" in html
+    assert "Hysteria 2" in html
+    assert "Прямой QUIC/UDP в Xray. До трёх независимых UDP-портов." in html
     assert 'name="hysteria_udp_idle_timeout"' in html
     assert 'name="hysteria_masquerade_type"' in html
     assert 'name="hysteria_masquerade_url"' in html
@@ -26,8 +26,10 @@ def test_client_and_subscription_pages_are_protocol_neutral() -> None:
     link = _read("link.html")
     users = _read("users.html")
     subscriptions = _read("subscriptions.html")
-    assert "HYSTERIA 2 / UDP" in link
-    assert "server.inbound_profile" in link
+    assert "item.profile_label" in link
+    assert "item.kind == 'hysteria'" in link
+    assert "Активные сейчас" in link
+    assert "Сохранённые, но неактивные" in link
     assert "текущего Inbound" in users
     assert "текущего Inbound-профиля" in subscriptions
 
@@ -38,7 +40,8 @@ def test_diagnostics_exposes_udp_transport_and_combined_ports() -> None:
     assert "TCP и UDP-порты" in html
     assert "diagnostics.transport_protocol" in html
     assert '["ss", "-lnup"]' in service
-    assert '"transport_protocol": "UDP"' in service
+    assert '"transport_protocol": "TCP + UDP"' in service
+    assert 'else ("UDP" if str(server["inbound_profile"]) == "hysteria2_tls" else "TCP")' in service
 
 
 def test_hysteria_database_fields_have_migrations() -> None:
@@ -56,7 +59,7 @@ def test_hysteria_database_fields_have_migrations() -> None:
 
 def test_hysteria_documentation_covers_udp_and_ec2() -> None:
     docs = (ROOT / "docs" / "INBOUND-PROFILES.md").read_text(encoding="utf-8")
-    assert "Hysteria 2 + TLS" in docs
+    assert "Hysteria 2" in docs
     assert "Security Group" in docs
     assert "443/udp" in docs
     assert "ss -lnup" in docs

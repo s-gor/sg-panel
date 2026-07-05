@@ -1,11 +1,11 @@
 # Inbound-профили
 
-Полное актуальное описание четырёх доступных профилей находится в документе [SERVER.md](SERVER.md).
+Полное актуальное описание пяти доступных профилей находится в документе [SERVER.md](SERVER.md).
 
 ## Hysteria 2: быстрая памятка
 
-`Hysteria 2 + TLS` работает поверх QUIC/UDP. Для стандартной точки подключения откройте
-`443/udp` в Security Group EC2 и в локальном firewall сервера.
+`Hysteria 2` работает поверх QUIC/UDP. Для стандартной точки подключения откройте
+`443/udp` для основного Hysteria 2 и дополнительные UDP-порты для включённых резервного/дополнительного Inbound в Security Group EC2 и локальном firewall сервера.
 
 Проверка прослушиваемых UDP-портов:
 
@@ -20,4 +20,4 @@ hysteria2://
 ```
 
 Настройки TLS, port hopping, masquerade и ручная проверка описаны в разделе
-[Hysteria 2 + TLS](SERVER.md#hysteria-2--tls).
+[Hysteria 2](SERVER.md#hysteria-2--tls).

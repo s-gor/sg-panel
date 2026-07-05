@@ -56,7 +56,7 @@ class InstallRecoveryTest(unittest.TestCase):
         self.assertIn("[SG-Panel] [%sOK%s] %s (%s сек)", text)
         self.assertIn("[SG-Panel] [%s%s%s] %s (%s сек)", text)
         self.assertIn(r"local frames='|/-\\'", text)
-        self.assertIn("Этап 7/7", text)
+        self.assertIn('stage 3 3 "Финальная проверка"', text)
         self.assertIn("Панель:", text)
         self.assertIn("$PANEL_URL", text)
 

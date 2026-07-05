@@ -39,7 +39,7 @@ ALLOWED_FLOWS = {"", "xtls-rprx-vision", "xtls-rprx-vision-udp443"}
 ALLOWED_OUTBOUND_NETWORKS = {"raw", "xhttp"}
 ALLOWED_OUTBOUND_SECURITY = {"reality", "tls"}
 ALLOWED_XHTTP_MODES = {"auto", "packet-up", "stream-up", "stream-one"}
-ALLOWED_INBOUND_PROFILES = {"raw_reality", "xhttp_tls", "xhttp_reality", "grpc_tls", "hysteria2_tls"}
+ALLOWED_INBOUND_PROFILES = {"raw_reality", "xhttp_tls", "xhttp_reality", "grpc_tls", "hysteria2_tls", "xhttp_hysteria_tls"}
 ALLOWED_HYSTERIA_PRESETS = {"auto", "mobile", "speed", "limited", "custom"}
 ALLOWED_HYSTERIA_CONGESTION = {"reno", "bbr", "brutal", "force-brutal"}
 ALLOWED_HYSTERIA_BBR_PROFILES = {"conservative", "standard", "aggressive"}
@@ -48,8 +48,10 @@ STANDARD_FINGERPRINTS = {
     "chrome", "firefox", "safari", "ios", "android", "edge", "360", "qq",
     "random", "randomized", "unsafe", *FINGERPRINT_ALIASES.keys(),
 }
-TLS_INBOUND_PROFILES = {"xhttp_tls", "grpc_tls"}
-DIRECT_TLS_INBOUND_PROFILES = {"hysteria2_tls"}
+TLS_INBOUND_PROFILES = {"xhttp_tls", "grpc_tls", "xhttp_hysteria_tls"}
+HYSTERIA_ACTIVE_PROFILES = {"hysteria2_tls", "xhttp_hysteria_tls"}
+XHTTP_ACTIVE_PROFILES = {"xhttp_tls", "xhttp_hysteria_tls"}
+DIRECT_TLS_INBOUND_PROFILES = HYSTERIA_ACTIVE_PROFILES
 CERTIFICATE_INBOUND_PROFILES = TLS_INBOUND_PROFILES | DIRECT_TLS_INBOUND_PROFILES
 REALITY_INBOUND_PROFILES = {"raw_reality", "xhttp_reality"}
 SUPPORTED_VLESS_OUTBOUND_COMBINATIONS = {
@@ -65,9 +67,29 @@ WARP_IPV4_ENDPOINT = "162.159.192.1:2408"
 WARP_RULE_NAME = "Cloudflare WARP"
 WARP_DIR = Path(os.environ.get("XPANEL_WARP_DIR", "/etc/xpanel-mvp/warp"))
 HYSTERIA_TLS_DIR = Path(os.environ.get("XPANEL_HYSTERIA_TLS_DIR", "/usr/local/etc/xray/sg-panel-tls"))
+HYSTERIA_MAX_INBOUNDS = 3
+HYSTERIA_INBOUND_TAGS = {
+    1: "vless-reality-in",
+    2: "hysteria2-secondary-in",
+    3: "hysteria2-tertiary-in",
+}
+XHTTP_MAX_INBOUNDS = 3
+XHTTP_INBOUND_TAGS = {
+    1: "vless-reality-in",
+    2: "xhttp-secondary-in",
+    3: "xhttp-tertiary-in",
+}
+REALITY_MAX_INBOUNDS = 3
+REALITY_INBOUND_TAGS = {
+    1: "vless-reality-in",
+    2: "reality-secondary-in",
+    3: "reality-tertiary-in",
+}
+HYSTERIA_COMBINED_PRIMARY_TAG = "hysteria2-primary-in"
 REALITY_EDGE_STATE = Path(os.environ.get("XPANEL_REALITY_EDGE_STATE", "/etc/xpanel-mvp/reality-edge.env"))
 REALITY_EDGE_XRAY_PORT = 8444
-REALITY_EDGE_WEB_PORT = 9443
+REALITY_EDGE_WEB_PORT = 10443
+REALITY_EDGE_LEGACY_WEB_PORT = 9443
 WARP_DEFAULT_DOMAINS = """domain:google.com
 domain:googleapis.com
 domain:gstatic.com
@@ -108,6 +130,446 @@ def get_server() -> sqlite3.Row:
     if row is None:
         raise XPanelError("настройки сервера ещё не заданы; выполните set-server")
     return row
+
+
+def list_hysteria_inbounds() -> list[sqlite3.Row]:
+    init_db()
+    with connect() as con:
+        return con.execute(
+            "SELECT * FROM hysteria_inbounds ORDER BY id"
+        ).fetchall()
+
+
+def list_xhttp_inbounds() -> list[sqlite3.Row]:
+    init_db()
+    with connect() as con:
+        return con.execute(
+            "SELECT * FROM xhttp_inbounds ORDER BY id"
+        ).fetchall()
+
+
+def list_reality_inbounds() -> list[sqlite3.Row]:
+    init_db()
+    with connect() as con:
+        return con.execute(
+            "SELECT * FROM reality_inbounds ORDER BY id"
+        ).fetchall()
+
+
+def _normalise_reality_instances(
+    values: list[dict[str, object]] | None,
+    *,
+    primary_listen: str,
+    primary_port: int,
+    primary_short_id: str,
+) -> list[dict[str, object]]:
+    current = {int(row["id"]): dict(row) for row in list_reality_inbounds()}
+    provided: dict[int, dict[str, object]] = {}
+    for raw in values or []:
+        try:
+            instance_id = int(raw.get("id", 0))
+        except (TypeError, ValueError) as exc:
+            raise ValueError("REALITY: некорректный номер Inbound") from exc
+        if instance_id not in REALITY_INBOUND_TAGS:
+            raise ValueError("REALITY: разрешены только Inbound #1, #2 и #3")
+        if instance_id in provided:
+            raise ValueError(f"REALITY #{instance_id}: настройки переданы дважды")
+        provided[instance_id] = raw
+
+    def as_bool(value: object) -> bool:
+        if isinstance(value, str):
+            return value.strip().lower() in {"1", "true", "yes", "on"}
+        return bool(value)
+
+    result: list[dict[str, object]] = []
+    names: dict[str, int] = {}
+    ports: dict[int, int] = {}
+    short_ids: dict[str, int] = {}
+    for instance_id in range(1, REALITY_MAX_INBOUNDS + 1):
+        base = current.get(instance_id, {})
+        item = provided.get(instance_id, {})
+        name = str(item.get("name", base.get("name", f"REALITY #{instance_id}"))).strip()
+        if not name or len(name) > 80:
+            raise ValueError(f"REALITY #{instance_id}: имя должно содержать от 1 до 80 символов")
+        name_key = name.casefold()
+        if name_key in names:
+            raise ValueError(f"REALITY #{instance_id}: название уже используется Inbound #{names[name_key]}")
+        names[name_key] = instance_id
+        enabled = True if instance_id == 1 else as_bool(item.get("enabled", base.get("enabled", False)))
+        listen = str(primary_listen if instance_id == 1 else item.get("listen", base.get("listen", "0.0.0.0"))).strip()
+        default_port = 8443 if instance_id == 2 else 9443
+        try:
+            port = int(primary_port if instance_id == 1 else item.get("port", base.get("port", default_port)))
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"REALITY #{instance_id}: TCP-порт должен быть числом") from exc
+        if not 1 <= port <= 65535:
+            raise ValueError(f"REALITY #{instance_id}: TCP-порт должен быть от 1 до 65535")
+        try:
+            parsed_listen = ipaddress.ip_address(listen)
+        except ValueError as exc:
+            raise ValueError(f"REALITY #{instance_id}: listen должен быть IP-адресом") from exc
+        if enabled and instance_id > 1 and parsed_listen.is_loopback:
+            raise ValueError(f"REALITY #{instance_id}: публичный TCP-listener не может быть loopback")
+        short_id = str(primary_short_id if instance_id == 1 else item.get("short_id", base.get("short_id", ""))).strip().lower()
+        if not short_id:
+            short_id = secrets.token_hex(8)
+        if not re.fullmatch(r"[0-9a-f]{2,32}", short_id) or len(short_id) % 2:
+            raise ValueError(f"REALITY #{instance_id}: Short ID должен быть HEX-строкой чётной длины от 2 до 32 символов")
+        if enabled:
+            if port in ports:
+                raise ValueError(f"Конфликт REALITY: TCP-порт {port} уже используется Inbound #{ports[port]}")
+            ports[port] = instance_id
+            if short_id in short_ids:
+                raise ValueError(f"Конфликт REALITY: Short ID уже используется Inbound #{short_ids[short_id]}")
+            short_ids[short_id] = instance_id
+        result.append({
+            "id": instance_id,
+            "name": name,
+            "tag": REALITY_INBOUND_TAGS[instance_id],
+            "enabled": enabled,
+            "listen": listen,
+            "port": port,
+            "short_id": short_id,
+        })
+    return result
+
+
+def update_reality_inbounds(
+    values: list[dict[str, object]] | None,
+    *,
+    primary_listen: str,
+    primary_port: int,
+    primary_short_id: str,
+) -> list[sqlite3.Row]:
+    cleaned = _normalise_reality_instances(
+        values,
+        primary_listen=primary_listen,
+        primary_port=primary_port,
+        primary_short_id=primary_short_id,
+    )
+    with connect() as con:
+        for item in cleaned:
+            con.execute(
+                """
+                INSERT INTO reality_inbounds (id, name, tag, enabled, listen, port, short_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET
+                    name=excluded.name, tag=excluded.tag, enabled=excluded.enabled,
+                    listen=excluded.listen, port=excluded.port, short_id=excluded.short_id,
+                    updated_at=CURRENT_TIMESTAMP
+                """,
+                (
+                    int(item["id"]), str(item["name"]), str(item["tag"]),
+                    int(bool(item["enabled"])), str(item["listen"]), int(item["port"]),
+                    str(item["short_id"]),
+                ),
+            )
+    return list_reality_inbounds()
+
+
+def _normalise_xhttp_instances(
+    values: list[dict[str, object]] | None,
+    *,
+    primary_listen: str,
+    primary_port: int,
+    primary_path: str,
+) -> list[dict[str, object]]:
+    current = {int(row["id"]): dict(row) for row in list_xhttp_inbounds()}
+    provided: dict[int, dict[str, object]] = {}
+    for raw in values or []:
+        try:
+            instance_id = int(raw.get("id", 0))
+        except (TypeError, ValueError) as exc:
+            raise ValueError("XHTTP: некорректный номер Inbound") from exc
+        if instance_id not in XHTTP_INBOUND_TAGS:
+            raise ValueError("XHTTP: разрешены только Inbound #1, #2 и #3")
+        if instance_id in provided:
+            raise ValueError(f"XHTTP #{instance_id}: настройки переданы дважды")
+        provided[instance_id] = raw
+
+    def as_bool(value: object) -> bool:
+        if isinstance(value, str):
+            return value.strip().lower() in {"1", "true", "yes", "on"}
+        return bool(value)
+
+    result: list[dict[str, object]] = []
+    names: dict[str, int] = {}
+    paths: dict[str, int] = {}
+    endpoints: dict[tuple[str, int], int] = {}
+    for instance_id in range(1, XHTTP_MAX_INBOUNDS + 1):
+        base = current.get(instance_id, {})
+        item = provided.get(instance_id, {})
+        name = str(item.get("name", base.get("name", f"XHTTP #{instance_id}"))).strip()
+        if not name or len(name) > 80:
+            raise ValueError(f"XHTTP #{instance_id}: имя должно содержать от 1 до 80 символов")
+        name_key = name.casefold()
+        if name_key in names:
+            raise ValueError(
+                f"XHTTP #{instance_id}: название уже используется Inbound #{names[name_key]}"
+            )
+        names[name_key] = instance_id
+        enabled = True if instance_id == 1 else as_bool(
+            item.get("enabled", base.get("enabled", False))
+        )
+        listen = str(
+            primary_listen if instance_id == 1 else item.get("listen", base.get("listen", "127.0.0.1"))
+        ).strip()
+        default_port = 8444 if instance_id == 2 else 8445
+        try:
+            port = int(
+                primary_port if instance_id == 1 else item.get("port", base.get("port", default_port))
+            )
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"XHTTP #{instance_id}: локальный TCP-порт должен быть числом") from exc
+        if not 1 <= port <= 65535:
+            raise ValueError(f"XHTTP #{instance_id}: локальный TCP-порт должен быть от 1 до 65535")
+        path = str(
+            primary_path if instance_id == 1 else item.get("path", base.get("path", f"/sg-xhttp-{instance_id}"))
+        ).strip()
+        _validate_xhttp_path(path)
+        try:
+            parsed_listen = ipaddress.ip_address(listen)
+        except ValueError as exc:
+            raise ValueError(f"XHTTP #{instance_id}: listen должен быть IP-адресом") from exc
+        if enabled and not parsed_listen.is_loopback:
+            raise ValueError(
+                f"XHTTP #{instance_id}: локальный Xray должен слушать только loopback-адрес"
+            )
+        canonical_path = path.rstrip("/") or "/"
+        if canonical_path in paths:
+            raise ValueError(
+                f"Конфликт XHTTP: Path {path} уже используется Inbound #{paths[canonical_path]}"
+            )
+        paths[canonical_path] = instance_id
+        endpoint = (listen, port)
+        if endpoint in endpoints:
+            raise ValueError(
+                f"Конфликт XHTTP: {listen}:{port} уже используется Inbound #{endpoints[endpoint]}"
+            )
+        endpoints[endpoint] = instance_id
+        result.append({
+            "id": instance_id,
+            "name": name,
+            "tag": XHTTP_INBOUND_TAGS[instance_id],
+            "enabled": enabled,
+            "listen": listen,
+            "port": port,
+            "path": path,
+        })
+    return result
+
+
+def update_xhttp_inbounds(
+    values: list[dict[str, object]] | None,
+    *,
+    primary_listen: str,
+    primary_port: int,
+    primary_path: str,
+) -> list[sqlite3.Row]:
+    cleaned = _normalise_xhttp_instances(
+        values,
+        primary_listen=primary_listen,
+        primary_port=primary_port,
+        primary_path=primary_path,
+    )
+    with connect() as con:
+        for item in cleaned:
+            con.execute(
+                """
+                INSERT INTO xhttp_inbounds (id, name, tag, enabled, listen, port, path)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET
+                    name=excluded.name, tag=excluded.tag, enabled=excluded.enabled,
+                    listen=excluded.listen, port=excluded.port, path=excluded.path,
+                    updated_at=CURRENT_TIMESTAMP
+                """,
+                (
+                    int(item["id"]), str(item["name"]), str(item["tag"]),
+                    int(bool(item["enabled"])), str(item["listen"]), int(item["port"]),
+                    str(item["path"]),
+                ),
+            )
+    return list_xhttp_inbounds()
+
+
+def _normalise_hysteria_instances(
+    values: list[dict[str, object]] | None,
+    *,
+    primary_listen: str,
+    primary_port: int,
+    hop_ports: str = "",
+) -> list[dict[str, object]]:
+    current = {int(row["id"]): dict(row) for row in list_hysteria_inbounds()}
+    provided: dict[int, dict[str, object]] = {}
+    for raw in values or []:
+        try:
+            instance_id = int(raw.get("id", 0))
+        except (TypeError, ValueError) as exc:
+            raise ValueError("Hysteria 2: некорректный номер Inbound") from exc
+        if instance_id not in HYSTERIA_INBOUND_TAGS:
+            raise ValueError("Hysteria 2: разрешены только Inbound #1, #2 и #3")
+        if instance_id in provided:
+            raise ValueError(f"Hysteria 2 #{instance_id}: настройки переданы дважды")
+        provided[instance_id] = raw
+
+    def as_bool(value: object) -> bool:
+        if isinstance(value, str):
+            return value.strip().lower() in {"1", "true", "yes", "on"}
+        return bool(value)
+
+    result: list[dict[str, object]] = []
+    names: dict[str, int] = {}
+    for instance_id in range(1, HYSTERIA_MAX_INBOUNDS + 1):
+        base = current.get(instance_id, {})
+        item = provided.get(instance_id, {})
+        name = str(
+            item.get("name", base.get("name", f"Hysteria 2 #{instance_id}"))
+        ).strip()
+        if not name or len(name) > 80:
+            raise ValueError(
+                f"Hysteria 2 #{instance_id}: имя должно содержать от 1 до 80 символов"
+            )
+        name_key = name.casefold()
+        if name_key in names:
+            raise ValueError(
+                f"Hysteria 2 #{instance_id}: название уже используется Inbound #{names[name_key]}"
+            )
+        names[name_key] = instance_id
+        tag = HYSTERIA_INBOUND_TAGS[instance_id]
+        enabled = True if instance_id == 1 else as_bool(
+            item.get("enabled", base.get("enabled", False))
+        )
+        listen = str(
+            primary_listen
+            if instance_id == 1
+            else item.get("listen", base.get("listen", "0.0.0.0"))
+        ).strip()
+        default_port = 8443 if instance_id == 2 else 9443
+        try:
+            port = int(
+                primary_port
+                if instance_id == 1
+                else item.get("port", base.get("port", default_port))
+            )
+        except (TypeError, ValueError) as exc:
+            raise ValueError(
+                f"Hysteria 2 #{instance_id}: UDP-порт должен быть числом"
+            ) from exc
+        if not 1 <= port <= 65535:
+            raise ValueError(
+                f"Hysteria 2 #{instance_id}: UDP-порт должен быть от 1 до 65535"
+            )
+        try:
+            parsed_listen = ipaddress.ip_address(listen)
+        except ValueError as exc:
+            raise ValueError(
+                f"Hysteria 2 #{instance_id}: listen должен быть IP-адресом"
+            ) from exc
+        if enabled and parsed_listen.is_loopback:
+            raise ValueError(
+                f"Hysteria 2 #{instance_id}: публичный UDP-listener не может быть loopback"
+            )
+        result.append(
+            {
+                "id": instance_id,
+                "name": name,
+                "tag": tag,
+                "enabled": enabled,
+                "listen": listen,
+                "port": port,
+            }
+        )
+
+    enabled_items = [item for item in result if item["enabled"]]
+    ports: dict[int, str] = {}
+    for item in enabled_items:
+        port = int(item["port"])
+        if port in ports:
+            raise ValueError(
+                f"Конфликт Hysteria 2: UDP-порт {port} уже используется "
+                f"экземпляром «{ports[port]}»"
+            )
+        ports[port] = str(item["name"])
+    if len(enabled_items) > 1 and str(hop_ports or "").strip():
+        raise ValueError(
+            "На первом этапе port hopping можно использовать только с одним Hysteria 2 Inbound. "
+            "Отключите дополнительные Inbound или очистите диапазон UDP hopping."
+        )
+    return result
+
+
+def update_hysteria_inbounds(
+    values: list[dict[str, object]] | None,
+    *,
+    primary_listen: str,
+    primary_port: int,
+    hop_ports: str = "",
+) -> list[sqlite3.Row]:
+    cleaned = _normalise_hysteria_instances(
+        values, primary_listen=primary_listen, primary_port=primary_port, hop_ports=hop_ports
+    )
+    with connect() as con:
+        for item in cleaned:
+            con.execute(
+                """
+                INSERT INTO hysteria_inbounds (id, name, tag, enabled, listen, port)
+                VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET
+                    name=excluded.name, tag=excluded.tag, enabled=excluded.enabled,
+                    listen=excluded.listen, port=excluded.port, updated_at=CURRENT_TIMESTAMP
+                """,
+                (
+                    int(item["id"]), str(item["name"]), str(item["tag"]),
+                    int(bool(item["enabled"])), str(item["listen"]), int(item["port"]),
+                ),
+            )
+    return list_hysteria_inbounds()
+
+
+def _ensure_hysteria_user_auths() -> dict[int, dict[int, str]]:
+    init_db()
+    with connect() as con:
+        inbounds = con.execute("SELECT id FROM hysteria_inbounds ORDER BY id").fetchall()
+        users = con.execute("SELECT id, uuid FROM users ORDER BY id").fetchall()
+        for inbound in inbounds:
+            inbound_id = int(inbound["id"])
+            for user in users:
+                user_id = int(user["id"])
+                if inbound_id == 1:
+                    auth = str(user["uuid"])
+                    con.execute(
+                        """
+                        INSERT INTO hysteria_user_auth (inbound_id, user_id, auth)
+                        VALUES (?, ?, ?)
+                        ON CONFLICT(inbound_id, user_id) DO UPDATE SET
+                            auth=excluded.auth, updated_at=CURRENT_TIMESTAMP
+                        """,
+                        (inbound_id, user_id, auth),
+                    )
+                    continue
+                exists = con.execute(
+                    "SELECT auth FROM hysteria_user_auth WHERE inbound_id=? AND user_id=?",
+                    (inbound_id, user_id),
+                ).fetchone()
+                if exists is not None:
+                    continue
+                while True:
+                    auth = secrets.token_urlsafe(24)
+                    try:
+                        con.execute(
+                            "INSERT INTO hysteria_user_auth (inbound_id, user_id, auth) VALUES (?, ?, ?)",
+                            (inbound_id, user_id, auth),
+                        )
+                        break
+                    except sqlite3.IntegrityError:
+                        continue
+        rows = con.execute(
+            "SELECT inbound_id, user_id, auth FROM hysteria_user_auth"
+        ).fetchall()
+    result: dict[int, dict[int, str]] = {}
+    for row in rows:
+        result.setdefault(int(row["inbound_id"]), {})[int(row["user_id"])] = str(row["auth"])
+    return result
 
 
 def find_user(identifier: str | int) -> sqlite3.Row:
@@ -2802,6 +3264,12 @@ def _reality_edge_settings(server: sqlite3.Row | None = None) -> dict[str, objec
         web_port = int(values.get("WEB_PORT", str(REALITY_EDGE_WEB_PORT)))
     except ValueError:
         return {"enabled": False}
+    # RC42 Hotfix 1: old HTTPS installations used loopback TCP/9443 for the
+    # REALITY fallback page. Multi-REALITY uses public TCP/9443 for slot #3,
+    # and binding 0.0.0.0:9443 conflicts with 127.0.0.1:9443. Treat the old
+    # internal value as migrated even before the installer rewrites the env.
+    if web_port == REALITY_EDGE_LEGACY_WEB_PORT:
+        web_port = REALITY_EDGE_WEB_PORT
     if not domain or not cert.is_file() or not key.is_file():
         return {"enabled": False}
     if not (1 <= xray_port <= 65535 and 1 <= web_port <= 65535):
@@ -2820,6 +3288,28 @@ def _reality_edge_settings(server: sqlite3.Row | None = None) -> dict[str, objec
         "web_port": web_port,
         "reality_name": reality_name,
     }
+
+
+def _validate_reality_edge_listener_ports(
+    server: sqlite3.Row,
+    instances: list[sqlite3.Row],
+) -> None:
+    edge = _reality_edge_settings(server)
+    if not edge.get("enabled"):
+        return
+    reserved = {
+        int(edge["xray_port"]): "внутренний listener основного REALITY",
+        int(edge["web_port"]): "локальная HTTPS-заглушка REALITY",
+    }
+    for instance in instances:
+        if not bool(instance["enabled"]) or int(instance["id"]) == 1:
+            continue
+        port = int(instance["port"])
+        if port in reserved:
+            raise XPanelError(
+                f"REALITY #{int(instance['id'])}: TCP-порт {port} занят: {reserved[port]}. "
+                "Выберите другой публичный TCP-порт."
+            )
 
 
 def _hostname_candidate(value: str) -> str:
@@ -2944,6 +3434,33 @@ def get_inbound_recommendations() -> dict[str, object]:
             "tls_cert_path": cert_path,
             "tls_key_path": key_path,
         },
+        "xhttp_hysteria_tls": {
+            "address": public_address,
+            "port": 443,
+            "listen": "0.0.0.0",
+            "server_name": domain,
+            "transport_listen": "127.0.0.1",
+            "transport_port": int(server["transport_port"] or 8443),
+            "xhttp_path": xhttp_path,
+            "xhttp_mode": str(server["xhttp_mode"] or "auto"),
+            "tls_cert_path": cert_path,
+            "tls_key_path": key_path,
+            "hysteria_udp_idle_timeout": 60,
+            "hysteria_masquerade_type": "",
+            "hysteria_masquerade_status": 404,
+            "hysteria_performance_profile": "auto",
+            "hysteria_congestion": "brutal",
+            "hysteria_bbr_profile": "standard",
+            "hysteria_brutal_up": "0",
+            "hysteria_brutal_down": "0",
+            "hysteria_quic_debug": False,
+            "hysteria_max_idle_timeout": 30,
+            "hysteria_keepalive_period": 0,
+            "hysteria_disable_pmtud": False,
+            "hysteria_max_incoming_streams": 1024,
+            "hysteria_udp_hop_ports": "",
+            "hysteria_udp_hop_interval": "30",
+        },
         "hysteria2_tls": {
             "address": public_address,
             "port": 443,
@@ -2990,12 +3507,18 @@ def get_hysteria_studio_overview() -> dict[str, object]:
     cert_path = Path(str(server["tls_cert_path"] or ""))
     key_path = Path(str(server["tls_key_path"] or ""))
     cert_ready = cert_path.is_file() and key_path.is_file()
+    instances = list_hysteria_inbounds()
+    enabled_instances = [row for row in instances if bool(row["enabled"])]
     udp_state = _listener_status(int(server["port"] or 443), "udp")
-    active = str(server["inbound_profile"] or "") == "hysteria2_tls"
+    active = str(server["inbound_profile"] or "") in HYSTERIA_ACTIVE_PROFILES
+    ports = [int(row["port"]) for row in enabled_instances]
     return {
         "active": active,
         "service": service_state,
         "endpoint": f"{server['address']}:{server['port']}/UDP",
+        "instances": len(enabled_instances),
+        "ports": ports,
+        "ports_label": ", ".join(str(value) for value in ports),
         "users": active_users,
         "certificate_ready": cert_ready,
         "certificate_label": "готов" if cert_ready else "требует проверки",
@@ -3010,7 +3533,10 @@ def get_hysteria_diagnostics() -> dict[str, object]:
     server = get_server()
     address = str(server["address"] or "").strip()
     port = int(server["port"] or 443)
-    profile_active = str(server["inbound_profile"] or "") == "hysteria2_tls"
+    profile_active = str(server["inbound_profile"] or "") in HYSTERIA_ACTIVE_PROFILES
+    enabled_instances = [row for row in list_hysteria_inbounds() if bool(row["enabled"])]
+    if not enabled_instances:
+        enabled_instances = [{"id": 1, "name": "Hysteria 2 — основной", "port": port}]
     checks: list[dict[str, str]] = []
 
     def add(key: str, label: str, level: str, status: str, detail: str) -> None:
@@ -3073,20 +3599,41 @@ def get_hysteria_diagnostics() -> dict[str, object]:
 
     try:
         config, _server, users = build_config()
-        inbound = config.get("inbounds", [{}])[0]
-        stream = inbound.get("streamSettings", {}) if isinstance(inbound, dict) else {}
-        shape_ok = (
-            inbound.get("protocol") == "hysteria"
-            and inbound.get("settings", {}).get("version") == 2
-            and stream.get("network") == "hysteria"
-            and stream.get("hysteriaSettings", {}).get("version") == 2
+        configured = [
+            item for item in config.get("inbounds", [])
+            if isinstance(item, dict) and str(item.get("tag", "")) in HYSTERIA_INBOUND_TAGS.values()
+        ]
+        invalid_tags: list[str] = []
+        for inbound in configured:
+            stream = inbound.get("streamSettings", {})
+            settings = inbound.get("settings", {})
+            shape_ok = (
+                inbound.get("protocol") == "hysteria"
+                and isinstance(settings, dict)
+                and settings.get("version") == 2
+                and isinstance(stream, dict)
+                and stream.get("network") == "hysteria"
+                and isinstance(stream.get("hysteriaSettings"), dict)
+                and stream["hysteriaSettings"].get("version") == 2
+            )
+            if not shape_ok:
+                invalid_tags.append(str(inbound.get("tag", "без tag")))
+        expected_count = len(enabled_instances)
+        all_shapes_ok = len(configured) == expected_count and not invalid_tags
+        detail = (
+            f"Inbound: {len(configured)}; пользователей: {len(users)}"
+            if all_shapes_ok
+            else (
+                f"Ожидалось Inbound: {expected_count}; найдено: {len(configured)}; "
+                f"ошибочные tags: {', '.join(invalid_tags) or 'нет'}"
+            )
         )
         add(
             "shape",
             "Структура Hysteria 2",
-            "ok" if shape_ok else "error",
-            "Корректна" if shape_ok else "Не соответствует Hysteria 2",
-            f"Пользователей в generated config: {len(users)}",
+            "ok" if all_shapes_ok else "error",
+            "Корректна" if all_shapes_ok else "Не соответствует Hysteria 2",
+            detail,
         )
     except (KeyError, IndexError, TypeError, ValueError, XPanelError) as exc:
         add("shape", "Структура Hysteria 2", "error", "Ошибка", str(exc))
@@ -3104,14 +3651,16 @@ def get_hysteria_diagnostics() -> dict[str, object]:
         f"systemd unit: {server['xray_service']}",
     )
 
-    udp_state = _listener_status(port, "udp")
-    add(
-        "udp",
-        f"UDP listener {port}",
-        "ok" if udp_state == "занят" and profile_active else ("warning" if not profile_active else "error"),
-        "Слушается" if udp_state == "занят" else "Не слушается",
-        "Проверена локальная таблица сокетов. Внешняя доступность из интернета отдельно не подтверждается.",
-    )
+    for index, instance in enumerate(enabled_instances):
+        instance_port = int(instance["port"])
+        udp_state = _listener_status(instance_port, "udp")
+        add(
+            "udp" if index == 0 else f"udp_{int(instance['id'])}",
+            f"UDP listener {instance_port}",
+            "ok" if udp_state == "занят" and profile_active else ("warning" if not profile_active else "error"),
+            "Слушается" if udp_state == "занят" else "Не слушается",
+            f"{instance['name']}. Проверена локальная таблица сокетов; внешний доступ проверяется клиентом из другой сети.",
+        )
 
     active_users = len(_active_users(list_users()))
     add(
@@ -3132,14 +3681,21 @@ def get_hysteria_diagnostics() -> dict[str, object]:
             f"Порты: {hop_ports}; откройте весь диапазон UDP в Security Group и firewall.",
         )
     else:
-        add("hopping", "UDP port hopping", "ok", "Выключен", f"Используется один UDP-порт {port}.")
+        active_ports = ", ".join(str(int(item["port"])) for item in enabled_instances)
+        add(
+            "hopping",
+            "UDP port hopping",
+            "ok",
+            "Выключен",
+            f"Используются фиксированные UDP-порты: {active_ports}.",
+        )
 
     try:
         journal = _run(["journalctl", "-u", str(server["xray_service"]), "-n", "80", "--no-pager"], timeout=8)
         log_lines = (journal.stdout or journal.stderr).splitlines()
     except (OSError, XPanelError) as exc:
         log_lines = [f"journalctl: {exc}"]
-    suspicious = [line for line in log_lines if re.search(r"(error|failed|panic|fatal)", line, re.I)]
+    suspicious = [line for line in log_lines if re.search(r"\b(error|failed|panic|fatal)\b", line, re.I)]
     add(
         "logs",
         "Журнал Xray",
@@ -3153,7 +3709,7 @@ def get_hysteria_diagnostics() -> dict[str, object]:
         "Внешняя доступность UDP",
         "neutral",
         "Не подтверждена локально",
-        "Для окончательной проверки подключитесь клиентом из другой сети. Security Group провайдера панель прочитать не может.",
+        "Для окончательной проверки подключитесь к каждому включённому UDP-порту из другой сети. Security Group провайдера панель прочитать не может.",
     )
 
     blocking = [item for item in checks if item["level"] == "error"]
@@ -3297,7 +3853,7 @@ def validate_server_values(
         if ":" not in dest:
             raise ValueError("dest должен иметь вид host:port")
 
-    if profile in {"xhttp_tls", "xhttp_reality"}:
+    if profile in XHTTP_ACTIVE_PROFILES | {"xhttp_reality"}:
         _validate_xhttp_path(xhttp_path)
         if xhttp_mode not in ALLOWED_XHTTP_MODES:
             raise ValueError("неподдерживаемый XHTTP mode")
@@ -3305,7 +3861,7 @@ def validate_server_values(
     if profile == "grpc_tls":
         _validate_grpc_service_name(grpc_service_name)
 
-    if profile == "hysteria2_tls" and not _hostname_candidate(server_name):
+    if profile in HYSTERIA_ACTIVE_PROFILES and not _hostname_candidate(server_name):
         raise ValueError(
             "Hysteria 2 требует ваш реальный домен и TLS-сертификат. "
             "Сначала настройте домен и HTTPS панели, затем выберите Hysteria 2."
@@ -3335,7 +3891,7 @@ def validate_server_values(
         if not 1 <= int(transport_port) <= 65535:
             raise ValueError("локальный порт Xray должен быть от 1 до 65535")
 
-    if profile == "hysteria2_tls":
+    if profile in HYSTERIA_ACTIVE_PROFILES:
         cert_file = Path(tls_cert_path)
         key_file = Path(tls_key_path)
         if not cert_file.is_file() or not key_file.is_file():
@@ -3453,6 +4009,9 @@ def update_server_settings(
     hysteria_max_stream_receive_window: int | None = None,
     hysteria_init_connection_receive_window: int | None = None,
     hysteria_max_connection_receive_window: int | None = None,
+    hysteria_instances: list[dict[str, object]] | None = None,
+    xhttp_instances: list[dict[str, object]] | None = None,
+    reality_instances: list[dict[str, object]] | None = None,
 ) -> sqlite3.Row:
     current = get_server()
     profile = (inbound_profile or current["inbound_profile"] or "raw_reality").strip()
@@ -3502,6 +4061,54 @@ def update_server_settings(
     hy_msrw = int(hysteria_max_stream_receive_window if hysteria_max_stream_receive_window is not None else current["hysteria_max_stream_receive_window"] or 8388608)
     hy_icrw = int(hysteria_init_connection_receive_window if hysteria_init_connection_receive_window is not None else current["hysteria_init_connection_receive_window"] or 20971520)
     hy_mcrw = int(hysteria_max_connection_receive_window if hysteria_max_connection_receive_window is not None else current["hysteria_max_connection_receive_window"] or 20971520)
+    cleaned_hysteria_instances = None
+    if profile in HYSTERIA_ACTIVE_PROFILES:
+        cleaned_hysteria_instances = _normalise_hysteria_instances(
+            hysteria_instances,
+            primary_listen=listen.strip(),
+            primary_port=int(port),
+            hop_ports=hy_hop_ports,
+        )
+    cleaned_xhttp_instances = None
+    if profile in XHTTP_ACTIVE_PROFILES:
+        cleaned_xhttp_instances = _normalise_xhttp_instances(
+            xhttp_instances,
+            primary_listen=local_listen,
+            primary_port=local_port,
+            primary_path=path,
+        )
+    cleaned_reality_instances = None
+    effective_short_id = short_id.strip().lower()
+    if profile == "raw_reality":
+        if not effective_short_id:
+            supplied_primary = next(
+                (
+                    str(item.get("short_id", "")).strip().lower()
+                    for item in (reality_instances or [])
+                    if int(item.get("id", 0)) == 1 and str(item.get("short_id", "")).strip()
+                ),
+                "",
+            )
+            stored_primary = next(
+                (
+                    str(row["short_id"] or "").strip().lower()
+                    for row in list_reality_inbounds()
+                    if int(row["id"]) == 1 and str(row["short_id"] or "").strip()
+                ),
+                "",
+            )
+            effective_short_id = (
+                supplied_primary
+                or stored_primary
+                or str(current["short_id"] or "").strip().lower()
+                or secrets.token_hex(8)
+            )
+        cleaned_reality_instances = _normalise_reality_instances(
+            reality_instances,
+            primary_listen=listen.strip(),
+            primary_port=int(port),
+            primary_short_id=effective_short_id,
+        )
     normalized_flow = flow if profile == "raw_reality" else ""
 
     validate_server_values(
@@ -3511,7 +4118,7 @@ def update_server_settings(
         normalized_server_name,
         private_key,
         public_key,
-        short_id,
+        effective_short_id if profile == "raw_reality" else short_id,
         flow=normalized_flow,
         loglevel=loglevel,
         api_listen=api_listen,
@@ -3582,7 +4189,8 @@ def update_server_settings(
             """,
             (
                 address.strip(), listen.strip(), int(port), dest.strip(), normalized_server_name,
-                private_key.strip(), public_key.strip(), short_id.strip(), fingerprint,
+                private_key.strip(), public_key.strip(),
+                effective_short_id if profile == "raw_reality" else short_id.strip(), fingerprint,
                 normalized_flow, loglevel, api_listen.strip(), int(stats_enabled),
                 config_path.strip(), xray_bin.strip(), xray_service.strip(),
                 profile, local_listen, local_port, path, mode, service_name,
@@ -3594,6 +4202,27 @@ def update_server_settings(
                 hy_streams, hy_hop_ports, hy_hop_interval,
                 hy_isrw, hy_msrw, hy_icrw, hy_mcrw,
             ),
+        )
+    if profile in HYSTERIA_ACTIVE_PROFILES:
+        update_hysteria_inbounds(
+            cleaned_hysteria_instances,
+            primary_listen=listen.strip(),
+            primary_port=int(port),
+            hop_ports=hy_hop_ports,
+        )
+    if profile in XHTTP_ACTIVE_PROFILES:
+        update_xhttp_inbounds(
+            cleaned_xhttp_instances,
+            primary_listen=local_listen,
+            primary_port=local_port,
+            primary_path=path,
+        )
+    if profile == "raw_reality":
+        update_reality_inbounds(
+            cleaned_reality_instances,
+            primary_listen=listen.strip(),
+            primary_port=int(port),
+            primary_short_id=effective_short_id,
         )
     return get_server()
 
@@ -3890,14 +4519,22 @@ def _active_users(rows: list[sqlite3.Row]) -> list[sqlite3.Row]:
     return [row for row in rows if row["enabled"] and not user_is_expired(row)]
 
 
-def _reality_settings(server: sqlite3.Row) -> dict[str, object]:
+def _reality_settings(
+    server: sqlite3.Row,
+    *,
+    short_id: str | None = None,
+    short_ids: list[str] | None = None,
+) -> dict[str, object]:
+    values = [str(value) for value in (short_ids or []) if str(value)]
+    if not values:
+        values = [short_id or server["short_id"]]
     return {
         "show": False,
         "dest": server["dest"],
         "xver": 0,
         "serverNames": [server["server_name"]],
         "privateKey": server["private_key"],
-        "shortIds": [server["short_id"]],
+        "shortIds": values,
     }
 
 
@@ -3968,6 +4605,147 @@ def _hysteria_quic_params(server: sqlite3.Row) -> dict[str, object]:
             "interval": _hysteria_hop_interval_value(server["hysteria_udp_hop_interval"]),
         }
     return params
+
+
+def _build_hysteria_inbound(
+    server: sqlite3.Row,
+    instance: sqlite3.Row,
+    users: list[sqlite3.Row],
+    auths: dict[int, dict[int, str]],
+    *,
+    tag_override: str | None = None,
+) -> dict[str, object]:
+    inbound_id = int(instance["id"])
+    auth_map = auths.get(inbound_id, {})
+    hysteria_users = [
+        {
+            "auth": auth_map[int(user["id"])],
+            "email": str(user["name"]),
+            "level": 0,
+        }
+        for user in users
+    ]
+    return {
+        "tag": str(tag_override or instance["tag"]),
+        "listen": str(instance["listen"]),
+        "port": int(instance["port"]),
+        "protocol": "hysteria",
+        "settings": {"version": 2, "users": hysteria_users},
+        "streamSettings": {
+            "network": "hysteria",
+            "security": "tls",
+            "hysteriaSettings": {
+                "version": 2,
+                "udpIdleTimeout": int(server["hysteria_udp_idle_timeout"] or 60),
+                "masquerade": _hysteria_masquerade(server),
+            },
+            "finalmask": {"quicParams": _hysteria_quic_params(server)},
+            "tlsSettings": {
+                "serverName": server["server_name"],
+                "alpn": ["h3"],
+                "minVersion": "1.3",
+                "certificates": [
+                    {
+                        "certificateFile": server["tls_cert_path"],
+                        "keyFile": server["tls_key_path"],
+                    }
+                ],
+            },
+        },
+    }
+
+
+def _build_xhttp_inbound(
+    server: sqlite3.Row,
+    instance: sqlite3.Row,
+    clients: list[dict[str, object]],
+) -> dict[str, object]:
+    settings: dict[str, object] = {"path": str(instance["path"])}
+    mode = str(server["xhttp_mode"] or "auto")
+    if mode != "auto":
+        settings["mode"] = mode
+    return {
+        "tag": str(instance["tag"]),
+        "listen": str(instance["listen"]),
+        "port": int(instance["port"]),
+        "protocol": "vless",
+        "settings": {"clients": clients, "decryption": "none"},
+        "streamSettings": {
+            "network": "xhttp",
+            "security": "none",
+            "xhttpSettings": settings,
+        },
+    }
+
+
+def _build_reality_inbound(
+    server: sqlite3.Row,
+    instance: sqlite3.Row,
+    clients: list[dict[str, object]],
+) -> dict[str, object]:
+    instance_id = int(instance["id"])
+    listen = str(instance["listen"])
+    port = int(instance["port"])
+    if instance_id == 1:
+        edge = _reality_edge_settings(server)
+        if edge.get("enabled"):
+            listen = "127.0.0.1"
+            port = int(edge["xray_port"])
+    return {
+        "tag": str(instance["tag"]),
+        "listen": listen,
+        "port": port,
+        "protocol": "vless",
+        "settings": {"clients": clients, "decryption": "none"},
+        "streamSettings": {
+            "network": "tcp",
+            "security": "reality",
+            "realitySettings": _reality_settings(server, short_id=str(instance["short_id"])),
+        },
+    }
+
+
+def _build_reality_vision_inbound(
+    server: sqlite3.Row,
+    instances: list[sqlite3.Row],
+    clients: list[dict[str, object]],
+) -> dict[str, object]:
+    """Build one Vision handler for every enabled public REALITY entry point.
+
+    Xray has a long-standing failure mode when several independent VLESS
+    REALITY handlers use Vision simultaneously.  A single handler can listen
+    on several ports and can accept several REALITY shortIds, so SG-Panel
+    consolidates the public entry points instead of duplicating Vision state.
+    """
+    if not instances:
+        raise XPanelError("не включён ни один REALITY Inbound")
+    edge = _reality_edge_settings(server)
+    if edge.get("enabled"):
+        listen: str = "127.0.0.1"
+        port: int | str = int(edge["xray_port"])
+    else:
+        listens = {str(item["listen"]) for item in instances}
+        if len(listens) != 1:
+            raise XPanelError(
+                "REALITY Vision с несколькими точками входа требует одинаковый listen"
+            )
+        listen = listens.pop()
+        port = ",".join(str(int(item["port"])) for item in instances)
+    return {
+        "tag": str(instances[0]["tag"]),
+        "listen": listen,
+        "port": port,
+        "protocol": "vless",
+        "settings": {"clients": clients, "decryption": "none"},
+        "streamSettings": {
+            "network": "tcp",
+            "security": "reality",
+            "realitySettings": _reality_settings(
+                server,
+                short_ids=[str(item["short_id"]) for item in instances],
+            ),
+        },
+    }
 
 
 def _build_primary_inbound(server: sqlite3.Row, clients: list[dict[str, object]]) -> dict[str, object]:
@@ -4106,7 +4884,61 @@ def _build_managed_config() -> tuple[dict, sqlite3.Row, list[sqlite3.Row]]:
             client["flow"] = server["flow"]
         clients.append(client)
 
-    inbound = _build_primary_inbound(server, clients)
+    profile = str(server["inbound_profile"] or "")
+    if profile == "raw_reality":
+        instances = [row for row in list_reality_inbounds() if bool(row["enabled"])]
+        if not instances or int(instances[0]["id"]) != 1:
+            raise XPanelError("Основной REALITY Inbound должен быть включён")
+        _validate_reality_edge_listener_ports(server, instances)
+        if str(server["flow"] or "") == "xtls-rprx-vision" and len(instances) > 1:
+            inbounds = [_build_reality_vision_inbound(server, instances, clients)]
+        else:
+            inbounds = [
+                _build_reality_inbound(server, instance, clients)
+                for instance in instances
+            ]
+    elif profile == "hysteria2_tls":
+        instances = [row for row in list_hysteria_inbounds() if bool(row["enabled"])]
+        if not instances or int(instances[0]["id"]) != 1:
+            raise XPanelError("Основной Hysteria 2 Inbound должен быть включён")
+        auths = _ensure_hysteria_user_auths()
+        inbounds = [
+            _build_hysteria_inbound(server, instance, users, auths)
+            for instance in instances
+        ]
+    elif profile == "xhttp_tls":
+        instances = [row for row in list_xhttp_inbounds() if bool(row["enabled"])]
+        if not instances or int(instances[0]["id"]) != 1:
+            raise XPanelError("Основной XHTTP Inbound должен быть включён")
+        inbounds = [
+            _build_xhttp_inbound(server, instance, clients)
+            for instance in instances
+        ]
+    elif profile == "xhttp_hysteria_tls":
+        xhttp_instances = [row for row in list_xhttp_inbounds() if bool(row["enabled"])]
+        hysteria_instances = [row for row in list_hysteria_inbounds() if bool(row["enabled"])]
+        if not xhttp_instances or int(xhttp_instances[0]["id"]) != 1:
+            raise XPanelError("Основной XHTTP Inbound должен быть включён")
+        if not hysteria_instances or int(hysteria_instances[0]["id"]) != 1:
+            raise XPanelError("Основной Hysteria 2 Inbound должен быть включён")
+        auths = _ensure_hysteria_user_auths()
+        inbounds = [
+            _build_xhttp_inbound(server, instance, clients)
+            for instance in xhttp_instances
+        ]
+        inbounds.extend(
+            _build_hysteria_inbound(
+                server,
+                instance,
+                users,
+                auths,
+                tag_override=(HYSTERIA_COMBINED_PRIMARY_TAG if int(instance["id"]) == 1 else None),
+            )
+            for instance in hysteria_instances
+        )
+    else:
+        inbounds = [_build_primary_inbound(server, clients)]
+
     if settings["sniffing_enabled"]:
         dest_override = []
         if settings["sniff_http"]:
@@ -4115,11 +4947,12 @@ def _build_managed_config() -> tuple[dict, sqlite3.Row, list[sqlite3.Row]]:
             dest_override.append("tls")
         if settings["sniff_quic"]:
             dest_override.append("quic")
-        inbound["sniffing"] = {
-            "enabled": True,
-            "destOverride": dest_override,
-            "routeOnly": bool(settings["sniffing_route_only"]),
-        }
+        for inbound in inbounds:
+            inbound["sniffing"] = {
+                "enabled": True,
+                "destOverride": dest_override,
+                "routeOnly": bool(settings["sniffing_route_only"]),
+            }
 
     routing_config = _json_object(settings["extra_json"])
     routing_config.pop("_sgPanel", None)
@@ -4127,7 +4960,7 @@ def _build_managed_config() -> tuple[dict, sqlite3.Row, list[sqlite3.Row]]:
     routing_config["rules"] = [build_rule_json(row) for row in rules]
     config: dict[str, object] = {
         "log": {"loglevel": server["loglevel"]},
-        "inbounds": [inbound],
+        "inbounds": inbounds,
         "outbounds": [],
         "routing": routing_config,
     }
@@ -4242,14 +5075,26 @@ def _merge_clients(base_items: object, managed_items: object) -> list[dict[str, 
 
 
 def _merge_inbounds(base_items: object, managed_items: list[dict[str, object]]) -> list[dict[str, object]]:
-    merged = _merge_tagged_objects(base_items, managed_items)
+    managed_tags = {str(item.get("tag", "")) for item in managed_items}
+    known_managed_tags = set(HYSTERIA_INBOUND_TAGS.values()) | set(XHTTP_INBOUND_TAGS.values()) | set(REALITY_INBOUND_TAGS.values()) | {HYSTERIA_COMBINED_PRIMARY_TAG}
+    filtered_base = (
+        [
+            item for item in base_items
+            if not isinstance(item, dict)
+            or str(item.get("tag", "")) not in known_managed_tags
+            or str(item.get("tag", "")) in managed_tags
+        ]
+        if isinstance(base_items, list)
+        else base_items
+    )
+    merged = _merge_tagged_objects(filtered_base, managed_items)
     for item in merged:
         if str(item.get("tag", "")) != "vless-reality-in":
             continue
         base_match = None
-        if isinstance(base_items, list):
+        if isinstance(filtered_base, list):
             base_match = next(
-                (candidate for candidate in base_items if isinstance(candidate, dict) and candidate.get("tag") == "vless-reality-in"),
+                (candidate for candidate in filtered_base if isinstance(candidate, dict) and candidate.get("tag") == "vless-reality-in"),
                 None,
             )
         if not isinstance(base_match, dict):
@@ -4601,7 +5446,7 @@ def _parse_full_config_server(
         raise ValueError("профиль RAW/TCP + REALITY не соответствует streamSettings")
     if profile == "xhttp_reality" and (network, security) != ("xhttp", "reality"):
         raise ValueError("профиль XHTTP + REALITY не соответствует streamSettings")
-    if profile == "xhttp_tls" and (network, security) != ("xhttp", "none"):
+    if profile in XHTTP_ACTIVE_PROFILES and (network, security) != ("xhttp", "none"):
         raise ValueError("для XHTTP + TLS Xray должен принимать локальный XHTTP без TLS")
     if profile == "grpc_tls" and (network, security) != ("grpc", "none"):
         raise ValueError("для gRPC + TLS Xray должен принимать локальный gRPC без TLS")
@@ -4634,7 +5479,7 @@ def _parse_full_config_server(
 
     xhttp_path = str(current["xhttp_path"] or "/sg-xhttp")
     xhttp_mode = str(meta.get("xhttpMode") or current["xhttp_mode"] or "auto")
-    if profile in {"xhttp_tls", "xhttp_reality"}:
+    if profile in XHTTP_ACTIVE_PROFILES | {"xhttp_reality"}:
         xhttp = stream.get("xhttpSettings")
         if not isinstance(xhttp, dict):
             raise ValueError("основной inbound: xhttpSettings не найден")
@@ -5378,27 +6223,34 @@ def _runtime_hysteria_config_text(text: str, cert_path: Path, key_path: Path) ->
         config = json.loads(text)
     except json.JSONDecodeError as exc:
         raise XPanelError(f"не удалось подготовить runtime-конфигурацию Hysteria 2: {exc}") from exc
-    inbound = _find_tagged_item(config.get("inbounds"), "vless-reality-in")
-    if inbound is None or str(inbound.get("protocol", "")).lower() != "hysteria":
+    inbounds = config.get("inbounds")
+    if not isinstance(inbounds, list):
+        raise XPanelError("не найден массив Hysteria 2 inbound")
+    updated = 0
+    for inbound in inbounds:
+        if not isinstance(inbound, dict) or str(inbound.get("protocol", "")).lower() != "hysteria":
+            continue
+        stream = inbound.get("streamSettings")
+        if not isinstance(stream, dict):
+            raise XPanelError("у Hysteria 2 отсутствует streamSettings")
+        tls = stream.get("tlsSettings")
+        if not isinstance(tls, dict):
+            raise XPanelError("у Hysteria 2 отсутствует tlsSettings")
+        certificates = tls.get("certificates")
+        if not isinstance(certificates, list) or not certificates or not isinstance(certificates[0], dict):
+            raise XPanelError("у Hysteria 2 отсутствует TLS-сертификат")
+        certificates[0]["certificateFile"] = str(cert_path)
+        certificates[0]["keyFile"] = str(key_path)
+        updated += 1
+    if not updated:
         raise XPanelError("не найден управляемый Hysteria 2 inbound")
-    stream = inbound.get("streamSettings")
-    if not isinstance(stream, dict):
-        raise XPanelError("у Hysteria 2 отсутствует streamSettings")
-    tls = stream.get("tlsSettings")
-    if not isinstance(tls, dict):
-        raise XPanelError("у Hysteria 2 отсутствует tlsSettings")
-    certificates = tls.get("certificates")
-    if not isinstance(certificates, list) or not certificates or not isinstance(certificates[0], dict):
-        raise XPanelError("у Hysteria 2 отсутствует TLS-сертификат")
-    certificates[0]["certificateFile"] = str(cert_path)
-    certificates[0]["keyFile"] = str(key_path)
     return json.dumps(config, ensure_ascii=False, indent=2) + "\n"
 
 
 def sync_hysteria_tls_material(*, restart: bool = False) -> dict[str, object]:
     require_root()
     server = get_server()
-    if str(server["inbound_profile"] or "") != "hysteria2_tls":
+    if str(server["inbound_profile"] or "") not in HYSTERIA_ACTIVE_PROFILES:
         return {"active": False, "restarted": False}
     snapshot = _snapshot_hysteria_tls_material()
     try:
@@ -5502,44 +6354,55 @@ def _nginx_transport_config(server: sqlite3.Row) -> str:
     proxy_block = ""
     http2 = ""
     if profile in TLS_INBOUND_PROFILES:
-        target_host = str(server["transport_listen"])
-        if ":" in target_host and not target_host.startswith("["):
-            target_host = f"[{target_host}]"
-        target = f"{target_host}:{server['transport_port']}"
         http2 = " http2"
-        if profile == "xhttp_tls":
-            path = str(server["xhttp_path"]).rstrip("/") + "/"
-            proxy_block = f'''    location {path} {{
-        grpc_socket_keepalive on;
-        grpc_read_timeout 1h;
-        grpc_send_timeout 1h;
-        client_body_timeout 1h;
-        send_timeout 1h;
-        client_max_body_size 100m;
-        chunked_transfer_encoding on;
-        grpc_set_header Host $host;
-        grpc_set_header X-Real-IP $remote_addr;
-        grpc_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        grpc_set_header X-Forwarded-Proto $scheme;
-        grpc_pass grpc://{target};
-    }}
-
-'''
+        if profile in XHTTP_ACTIVE_PROFILES:
+            instances = [row for row in list_xhttp_inbounds() if bool(row["enabled"])]
+            if not instances or int(instances[0]["id"]) != 1:
+                raise XPanelError("Основной XHTTP Inbound должен быть включён")
+            blocks: list[str] = []
+            for instance in instances:
+                target_host = str(instance["listen"])
+                if ":" in target_host and not target_host.startswith("["):
+                    target_host = f"[{target_host}]"
+                target = f"{target_host}:{int(instance['port'])}"
+                path = str(instance["path"]).rstrip("/") + "/"
+                blocks.append(
+                    f"    # {instance['name']} · {instance['tag']}\n"
+                    f"    location {path} {{\n"
+                    "        grpc_socket_keepalive on;\n"
+                    "        grpc_read_timeout 1h;\n"
+                    "        grpc_send_timeout 1h;\n"
+                    "        client_body_timeout 1h;\n"
+                    "        send_timeout 1h;\n"
+                    "        client_max_body_size 100m;\n"
+                    "        chunked_transfer_encoding on;\n"
+                    "        grpc_set_header Host $host;\n"
+                    "        grpc_set_header X-Real-IP $remote_addr;\n"
+                    "        grpc_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n"
+                    "        grpc_set_header X-Forwarded-Proto $scheme;\n"
+                    f"        grpc_pass grpc://{target};\n"
+                    "    }\n\n"
+                )
+            proxy_block = "".join(blocks)
         else:
+            target_host = str(server["transport_listen"])
+            if ":" in target_host and not target_host.startswith("["):
+                target_host = f"[{target_host}]"
+            target = f"{target_host}:{server['transport_port']}"
             service = str(server["grpc_service_name"]).strip("/")
-            proxy_block = f'''    location /{service} {{
-        grpc_socket_keepalive on;
-        grpc_read_timeout 1h;
-        grpc_send_timeout 1h;
-        grpc_set_header Host $host;
-        grpc_set_header X-Real-IP $remote_addr;
-        grpc_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        grpc_set_header X-Forwarded-Proto $scheme;
-        grpc_pass grpc://{target};
-    }}
-
-'''
-    return f'''# Managed by SG-Panel. Manual changes may be overwritten.
+            proxy_block = (
+                f"    location /{service} {{\n"
+                "        grpc_socket_keepalive on;\n"
+                "        grpc_read_timeout 1h;\n"
+                "        grpc_send_timeout 1h;\n"
+                "        grpc_set_header Host $host;\n"
+                "        grpc_set_header X-Real-IP $remote_addr;\n"
+                "        grpc_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n"
+                "        grpc_set_header X-Forwarded-Proto $scheme;\n"
+                f"        grpc_pass grpc://{target};\n"
+                "    }\n\n"
+            )
+    return f"""# Managed by SG-Panel. Manual changes may be overwritten.
 server {{
     listen {public_port} ssl{http2};
     listen [::]:{public_port} ssl{http2};
@@ -5554,7 +6417,7 @@ server {{
 
 {proxy_block}{placeholder}
 }}
-'''
+"""
 
 
 def _nginx_reality_edge_configs(server: sqlite3.Row) -> tuple[str, str]:
@@ -5569,7 +6432,37 @@ def _nginx_reality_edge_configs(server: sqlite3.Row) -> tuple[str, str]:
     key = str(edge["key"])
     xray_port = int(edge["xray_port"])
     web_port = int(edge["web_port"])
-    stream = f'''# Managed by SG-Panel. Top-level Nginx stream router for TCP 443.
+    instances = [row for row in list_reality_inbounds() if bool(row["enabled"])]
+    vision_multi = (
+        str(server["inbound_profile"] or "") == "raw_reality"
+        and str(server["flow"] or "") == "xtls-rprx-vision"
+        and len(instances) > 1
+    )
+    extra_servers = ""
+    if vision_multi:
+        for instance in instances[1:]:
+            public_port = int(instance["port"])
+            public_listen = str(instance["listen"] or "0.0.0.0").strip()
+            if public_listen in {"0.0.0.0", "::"}:
+                listen_directives = (
+                    f"        listen {public_port};\n"
+                    f"        listen [::]:{public_port};\n"
+                )
+            elif ":" in public_listen:
+                listen_directives = f"        listen [{public_listen}]:{public_port};\n"
+            else:
+                listen_directives = f"        listen {public_listen}:{public_port};\n"
+            safe_name = str(instance["name"]).replace("\r", " ").replace("\n", " ")
+            extra_servers += (
+                f"\n    # {safe_name} · public REALITY Vision entry point\n"
+                "    server {\n"
+                f"{listen_directives}"
+                f"        proxy_pass 127.0.0.1:{xray_port};\n"
+                "        proxy_connect_timeout 5s;\n"
+                "        proxy_timeout 1h;\n"
+                "    }\n"
+            )
+    stream = f'''# Managed by SG-Panel. Top-level Nginx stream router for REALITY TCP entry points.
 stream {{
     map $ssl_preread_server_name $sg_panel_443_backend {{
         hostnames;
@@ -5585,7 +6478,7 @@ stream {{
         proxy_connect_timeout 5s;
         proxy_timeout 1h;
     }}
-}}
+{extra_servers}}}
 '''
     placeholder = _nginx_placeholder_block()
     web = f'''# Managed by SG-Panel. Local HTTPS placeholder behind the TCP 443 router.
@@ -5725,7 +6618,7 @@ def _prepare_nginx_frontend() -> None:
 
 def _activate_nginx_frontend(server: sqlite3.Row) -> str:
     profile = str(server["inbound_profile"] or "raw_reality")
-    if profile in TLS_INBOUND_PROFILES or profile == "hysteria2_tls":
+    if profile in CERTIFICATE_INBOUND_PROFILES:
         _enable_nginx_transport(server)
         return "tls-placeholder" if profile == "hysteria2_tls" else "tls-transport"
     if profile in REALITY_INBOUND_PROFILES and _reality_edge_settings(server).get("enabled"):
@@ -5746,9 +6639,9 @@ def apply_config() -> dict[str, object]:
     nginx_snapshot = _snapshot_nginx_frontends()
     previous_config: bytes | None = config_path.read_bytes() if config_path.exists() else None
     profile = str(server["inbound_profile"] or "raw_reality")
-    hysteria_tls_snapshot = _snapshot_hysteria_tls_material() if profile == "hysteria2_tls" else None
+    hysteria_tls_snapshot = _snapshot_hysteria_tls_material() if profile in HYSTERIA_ACTIVE_PROFILES else None
     try:
-        if profile == "hysteria2_tls":
+        if profile in HYSTERIA_ACTIVE_PROFILES:
             runtime_cert, runtime_key = _sync_hysteria_tls_material(server)
             text = _runtime_hysteria_config_text(text, runtime_cert, runtime_key)
         temp_handle = os.fdopen(temp_fd, "w", encoding="utf-8")
@@ -5763,7 +6656,7 @@ def apply_config() -> dict[str, object]:
             detail = (test.stderr or test.stdout).strip()
             raise XPanelError(f"новый config.json не прошёл xray run -test:\n{detail}")
 
-        if profile in TLS_INBOUND_PROFILES or profile == "hysteria2_tls":
+        if profile in CERTIFICATE_INBOUND_PROFILES:
             _nginx_transport_config(server)
         elif profile in REALITY_INBOUND_PROFILES and _reality_edge_settings(server).get("enabled"):
             _nginx_reality_edge_configs(server)
@@ -6647,11 +7540,12 @@ def get_status() -> dict[str, object]:
     except Exception as exc:  # dashboard must stay available even if API is down
         stats_error = str(exc)
     profile_labels = {
-        "raw_reality": "RAW/TCP + REALITY",
-        "xhttp_tls": "XHTTP + TLS",
-        "xhttp_reality": "XHTTP + REALITY",
+        "raw_reality": "VLESS REALITY",
+        "xhttp_tls": "VLESS XHTTP-TLS",
+        "xhttp_reality": "VLESS XHTTP-REALITY",
         "grpc_tls": "gRPC + TLS",
-        "hysteria2_tls": "Hysteria 2 + TLS",
+        "hysteria2_tls": "Hysteria 2",
+        "xhttp_hysteria_tls": "XHTTP-TLS + Hysteria 2",
     }
     config_updated_at = ""
     if config_path.exists():
@@ -6704,48 +7598,157 @@ def get_status() -> dict[str, object]:
     }
 
 
-def make_link(identifier: str | int, allow_disabled: bool = False) -> str:
-    server = get_server()
-    user = find_user(identifier)
-    if (not user["enabled"] or user_is_expired(user)) and not allow_disabled:
-        raise XPanelError("пользователь отключён или срок действия истёк")
-    name = quote(user["name"], safe="")
-    profile = str(server["inbound_profile"] or "raw_reality")
-    sni = quote(str(server["server_name"]), safe="")
+CLIENT_LINK_ROLES = {
+    1: "Primary",
+    2: "Backup",
+    3: "Alt",
+}
 
-    if profile == "hysteria2_tls":
-        auth = quote(str(user["uuid"]), safe="")
-        host = str(server["address"])
-        hop_ports = str(server["hysteria_udp_hop_ports"] or "").strip()
-        authority_ports = hop_ports or str(server["port"])
-        return (
-            f"hysteria2://{auth}@{host}:{authority_ports}/"
-            f"?sni={sni}&insecure=0#{name}"
-        )
+SAVED_LINK_PROFILE_LABELS = {
+    "raw_reality": "VLESS REALITY",
+    "xhttp_tls": "VLESS XHTTP-TLS",
+    "xhttp_reality": "VLESS XHTTP-REALITY",
+    "hysteria2_tls": "Hysteria 2",
+    "grpc_tls": "VLESS gRPC-TLS",
+}
 
-    base = f"vless://{user['uuid']}@{server['address']}:{server['port']}"
-    fp = quote(fingerprint_for_xray(str(server["fingerprint"])), safe="")
+
+def _client_link_title(user_name: str, instance_id: int | None = None) -> str:
+    name = str(user_name or "").strip()
+    if instance_id is None:
+        return name
+    role = CLIENT_LINK_ROLES.get(int(instance_id), f"#{int(instance_id)}")
+    return f"{name}/{role}"
+
+
+def _link_sni_for_profile(server: sqlite3.Row, profile: str) -> str:
+    current = str(server["inbound_profile"] or "raw_reality")
+    if profile in REALITY_INBOUND_PROFILES:
+        if current in REALITY_INBOUND_PROFILES:
+            value = str(server["server_name"] or "").strip()
+        else:
+            value = str(server["dest"] or "").rsplit(":", 1)[0].strip().strip("[]")
+    else:
+        if current in CERTIFICATE_INBOUND_PROFILES:
+            value = str(server["server_name"] or "").strip()
+        else:
+            value = _hostname_candidate(str(server["address"] or "")) or str(server["server_name"] or "").strip()
+    return value
+
+
+def _make_links_for_profile(
+    user: sqlite3.Row, server: sqlite3.Row, profile: str
+) -> list[dict[str, object]]:
+    sni = quote(_link_sni_for_profile(server, profile), safe="")
+    result: list[dict[str, object]] = []
 
     if profile == "raw_reality":
+        base = f"vless://{user['uuid']}@{server['address']}"
+        fp = quote(fingerprint_for_xray(str(server["fingerprint"])), safe="")
         flow = f"&flow={quote(server['flow'], safe='-_')}" if server["flow"] else ""
-        query = (
-            f"type=tcp&security=reality&pbk={quote(server['public_key'], safe='-_')}"
-            f"&fp={fp}&sni={sni}&sid={quote(server['short_id'], safe='')}"
-            f"{flow}&spx=%2F"
+        for instance in list_reality_inbounds():
+            if not bool(instance["enabled"]):
+                continue
+            instance_id = int(instance["id"])
+            title = _client_link_title(str(user["name"]), instance_id)
+            query = (
+                f"type=tcp&security=reality&pbk={quote(server['public_key'], safe='-_')}"
+                f"&fp={fp}&sni={sni}&sid={quote(str(instance['short_id']), safe='')}"
+                f"{flow}&spx=%2F"
+            )
+            result.append({
+                "id": instance_id,
+                "key": f"reality-{instance_id}",
+                "kind": "reality",
+                "name": str(instance["name"]),
+                "client_title": title,
+                "tag": str(instance["tag"]),
+                "listen": str(instance["listen"]),
+                "port": int(instance["port"]),
+                "short_id": str(instance["short_id"]),
+                "link": f"{base}:{int(instance['port'])}?{query}#{quote(title, safe='')}",
+            })
+        if not result:
+            raise XPanelError("не включён ни один REALITY Inbound")
+        return result
+
+    if profile == "xhttp_tls":
+        base = f"vless://{user['uuid']}@{server['address']}:{server['port']}"
+        fp = quote(fingerprint_for_xray(str(server["fingerprint"])), safe="")
+        for instance in list_xhttp_inbounds():
+            if not bool(instance["enabled"]):
+                continue
+            instance_id = int(instance["id"])
+            mode = (
+                "" if server["xhttp_mode"] == "auto"
+                else f"&mode={quote(server['xhttp_mode'], safe='-_')}"
+            )
+            title = _client_link_title(str(user["name"]), instance_id)
+            query = (
+                f"type=xhttp&security=tls&fp={fp}&sni={sni}"
+                f"&host={quote(server['address'], safe='')}"
+                f"&path={quote(str(instance['path']), safe='')}{mode}"
+            )
+            result.append({
+                "id": instance_id,
+                "key": f"xhttp-{instance_id}",
+                "kind": "xhttp",
+                "name": str(instance["name"]),
+                "client_title": title,
+                "tag": str(instance["tag"]),
+                "listen": str(instance["listen"]),
+                "port": int(server["port"]),
+                "local_port": int(instance["port"]),
+                "path": str(instance["path"]),
+                "link": f"{base}?{query}#{quote(title, safe='')}",
+            })
+        if not result:
+            raise XPanelError("не включён ни один XHTTP Inbound")
+        return result
+
+    if profile == "hysteria2_tls":
+        auths = _ensure_hysteria_user_auths()
+        for instance in list_hysteria_inbounds():
+            if not bool(instance["enabled"]):
+                continue
+            inbound_id = int(instance["id"])
+            auth = quote(auths[inbound_id][int(user["id"])], safe="")
+            host = str(server["address"])
+            hop_ports = str(server["hysteria_udp_hop_ports"] or "").strip()
+            authority_ports = (
+                hop_ports if inbound_id == 1 and hop_ports else str(instance["port"])
+            )
+            title = _client_link_title(str(user["name"]), inbound_id)
+            result.append({
+                "id": inbound_id,
+                "key": f"hysteria-{inbound_id}",
+                "kind": "hysteria",
+                "name": str(instance["name"]),
+                "client_title": title,
+                "tag": str(instance["tag"]),
+                "listen": str(instance["listen"]),
+                "port": int(instance["port"]),
+                "link": (
+                    f"hysteria2://{auth}@{host}:{authority_ports}/"
+                    f"?sni={sni}&insecure=0#{quote(title, safe='')}"
+                ),
+            })
+        if not result:
+            raise XPanelError("не включён ни один Hysteria 2 Inbound")
+        return result
+
+    name = quote(str(user["name"]), safe="")
+    base = f"vless://{user['uuid']}@{server['address']}:{server['port']}"
+    fp = quote(fingerprint_for_xray(str(server["fingerprint"])), safe="")
+    if profile == "xhttp_reality":
+        mode = (
+            "" if server["xhttp_mode"] == "auto"
+            else f"&mode={quote(server['xhttp_mode'], safe='-_')}"
         )
-    elif profile == "xhttp_reality":
-        mode = "" if server["xhttp_mode"] == "auto" else f"&mode={quote(server['xhttp_mode'], safe='-_')}"
         query = (
             f"type=xhttp&security=reality&pbk={quote(server['public_key'], safe='-_')}"
             f"&fp={fp}&sni={sni}&sid={quote(server['short_id'], safe='')}"
             f"&path={quote(server['xhttp_path'], safe='')}{mode}&spx=%2F"
-        )
-    elif profile == "xhttp_tls":
-        mode = "" if server["xhttp_mode"] == "auto" else f"&mode={quote(server['xhttp_mode'], safe='-_')}"
-        query = (
-            f"type=xhttp&security=tls&fp={fp}&sni={sni}"
-            f"&host={quote(server['address'], safe='')}"
-            f"&path={quote(server['xhttp_path'], safe='')}{mode}"
         )
     elif profile == "grpc_tls":
         query = (
@@ -6754,7 +7757,82 @@ def make_link(identifier: str | int, allow_disabled: bool = False) -> str:
         )
     else:
         raise XPanelError(f"неподдерживаемый профиль inbound: {profile}")
-    return f"{base}?{query}#{name}"
+    return [{
+        "id": 1,
+        "key": f"{profile}-1",
+        "kind": "vless",
+        "name": "Основной профиль",
+        "client_title": str(user["name"]),
+        "tag": "vless-reality-in",
+        "listen": str(server["listen"]),
+        "port": int(server["port"]),
+        "link": f"{base}?{query}#{name}",
+    }]
+
+
+def make_links(
+    identifier: str | int, allow_disabled: bool = False
+) -> list[dict[str, object]]:
+    server = get_server()
+    user = find_user(identifier)
+    if (not user["enabled"] or user_is_expired(user)) and not allow_disabled:
+        raise XPanelError("пользователь отключён или срок действия истёк")
+    profile = str(server["inbound_profile"] or "raw_reality")
+
+    if profile == "xhttp_hysteria_tls":
+        xhttp_links = _make_links_for_profile(user, server, "xhttp_tls")
+        hysteria_links = _make_links_for_profile(user, server, "hysteria2_tls")
+        for item in hysteria_links:
+            if int(item["id"]) == 1:
+                item["tag"] = HYSTERIA_COMBINED_PRIMARY_TAG
+        return xhttp_links + hysteria_links
+    return _make_links_for_profile(user, server, profile)
+
+
+def make_saved_links(
+    identifier: str | int, allow_disabled: bool = False
+) -> list[dict[str, object]]:
+    """Return active links plus links saved for currently inactive profile families.
+
+    The public subscription deliberately continues to use make_links(), so clients
+    receive only endpoints that the server is serving right now.
+    """
+    server = get_server()
+    user = find_user(identifier)
+    if (not user["enabled"] or user_is_expired(user)) and not allow_disabled:
+        raise XPanelError("пользователь отключён или срок действия истёк")
+
+    current = str(server["inbound_profile"] or "raw_reality")
+    active_families: set[str]
+    if current == "xhttp_hysteria_tls":
+        active_families = {"xhttp_tls", "hysteria2_tls"}
+    else:
+        active_families = {current}
+
+    profiles = ("raw_reality", "xhttp_tls", "xhttp_reality", "hysteria2_tls")
+    if current == "grpc_tls":
+        profiles = ("grpc_tls", *profiles)
+    links: list[dict[str, object]] = []
+    for profile in profiles:
+        try:
+            profile_links = _make_links_for_profile(user, server, profile)
+        except XPanelError:
+            continue
+        is_active = profile in active_families
+        for item in profile_links:
+            if current == "xhttp_hysteria_tls" and profile == "hysteria2_tls" and int(item["id"]) == 1:
+                item["tag"] = HYSTERIA_COMBINED_PRIMARY_TAG
+            links.append({
+                **item,
+                "profile": profile,
+                "profile_label": SAVED_LINK_PROFILE_LABELS[profile],
+                "active": is_active,
+            })
+    return links
+
+
+def make_link(identifier: str | int, allow_disabled: bool = False) -> str:
+    return str(make_links(identifier, allow_disabled=allow_disabled)[0]["link"])
 
 
 def backup_dir() -> Path:
@@ -7030,7 +8108,7 @@ def get_diagnostics() -> dict[str, object]:
         "server_address": server["address"],
         "server_port": server["port"],
         "inbound_profile": server["inbound_profile"],
-        "transport_protocol": "UDP" if str(server["inbound_profile"]) == "hysteria2_tls" else "TCP",
+        "transport_protocol": "TCP + UDP" if str(server["inbound_profile"]) == "xhttp_hysteria_tls" else ("UDP" if str(server["inbound_profile"]) == "hysteria2_tls" else "TCP"),
         "tcp_ports": tcp_ports,
         "udp_ports": udp_ports,
         "config_validation": validate_generated_config(),

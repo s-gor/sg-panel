@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 import secrets
 import sqlite3
 from contextlib import contextmanager
@@ -66,6 +67,53 @@ CREATE TABLE IF NOT EXISTS server_settings (
     hysteria_max_stream_receive_window INTEGER NOT NULL DEFAULT 8388608,
     hysteria_init_connection_receive_window INTEGER NOT NULL DEFAULT 20971520,
     hysteria_max_connection_receive_window INTEGER NOT NULL DEFAULT 20971520
+
+);
+
+CREATE TABLE IF NOT EXISTS hysteria_inbounds (
+    id INTEGER PRIMARY KEY CHECK (id BETWEEN 1 AND 3),
+    name TEXT NOT NULL,
+    tag TEXT NOT NULL UNIQUE,
+    enabled INTEGER NOT NULL DEFAULT 0 CHECK (enabled IN (0, 1)),
+    listen TEXT NOT NULL DEFAULT '0.0.0.0',
+    port INTEGER NOT NULL CHECK (port BETWEEN 1 AND 65535),
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS hysteria_user_auth (
+    inbound_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    auth TEXT NOT NULL UNIQUE,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (inbound_id, user_id),
+    FOREIGN KEY (inbound_id) REFERENCES hysteria_inbounds(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS xhttp_inbounds (
+    id INTEGER PRIMARY KEY CHECK (id BETWEEN 1 AND 3),
+    name TEXT NOT NULL,
+    tag TEXT NOT NULL UNIQUE,
+    enabled INTEGER NOT NULL DEFAULT 0 CHECK (enabled IN (0, 1)),
+    listen TEXT NOT NULL DEFAULT '127.0.0.1',
+    port INTEGER NOT NULL CHECK (port BETWEEN 1 AND 65535),
+    path TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS reality_inbounds (
+    id INTEGER PRIMARY KEY CHECK (id BETWEEN 1 AND 3),
+    name TEXT NOT NULL,
+    tag TEXT NOT NULL UNIQUE,
+    enabled INTEGER NOT NULL DEFAULT 0 CHECK (enabled IN (0, 1)),
+    listen TEXT NOT NULL DEFAULT '0.0.0.0',
+    port INTEGER NOT NULL CHECK (port BETWEEN 1 AND 65535),
+    short_id TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS users (
@@ -528,6 +576,104 @@ def init_db() -> Path:
         )
         con.execute(
             "INSERT OR IGNORE INTO config_settings (id, document_json) VALUES (1, '{}')"
+        )
+        server_row = con.execute(
+            """
+            SELECT inbound_profile, listen, port, short_id, transport_listen,
+                   transport_port, xhttp_path
+            FROM server_settings WHERE id = 1
+            """
+        ).fetchone()
+        primary_enabled = 1
+        primary_listen = str(server_row["listen"] or "0.0.0.0") if server_row else "0.0.0.0"
+        primary_port = int(server_row["port"] or 443) if server_row else 443
+        con.executemany(
+            """
+            INSERT OR IGNORE INTO hysteria_inbounds
+                (id, name, tag, enabled, listen, port)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                (1, "Hysteria 2 — основной", "vless-reality-in", primary_enabled, primary_listen, primary_port),
+                (2, "Hysteria 2 — резервный", "hysteria2-secondary-in", 0, "0.0.0.0", 8443),
+                (3, "Hysteria 2 — дополнительный", "hysteria2-tertiary-in", 0, "0.0.0.0", 9443),
+            ),
+        )
+        con.execute(
+            "UPDATE hysteria_inbounds SET enabled=1 WHERE id=1 AND enabled!=1"
+        )
+        xhttp_listen = str(server_row["transport_listen"] or "127.0.0.1") if server_row else "127.0.0.1"
+        xhttp_port = int(server_row["transport_port"] or 8443) if server_row else 8443
+        xhttp_path = str(server_row["xhttp_path"] or "/sg-xhttp") if server_row else "/sg-xhttp"
+        xhttp_defaults = (
+            (1, "XHTTP — основной", "vless-reality-in", 1, xhttp_listen, xhttp_port, xhttp_path),
+            (2, "XHTTP — резервный", "xhttp-secondary-in", 0, "127.0.0.1", 8444, f"/sg-xhttp-{secrets.token_hex(6)}"),
+            (3, "XHTTP — дополнительный", "xhttp-tertiary-in", 0, "127.0.0.1", 8445, f"/sg-xhttp-{secrets.token_hex(6)}"),
+        )
+        con.executemany(
+            """
+            INSERT OR IGNORE INTO xhttp_inbounds
+                (id, name, tag, enabled, listen, port, path)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            xhttp_defaults,
+        )
+        con.execute(
+            """
+            UPDATE xhttp_inbounds
+            SET enabled=1, listen=?, port=?, path=?, updated_at=CURRENT_TIMESTAMP
+            WHERE id=1
+            """,
+            (xhttp_listen, xhttp_port, xhttp_path),
+        )
+        existing_primary_reality = con.execute(
+            "SELECT short_id FROM reality_inbounds WHERE id = 1"
+        ).fetchone()
+        server_reality_short_id = str(server_row["short_id"] or "").strip().lower() if server_row else ""
+        stored_primary_short_id = (
+            str(existing_primary_reality["short_id"] or "").strip().lower()
+            if existing_primary_reality else ""
+        )
+
+        def valid_reality_short_id(value: str) -> bool:
+            return bool(re.fullmatch(r"[0-9a-f]{2,32}", value)) and len(value) % 2 == 0
+
+        if valid_reality_short_id(server_reality_short_id):
+            reality_short_id = server_reality_short_id
+        elif valid_reality_short_id(stored_primary_short_id):
+            reality_short_id = stored_primary_short_id
+        else:
+            reality_short_id = secrets.token_hex(8)
+
+        # server_settings.short_id is the legacy source used by links and forms.
+        # Keep it synchronized with the primary Multi-REALITY slot so an RC41
+        # migration from an empty legacy field never leaves the UI blank.
+        if server_row:
+            con.execute(
+                "UPDATE server_settings SET short_id = ? WHERE id = 1",
+                (reality_short_id,),
+            )
+
+        reality_defaults = (
+            (1, "REALITY — основной", "vless-reality-in", 1, primary_listen, primary_port, reality_short_id),
+            (2, "REALITY — резервный", "reality-secondary-in", 0, "0.0.0.0", 8443, secrets.token_hex(8)),
+            (3, "REALITY — дополнительный", "reality-tertiary-in", 0, "0.0.0.0", 9443, secrets.token_hex(8)),
+        )
+        con.executemany(
+            """
+            INSERT OR IGNORE INTO reality_inbounds
+                (id, name, tag, enabled, listen, port, short_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            reality_defaults,
+        )
+        con.execute(
+            """
+            UPDATE reality_inbounds
+            SET enabled=1, listen=?, port=?, short_id=?, updated_at=CURRENT_TIMESTAMP
+            WHERE id=1
+            """,
+            (primary_listen, primary_port, reality_short_id),
         )
         con.execute(
             """

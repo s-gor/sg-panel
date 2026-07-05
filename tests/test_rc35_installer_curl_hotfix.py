@@ -19,9 +19,11 @@ def test_http_placeholder_check_does_not_pipe_curl_into_grep_q():
 def test_https_fallback_check_does_not_pipe_curl_into_grep_q():
     text = HTTPS.read_text(encoding="utf-8")
     assert '"https://$DOMAIN/" | grep -q' not in text
-    assert 'local body_file="$BACKUP_DIR/fallback-check.html"' in text
+    assert 'BACKUP_DIR/fallback-check.html' not in text
+    assert 'mktemp "${TMPDIR:-/tmp}/sg-panel-fallback-check.XXXXXX"' in text
     assert '--output "$body_file"' in text
     assert "grep -Fq 'SG Digital Systems' \"$body_file\"" in text
+    assert text.count('rm -f "$body_file"') >= 2
 
 
 def test_no_installer_uses_curl_pipe_grep_q_for_placeholder_validation():

@@ -15,7 +15,8 @@ def test_installer_pins_xray_2659_and_has_rollback() -> None:
     assert "ensure_xray_version" in script
     assert "rollback_xray" in script
     assert "xray run -test -config" in script
-    assert "Обновление Xray до $XRAY_VERSION с автоматическим откатом" in script
+    assert "Установка или проверка Xray" in script
+    assert "Сохраняю установленный Xray" in script
 
 
 def test_inbound_recommendations_prefer_detected_certificate() -> None:

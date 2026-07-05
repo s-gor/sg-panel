@@ -8,8 +8,8 @@ CSS = ROOT / "xpanel" / "static" / "app.css"
 def test_active_and_draft_inbound_states_are_distinct() -> None:
     html = TEMPLATE.read_text(encoding="utf-8")
     css = CSS.read_text(encoding="utf-8")
-    assert "Активен сейчас" in html
-    assert "Выбрано для настройки" in html
+    assert "Работает сейчас" in html
+    assert "Выбрано, ещё не применено" in html
     assert "const activeProfile" in html
     assert "is-draft-selected" in html
     assert ".profile-card-active-state" in css

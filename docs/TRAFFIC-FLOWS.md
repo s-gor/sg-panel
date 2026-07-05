@@ -10,14 +10,14 @@
 - **Traffic Rules** выбирают маршрут;
 - **Outbound** определяет дальнейший выход.
 
-## RAW/TCP + REALITY
+## VLESS REALITY
 
 Без fallback:
 
 ```text
 Клиент VLESS
     ↓ TCP 443
-Xray RAW/TCP + REALITY
+Xray VLESS REALITY
     ↓
 direct / warp / пользовательский Outbound
 ```
@@ -30,32 +30,34 @@ TCP 443 → Nginx stream SNI-router
           └─ собственный домен → локальная HTTPS-заглушка
 ```
 
-## XHTTP + REALITY
+## VLESS XHTTP-REALITY
 
 ```text
 Клиент VLESS XHTTP REALITY, выбранный XHTTP mode
     ↓ TCP 443
 Nginx stream SNI-router при включённом fallback
-    ├─ Reality SNI → Xray XHTTP + REALITY
+    ├─ Reality SNI → Xray VLESS XHTTP-REALITY
     └─ собственный домен → локальная HTTPS-заглушка
 ```
 
 Без настроенного домена Xray может принимать публичный TCP `443` напрямую.
 
-## XHTTP + TLS
+## VLESS XHTTP-TLS
 
 ```text
 Клиент VLESS XHTTP TLS
     ↓ TCP 443
 Nginx TLS
-    ├─ клиентский path → Xray 127.0.0.1:8443
+    ├─ основной Path → Xray 127.0.0.1:8443
+    ├─ резервный Path → Xray 127.0.0.1:8444
+    ├─ дополнительный Path → Xray 127.0.0.1:8445
     └─ другие запросы → локальная SG-заглушка
 ```
 
 SNI клиента должен соответствовать сертификату.
 
 
-## Hysteria 2 + TLS
+## Hysteria 2
 
 ```text
 Клиент Hysteria 2
@@ -120,7 +122,7 @@ VLESS Outbound
     ↓ HTTP/HTTPS
 /sub/персональный-token
     ↓
-SG-Panel формирует актуальную ссылку текущего Inbound
+SG-Panel формирует актуальную ссылку текущего Inbound или набор ссылок для нескольких Hysteria 2
 ```
 
 После смены Inbound приложение обновляет подписку и получает новые transport-параметры.
@@ -129,9 +131,11 @@ SG-Panel формирует актуальную ссылку текущего I
 
 ```text
 127.0.0.1:8080   backend SG-Panel
-127.0.0.1:8443   внутренний Xray для XHTTP + TLS
+127.0.0.1:8443–8445   локальные Xray listener для Multi-XHTTP-TLS
 PUBLIC:61443     публичный порт панели
 PUBLIC:80        SG-заглушка и HTTP-01
 PUBLIC:443/tcp   VLESS и обычный HTTPS/fallback на локальную SG-заглушку
-PUBLIC:443/udp   Hysteria 2
+PUBLIC:443/udp   Hysteria 2 основной
+PUBLIC:8443/udp  Hysteria 2 резервный (если включён)
+PUBLIC:9443/udp  Hysteria 2 дополнительный (если включён)
 ```

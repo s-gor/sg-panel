@@ -2,48 +2,112 @@
 {% block title %}{{ user.name }} — SG-Panel{% endblock %}
 {% block section %}USERS / ACCESS{% endblock %}
 {% block heading %}Клиентский доступ{% endblock %}
-{% block subtitle %}Прямая {{ 'Hysteria 2' if server.inbound_profile == 'hysteria2_tls' else 'VLESS' }}-ссылка и постоянная подписка пользователя {{ user.name }}{% endblock %}
+{% block subtitle %}Активные соединения и сохранённые профили пользователя {{ user.name }}{% endblock %}
 {% block content %}
-<section class="link-grid">
+
+{% macro render_connection(item) %}
+<section class="link-grid direct-link-instance {{ 'saved-link-inactive' if not item.active else 'saved-link-active' }}">
   <article class="panel-card qr-panel">
-    <div class="panel-heading"><div><p class="panel-kicker">DIRECT QR</p><h2>{{ user.name }}</h2></div><span class="pill {{ 'enabled' if user.enabled else 'disabled' }}"><i></i>{{ 'enabled' if user.enabled else 'disabled' }}</span></div>
-    <div class="qr-frame"><img src="data:image/png;base64,{{ qr_data }}" alt="QR подключения для {{ user.name }}"></div>
-    <p class="hint center">Прямая ссылка. При изменении сервера её потребуется импортировать заново.</p>
+    <div class="panel-heading">
+      <div>
+        <p class="panel-kicker">{{ item.profile_label }} · {{ 'РАБОТАЕТ' if item.active else 'СОХРАНЁН' }}</p>
+        <h2>{{ item.client_title }}</h2>
+      </div>
+      <span class="pill {{ 'enabled' if item.active else 'disabled' }}"><i></i>{{ 'Активен' if item.active else 'Неактивен' }}</span>
+    </div>
+    <div class="qr-frame"><img src="data:image/png;base64,{{ item.qr_data }}" alt="QR {{ item.client_title }} для {{ user.name }}"></div>
+    <p class="hint center">
+      {% if item.active %}Сервер сейчас обслуживает это соединение.
+      {% else %}Параметры сохранены, но выбранный профиль сервера сейчас не обслуживает это соединение.
+      {% endif %}
+    </p>
   </article>
   <article class="panel-card link-panel">
-    <div class="panel-heading"><div><p class="panel-kicker">{{ 'HYSTERIA 2 / UDP' if server.inbound_profile == 'hysteria2_tls' else 'VLESS / XRAY' }}</p><h2>Прямая ссылка</h2></div><span class="panel-index">#{{ user.id }}</span></div>
-    <label class="link-label" for="link">Connection URI</label>
-    <textarea id="link" class="link-box" readonly>{{ link }}</textarea>
-    <div class="actions"><button class="button primary" type="button" onclick="copyField('link', this)">Скопировать ссылку</button><a class="button secondary" href="{{ url_for('users_page') }}">Назад</a></div>
-    <div class="secure-note"><span>◆</span><p><strong>{{ 'Персональный Hysteria auth' if server.inbound_profile == 'hysteria2_tls' else 'Персональный UUID' }}</strong><small>Не публикуйте эту ссылку в открытом доступе.</small></p></div>
+    <div class="panel-heading">
+      <div><p class="panel-kicker">{{ item.profile_label }}</p><h2>{{ item.client_title }}</h2></div>
+      <span class="panel-index">{{ item.tag }}</span>
+    </div>
+    {% if item.kind == 'hysteria' %}
+    <div class="hysteria-link-endpoint"><span>Публичная точка</span><strong>{{ server.address }}:{{ item.port }}/UDP</strong></div>
+    {% elif item.kind == 'xhttp' %}
+    <div class="hysteria-link-endpoint"><span>Публичная точка</span><strong>{{ server.address }}:{{ item.port }}/TCP · {{ item.path }}</strong></div>
+    <div class="hysteria-link-endpoint"><span>Локальный Xray</span><strong>{{ item.listen }}:{{ item.local_port }}</strong></div>
+    {% elif item.kind == 'reality' %}
+    <div class="hysteria-link-endpoint"><span>Публичная точка</span><strong>{{ server.address }}:{{ item.port }}/TCP</strong></div>
+    <div class="hysteria-link-endpoint"><span>Short ID</span><strong>{{ item.short_id }}</strong></div>
+    {% else %}
+    <div class="hysteria-link-endpoint"><span>Публичная точка</span><strong>{{ server.address }}:{{ item.port }}/TCP</strong></div>
+    {% endif %}
+    <label class="link-label" for="link-{{ item.key }}">Connection URI</label>
+    <textarea id="link-{{ item.key }}" class="link-box" readonly>{{ item.link }}</textarea>
+    <div class="actions">
+      <button class="button primary" type="button" onclick="copyField('link-{{ item.key }}', this)">Скопировать ссылку</button>
+    </div>
+    {% if not item.active %}
+    <div class="ui-warning-note saved-link-warning"><span>!</span><p><strong>Сейчас не работает.</strong> Для подключения сначала активируйте профиль {{ item.profile_label }} и примените конфигурацию.</p></div>
+    {% endif %}
+    <div class="secure-note"><span>◆</span><p><strong>{{ 'Отдельный персональный Hysteria auth' if item.kind == 'hysteria' else 'Персональный UUID' }}</strong><small>Не публикуйте эту ссылку в открытом доступе.</small></p></div>
   </article>
 </section>
+{% endmacro %}
+
+<section class="client-link-group client-link-group-active">
+  <div class="client-link-group-heading">
+    <div><p class="panel-kicker">ACTIVE NOW</p><h2>Активные сейчас</h2></div>
+    <span class="pill enabled"><i></i>{{ active_links|length }}</span>
+  </div>
+  {% for item in active_links %}{{ render_connection(item) }}{% endfor %}
+</section>
+
+{% if inactive_links %}
+<section class="client-link-group client-link-group-saved">
+  <div class="client-link-group-heading">
+    <div><p class="panel-kicker">SAVED PROFILES</p><h2>Сохранённые, но неактивные</h2></div>
+    <span class="pill disabled"><i></i>{{ inactive_links|length }}</span>
+  </div>
+  <p class="ui-section-note">Эти ссылки не удалены. Их можно скопировать, но они заработают только после переключения и применения соответствующего профиля сервера.</p>
+  {% for item in inactive_links %}{{ render_connection(item) }}{% endfor %}
+</section>
+{% endif %}
 
 <section class="link-grid subscription-link-grid">
   <article class="panel-card qr-panel">
     <div class="panel-heading"><div><p class="panel-kicker">SUBSCRIPTION QR</p><h2>Постоянный URL</h2></div><span class="pill {{ 'enabled' if user.subscription_enabled else 'disabled' }}"><i></i>{{ 'enabled' if user.subscription_enabled else 'disabled' }}</span></div>
     <div class="qr-frame"><img src="data:image/png;base64,{{ subscription_qr_data }}" alt="QR подписки для {{ user.name }}"></div>
-    <p class="hint center">Клиент получает по этому адресу актуальную ссылку выбранного Inbound-профиля.</p>
+    <p class="hint center">Подписка выдаёт только соединения, которые реально активны на сервере сейчас.</p>
   </article>
   <article class="panel-card link-panel">
     <div class="panel-heading"><div><p class="panel-kicker">BASE64 FEED</p><h2>URL подписки</h2></div><span class="panel-index">SUB</span></div>
     <label class="link-label" for="subscription-link">Subscription URL</label>
     <textarea id="subscription-link" class="link-box" readonly>{{ subscription_url }}</textarea>
-    <div class="actions"><button class="button primary" type="button" onclick="copyField('subscription-link', this)">Скопировать подписку</button><a class="button secondary" href="{{ url_for('subscriptions_page') }}">Настройки</a></div>
+    <div class="actions"><button class="button primary" type="button" onclick="copyField('subscription-link', this)">Скопировать подписку</button><a class="button secondary" href="{{ url_for('subscriptions_page') }}">Настройки</a><a class="button secondary" href="{{ url_for('users_page') }}">Назад</a></div>
     {% if not subscription_settings.enabled %}<div class="alert error">Глобальная выдача подписок выключена. URL начнёт работать после включения на странице «Подписки».</div>{% endif %}
     {% if not user.subscription_enabled %}<div class="alert error">Подписка этого пользователя отключена.</div>{% endif %}
-    <div class="secure-note"><span>◆</span><p><strong>Стабильный token</strong><small>Адрес не меняется при обновлении UUID сервера, SNI или порта. Новый token отключает старый URL.</small></p></div>
+    <div class="secure-note"><span>◆</span><p><strong>Стабильный token</strong><small>Адрес не меняется при переключении профиля. Состав подписки обновляется автоматически и включает только активные соединения.</small></p></div>
   </article>
 </section>
 <script>
+function showCopyFeedback(button, message) {
+  if (!button.dataset.copyLabel) button.dataset.copyLabel = button.textContent.trim();
+  if (button._copyResetTimer) window.clearTimeout(button._copyResetTimer);
+  button.textContent = message;
+  button._copyResetTimer = window.setTimeout(() => {
+    button.textContent = button.dataset.copyLabel;
+    button._copyResetTimer = null;
+  }, 1800);
+}
+
 async function copyField(id, button) {
   const field = document.getElementById(id);
+  if (!field) return;
   try {
     if (navigator.clipboard && window.isSecureContext) await navigator.clipboard.writeText(field.value);
     else { field.focus(); field.select(); document.execCommand('copy'); }
-    button.textContent = 'Скопировано';
+    showCopyFeedback(button, 'Скопировано');
   } catch (error) {
-    field.focus(); field.select(); button.textContent = 'Выделено — Ctrl+C';
+    field.focus();
+    field.select();
+    showCopyFeedback(button, 'Выделено — Ctrl+C');
   }
 }
 </script>

@@ -41,6 +41,12 @@ from .update_manager import (
     start_panel_update,
     update_in_progress,
 )
+from .xray_update_manager import (
+    check_xray_updates,
+    get_xray_update_status,
+    start_xray_update,
+    xray_update_in_progress,
+)
 from .security import (
     create_admin_session,
     get_security_settings,
@@ -113,7 +119,12 @@ from .service import (
     list_balancer_tags,
     list_routing_rules,
     list_users,
+    list_hysteria_inbounds,
+    list_xhttp_inbounds,
+    list_reality_inbounds,
     make_link,
+    make_links,
+    make_saved_links,
     outbound_json_document,
     make_subscription_url,
     preview_dns_json,
@@ -335,11 +346,12 @@ def _activity_text(value: str | None, *, online: bool | None = None) -> str:
 
 
 INBOUND_PROFILE_LABELS = {
-    "raw_reality": "VLESS RAW + REALITY",
-    "xhttp_tls": "VLESS XHTTP + TLS",
-    "xhttp_reality": "VLESS XHTTP + REALITY",
+    "raw_reality": "VLESS REALITY",
+    "xhttp_tls": "VLESS XHTTP-TLS",
+    "xhttp_reality": "VLESS XHTTP-REALITY",
     "grpc_tls": "VLESS gRPC + TLS",
-    "hysteria2_tls": "Hysteria 2 + TLS",
+    "hysteria2_tls": "Hysteria 2",
+    "xhttp_hysteria_tls": "XHTTP-TLS + Hysteria 2",
 }
 
 
@@ -510,6 +522,11 @@ def create_app(test_config: dict | None = None) -> Flask:
         init_db()
         queries = {
             "server_settings": "SELECT * FROM server_settings ORDER BY id",
+            "hysteria_inbounds": "SELECT * FROM hysteria_inbounds ORDER BY id",
+            "hysteria_user_auth": (
+                "SELECT inbound_id,user_id,auth,updated_at "
+                "FROM hysteria_user_auth ORDER BY inbound_id,user_id"
+            ),
             "users": (
                 "SELECT id,name,uuid,enabled,comment,expiry_at,subscription_enabled "
                 "FROM users ORDER BY id"
@@ -1122,11 +1139,18 @@ def create_app(test_config: dict | None = None) -> Flask:
         import qrcode
 
         user = find_user(user_id)
-        link = make_link(user_id, allow_disabled=True)
-        image = qrcode.make(link)
-        buffer = io.BytesIO()
-        image.save(buffer, format="PNG")
-        qr_data = base64.b64encode(buffer.getvalue()).decode("ascii")
+        links = make_saved_links(user_id, allow_disabled=True)
+        direct_links: list[dict[str, object]] = []
+        for item in links:
+            image = qrcode.make(str(item["link"]))
+            buffer = io.BytesIO()
+            image.save(buffer, format="PNG")
+            direct_links.append({
+                **item,
+                "qr_data": base64.b64encode(buffer.getvalue()).decode("ascii"),
+            })
+        link = str(direct_links[0]["link"])
+        qr_data = str(direct_links[0]["qr_data"])
 
         subscription_url = make_subscription_url(
             user_id, request.url_root.rstrip("/")
@@ -1140,6 +1164,9 @@ def create_app(test_config: dict | None = None) -> Flask:
         return render_template(
             "link.html",
             user=user,
+            direct_links=direct_links,
+            active_links=[item for item in direct_links if bool(item.get("active"))],
+            inactive_links=[item for item in direct_links if not bool(item.get("active"))],
             link=link,
             qr_data=qr_data,
             subscription_url=subscription_url,
@@ -1220,7 +1247,9 @@ def create_app(test_config: dict | None = None) -> Flask:
                 return Response(
                     "Not found\n", status=404, content_type="text/plain; charset=utf-8"
                 )
-            link = make_link(user["id"])
+            links = make_links(user["id"])
+            link = str(links[0]["link"])
+            link_lines = [str(item["link"]) for item in links]
             settings = get_subscription_settings()
         except XPanelError:
             return Response(
@@ -1234,15 +1263,16 @@ def create_app(test_config: dict | None = None) -> Flask:
         if output_format == "json" and not security["subscription_json_enabled"]:
             return Response("Not found\n", status=404, content_type="text/plain; charset=utf-8")
         if output_format == "base64":
-            body = base64.b64encode((link + "\n").encode("utf-8")).decode("ascii")
+            body = base64.b64encode(("\n".join(link_lines) + "\n").encode("utf-8")).decode("ascii")
             response = Response(body + "\n", content_type="text/plain; charset=utf-8")
         elif output_format == "plain":
-            response = Response(link + "\n", content_type="text/plain; charset=utf-8")
+            response = Response("\n".join(link_lines) + "\n", content_type="text/plain; charset=utf-8")
         elif output_format == "json":
             body = {
                 "profile": settings["profile_title"],
                 "user": user["name"],
                 "link": link,
+                "links": links,
                 "generated_at": datetime.now(timezone.utc).isoformat(),
             }
             response = Response(
@@ -1285,16 +1315,155 @@ def create_app(test_config: dict | None = None) -> Flask:
         return render_template(
             "settings.html",
             server=get_server(),
+            hysteria_inbounds=list_hysteria_inbounds(),
+            xhttp_inbounds=list_xhttp_inbounds(),
+            reality_inbounds=list_reality_inbounds(),
             inbound_recommendations=get_inbound_recommendations(),
             hysteria_studio=get_hysteria_studio_overview(),
         )
 
     def server_form_values() -> dict[str, object]:
         current = get_server()
+        current_instances = {int(row["id"]): row for row in list_hysteria_inbounds()}
+        current_xhttp = {int(row["id"]): row for row in list_xhttp_inbounds()}
+        current_reality = {int(row["id"]): row for row in list_reality_inbounds()}
+        public_listen = request.form.get("listen", current["listen"])
+        public_port = int(request.form.get("port", current["port"]))
+        hysteria_instances = [
+            {
+                "id": 1,
+                "name": request.form.get(
+                    "hysteria_instance_1_name", current_instances[1]["name"]
+                ),
+                "enabled": True,
+                "listen": public_listen,
+                "port": public_port,
+            },
+            {
+                "id": 2,
+                "name": request.form.get(
+                    "hysteria_instance_2_name", current_instances[2]["name"]
+                ),
+                "enabled": request.form.get("hysteria_instance_2_enabled") == "1",
+                "listen": request.form.get(
+                    "hysteria_instance_2_listen", current_instances[2]["listen"]
+                ),
+                "port": int(request.form.get(
+                    "hysteria_instance_2_port", current_instances[2]["port"]
+                )),
+            },
+            {
+                "id": 3,
+                "name": request.form.get(
+                    "hysteria_instance_3_name", current_instances[3]["name"]
+                ),
+                "enabled": request.form.get("hysteria_instance_3_enabled") == "1",
+                "listen": request.form.get(
+                    "hysteria_instance_3_listen", current_instances[3]["listen"]
+                ),
+                "port": int(request.form.get(
+                    "hysteria_instance_3_port", current_instances[3]["port"]
+                )),
+            },
+        ]
+        reality_instances = [
+            {
+                "id": 1,
+                "name": request.form.get(
+                    "reality_instance_1_name", current_reality[1]["name"]
+                ),
+                "enabled": True,
+                "listen": public_listen,
+                "port": public_port,
+                "short_id": request.form.get("short_id", current_reality[1]["short_id"]),
+            },
+            {
+                "id": 2,
+                "name": request.form.get(
+                    "reality_instance_2_name", current_reality[2]["name"]
+                ),
+                "enabled": request.form.get("reality_instance_2_enabled") == "1",
+                "listen": request.form.get(
+                    "reality_instance_2_listen", current_reality[2]["listen"]
+                ),
+                "port": int(request.form.get(
+                    "reality_instance_2_port", current_reality[2]["port"]
+                )),
+                "short_id": request.form.get(
+                    "reality_instance_2_short_id", current_reality[2]["short_id"]
+                ),
+            },
+            {
+                "id": 3,
+                "name": request.form.get(
+                    "reality_instance_3_name", current_reality[3]["name"]
+                ),
+                "enabled": request.form.get("reality_instance_3_enabled") == "1",
+                "listen": request.form.get(
+                    "reality_instance_3_listen", current_reality[3]["listen"]
+                ),
+                "port": int(request.form.get(
+                    "reality_instance_3_port", current_reality[3]["port"]
+                )),
+                "short_id": request.form.get(
+                    "reality_instance_3_short_id", current_reality[3]["short_id"]
+                ),
+            },
+        ]
+        xhttp_instances = [
+            {
+                "id": 1,
+                "name": request.form.get(
+                    "xhttp_instance_1_name", current_xhttp[1]["name"]
+                ),
+                "enabled": True,
+                "listen": request.form.get(
+                    "transport_listen", current_xhttp[1]["listen"]
+                ),
+                "port": int(request.form.get(
+                    "transport_port", current_xhttp[1]["port"]
+                )),
+                "path": request.form.get(
+                    "xhttp_path", current_xhttp[1]["path"]
+                ),
+            },
+            {
+                "id": 2,
+                "name": request.form.get(
+                    "xhttp_instance_2_name", current_xhttp[2]["name"]
+                ),
+                "enabled": request.form.get("xhttp_instance_2_enabled") == "1",
+                "listen": request.form.get(
+                    "xhttp_instance_2_listen", current_xhttp[2]["listen"]
+                ),
+                "port": int(request.form.get(
+                    "xhttp_instance_2_port", current_xhttp[2]["port"]
+                )),
+                "path": request.form.get(
+                    "xhttp_instance_2_path", current_xhttp[2]["path"]
+                ),
+            },
+            {
+                "id": 3,
+                "name": request.form.get(
+                    "xhttp_instance_3_name", current_xhttp[3]["name"]
+                ),
+                "enabled": request.form.get("xhttp_instance_3_enabled") == "1",
+                "listen": request.form.get(
+                    "xhttp_instance_3_listen", current_xhttp[3]["listen"]
+                ),
+                "port": int(request.form.get(
+                    "xhttp_instance_3_port", current_xhttp[3]["port"]
+                )),
+                "path": request.form.get(
+                    "xhttp_instance_3_path", current_xhttp[3]["path"]
+                ),
+            },
+        ]
         return {
             "address": request.form.get("address", ""),
-            "listen": request.form.get("listen", current["listen"]),
-            "port": int(request.form.get("port", "443")),
+            "listen": public_listen,
+            "port": public_port,
             "dest": request.form.get("dest", ""),
             "server_name": request.form.get("server_name", ""),
             "private_key": request.form.get("private_key", ""),
@@ -1391,6 +1560,9 @@ def create_app(test_config: dict | None = None) -> Flask:
             "hysteria_max_connection_receive_window": int(
                 request.form.get("hysteria_max_connection_receive_window", current["hysteria_max_connection_receive_window"])
             ),
+            "hysteria_instances": hysteria_instances,
+            "xhttp_instances": xhttp_instances,
+            "reality_instances": reality_instances,
         }
 
     @app.get("/settings/hysteria/diagnostics")
@@ -1418,7 +1590,7 @@ def create_app(test_config: dict | None = None) -> Flask:
                 )
             _require_validation_token(scope, _draft_payload())
             server = update_server_settings(**values)
-            label = "Hysteria 2 применена" if server["inbound_profile"] == "hysteria2_tls" else "Inbound применён"
+            label = "XHTTP и Hysteria 2 применены" if server["inbound_profile"] == "xhttp_hysteria_tls" else ("Hysteria 2 применена" if server["inbound_profile"] == "hysteria2_tls" else "Inbound применён")
             apply_saved_change(label)
         except (ValueError, XPanelError) as exc:
             flash(str(exc), "error")
@@ -1940,10 +2112,23 @@ def create_app(test_config: dict | None = None) -> Flask:
     @app.get("/updates")
     @login_required
     def updates_page():
-        update_info = check_for_updates(
-            force=False, allow_network=not bool(app.config.get("TESTING"))
-        )
+        allow_network = not bool(app.config.get("TESTING"))
+        update_info = check_for_updates(force=False, allow_network=allow_network)
         update_status = get_update_status()
+        server = get_server()
+        xray_stable_info = check_xray_updates(
+            channel="stable",
+            force=False,
+            allow_network=allow_network,
+            xray_bin=str(server["xray_bin"]),
+        )
+        xray_prerelease_info = check_xray_updates(
+            channel="prerelease",
+            force=False,
+            allow_network=allow_network,
+            xray_bin=str(server["xray_bin"]),
+        )
+        xray_update_status = get_xray_update_status()
         labels = {
             "idle": "НЕ ЗАПУСКАЛОСЬ",
             "starting": "ПОДГОТОВКА",
@@ -1958,29 +2143,48 @@ def create_app(test_config: dict | None = None) -> Flask:
             "error": "ОШИБКА",
             "unknown": "НЕИЗВЕСТНО",
         }
+        running_states = {
+            "starting", "downloading", "verifying", "backing_up",
+            "installing", "validating", "rollback",
+        }
         state = str(update_status.get("state") or "idle")
         state_class = (
             "success" if state == "success"
             else "danger" if state in {"error", "rolled_back"}
-            else "warning" if state in {
-                "starting", "downloading", "verifying", "backing_up",
-                "installing", "validating", "rollback",
-            }
+            else "warning" if state in running_states
             else ""
         )
+        xray_state = str(xray_update_status.get("state") or "idle")
+        xray_state_class = (
+            "success" if xray_state == "success"
+            else "danger" if xray_state in {"error", "rolled_back"}
+            else "warning" if xray_state in running_states
+            else ""
+        )
+        panel_running = update_in_progress()
+        xray_running = xray_update_in_progress()
         return render_template(
             "updates.html",
             update_info=update_info,
             update_status=update_status,
-            update_running=update_in_progress(),
+            update_running=panel_running,
             update_state_label=labels.get(state, state.upper()),
             update_state_class=state_class,
+            xray_stable_info=xray_stable_info,
+            xray_prerelease_info=xray_prerelease_info,
+            xray_update_status=xray_update_status,
+            xray_update_running=xray_running,
+            xray_update_state_label=labels.get(xray_state, xray_state.upper()),
+            xray_update_state_class=xray_state_class,
+            any_update_running=panel_running or xray_running,
         )
 
     @app.post("/updates/check")
     @login_required
     def updates_check():
         try:
+            if xray_update_in_progress():
+                raise XPanelError("Сначала дождитесь завершения обновления Xray")
             info = check_for_updates(force=True, allow_network=True)
             if info.get("error"):
                 raise XPanelError(str(info["error"]))
@@ -1996,6 +2200,8 @@ def create_app(test_config: dict | None = None) -> Flask:
     @login_required
     def updates_start():
         try:
+            if xray_update_in_progress():
+                raise XPanelError("Сначала дождитесь завершения обновления Xray")
             info = check_for_updates(force=True, allow_network=True)
             if info.get("error"):
                 raise XPanelError(str(info["error"]))
@@ -2016,7 +2222,7 @@ def create_app(test_config: dict | None = None) -> Flask:
             )
         except (OSError, ValueError, PermissionError, XPanelError) as exc:
             flash(str(exc), "error")
-        return redirect(url_for("updates_page", watch="1"))
+        return redirect(url_for("updates_page", watch="panel"))
 
     @app.get("/updates/status")
     @login_required
@@ -2025,6 +2231,91 @@ def create_app(test_config: dict | None = None) -> Flask:
             json.dumps(get_update_status(), ensure_ascii=False),
             content_type="application/json; charset=utf-8",
         )
+
+    @app.post("/updates/xray/check")
+    @login_required
+    def xray_updates_check():
+        channel = request.form.get("channel", "stable").strip().lower()
+        try:
+            if update_in_progress() or xray_update_in_progress():
+                raise XPanelError("Сначала дождитесь завершения текущей операции обновления")
+            server = get_server()
+            info = check_xray_updates(
+                channel=channel,
+                force=True,
+                allow_network=True,
+                xray_bin=str(server["xray_bin"]),
+            )
+            if info.get("error"):
+                raise XPanelError(str(info["error"]))
+            channel_name = "предварительная" if channel == "prerelease" else "стабильная"
+            if info.get("available"):
+                flash(
+                    f"Доступна {channel_name} версия Xray {info['latest']}",
+                    "success",
+                )
+            elif info.get("installed_newer"):
+                flash(
+                    f"Установленный Xray {info['current']} новее найденной версии {info['latest']}",
+                    "success",
+                )
+            else:
+                flash(
+                    f"Для канала «{channel_name}» обновление Xray не требуется",
+                    "success",
+                )
+        except (OSError, ValueError, XPanelError) as exc:
+            flash(f"Не удалось проверить Xray: {exc}", "error")
+        return redirect(url_for("updates_page", xray_channel=channel))
+
+    @app.post("/updates/xray/start")
+    @login_required
+    def xray_updates_start():
+        channel = request.form.get("channel", "stable").strip().lower()
+        try:
+            if update_in_progress() or xray_update_in_progress():
+                raise XPanelError("Сначала дождитесь завершения текущей операции обновления")
+            server = get_server()
+            info = check_xray_updates(
+                channel=channel,
+                force=True,
+                allow_network=True,
+                xray_bin=str(server["xray_bin"]),
+            )
+            if info.get("error"):
+                raise XPanelError(str(info["error"]))
+            version = request.form.get("version", "").strip()
+            if not info.get("available") or version != str(info.get("latest") or ""):
+                raise ValueError(
+                    "Данные о версии Xray изменились. Сначала повторите проверку"
+                )
+            result = start_xray_update(
+                version,
+                channel,
+                xray_bin=str(server["xray_bin"]),
+                config_path=str(server["config_path"]),
+                xray_service=str(server["xray_service"]),
+            )
+            flash(
+                f"Обновление Xray до {result['version']} запущено. Следите за журналом Xray.",
+                "success",
+            )
+        except (OSError, ValueError, PermissionError, XPanelError) as exc:
+            flash(str(exc), "error")
+        return redirect(url_for("updates_page", watch="xray", xray_channel=channel))
+
+    @app.get("/updates/xray/status")
+    @login_required
+    def xray_updates_status():
+        return Response(
+            json.dumps(get_xray_update_status(), ensure_ascii=False),
+            content_type="application/json; charset=utf-8",
+        )
+
+    @app.get("/help")
+    @login_required
+    def help_page():
+        return render_template("help.html")
 
     @app.get("/diagnostics")
     @login_required

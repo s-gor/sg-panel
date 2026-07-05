@@ -2,7 +2,7 @@
 {% block title %}Подписки — SG-Panel{% endblock %}
 {% block section %}CLIENTS{% endblock %}
 {% block heading %}Clients{% endblock %}
-{% block subtitle %}Постоянные ссылки для автоматического обновления текущего Inbound-профиля{% endblock %}
+{% block subtitle %}Постоянные ссылки для автоматического обновления текущего Inbound-профиля и всех включённых Hysteria 2 Inbound{% endblock %}
 {% block content %}
 <script>document.body.classList.add('ui-standard-page','subscriptions-page');</script>
 <div class="ui-page ui-page-wide">
@@ -14,7 +14,7 @@
       <header class="ui-card-heading">
         <div>
           <p class="panel-kicker">ПАРАМЕТРЫ</p>
-          <h2>Публичные подписки</h2>
+          <h2>Публичные подписки <a class="context-help-link" href="{{ url_for('help_page') }}#clients-links" title="Справка о ссылках и подписках" aria-label="Справка о ссылках и подписках">?</a></h2>
           <p>Настройте название профиля и внешний адрес, который будет получать клиент.</p>
         </div>
       </header>
@@ -51,9 +51,9 @@
       </header>
 
       <div class="ui-code-list">
-        <div><span>Base64</span><code>/sub/TOKEN</code><small>Основной вариант для v2rayN, v2rayNG и совместимых клиентов.</small></div>
-        <div><span>Обычная ссылка</span><code>/sub/TOKEN?format=plain</code><small>Текущая прямая ссылка без кодирования, удобная для проверки.</small></div>
-        <div><span>JSON</span><code>/sub/TOKEN?format=json</code><small>Структурированный ответ для интеграций.</small></div>
+        <div><span>Base64</span><code>/sub/TOKEN</code><small>Основной вариант для совместимых клиентов; при Multi-Hysteria содержит все включённые ссылки.</small></div>
+        <div><span>Обычная ссылка</span><code>/sub/TOKEN?format=plain</code><small>Все актуальные прямые ссылки без кодирования, по одной в строке.</small></div>
+        <div><span>JSON</span><code>/sub/TOKEN?format=json</code><small>Структурированный ответ с основной ссылкой и массивом links для интеграций.</small></div>
       </div>
 
       <div class="ui-warning-note"><span>!</span><p><strong>Токен является секретом.</strong> После его перегенерации прежний адрес сразу перестаёт работать.</p></div>
@@ -94,14 +94,27 @@
   </section>
 </div>
 <script>
+function showSubscriptionCopyFeedback(button, message) {
+  if (!button.dataset.copyLabel) button.dataset.copyLabel = button.textContent.trim();
+  if (button._copyResetTimer) window.clearTimeout(button._copyResetTimer);
+  button.textContent = message;
+  button._copyResetTimer = window.setTimeout(() => {
+    button.textContent = button.dataset.copyLabel;
+    button._copyResetTimer = null;
+  }, 1800);
+}
+
 async function copySubscription(id, button) {
   const field = document.getElementById('sub-' + id);
+  if (!field) return;
   try {
     if (navigator.clipboard && window.isSecureContext) await navigator.clipboard.writeText(field.value);
     else { field.focus(); field.select(); document.execCommand('copy'); }
-    button.textContent = 'Скопировано';
+    showSubscriptionCopyFeedback(button, 'Скопировано');
   } catch (error) {
-    field.focus(); field.select(); button.textContent = 'Ctrl+C';
+    field.focus();
+    field.select();
+    showSubscriptionCopyFeedback(button, 'Ctrl+C');
   }
 }
 </script>

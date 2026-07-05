@@ -18,7 +18,7 @@
     <header class="ui-card-heading ui-card-heading-row">
       <div>
         <p class="panel-kicker">ДОСТУП К ПАНЕЛИ</p>
-        <h2>HTTP или HTTPS</h2>
+        <h2>HTTP или HTTPS <a class="context-help-link" href="{{ url_for('help_page') }}#tls-https" title="Справка об HTTPS" aria-label="Справка об HTTPS">?</a></h2>
         <p>Начальная установка работает по HTTP. Домен и сертификат можно добавить позже, когда сервер уже проверен.</p>
       </div>
       <span class="pill {{ 'enabled' if panel_access.mode == 'https' else 'warning' }}"><i></i>{{ panel_access.mode|upper }}</span>

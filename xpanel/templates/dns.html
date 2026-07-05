@@ -16,7 +16,7 @@
   <div class="ui-page-toolbar"><div><strong>Контекстный JSON DNS</strong><small>Серверы, hosts и глобальные параметры в одном проверяемом документе.</small></div><a class="button secondary" href="{{ url_for('dns_json_page') }}">{ } DNS JSON</a></div>
   <section class="ui-top-grid dns-top-grid">
     <article class="ui-card ui-card-form">
-      <header class="ui-card-heading"><div><p class="panel-kicker">ПАРАМЕТРЫ</p><h2>Общие настройки DNS</h2><p>Включение встроенного DNS Xray и базовая стратегия запросов.</p></div></header>
+      <header class="ui-card-heading"><div><p class="panel-kicker">ПАРАМЕТРЫ</p><h2>Общие настройки DNS <a class="context-help-link" href="{{ url_for('help_page') }}#network" title="Справка о DNS" aria-label="Справка о DNS">?</a></h2><p>Включение встроенного DNS Xray и базовая стратегия запросов.</p></div></header>
       <form method="post" action="{{ url_for('dns_settings_save') }}" class="ui-form" data-validated-form>
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <label class="ui-toggle-row"><span><strong>Включить встроенный DNS</strong><small>Добавить раздел dns в генерируемый config.json.</small></span><input type="checkbox" name="enabled" {% if settings.enabled %}checked{% endif %}><span class="switch"></span></label>

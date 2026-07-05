@@ -271,6 +271,10 @@ def start_panel_update(version: str, ref: str) -> dict[str, str]:
         raise PermissionError("Для обновления панели нужны права root")
     if update_in_progress():
         raise XPanelError("Обновление уже выполняется")
+    from .xray_update_manager import xray_update_in_progress
+
+    if xray_update_in_progress():
+        raise XPanelError("Сначала дождитесь завершения обновления Xray")
 
     script = _project_dir() / "deploy" / "update-from-github.sh"
     if not script.is_file():

@@ -87,9 +87,62 @@ class Rc30FallbackHotfixTest(unittest.TestCase):
         )
         stream, web = service._nginx_reality_edge_configs(server)
         self.assertIn("www.bing.com 127.0.0.1:8444;", stream)
-        self.assertIn("default 127.0.0.1:9443;", stream)
+        self.assertIn("default 127.0.0.1:10443;", stream)
         self.assertIn("ssl_preread on;", stream)
         self.assertIn("server_name panel.example.com;", web)
+
+    def test_multi_reality_keeps_public_9443_and_moves_internal_fallback(self):
+        self.enable_edge()
+        rows = {int(row["id"]): row for row in service.list_reality_inbounds()}
+        service.update_server_settings(
+            address="vpn.example.com", listen="0.0.0.0", port=443,
+            dest="www.bing.com:443", server_name="www.bing.com",
+            private_key="private", public_key="public", short_id="0011223344556677",
+            fingerprint="chrome", flow="xtls-rprx-vision", loglevel="warning",
+            api_listen="127.0.0.1:10085", stats_enabled=False,
+            config_path=str(Path(self.tmp.name) / "config.json"), xray_bin="/bin/true",
+            xray_service="xray", inbound_profile="raw_reality",
+            reality_instances=[
+                {"id": 1, "name": "Primary", "enabled": True, "listen": "0.0.0.0", "port": 443, "short_id": "0011223344556677"},
+                {"id": 2, "name": "Backup", "enabled": True, "listen": "0.0.0.0", "port": 8443, "short_id": str(rows[2]["short_id"])},
+                {"id": 3, "name": "Alt", "enabled": True, "listen": "0.0.0.0", "port": 9443, "short_id": str(rows[3]["short_id"])},
+            ],
+        )
+        config, server, _users = service.build_config()
+        self.assertEqual(len(config["inbounds"]), 1)
+        inbound = config["inbounds"][0]
+        self.assertEqual(inbound["listen"], "127.0.0.1")
+        self.assertEqual(inbound["port"], 8444)
+        self.assertEqual(
+            len(inbound["streamSettings"]["realitySettings"]["shortIds"]), 3
+        )
+        stream, web = service._nginx_reality_edge_configs(server)
+        self.assertIn("default 127.0.0.1:10443;", stream)
+        self.assertIn("listen 8443;", stream)
+        self.assertIn("listen 9443;", stream)
+        self.assertEqual(stream.count("proxy_pass 127.0.0.1:8444;"), 2)
+        self.assertIn("listen 127.0.0.1:10443 ssl;", web)
+        self.assertNotIn("127.0.0.1:9443 ssl", web)
+
+    def test_reality_extra_port_cannot_use_internal_edge_listener(self):
+        self.enable_edge()
+        rows = {int(row["id"]): row for row in service.list_reality_inbounds()}
+        service.update_server_settings(
+            address="vpn.example.com", listen="0.0.0.0", port=443,
+            dest="www.bing.com:443", server_name="www.bing.com",
+            private_key="private", public_key="public", short_id="0011223344556677",
+            fingerprint="chrome", flow="xtls-rprx-vision", loglevel="warning",
+            api_listen="127.0.0.1:10085", stats_enabled=False,
+            config_path=str(Path(self.tmp.name) / "config.json"), xray_bin="/bin/true",
+            xray_service="xray", inbound_profile="raw_reality",
+            reality_instances=[
+                {"id": 1, "name": "Primary", "enabled": True, "listen": "0.0.0.0", "port": 443, "short_id": "0011223344556677"},
+                {"id": 2, "name": "Backup", "enabled": True, "listen": "0.0.0.0", "port": 8444, "short_id": str(rows[2]["short_id"])},
+                {"id": 3, "name": "Alt", "enabled": False, "listen": "0.0.0.0", "port": 9443, "short_id": str(rows[3]["short_id"])},
+            ],
+        )
+        with self.assertRaisesRegex(service.XPanelError, "TCP-порт 8444 занят"):
+            service.build_config()
 
     def test_xhttp_and_grpc_tls_keep_transport_and_placeholder(self):
         for profile in ("xhttp_tls", "grpc_tls"):
@@ -139,9 +192,9 @@ class Rc30FallbackHotfixTest(unittest.TestCase):
         )
         stream, web = service._nginx_reality_edge_configs(server)
         self.assertIn("www.bing.com 127.0.0.1:8444;", stream)
-        self.assertIn("default 127.0.0.1:9443;", stream)
+        self.assertIn("default 127.0.0.1:10443;", stream)
         self.assertIn("ssl_preread on;", stream)
-        self.assertIn("listen 127.0.0.1:9443 ssl;", web)
+        self.assertIn("listen 127.0.0.1:10443 ssl;", web)
         self.assertIn("server_name panel.example.com;", web)
 
     def test_full_json_roundtrip_preserves_public_port_with_edge(self):
@@ -193,6 +246,10 @@ class Rc30FallbackHotfixTest(unittest.TestCase):
         self.assertIn("SG Digital Systems", http)
         self.assertIn("libnginx-mod-stream", install)
         self.assertIn("REALITY_EDGE_STATE", https)
+        self.assertIn("WEB_PORT=10443", https)
+        self.assertIn("migrate_reality_edge_web_port", install)
+        self.assertIn("WEB_PORT=9443", install)
+        self.assertIn("WEB_PORT=10443", install)
         self.assertIn(".venv/bin/python -m xpanel apply", https)
         self.assertIn("https://$DOMAIN/", https)
 

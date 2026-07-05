@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-EXPECTED_VERSION="0.10.0-rc35"
+EXPECTED_VERSION="0.10.0-rc45"
 SOURCE_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 XRAY_VERSION="v26.5.9"
 DEFAULT_PANEL_PORT="61443"
@@ -18,63 +18,148 @@ RECONFIGURE=0
 PARTIAL_INSTALL=0
 PRESERVE_PANEL_ACCESS=0
 
-log(){ printf '[SG-Panel Install] %s\n' "$*"; }
-fail(){ printf '[SG-Panel Install] ERROR: %s\n' "$*" >&2; exit 1; }
+LOG_FILE="${SG_PANEL_INSTALL_LOG:-/var/log/sg-panel-install-$(date -u +%Y%m%d-%H%M%S).log}"
+STEP_LABEL=""
+STEP_STARTED=0
+STEP_ACTIVE=0
+STEP_SPINNER_PID=""
 
 if [[ -t 1 && "${TERM:-dumb}" != "dumb" ]]; then
   COLOR_GREEN=$'\033[1;32m'
   COLOR_RED=$'\033[1;31m'
-  COLOR_DIM=$'\033[2m'
   COLOR_RESET=$'\033[0m'
 else
-  COLOR_GREEN=""; COLOR_RED=""; COLOR_DIM=""; COLOR_RESET=""
+  COLOR_GREEN=""; COLOR_RED=""; COLOR_RESET=""
 fi
 
-run_stage(){
-  local label="$1"; shift
-  local output rc pid frame_index=0 started elapsed
-  local frames='|/-\\'
-  output="$(mktemp /tmp/sg-panel-stage.XXXXXX)"
-  started=$SECONDS
-
-  if [[ -t 1 && "${TERM:-dumb}" != "dumb" ]]; then
-    "$@" >"$output" 2>&1 &
-    pid=$!
-    while kill -0 "$pid" 2>/dev/null; do
-      elapsed=$((SECONDS - started))
-      printf '\r[SG-Panel] [%s%s%s] %s (%s сек)' \
-        "$COLOR_GREEN" "${frames:frame_index%4:1}" "$COLOR_RESET" "$label" "$elapsed"
-      frame_index=$((frame_index + 1))
-      sleep 0.25
-    done
-    if wait "$pid"; then
-      rc=0
-      elapsed=$((SECONDS - started))
-      printf '\r[SG-Panel] [%sOK%s] %s (%s сек)\033[K\n' \
-        "$COLOR_GREEN" "$COLOR_RESET" "$label" "$elapsed"
-    else
-      rc=$?
-      elapsed=$((SECONDS - started))
-      printf '\r[SG-Panel] [%sОШИБКА%s] %s (%s сек)\033[K\n' \
-        "$COLOR_RED" "$COLOR_RESET" "$label" "$elapsed" >&2
-      cat "$output" >&2
-      rm -f "$output"
-      return "$rc"
-    fi
-  else
-    printf '[SG-Panel] %s\n' "$label"
-    if "$@" >"$output" 2>&1; then rc=0; else rc=$?; fi
-    elapsed=$((SECONDS - started))
-    if [[ $rc -eq 0 ]]; then
-      printf '[SG-Panel] [OK] %s (%s сек)\n' "$label" "$elapsed"
-    else
-      printf '[SG-Panel] [ОШИБКА] %s (%s сек)\n' "$label" "$elapsed" >&2
-      cat "$output" >&2
-      rm -f "$output"
-      return "$rc"
-    fi
+log(){
+  printf '[SG-Panel] %s\n' "$*"
+  if [[ -e "$LOG_FILE" ]]; then
+    printf '[SG-Panel] %s\n' "$*" >>"$LOG_FILE"
   fi
-  rm -f "$output"
+}
+
+stage(){
+  printf '\n[SG-Panel] Этап %s/%s: %s\n' "$1" "$2" "$3"
+  printf '[SG-Panel] Этап %s/%s: %s\n' "$1" "$2" "$3" >>"$LOG_FILE"
+}
+
+stop_spinner(){
+  if [[ -n "$STEP_SPINNER_PID" ]]; then
+    kill "$STEP_SPINNER_PID" 2>/dev/null || true
+    wait "$STEP_SPINNER_PID" 2>/dev/null || true
+    STEP_SPINNER_PID=""
+  fi
+}
+
+spinner_loop(){
+  local label="$1" started="$2" frame_index=0 elapsed
+  local frames='|/-\\'
+  while true; do
+    elapsed=$((SECONDS - started))
+    printf '\r[SG-Panel] [%s%s%s] %s (%s сек)' \
+      "$COLOR_GREEN" "${frames:frame_index%4:1}" "$COLOR_RESET" "$label" "$elapsed"
+    frame_index=$((frame_index + 1))
+    sleep 0.25
+  done
+}
+
+step_begin(){
+  stop_spinner
+  STEP_LABEL="$1"
+  STEP_STARTED=$SECONDS
+  STEP_ACTIVE=1
+  printf '\n[SG-Panel] %s\n' "$STEP_LABEL" >>"$LOG_FILE"
+  if [[ -t 1 && "${TERM:-dumb}" != "dumb" ]]; then
+    spinner_loop "$STEP_LABEL" "$STEP_STARTED" &
+    STEP_SPINNER_PID=$!
+  else
+    printf '[SG-Panel] [..] %s...\n' "$STEP_LABEL"
+  fi
+}
+
+step_ok(){
+  local elapsed=$((SECONDS - STEP_STARTED))
+  stop_spinner
+  if [[ -t 1 && "${TERM:-dumb}" != "dumb" ]]; then
+    printf '\r[SG-Panel] [%sOK%s] %s (%s сек)\033[K\n' \
+      "$COLOR_GREEN" "$COLOR_RESET" "$STEP_LABEL" "$elapsed"
+  else
+    printf '[SG-Panel] [OK] %s (%s сек)\n' "$STEP_LABEL" "$elapsed"
+  fi
+  printf '[SG-Panel] [OK] %s (%s сек)\n' "$STEP_LABEL" "$elapsed" >>"$LOG_FILE"
+  STEP_ACTIVE=0
+}
+
+fail(){
+  local message="$*" elapsed=0
+  if (( STEP_ACTIVE == 1 )); then
+    elapsed=$((SECONDS - STEP_STARTED))
+    stop_spinner
+    if [[ -t 1 && "${TERM:-dumb}" != "dumb" ]]; then
+      printf '\r[SG-Panel] [%sОШИБКА%s] %s (%s сек)\033[K\n' \
+        "$COLOR_RED" "$COLOR_RESET" "$STEP_LABEL" "$elapsed" >&2
+    else
+      printf '[SG-Panel] [ОШИБКА] %s (%s сек)\n' "$STEP_LABEL" "$elapsed" >&2
+    fi
+    STEP_ACTIVE=0
+  fi
+  printf '[SG-Panel] [ERROR] %s\n' "$message" >&2
+  if [[ -s "$LOG_FILE" ]]; then
+    printf '\nПоследние строки журнала %s:\n' "$LOG_FILE" >&2
+    tail -n 50 "$LOG_FILE" >&2 || true
+  fi
+  exit 1
+}
+
+cleanup_spinner(){ stop_spinner; }
+trap cleanup_spinner EXIT
+
+run_logged(){
+  local label="$1"; shift
+  printf '[SG-Panel] %s\n' "$label" >>"$LOG_FILE"
+  "$@" >>"$LOG_FILE" 2>&1
+}
+
+run_stage(){
+  local label="$1" rc; shift
+  step_begin "$label"
+  set +e
+  ( set -Eeuo pipefail; "$@" ) >>"$LOG_FILE" 2>&1
+  rc=$?
+  set -e
+  if (( rc != 0 )); then
+    fail "$label завершился с кодом $rc"
+  fi
+  step_ok
+}
+
+wait_for_apt(){
+  local waited=0 timeout=900
+  local locks=(
+    /var/lib/dpkg/lock-frontend
+    /var/lib/dpkg/lock
+    /var/lib/apt/lists/lock
+    /var/cache/apt/archives/lock
+  )
+  while command -v fuser >/dev/null 2>&1 \
+    && fuser "${locks[@]}" >/dev/null 2>&1; do
+    if (( waited == 0 )); then
+      printf '[SG-Panel] Ожидание завершения apt/dpkg...\n' >>"$LOG_FILE"
+    fi
+    (( waited < timeout )) || fail "apt/dpkg не освободил блокировку за ${timeout} секунд"
+    sleep 5
+    waited=$((waited + 5))
+  done
+}
+
+migrate_reality_edge_web_port(){
+  local state="/etc/xpanel-mvp/reality-edge.env"
+  [[ -f "$state" ]] || return 0
+  if grep -qx 'WEB_PORT=9443' "$state"; then
+    sed -i 's/^WEB_PORT=9443$/WEB_PORT=10443/' "$state"
+    printf '[SG-Panel] REALITY fallback: внутренний WEB_PORT перенесён 9443 -> 10443\n' >>"$LOG_FILE"
+  fi
 }
 
 ensure_xray_version(){
@@ -84,6 +169,23 @@ ensure_xray_version(){
   fi
   if [[ "$current" == "$XRAY_VERSION" ]]; then
     systemctl enable xray >/dev/null 2>&1 || true
+    return 0
+  fi
+  if [[ -n "$current" ]] && [[ "$(printf '%s\n%s\n' "$current" "$XRAY_VERSION" | sort -V | tail -n 1)" == "$current" ]]; then
+    if [[ -s "$config" ]] && ! /usr/local/bin/xray run -test -config "$config"; then
+      echo "текущий config.json не прошёл проверку установленным Xray $current" >&2
+      return 1
+    fi
+    systemctl enable xray >/dev/null 2>&1 || true
+    if [[ -s "$config" ]]; then
+      systemctl restart xray
+      sleep 1
+      systemctl is-active --quiet xray || {
+        echo "установленный Xray $current не запустился с текущей конфигурацией" >&2
+        return 1
+      }
+    fi
+    log "Сохраняю установленный Xray $current: он новее рекомендуемой версии $XRAY_VERSION"
     return 0
   fi
 
@@ -160,6 +262,9 @@ done
 cd /
 [[ -f "$SOURCE_DIR/xpanel/__init__.py" ]] || fail "не найден каталог проекта"
 grep -q "__version__ = \"$EXPECTED_VERSION\"" "$SOURCE_DIR/xpanel/__init__.py" || fail "исходники не версии $EXPECTED_VERSION"
+install -d -m 0755 "$(dirname "$LOG_FILE")"
+touch "$LOG_FILE"
+chmod 0600 "$LOG_FILE"
 
 core_panel_files_exist(){
   [[ -d "$TARGET/xpanel" ]] &&
@@ -241,11 +346,24 @@ if existing_install_is_complete && [[ $RECONFIGURE -eq 0 ]]; then
   CURRENT_VERSION="$(cd "$TARGET" && .venv/bin/python -m xpanel --version 2>/dev/null | awk '{print $2}' || true)"
   CURRENT_VERSION="${CURRENT_VERSION:-неизвестна}"
   log "Обнаружена завершённая SG-Panel $CURRENT_VERSION"
-  run_stage "Обновление Xray до $XRAY_VERSION с автоматическим откатом" ensure_xray_version
-  run_stage "Обновление приложения с сохранением текущего доступа" bash "$SOURCE_DIR/install-or-upgrade.sh"
+  log "Журнал: $LOG_FILE"
+
+  update_panel_stage(){ bash "$SOURCE_DIR/install-or-upgrade.sh"; }
+  validate_updated_panel_stage(){
+    NEW_VERSION="$(cd "$TARGET" && .venv/bin/python -m xpanel --version | awk '{print $2}')"
+    [[ "$NEW_VERSION" == "$EXPECTED_VERSION" ]] || return 1
+    systemctl is-active --quiet "$SERVICE"
+    systemctl is-active --quiet xray
+    systemctl is-active --quiet nginx
+  }
+
+  stage 1 2 "Подготовка обновления"
+  run_stage "Проверка установленного Xray" ensure_xray_version
+  run_stage "Миграция внутреннего порта REALITY fallback" migrate_reality_edge_web_port
+  stage 2 2 "Обновление SG-Panel"
+  run_stage "Обновление приложения с сохранением данных и доступа" update_panel_stage
+  run_stage "Финальная проверка служб и версии" validate_updated_panel_stage
   NEW_VERSION="$(cd "$TARGET" && .venv/bin/python -m xpanel --version | awk '{print $2}')"
-  [[ "$NEW_VERSION" == "$EXPECTED_VERSION" ]] || fail "после обновления установлена версия $NEW_VERSION"
-  systemctl is-active --quiet "$SERVICE" || fail "служба $SERVICE не active после обновления"
   detect_panel_access
   PANEL_HOST="${PANEL_HOST:-localhost}"
   if [[ "$PANEL_MODE" == "https" ]]; then
@@ -268,6 +386,7 @@ if existing_install_is_complete && [[ $RECONFIGURE -eq 0 ]]; then
   $PANEL_URL
 
 Резервная копия создана установщиком в /root/sg-panel-backups/
+Журнал: $LOG_FILE
 ============================================================
 EOF_UPDATE
   exit 0
@@ -359,19 +478,13 @@ REALITY_DEST_DEFAULT="${CURRENT_REALITY_DEST:-$DEFAULT_REALITY_DEST}"
 REALITY_SNI_DEFAULT="${CURRENT_REALITY_SNI:-$DEFAULT_REALITY_SNI}"
 
 printf '%s\n' \
-  "Начальная установка работает по HTTP и не требует домена или сертификата." \
-  "HTTPS можно включить позже в разделе «Безопасность → Доступ к панели»." \
+  "Сначала задайте пароль администратора. Затем установщик соберёт остальные параметры" \
+  "и выполнит все действия автоматически без дополнительных вопросов." \
+  "Начальная установка работает по HTTP; HTTPS можно включить позже в панели." \
   "Чтобы принять значение в квадратных скобках, нажмите Enter." \
   ""
 
-prompt_value XRAY_ADDRESS "Адрес Xray для клиентов (публичный IP или домен)" "$XRAY_ADDRESS_DEFAULT"
-if [[ $PRESERVE_PANEL_ACCESS -eq 0 ]]; then
-  prompt_value PANEL_PUBLIC_PORT "Публичный HTTP-порт панели" "$DEFAULT_PANEL_PORT"
-fi
-prompt_value FIRST_USER "Имя первого пользователя" "$FIRST_USER_DEFAULT"
-prompt_value REALITY_DEST "Reality target" "$REALITY_DEST_DEFAULT"
-prompt_value REALITY_SNI "Reality SNI" "$REALITY_SNI_DEFAULT"
-
+# На новой установке пароль — самый первый вопрос мастера.
 if [[ -f /etc/xpanel-mvp/web.env ]]; then
   log "Существующий пароль администратора будет сохранён"
 elif [[ -z "${XPANEL_ADMIN_PASSWORD:-}" ]]; then
@@ -388,6 +501,17 @@ elif [[ -z "${XPANEL_ADMIN_PASSWORD:-}" ]]; then
     unset XPANEL_ADMIN_PASSWORD XPANEL_ADMIN_PASSWORD_2
   done
 fi
+
+prompt_value XRAY_ADDRESS "Адрес Xray для клиентов (публичный IP или домен)" "$XRAY_ADDRESS_DEFAULT"
+if [[ $PRESERVE_PANEL_ACCESS -eq 0 ]]; then
+  prompt_value PANEL_PUBLIC_PORT "Публичный HTTP-порт панели" "$DEFAULT_PANEL_PORT"
+fi
+prompt_value FIRST_USER "Имя первого пользователя" "$FIRST_USER_DEFAULT"
+prompt_value REALITY_DEST "Reality target" "$REALITY_DEST_DEFAULT"
+prompt_value REALITY_SNI "Reality SNI" "$REALITY_SNI_DEFAULT"
+
+log "Все параметры приняты. Дальнейшая установка не потребует ввода"
+log "Журнал: $LOG_FILE"
 
 [[ -n "$XRAY_ADDRESS" && "$XRAY_ADDRESS" =~ ^[A-Za-z0-9._:-]+$ ]] || fail "некорректный IP или домен Xray"
 [[ -n "$FIRST_USER" ]] || fail "имя пользователя не может быть пустым"
@@ -413,8 +537,11 @@ ensure_swap(){
 
 install_system_packages(){
   export DEBIAN_FRONTEND=noninteractive
-  apt-get update
-  apt-get install -y \
+  export NEEDRESTART_MODE=a
+  wait_for_apt
+  dpkg --configure -a
+  apt-get -o Dpkg::Use-Pty=0 update -qq
+  apt-get -o Dpkg::Use-Pty=0 install -y \
     curl ca-certificates unzip rsync zstd \
     python3 python3-venv python3-pip \
     sqlite3 jq iproute2 dnsutils \
@@ -495,7 +622,8 @@ validate_installation_stage(){
   cli_version="$(.venv/bin/python -m xpanel --version | awk '{print $2}')"
   [[ "$cli_version" == "$EXPECTED_VERSION" ]] || fail "неожиданная версия CLI: $cli_version"
   xray_version="v$(/usr/local/bin/xray version | awk 'NR==1 {print $2}' | sed 's/^v//')"
-  [[ "$xray_version" == "$XRAY_VERSION" ]] || fail "неожиданная версия Xray: $xray_version"
+  [[ "$xray_version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || fail "не удалось определить версию Xray: $xray_version"
+  [[ "$(printf '%s\n%s\n' "$xray_version" "$XRAY_VERSION" | sort -V | tail -n 1)" == "$xray_version" ]] || fail "версия Xray $xray_version старее рекомендуемой $XRAY_VERSION"
   systemctl is-active --quiet xpanel-web || fail "xpanel-web не active"
   systemctl is-active --quiet xray || fail "xray не active"
   systemctl is-active --quiet nginx || fail "nginx не active"
@@ -515,20 +643,32 @@ validate_installation_stage(){
   write_install_marker "$mode" "$host" "$port"
 }
 
-run_stage "Этап 1/7 · Подготовка системы" ensure_swap
-run_stage "Этап 2/7 · Установка системных пакетов" install_system_packages
+check_panel_port_stage(){
+  if [[ $PRESERVE_PANEL_ACCESS -eq 0 ]] \
+    && ss -lntH | awk '{print $4}' | grep -Eq "(^|:)$PANEL_PUBLIC_PORT$"; then
+    nginx -T 2>/dev/null \
+      | grep -Eq "listen[[:space:]]+${PANEL_PUBLIC_PORT}([[:space:]]|;)" \
+      || return 1
+  fi
+}
 
-if [[ $PRESERVE_PANEL_ACCESS -eq 0 ]] && ss -lntH | awk '{print $4}' | grep -Eq "(^|:)$PANEL_PUBLIC_PORT$"; then
-  nginx -T 2>/dev/null | grep -Eq "listen[[:space:]]+${PANEL_PUBLIC_PORT}([[:space:]]|;)" || fail "порт $PANEL_PUBLIC_PORT уже занят другим процессом"
-fi
-
-run_stage "Этап 3/7 · Установка Xray $XRAY_VERSION" install_xray_stage
-run_stage "Этап 4/7 · Установка SG-Panel" install_panel_stage
-unset XPANEL_ADMIN_PASSWORD XPANEL_ADMIN_PASSWORD_2 2>/dev/null || true
-run_stage "Этап 5/7 · Настройка Reality и пользователей" configure_panel_data_stage
 apply_and_publish_stage(){ apply_xray_stage; configure_panel_access_stage; }
-run_stage "Этап 6/7 · Применение Xray и публикация панели" apply_and_publish_stage
-run_stage "Этап 7/7 · Финальная проверка" validate_installation_stage
+
+stage 1 3 "Подготовка системы"
+run_stage "Подготовка памяти и swap" ensure_swap
+run_stage "Обновление системы и установка пакетов" install_system_packages
+run_stage "Проверка публичного порта панели" check_panel_port_stage
+run_stage "Установка или проверка Xray" install_xray_stage
+
+stage 2 3 "Установка и настройка"
+run_stage "Установка SG-Panel" install_panel_stage
+unset XPANEL_ADMIN_PASSWORD XPANEL_ADMIN_PASSWORD_2 2>/dev/null || true
+run_stage "Настройка сервера и первого пользователя" configure_panel_data_stage
+run_stage "Миграция внутреннего порта REALITY fallback" migrate_reality_edge_web_port
+run_stage "Применение Xray и публикация панели" apply_and_publish_stage
+
+stage 3 3 "Финальная проверка"
+run_stage "Проверка служб, конфигурации и адреса панели" validate_installation_stage
 
 cd "$TARGET"
 CLI_VERSION="$(.venv/bin/python -m xpanel --version | awk '{print $2}')"
@@ -557,6 +697,7 @@ if [[ "$PANEL_MODE" == "https" ]]; then
 else
   PANEL_HTTPS_STATUS="можно включить позже в «Безопасность → Доступ к панели»"
 fi
+ACTIVE_XRAY_VERSION="v$(/usr/local/bin/xray version | awk 'NR==1 {print $2}' | sed 's/^v//')"
 
 cat <<EOF_RESULT
 
@@ -579,7 +720,7 @@ XRAY REALITY
 ПРОВЕРКИ
   SG-Panel:        active
   Nginx:           active — :$PANEL_PUBLIC_PORT
-  Xray:            active — $XRAY_VERSION — Reality :443
+  Xray:            active — $ACTIVE_XRAY_VERSION — Reality :443
 
 FIREWALL / SECURITY GROUP
   22/tcp           $SSH_SOURCE
@@ -587,6 +728,9 @@ FIREWALL / SECURITY GROUP
   $PANEL_PUBLIC_PORT/tcp       только ваш IP или локальная сеть
   $DEFAULT_BACKEND_PORT/tcp         НЕ ОТКРЫВАТЬ
   80/tcp           нужен только при последующем включении Let's Encrypt
+
+ЖУРНАЛ
+  $LOG_FILE
 
 Откройте панель и войдите с заданным паролем.
 ============================================================

@@ -40,7 +40,7 @@ def test_hysteria_heading_uses_full_width_and_keeps_actions_on_left():
 def test_stylesheet_cache_key_is_updated_everywhere():
     for name in ("base.html", "login.html"):
         template = (ROOT / "xpanel/templates" / name).read_text(encoding="utf-8")
-        assert "?v={{ xpanel_version }}-rc34-updates-ui" in template
+        assert "?v={{ xpanel_version }}" in template
 
 
 def test_network_status_cards_use_one_desktop_row_with_existing_responsive_fallbacks():
@@ -62,7 +62,7 @@ def test_remaining_ui_polish_is_compact_and_responsive():
     assert ".link-grid.link-box{min-height:150px;" in packed
     assert "@media(max-width:1280px){.link-grid{grid-template-columns:minmax(230px,.58fr)minmax(420px,1.42fr);}}" in packed
     assert "@media(max-width:900px){.link-grid{grid-template-columns:1fr;}" in packed
-    assert "DIRECT QR" in link and "SUBSCRIPTION QR" in link
+    assert "ACTIVE NOW" in link and "SUBSCRIPTION QR" in link
 
     assert 'class="inbound-detection-header"' in settings
     assert 'class="inbound-detection-domain"' in settings
