@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ipaddress
+import re
 import secrets
 import sqlite3
 from datetime import datetime, timedelta, timezone
@@ -139,6 +140,56 @@ def update_security_settings(
             ),
         )
     purge_security_history()
+    return get_security_settings()
+
+
+def update_panel_exposure_settings(
+    *,
+    mode: str,
+    cloudflare_hostname: str = "",
+    cloudflare_origin_lockdown: bool = False,
+    cloudflare_access_enabled: bool = False,
+    cloudflare_tunnel_name: str = "",
+) -> sqlite3.Row:
+    selected = str(mode or "direct").strip().lower()
+    allowed = {"direct", "cloudflare_proxy", "cloudflare_tunnel"}
+    if selected not in allowed:
+        raise ValueError("Panel exposure: выберите Direct, Cloudflare Proxy или Cloudflare Tunnel")
+
+    hostname = str(cloudflare_hostname or "").strip().lower().rstrip(".")
+    if selected != "direct":
+        if not hostname:
+            raise ValueError("Для Cloudflare укажите hostname панели")
+        if not re.fullmatch(
+            r"([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}",
+            hostname,
+        ):
+            raise ValueError("Cloudflare hostname должен быть полным доменным именем")
+    if len(hostname) > 253:
+        raise ValueError("Cloudflare hostname слишком длинный")
+
+    tunnel_name = str(cloudflare_tunnel_name or "").strip()
+    if len(tunnel_name) > 120:
+        raise ValueError("Cloudflare Tunnel name не должен превышать 120 символов")
+
+    with connect() as con:
+        con.execute(
+            """
+            UPDATE security_settings SET
+                panel_exposure_mode=?, cloudflare_hostname=?,
+                cloudflare_origin_lockdown=?, cloudflare_access_enabled=?,
+                cloudflare_tunnel_name=?, updated_at=?
+            WHERE id=1
+            """,
+            (
+                selected,
+                hostname,
+                1 if cloudflare_origin_lockdown else 0,
+                1 if cloudflare_access_enabled else 0,
+                tunnel_name,
+                _iso(),
+            ),
+        )
     return get_security_settings()
 
 

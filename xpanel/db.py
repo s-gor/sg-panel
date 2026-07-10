@@ -18,6 +18,7 @@ PRAGMA foreign_keys = ON;
 
 CREATE TABLE IF NOT EXISTS server_settings (
     id INTEGER PRIMARY KEY CHECK (id = 1),
+    instance_name TEXT NOT NULL DEFAULT '',
     address TEXT NOT NULL,
     listen TEXT NOT NULL DEFAULT '0.0.0.0',
     port INTEGER NOT NULL DEFAULT 443 CHECK (port BETWEEN 1 AND 65535),
@@ -26,7 +27,7 @@ CREATE TABLE IF NOT EXISTS server_settings (
     private_key TEXT NOT NULL,
     public_key TEXT NOT NULL,
     short_id TEXT NOT NULL,
-    fingerprint TEXT NOT NULL DEFAULT 'chrome',
+    fingerprint TEXT NOT NULL DEFAULT 'firefox',
     flow TEXT NOT NULL DEFAULT '',
     loglevel TEXT NOT NULL DEFAULT 'warning',
     api_listen TEXT NOT NULL DEFAULT '127.0.0.1:10085',
@@ -247,7 +248,7 @@ CREATE TABLE IF NOT EXISTS outbounds (
     server_name TEXT NOT NULL,
     public_key TEXT NOT NULL,
     short_id TEXT NOT NULL DEFAULT '',
-    fingerprint TEXT NOT NULL DEFAULT 'chrome',
+    fingerprint TEXT NOT NULL DEFAULT 'firefox',
     spider_x TEXT NOT NULL DEFAULT '',
     xhttp_host TEXT NOT NULL DEFAULT '',
     xhttp_path TEXT NOT NULL DEFAULT '/',
@@ -259,6 +260,23 @@ CREATE TABLE IF NOT EXISTS outbounds (
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS cascade_settings (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    outbound_id INTEGER,
+    exit_name TEXT NOT NULL DEFAULT '',
+    service_user_id INTEGER,
+    last_test_state TEXT NOT NULL DEFAULT '',
+    last_test_ip TEXT NOT NULL DEFAULT '',
+    last_test_country TEXT NOT NULL DEFAULT '',
+    last_test_colo TEXT NOT NULL DEFAULT '',
+    last_test_warp TEXT NOT NULL DEFAULT '',
+    last_test_detail TEXT NOT NULL DEFAULT '',
+    tested_signature TEXT NOT NULL DEFAULT '',
+    last_test_at TEXT,
+    enabled_at TEXT,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE IF NOT EXISTS warp_settings (
     id INTEGER PRIMARY KEY CHECK (id = 1),
     enabled INTEGER NOT NULL DEFAULT 0 CHECK (enabled IN (0, 1)),
@@ -267,6 +285,7 @@ CREATE TABLE IF NOT EXISTS warp_settings (
     route_mode TEXT NOT NULL DEFAULT 'off'
         CHECK (route_mode IN ('off', 'selected', 'all')),
     selected_domains TEXT NOT NULL DEFAULT '',
+    selected_ips TEXT NOT NULL DEFAULT '',
     last_test_state TEXT NOT NULL DEFAULT '',
     last_test_ip TEXT NOT NULL DEFAULT '',
     last_test_at TEXT,
@@ -293,6 +312,56 @@ CREATE TABLE IF NOT EXISTS routing_rules (
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+
+
+CREATE TABLE IF NOT EXISTS transport_expert_settings (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    xhttp_extra_server_json TEXT NOT NULL DEFAULT '{}',
+    xhttp_extra_client_json TEXT NOT NULL DEFAULT '{}',
+    finalmask_enabled INTEGER NOT NULL DEFAULT 0 CHECK (finalmask_enabled IN (0, 1)),
+    finalmask_server_json TEXT NOT NULL DEFAULT '{}',
+    finalmask_client_json TEXT NOT NULL DEFAULT '{}',
+    ech_mode TEXT NOT NULL DEFAULT 'off' CHECK (ech_mode IN ('off', 'generated', 'existing', 'dns')),
+    ech_public_name TEXT NOT NULL DEFAULT '',
+    ech_server_keys TEXT NOT NULL DEFAULT '',
+    ech_config_list TEXT NOT NULL DEFAULT '',
+    certificate_pinning_enabled INTEGER NOT NULL DEFAULT 0 CHECK (certificate_pinning_enabled IN (0, 1)),
+    certificate_pinning_sha256 TEXT NOT NULL DEFAULT '',
+    certificate_pinning_source TEXT NOT NULL DEFAULT '',
+    tls_verify_name_mode TEXT NOT NULL DEFAULT 'auto' CHECK (tls_verify_name_mode IN ('auto', 'manual')),
+    tls_verify_name TEXT NOT NULL DEFAULT '',
+    client_ca_pem TEXT NOT NULL DEFAULT '',
+    client_ca_source TEXT NOT NULL DEFAULT '',
+    client_ca_sha256 TEXT NOT NULL DEFAULT '',
+    last_validation_state TEXT NOT NULL DEFAULT '',
+    last_validation_message TEXT NOT NULL DEFAULT '',
+    last_validation_at TEXT,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS geofiles_settings (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    source TEXT NOT NULL DEFAULT 'xray'
+        CHECK (source IN ('xray', 'v2fly', 'loyalsoldier', 'runetfreedom', 'custom', 'local')),
+    geoip_url TEXT NOT NULL DEFAULT '',
+    geosite_url TEXT NOT NULL DEFAULT '',
+    geoip_local_path TEXT NOT NULL DEFAULT '',
+    geosite_local_path TEXT NOT NULL DEFAULT '',
+    active_geoip_path TEXT NOT NULL DEFAULT '/usr/local/share/xray/geoip.dat',
+    active_geosite_path TEXT NOT NULL DEFAULT '/usr/local/share/xray/geosite.dat',
+    active_geoip_sha256 TEXT NOT NULL DEFAULT '',
+    active_geosite_sha256 TEXT NOT NULL DEFAULT '',
+    active_geoip_size INTEGER NOT NULL DEFAULT 0,
+    active_geosite_size INTEGER NOT NULL DEFAULT 0,
+    active_source TEXT NOT NULL DEFAULT 'xray',
+    staged_manifest_json TEXT NOT NULL DEFAULT '{}',
+    last_check_state TEXT NOT NULL DEFAULT '',
+    last_check_message TEXT NOT NULL DEFAULT '',
+    last_checked_at TEXT,
+    last_applied_at TEXT,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE IF NOT EXISTS security_settings (
     id INTEGER PRIMARY KEY CHECK (id = 1),
     session_timeout_minutes INTEGER NOT NULL DEFAULT 60
@@ -304,6 +373,14 @@ CREATE TABLE IF NOT EXISTS security_settings (
     allowlist_enabled INTEGER NOT NULL DEFAULT 0 CHECK (allowlist_enabled IN (0, 1)),
     allowed_networks TEXT NOT NULL DEFAULT '',
     trust_proxy_headers INTEGER NOT NULL DEFAULT 0 CHECK (trust_proxy_headers IN (0, 1)),
+    panel_exposure_mode TEXT NOT NULL DEFAULT 'direct'
+        CHECK (panel_exposure_mode IN ('direct', 'cloudflare_proxy', 'cloudflare_tunnel')),
+    cloudflare_hostname TEXT NOT NULL DEFAULT '',
+    cloudflare_origin_lockdown INTEGER NOT NULL DEFAULT 0
+        CHECK (cloudflare_origin_lockdown IN (0, 1)),
+    cloudflare_access_enabled INTEGER NOT NULL DEFAULT 0
+        CHECK (cloudflare_access_enabled IN (0, 1)),
+    cloudflare_tunnel_name TEXT NOT NULL DEFAULT '',
     subscription_plain_enabled INTEGER NOT NULL DEFAULT 1 CHECK (subscription_plain_enabled IN (0, 1)),
     subscription_json_enabled INTEGER NOT NULL DEFAULT 1 CHECK (subscription_json_enabled IN (0, 1)),
     subscription_allowlist_enabled INTEGER NOT NULL DEFAULT 0
@@ -336,6 +413,159 @@ CREATE TABLE IF NOT EXISTS login_attempts (
 
 CREATE INDEX IF NOT EXISTS idx_login_attempts_ip_time
     ON login_attempts(ip_address, attempted_at);
+
+CREATE TABLE IF NOT EXISTS nodes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE COLLATE NOCASE,
+    slug TEXT NOT NULL UNIQUE COLLATE NOCASE,
+    role TEXT NOT NULL DEFAULT 'regional'
+        CHECK (role IN ('primary', 'backup', 'regional', 'entry', 'exit', 'test')),
+    location TEXT NOT NULL DEFAULT '',
+    description TEXT NOT NULL DEFAULT '',
+    is_local INTEGER NOT NULL DEFAULT 0 CHECK (is_local IN (0, 1)),
+    state TEXT NOT NULL DEFAULT 'pending'
+        CHECK (state IN ('local', 'pending', 'online', 'offline', 'revoked')),
+    agent_id TEXT UNIQUE,
+    agent_token_hash TEXT,
+    public_address TEXT NOT NULL DEFAULT '',
+    platform TEXT NOT NULL DEFAULT '',
+    platform_version TEXT NOT NULL DEFAULT '',
+    architecture TEXT NOT NULL DEFAULT '',
+    agent_version TEXT NOT NULL DEFAULT '',
+    agent_state TEXT NOT NULL DEFAULT '',
+    worker_version TEXT NOT NULL DEFAULT '',
+    worker_state TEXT NOT NULL DEFAULT '',
+    xray_version TEXT NOT NULL DEFAULT '',
+    xray_state TEXT NOT NULL DEFAULT '',
+    nginx_version TEXT NOT NULL DEFAULT '',
+    nginx_state TEXT NOT NULL DEFAULT '',
+    inbound_profile TEXT NOT NULL DEFAULT '',
+    cpu_percent REAL,
+    memory_percent REAL,
+    disk_percent REAL,
+    load1 REAL,
+    client_count INTEGER CHECK (client_count IS NULL OR client_count >= 0),
+    last_error TEXT NOT NULL DEFAULT '',
+    last_seen_at TEXT,
+    registered_at TEXT,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_nodes_single_local
+    ON nodes(is_local) WHERE is_local = 1;
+CREATE INDEX IF NOT EXISTS idx_nodes_state ON nodes(state);
+CREATE INDEX IF NOT EXISTS idx_nodes_last_seen ON nodes(last_seen_at);
+
+CREATE TABLE IF NOT EXISTS node_enrollment_tokens (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    node_id INTEGER NOT NULL,
+    token_hash TEXT NOT NULL UNIQUE,
+    token_hint TEXT NOT NULL DEFAULT '',
+    expires_at TEXT NOT NULL,
+    used_at TEXT,
+    revoked_at TEXT,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (node_id) REFERENCES nodes(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_node_enrollment_node
+    ON node_enrollment_tokens(node_id, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS node_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    node_id INTEGER NOT NULL,
+    level TEXT NOT NULL DEFAULT 'info'
+        CHECK (level IN ('info', 'success', 'warning', 'error')),
+    event_type TEXT NOT NULL,
+    message TEXT NOT NULL,
+    details_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (node_id) REFERENCES nodes(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_node_events_node_created
+    ON node_events(node_id, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS node_jobs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    node_id INTEGER NOT NULL,
+    job_type TEXT NOT NULL CHECK (job_type IN ('apply_xray_config')),
+    status TEXT NOT NULL DEFAULT 'queued'
+        CHECK (status IN ('queued', 'running', 'succeeded', 'failed', 'cancelled')),
+    title TEXT NOT NULL DEFAULT '',
+    payload_json TEXT NOT NULL DEFAULT '{}',
+    result_json TEXT NOT NULL DEFAULT '{}',
+    client_link TEXT NOT NULL DEFAULT '',
+    requested_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    claimed_at TEXT,
+    completed_at TEXT,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (node_id) REFERENCES nodes(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_node_jobs_node_status
+    ON node_jobs(node_id, status, id);
+
+CREATE TABLE IF NOT EXISTS node_deployments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    node_id INTEGER NOT NULL,
+    user_id INTEGER,
+    user_uuid TEXT NOT NULL,
+    user_name TEXT NOT NULL DEFAULT '',
+    profile TEXT NOT NULL DEFAULT '',
+    public_host TEXT NOT NULL DEFAULT '',
+    public_port INTEGER,
+    client_link TEXT NOT NULL DEFAULT '',
+    state TEXT NOT NULL DEFAULT 'pending'
+        CHECK (state IN ('pending', 'active', 'removing', 'removed', 'error')),
+    last_job_id INTEGER,
+    last_message TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (node_id, user_uuid),
+    FOREIGN KEY (node_id) REFERENCES nodes(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
+    FOREIGN KEY (last_job_id) REFERENCES node_jobs(id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_node_deployments_user
+    ON node_deployments(user_id, state);
+CREATE INDEX IF NOT EXISTS idx_node_deployments_node
+    ON node_deployments(node_id, state);
+
+CREATE TABLE IF NOT EXISTS user_deletion_requests (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER,
+    user_name TEXT NOT NULL,
+    user_uuid TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending'
+        CHECK (status IN ('pending', 'running', 'succeeded', 'failed')),
+    error TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    completed_at TEXT,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS user_deletion_targets (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    request_id INTEGER NOT NULL,
+    node_id INTEGER NOT NULL,
+    job_id INTEGER NOT NULL,
+    status TEXT NOT NULL DEFAULT 'queued'
+        CHECK (status IN ('queued', 'running', 'succeeded', 'failed')),
+    message TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (request_id, node_id),
+    FOREIGN KEY (request_id) REFERENCES user_deletion_requests(id) ON DELETE CASCADE,
+    FOREIGN KEY (node_id) REFERENCES nodes(id) ON DELETE CASCADE,
+    FOREIGN KEY (job_id) REFERENCES node_jobs(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_deletion_targets_job
+    ON user_deletion_targets(job_id);
 
 CREATE TABLE IF NOT EXISTS audit_log (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -410,6 +640,15 @@ def _migrate(con: sqlite3.Connection) -> None:
     _ensure_column(con, "server_settings", "api_listen", "TEXT NOT NULL DEFAULT '127.0.0.1:10085'")
     _ensure_column(con, "server_settings", "stats_enabled", "INTEGER NOT NULL DEFAULT 1")
 
+    # v0.10 RC46 Multi-Node service health fields. The CREATE TABLE schema
+    # already contains them for new databases; these guards keep preview and
+    # restored databases forward-compatible.
+    _ensure_column(con, "nodes", "xray_state", "TEXT NOT NULL DEFAULT ''")
+    _ensure_column(con, "nodes", "nginx_state", "TEXT NOT NULL DEFAULT ''")
+    _ensure_column(con, "nodes", "agent_state", "TEXT NOT NULL DEFAULT ''")
+    _ensure_column(con, "nodes", "worker_version", "TEXT NOT NULL DEFAULT ''")
+    _ensure_column(con, "nodes", "worker_state", "TEXT NOT NULL DEFAULT ''")
+
     # v0.10 RC29: Clients & Traffic Studio depends on the local Xray Stats API.
     # Enable it once for existing installations. A migration marker prevents a
     # later init-db call from overriding an administrator who disables it again.
@@ -430,6 +669,23 @@ def _migrate(con: sqlite3.Connection) -> None:
         con.execute(
             "INSERT INTO schema_migrations (name) VALUES (?)", (migration_name,)
         )
+
+    # v0.10 RC64 visible panel identity and simplified Cascade roles.
+    _ensure_column(con, "server_settings", "instance_name", "TEXT NOT NULL DEFAULT ''")
+    _ensure_column(con, "cascade_settings", "exit_name", "TEXT NOT NULL DEFAULT ''")
+    _ensure_column(con, "cascade_settings", "service_user_id", "INTEGER")
+    con.execute("UPDATE server_settings SET instance_name='' WHERE instance_name IS NULL")
+    con.execute("UPDATE cascade_settings SET exit_name='' WHERE exit_name IS NULL")
+
+    # v0.10 RC51 panel exposure modes and safe Cloudflare metadata.
+    _ensure_column(con, "security_settings", "panel_exposure_mode", "TEXT NOT NULL DEFAULT 'direct'")
+    _ensure_column(con, "security_settings", "cloudflare_hostname", "TEXT NOT NULL DEFAULT ''")
+    _ensure_column(con, "security_settings", "cloudflare_origin_lockdown", "INTEGER NOT NULL DEFAULT 0")
+    _ensure_column(con, "security_settings", "cloudflare_access_enabled", "INTEGER NOT NULL DEFAULT 0")
+    _ensure_column(con, "security_settings", "cloudflare_tunnel_name", "TEXT NOT NULL DEFAULT ''")
+    con.execute("UPDATE security_settings SET panel_exposure_mode='direct' WHERE panel_exposure_mode IS NULL OR panel_exposure_mode NOT IN ('direct','cloudflare_proxy','cloudflare_tunnel')")
+    con.execute("UPDATE security_settings SET cloudflare_hostname='' WHERE cloudflare_hostname IS NULL")
+    con.execute("UPDATE security_settings SET cloudflare_tunnel_name='' WHERE cloudflare_tunnel_name IS NULL")
 
     # v0.10 RC3 inbound profiles
     _ensure_column(con, "server_settings", "inbound_profile", "TEXT NOT NULL DEFAULT 'raw_reality'")
@@ -495,6 +751,81 @@ def _migrate(con: sqlite3.Connection) -> None:
     con.execute("UPDATE server_settings SET xhttp_mode='auto' WHERE xhttp_mode IS NULL OR xhttp_mode=''")
     con.execute("UPDATE server_settings SET grpc_service_name='sg-grpc' WHERE grpc_service_name IS NULL OR grpc_service_name=''")
 
+
+    # SG-Panel 050: advanced transport settings and managed GeoFiles.
+    con.execute(
+        """
+        CREATE TABLE IF NOT EXISTS transport_expert_settings (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            xhttp_extra_server_json TEXT NOT NULL DEFAULT '{}',
+            xhttp_extra_client_json TEXT NOT NULL DEFAULT '{}',
+            finalmask_enabled INTEGER NOT NULL DEFAULT 0 CHECK (finalmask_enabled IN (0, 1)),
+            finalmask_server_json TEXT NOT NULL DEFAULT '{}',
+            finalmask_client_json TEXT NOT NULL DEFAULT '{}',
+            ech_mode TEXT NOT NULL DEFAULT 'off',
+            ech_public_name TEXT NOT NULL DEFAULT '',
+            ech_server_keys TEXT NOT NULL DEFAULT '',
+            ech_config_list TEXT NOT NULL DEFAULT '',
+            certificate_pinning_enabled INTEGER NOT NULL DEFAULT 0 CHECK (certificate_pinning_enabled IN (0, 1)),
+            certificate_pinning_sha256 TEXT NOT NULL DEFAULT '',
+            certificate_pinning_source TEXT NOT NULL DEFAULT '',
+            tls_verify_name_mode TEXT NOT NULL DEFAULT 'auto',
+            tls_verify_name TEXT NOT NULL DEFAULT '',
+            client_ca_pem TEXT NOT NULL DEFAULT '',
+            client_ca_source TEXT NOT NULL DEFAULT '',
+            client_ca_sha256 TEXT NOT NULL DEFAULT '',
+            last_validation_state TEXT NOT NULL DEFAULT '',
+            last_validation_message TEXT NOT NULL DEFAULT '',
+            last_validation_at TEXT,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+    con.execute(
+        """
+        CREATE TABLE IF NOT EXISTS geofiles_settings (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            source TEXT NOT NULL DEFAULT 'xray',
+            geoip_url TEXT NOT NULL DEFAULT '',
+            geosite_url TEXT NOT NULL DEFAULT '',
+            geoip_local_path TEXT NOT NULL DEFAULT '',
+            geosite_local_path TEXT NOT NULL DEFAULT '',
+            active_geoip_path TEXT NOT NULL DEFAULT '/usr/local/share/xray/geoip.dat',
+            active_geosite_path TEXT NOT NULL DEFAULT '/usr/local/share/xray/geosite.dat',
+            active_geoip_sha256 TEXT NOT NULL DEFAULT '',
+            active_geosite_sha256 TEXT NOT NULL DEFAULT '',
+            active_geoip_size INTEGER NOT NULL DEFAULT 0,
+            active_geosite_size INTEGER NOT NULL DEFAULT 0,
+            active_source TEXT NOT NULL DEFAULT 'xray',
+            staged_manifest_json TEXT NOT NULL DEFAULT '{}',
+            last_check_state TEXT NOT NULL DEFAULT '',
+            last_check_message TEXT NOT NULL DEFAULT '',
+            last_checked_at TEXT,
+            last_applied_at TEXT,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+
+    # RC51: empty expert fields are normalized to visible neutral values.
+    con.execute("UPDATE transport_expert_settings SET xhttp_extra_server_json='{}' WHERE xhttp_extra_server_json IS NULL OR TRIM(xhttp_extra_server_json)=''")
+    con.execute("UPDATE transport_expert_settings SET xhttp_extra_client_json='{}' WHERE xhttp_extra_client_json IS NULL OR TRIM(xhttp_extra_client_json)=''")
+    con.execute("UPDATE transport_expert_settings SET finalmask_server_json='{}' WHERE finalmask_server_json IS NULL OR TRIM(finalmask_server_json)=''")
+    con.execute("UPDATE transport_expert_settings SET finalmask_client_json='{}' WHERE finalmask_client_json IS NULL OR TRIM(finalmask_client_json)=''")
+    con.execute("UPDATE transport_expert_settings SET ech_mode='off' WHERE ech_mode IS NULL OR ech_mode NOT IN ('off','generated','existing','dns')")
+
+    # RC53: explicit SG Client contract for TLS name checks and private CA bundles.
+    _ensure_column(con, "transport_expert_settings", "tls_verify_name_mode", "TEXT NOT NULL DEFAULT 'auto'")
+    _ensure_column(con, "transport_expert_settings", "tls_verify_name", "TEXT NOT NULL DEFAULT ''")
+    _ensure_column(con, "transport_expert_settings", "client_ca_pem", "TEXT NOT NULL DEFAULT ''")
+    _ensure_column(con, "transport_expert_settings", "client_ca_source", "TEXT NOT NULL DEFAULT ''")
+    _ensure_column(con, "transport_expert_settings", "client_ca_sha256", "TEXT NOT NULL DEFAULT ''")
+    con.execute("UPDATE transport_expert_settings SET tls_verify_name_mode='auto' WHERE tls_verify_name_mode IS NULL OR tls_verify_name_mode NOT IN ('auto','manual')")
+    con.execute("UPDATE transport_expert_settings SET tls_verify_name='' WHERE tls_verify_name IS NULL")
+    con.execute("UPDATE transport_expert_settings SET client_ca_pem='' WHERE client_ca_pem IS NULL")
+    con.execute("UPDATE transport_expert_settings SET client_ca_source='' WHERE client_ca_source IS NULL")
+    con.execute("UPDATE transport_expert_settings SET client_ca_sha256='' WHERE client_ca_sha256 IS NULL")
+
     # v0.5 users
     _ensure_column(con, "users", "comment", "TEXT NOT NULL DEFAULT ''")
     _ensure_column(con, "users", "expiry_at", "TEXT")
@@ -504,6 +835,40 @@ def _migrate(con: sqlite3.Connection) -> None:
     # v0.6 routing and custom outbounds
     _ensure_column(con, "routing_settings", "default_outbound_tag", "TEXT NOT NULL DEFAULT 'direct'")
     _ensure_column(con, "routing_rules", "users", "TEXT NOT NULL DEFAULT ''")
+
+    # v0.10 RC56: WARP selection stores domain/geosite and IP/geoip conditions separately.
+    _ensure_column(con, "warp_settings", "selected_ips", "TEXT NOT NULL DEFAULT ''")
+
+    # v0.10 RC67: remove the short-lived RC66 HTTP/SOCKS experiment.
+    # Existing RC66 databases may still contain its private table and routing
+    # rules. They are removed once so a missing experimental outbound cannot
+    # block generation of the normal Xray configuration after upgrade.
+    legacy_proxy_table = con.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='proxy_outbounds'"
+    ).fetchone()
+    if legacy_proxy_table is not None:
+        legacy_tags = [
+            str(row[0])
+            for row in con.execute("SELECT tag FROM proxy_outbounds").fetchall()
+            if str(row[0] or "").strip()
+        ]
+        if legacy_tags:
+            placeholders = ",".join("?" for _ in legacy_tags)
+            con.execute(
+                f"UPDATE routing_settings SET default_outbound_tag='direct', "
+                f"updated_at=CURRENT_TIMESTAMP WHERE default_outbound_tag IN ({placeholders})",
+                legacy_tags,
+            )
+            con.execute(
+                f"DELETE FROM routing_rules WHERE target_type='outbound' "
+                f"AND outbound_tag IN ({placeholders})",
+                legacy_tags,
+            )
+        con.execute("DROP TABLE proxy_outbounds")
+        con.execute(
+            "INSERT OR IGNORE INTO schema_migrations (name) VALUES (?)",
+            ("rc67-remove-experimental-proxy",),
+        )
 
     # v0.7 DNS tables are created by SCHEMA.
 
@@ -576,6 +941,15 @@ def init_db() -> Path:
         )
         con.execute(
             "INSERT OR IGNORE INTO config_settings (id, document_json) VALUES (1, '{}')"
+        )
+        con.execute(
+            "INSERT OR IGNORE INTO transport_expert_settings (id) VALUES (1)"
+        )
+        con.execute(
+            "INSERT OR IGNORE INTO cascade_settings (id) VALUES (1)"
+        )
+        con.execute(
+            "INSERT OR IGNORE INTO geofiles_settings (id) VALUES (1)"
         )
         server_row = con.execute(
             """
@@ -691,6 +1065,24 @@ def init_db() -> Path:
                 subscription_allowlist_enabled, subscription_allowed_networks,
                 audit_retention_days
             ) VALUES (1, 60, 5, 15, 0, '', 0, 1, 1, 0, '', 90)
+            """
+        )
+        con.execute(
+            """
+            INSERT OR IGNORE INTO nodes (
+                name, slug, role, location, description, is_local, state
+            ) VALUES (
+                'Основной сервер', 'local', 'primary', '',
+                'Сервер, на котором работает центральная SG-Panel', 1, 'local'
+            )
+            """
+        )
+        con.execute(
+            """
+            UPDATE nodes
+            SET is_local = 1, role = 'primary', state = 'local',
+                updated_at = CURRENT_TIMESTAMP
+            WHERE slug = 'local'
             """
         )
         missing_tokens = con.execute(

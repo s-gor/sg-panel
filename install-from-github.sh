@@ -1,65 +1,106 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-INSTALLER_ARGS=("$@")
-
 OWNER="${OWNER:-s-gor}"
 REPO="${REPO:-sg-panel}"
 BRANCH="${BRANCH:-main}"
+RAW_INSTALLER_URL="${SG_PANEL_INSTALLER_URL:-https://raw.githubusercontent.com/${OWNER}/${REPO}/${BRANCH}/install.sh}"
+LOG_FILE="${SG_PANEL_BOOTSTRAP_LOG:-/var/log/sg-panel-bootstrap-$(date -u +%Y%m%d-%H%M%S).log}"
+TMP_INSTALLER="$(mktemp /tmp/sg-panel-install.XXXXXX.sh)"
+SPINNER_PID=""
 
-cd /
+if [[ -t 1 && "${TERM:-dumb}" != "dumb" ]]; then
+  GREEN=$'\033[1;32m'
+  RED=$'\033[1;31m'
+  RESET=$'\033[0m'
+else
+  GREEN=""
+  RED=""
+  RESET=""
+fi
 
-ARCHIVE="${REPO}-${BRANCH}.zip"
-ARCHIVE_URL="https://github.com/${OWNER}/${REPO}/archive/refs/heads/${BRANCH}.zip"
-WORK="$(mktemp -d /tmp/sg-panel-install.XXXXXX)"
-
-cleanup() {
-    rm -rf "$WORK"
+cleanup(){
+  if [[ -n "$SPINNER_PID" ]] && kill -0 "$SPINNER_PID" 2>/dev/null; then
+    kill "$SPINNER_PID" 2>/dev/null || true
+    wait "$SPINNER_PID" 2>/dev/null || true
+  fi
+  rm -f "$TMP_INSTALLER"
 }
-
 trap cleanup EXIT
 
-log() {
-    printf '[SG-Panel bootstrap] %s\n' "$*"
+spinner_loop(){
+  local label="$1" started="$2" i=0 elapsed
+  local frames='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
+  while :; do
+    elapsed=$(( $(date +%s) - started ))
+    printf '\r\033[K[SG-Panel] [%s%s%s] %s (%s сек)' \
+      "$GREEN" "${frames:i%10:1}" "$RESET" "$label" "$elapsed"
+    i=$((i + 1))
+    sleep 0.25
+  done
 }
 
-fail() {
-    printf '[SG-Panel bootstrap] ERROR: %s\n' "$*" >&2
-    exit 1
+run_step(){
+  local label="$1" rc started
+  shift
+  started="$(date +%s)"
+  printf '[SG-Panel] %s\n' "$label" >>"$LOG_FILE"
+  if [[ -t 1 && "${TERM:-dumb}" != "dumb" ]]; then
+    spinner_loop "$label" "$started" &
+    SPINNER_PID=$!
+  else
+    printf '[SG-Panel] %s\n' "$label"
+  fi
+
+  set +e
+  "$@" >>"$LOG_FILE" 2>&1
+  rc=$?
+  set -e
+
+  if [[ -n "$SPINNER_PID" ]]; then
+    kill "$SPINNER_PID" 2>/dev/null || true
+    wait "$SPINNER_PID" 2>/dev/null || true
+    SPINNER_PID=""
+  fi
+
+  if (( rc != 0 )); then
+    printf '\r\033[K[SG-Panel] [%sОШИБКА%s] %s\n' "$RED" "$RESET" "$label" >&2
+    tail -n 40 "$LOG_FILE" >&2 || true
+    printf 'Полный журнал: %s\n' "$LOG_FILE" >&2
+    exit "$rc"
+  fi
+
+  printf '\r\033[K[SG-Panel] [%sOK%s] %s (%s сек)\n' \
+    "$GREEN" "$RESET" "$label" "$(( $(date +%s) - started ))"
 }
 
-[[ $EUID -eq 0 ]] || fail "запустите скрипт от root"
-command -v curl >/dev/null 2>&1 || fail "не установлен curl"
-command -v unzip >/dev/null 2>&1 || fail "не установлен unzip"
+ensure_downloader(){
+  if command -v curl >/dev/null 2>&1; then
+    return 0
+  fi
+  export DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a APT_LISTCHANGES_FRONTEND=none
+  apt-get -o Dpkg::Use-Pty=0 update -qq
+  apt-get -o Dpkg::Use-Pty=0 install -y -qq curl ca-certificates
+}
 
-log "Скачиваю ${OWNER}/${REPO}, ветка ${BRANCH}"
-curl -fL --retry 3 --retry-delay 2 --connect-timeout 15 \
-    -o "$WORK/$ARCHIVE" "$ARCHIVE_URL"
+download_installer(){
+  curl -fL --retry 3 --retry-delay 2 --connect-timeout 20 \
+    -o "$TMP_INSTALLER" "$RAW_INSTALLER_URL"
+  bash -n "$TMP_INSTALLER"
+  chmod 0700 "$TMP_INSTALLER"
+}
 
-mkdir -p "$WORK/extracted"
-log "Распаковываю архив репозитория"
-unzip -q "$WORK/$ARCHIVE" -d "$WORK/extracted"
+main(){
+  [[ $EUID -eq 0 ]] || { echo 'Запустите через sudo bash.' >&2; exit 1; }
+  install -d -m 0755 "$(dirname "$LOG_FILE")"
+  : >"$LOG_FILE"
+  chmod 0600 "$LOG_FILE"
 
-INSTALLER="$(
-    find "$WORK/extracted" \
-        -maxdepth 5 \
-        -type f \
-        -path '*/deploy/ec2-first-install.sh' \
-        -print \
-        -quit
-)"
+  run_step 'Bootstrap 1/2 · Подготовка загрузчика' ensure_downloader
+  run_step 'Bootstrap 2/2 · Загрузка мастера SG-Panel' download_installer
 
-[[ -n "$INSTALLER" && -f "$INSTALLER" ]] || \
-    fail "в архиве репозитория не найден deploy/ec2-first-install.sh"
+  printf '[SG-Panel] Мастер загружен. Все вопросы будут заданы до начала установки.\n\n'
+  bash "$TMP_INSTALLER" "$@"
+}
 
-SOURCE="$(dirname "$(dirname "$INSTALLER")")"
-[[ -f "$SOURCE/install-or-upgrade.sh" ]] || \
-    fail "не удалось определить каталог проекта SG-Panel"
-
-# GitHub source archives do not preserve executable bits reliably.
-find "$SOURCE" -type f -name '*.sh' -exec chmod 755 {} +
-
-log "Каталог проекта: $SOURCE"
-log "Запускаю установку или обновление SG-Panel"
-cd "$SOURCE"
-bash "$INSTALLER" "${INSTALLER_ARGS[@]}"
+main "$@"

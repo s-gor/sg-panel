@@ -51,7 +51,7 @@ def test_dark_theme_uses_awg_blue_palette_and_bright_text() -> None:
 
 def test_installer_uses_green_awg_single_line_spinner() -> None:
     script = (ROOT / "deploy/ec2-first-install.sh").read_text(encoding="utf-8")
-    assert r"local frames='|/-\\'" in script
+    assert "local frames='|/-\\'" in script
     assert "[SG-Panel] [%s%s%s] %s (%s сек)" in script
     assert '"$COLOR_GREEN" "${frames:frame_index%4:1}" "$COLOR_RESET"' in script
     assert "sleep 0.25" in script

@@ -58,9 +58,9 @@ def test_graphite_palette_matches_sg_client_values():
 
 
 def test_rc45_version_installers_and_release_notes_are_consistent():
-    assert '__version__ = "0.10.0-rc45"' in (ROOT / "xpanel/__init__.py").read_text(encoding="utf-8")
+    assert '__version__ = "0.10.0-rc70"' in (ROOT / "xpanel/__init__.py").read_text(encoding="utf-8")
     for relative in ("deploy/ec2-first-install.sh", "install-or-upgrade.sh"):
-        assert 'EXPECTED_VERSION="0.10.0-rc45"' in (ROOT / relative).read_text(encoding="utf-8")
+        assert 'EXPECTED_VERSION="0.10.0-rc70"' in (ROOT / relative).read_text(encoding="utf-8")
     release = (ROOT / "RELEASE-NOTES-RC45.md").read_text(encoding="utf-8")
     assert "Графит" in release
     assert "Светлая" in release

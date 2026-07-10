@@ -1,18 +1,78 @@
 {% extends "base.html" %}
 {% block title %}Изменить пользователя — SG-Panel{% endblock %}
-{% block section %}USERS / EDIT{% endblock %}
+{% block section %}CLIENTS / EDIT{% endblock %}
 {% block heading %}Пользователь {{ user.name }}{% endblock %}
-{% block subtitle %}Имя, UUID, комментарий и срок действия{% endblock %}
+{% block subtitle %}Имя, UUID, комментарий, срок действия и развёртывания в Cluster{% endblock %}
 {% block content %}
-<section class="panel-card narrow-card edit-card">
-  <div class="panel-heading"><div><p class="panel-kicker">IDENTITY #{{ user.id }}</p><h2>{{ user.name }}</h2></div><span class="pill {{ 'enabled' if user.enabled else 'disabled' }}"><i></i>{{ 'enabled' if user.enabled else 'disabled' }}</span></div>
-  <form method="post" action="{{ url_for('user_edit', user_id=user.id) }}" class="stack modern-form" data-validated-form>
-    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-    <div class="form-grid"><label><span>Имя пользователя</span><input name="name" maxlength="80" value="{{ user.name }}" required></label><label><span>Срок действия, UTC</span><input name="expiry_at" type="datetime-local" value="{{ expiry_for_form(user.expiry_at) }}"></label></div>
-    <label><span>UUID</span><input name="uuid" value="{{ user.uuid }}" required></label>
-    <label><span>Комментарий</span><textarea name="comment" rows="4" maxlength="500">{{ user.comment }}</textarea></label>
-    <div class="actions"><button class="button primary" type="submit">Сохранить изменения</button><a class="button secondary" href="{{ url_for('users_page') }}">Отмена</a></div>
-  </form>
-  <div class="danger-zone"><div><p class="panel-kicker">ROTATE IDENTITY</p><h3>Сменить UUID</h3><p>После подтверждения новая конфигурация будет применена сразу, и старая прямая ссылка перестанет работать.</p></div><form method="post" action="{{ url_for('user_regenerate_uuid', user_id=user.id) }}" onsubmit="return confirm('Создать новый UUID для {{ user.name }}?')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button danger" type="submit">Создать новый UUID</button></form></div>
-</section>
+<div class="ui-page user-edit-cluster-page">
+  <section class="panel-card narrow-card edit-card">
+    <div class="panel-heading"><div><p class="panel-kicker">IDENTITY #{{ user.id }}</p><h2>{{ user.name }}</h2></div><span class="pill {{ 'enabled' if user.enabled else 'disabled' }}"><i></i>{{ 'Включён' if user.enabled else 'Отключён' }}</span></div>
+    <form method="post" action="{{ url_for('user_edit', user_id=user.id) }}" class="stack modern-form" data-validated-form>
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="form-grid"><label><span>Имя пользователя</span><input name="name" maxlength="80" value="{{ user.name }}" required></label><label><span>Срок действия, UTC</span><input name="expiry_at" type="datetime-local" value="{{ expiry_for_form(user.expiry_at) }}"></label></div>
+      <label><span>UUID</span><input name="uuid" value="{{ user.uuid }}" required></label>
+      <label><span>Комментарий</span><textarea name="comment" rows="4" maxlength="500">{{ user.comment }}</textarea></label>
+      <div class="actions"><button class="button primary" type="submit">Сохранить изменения</button><a class="button secondary" href="{{ url_for('users_page') }}">Назад</a></div>
+    </form>
+    <div class="simple-delete-form">
+      <button class="button danger" type="button" data-edit-user-delete-open {% if deletion_request and deletion_request.status in ['running','pending'] %}disabled{% endif %}>Удалить пользователя</button>
+      <section class="inline-confirm edit-user-delete-confirm" data-edit-user-delete-confirm hidden>
+        <div><strong>Удалить пользователя «{{ user.name }}» со всех серверов?</strong><span>Ссылки этого пользователя перестанут работать.</span></div>
+        <form method="post" action="{{ url_for('users_delete', user_id=user.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button class="button ghost" type="button" data-edit-user-delete-cancel>Отмена</button>
+          <button class="button danger" type="submit">Удалить</button>
+        </form>
+      </section>
+    </div>
+  </section>
+
+  <section class="ui-card user-cluster-deployments">
+    <header class="ui-card-heading"><div><p class="panel-kicker">CLUSTER</p><h2>Где работает пользователь</h2><p>Центральный сервер управляется напрямую. Удалённые ноды очищаются отдельными проверяемыми заданиями.</p></div></header>
+    <div class="user-deployment-list">
+      <div class="user-deployment-row is-local"><div><strong>Центральный сервер</strong><span>Локальная SG-Panel</span></div><b>{{ 'Активен' if user.enabled else 'Отключён' }}</b></div>
+      {% for deployment in node_deployments %}
+      <div class="user-deployment-row state-{{ deployment.state }}">
+        <div><strong>{{ deployment.node_name }}</strong><span>{{ deployment.profile or 'Профиль не указан' }}{% if deployment.public_host %} · {{ deployment.public_host }}{% if deployment.public_port %}:{{ deployment.public_port }}{% endif %}{% endif %}</span></div>
+        <b>{{ {'pending':'Ожидает применения','active':'Активен','removing':'Удаляется','removed':'Удалён','error':'Ошибка'}.get(deployment.state, deployment.state) }}</b>
+      </div>
+      {% else %}
+      <div class="user-deployment-empty">На удалённых нодах пользователь пока не развёрнут.</div>
+      {% endfor %}
+    </div>
+  </section>
+
+  {% if deletion_request and deletion_request.status in ['running','pending','failed'] %}
+  <section class="ui-card user-deletion-progress state-{{ deletion_request.status }}">
+    <header class="ui-card-heading"><div><p class="panel-kicker">УДАЛЕНИЕ</p><h2>{{ {'running':'Очистка нод выполняется','pending':'Ноды очищены, завершается удаление','failed':'Удаление остановлено ошибкой'}.get(deletion_request.status, 'Удаление') }}</h2></div></header>
+    {% if deletion_request.error %}<p>{{ deletion_request.error }}</p>{% endif %}
+    {% if deletion_request.targets %}<div class="user-deletion-targets">{% for target in deletion_request.targets %}<div><span>{{ target.node_name }}</span><strong>{{ {'queued':'Ожидает ноду','running':'Выполняется','succeeded':'Очищена','failed':'Ошибка'}.get(target.status, target.status) }}</strong></div>{% endfor %}</div>{% endif %}
+  </section>
+  {% endif %}
+
+  <section class="ui-card user-identity-rotation">
+    <header class="ui-card-heading"><div><p class="panel-kicker">IDENTITY</p><h2>Сменить UUID</h2><p>Старая прямая ссылка перестанет работать. Развёртывания на удалённых нодах автоматически не меняются.</p></div></header>
+    <form method="post" action="{{ url_for('user_regenerate_uuid', user_id=user.id) }}" onsubmit="return confirm('Создать новый UUID для {{ user.name }}?')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button danger" type="submit">Создать новый UUID</button></form>
+  </section>
+
+</div>
+<script>
+(() => {
+  const open = document.querySelector('[data-edit-user-delete-open]');
+  const panel = document.querySelector('[data-edit-user-delete-confirm]');
+  const cancel = document.querySelector('[data-edit-user-delete-cancel]');
+  open?.addEventListener('click', () => {
+    if (!panel) return;
+    panel.hidden = false;
+    open.setAttribute('aria-expanded', 'true');
+    panel.scrollIntoView({behavior:'smooth', block:'nearest'});
+  });
+  cancel?.addEventListener('click', () => {
+    if (!panel) return;
+    panel.hidden = true;
+    open?.setAttribute('aria-expanded', 'false');
+    open?.focus();
+  });
+})();
+</script>
 {% endblock %}

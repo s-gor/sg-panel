@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import io
+import ipaddress
 import json
 import os
 import re
@@ -16,10 +17,12 @@ import uuid as uuidlib
 from datetime import datetime, timedelta, timezone
 from functools import wraps
 from pathlib import Path
+from urllib.parse import quote, urlencode
 
 from flask import (
     Flask,
     Response,
+    jsonify,
     abort,
     flash,
     g,
@@ -47,6 +50,32 @@ from .xray_update_manager import (
     start_xray_update,
     xray_update_in_progress,
 )
+from .node_manager import (
+    ROLE_LABELS as NODE_ROLE_LABELS,
+    create_enrollment_token,
+    create_node,
+    create_node_job,
+    delete_node,
+    find_node,
+    heartbeat_node,
+    has_active_enrollment,
+    list_node_events,
+    list_node_jobs,
+    list_node_deployments,
+    list_user_deployments,
+    latest_node_config,
+    create_user_deletion_request,
+    user_deletion_request,
+    finish_user_deletion_request,
+    list_nodes,
+    claim_node_job,
+    complete_node_job,
+    network_summary,
+    register_node,
+    restore_node,
+    revoke_node,
+    update_node,
+)
 from .security import (
     create_admin_session,
     get_security_settings,
@@ -61,6 +90,7 @@ from .security import (
     revoke_all_admin_sessions,
     security_overview,
     update_security_settings,
+    update_panel_exposure_settings,
     validate_admin_session,
     write_audit,
 )
@@ -75,10 +105,12 @@ from .service import (
     add_vless_outbound_json,
     add_user,
     apply_config,
+    apply_geofiles_source,
     config_json_document,
     dns_json_document,
     inbound_json_document,
     backup_file,
+    calculate_certificate_pin,
     create_backup,
     create_warp,
     configure_warp_routing,
@@ -98,19 +130,33 @@ from .service import (
     find_subscription_user,
     format_bytes,
     generate_reality_keys,
+    generate_ech_pair,
     get_diagnostics,
     get_geodata_status,
+    get_geofiles_overview,
     get_dns_settings,
     get_routing_settings,
     get_server,
     get_inbound_recommendations,
     get_hysteria_studio_overview,
     get_hysteria_diagnostics,
+    get_transport_expert_overview,
     get_status,
     get_subscription_settings,
     get_user_stats,
     get_user_traffic_history,
     get_warp_overview,
+    get_cascade_overview,
+    get_instance_name,
+    get_instance_address,
+    get_instance_identity,
+    update_instance_name,
+    ensure_cascade_service_access,
+    remove_cascade,
+    import_cascade_link,
+    select_cascade_outbound,
+    set_cascade_enabled,
+    test_cascade,
     list_backups,
     list_dns_hosts,
     list_dns_servers,
@@ -122,10 +168,14 @@ from .service import (
     list_hysteria_inbounds,
     list_xhttp_inbounds,
     list_reality_inbounds,
+    load_client_ca_pem,
     make_link,
+    managed_client_export,
+    managed_client_export_v2,
     make_links,
     make_saved_links,
     outbound_json_document,
+    parse_vless_share_link,
     make_subscription_url,
     preview_dns_json,
     warp_json_document,
@@ -159,6 +209,7 @@ from .service import (
     update_warp_json_document,
     update_routing_settings,
     update_server_settings,
+    update_transport_expert_settings,
     update_user,
     update_users_json_document,
     update_subscription_settings,
@@ -167,6 +218,7 @@ from .service import (
     users_json_document,
     subscription_is_available,
     validate_generated_config,
+    validate_geofiles_source,
     test_dns_resolution,
     test_outbound_tcp,
     test_warp,
@@ -185,6 +237,115 @@ PANEL_ACCESS_JOB_DIR = Path(os.environ.get(
 PANEL_ACCESS_SCRIPT = Path(os.environ.get(
     "XPANEL_ACCESS_SCRIPT", "/opt/xpanel-mvp/deploy/configure-panel-access.sh"
 ))
+NODE_FULL_INSTALLER = Path(__file__).resolve().parent.parent / "deploy" / "install-sg-node.sh"
+NODE_CONNECT_INSTALLER = Path(__file__).resolve().parent.parent / "deploy" / "connect-node.sh"
+NODE_AGENT_INSTALLER = Path(__file__).resolve().parent.parent / "deploy" / "install-node-agent.sh"
+NODE_RUNTIME_INSTALLER = Path(__file__).resolve().parent.parent / "deploy" / "install-node-runtime.sh"
+NODE_AGENT_SOURCE = Path(__file__).resolve().parent.parent / "node_agent" / "sg_node_agent.py"
+NODE_WORKER_SOURCE = Path(__file__).resolve().parent.parent / "node_agent" / "sg_node_worker.py"
+NODE_AGENT_UNINSTALLER = Path(__file__).resolve().parent.parent / "deploy" / "uninstall-node-agent.sh"
+
+CLOUDFLARE_HTTPS_PORTS = {443, 2053, 2083, 2087, 2096, 8443}
+PANEL_CLOUDFLARE_PORTS = CLOUDFLARE_HTTPS_PORTS - {443}
+
+
+
+def _friendly_geodata_error(detail: str) -> str:
+    lowered = detail.lower()
+    if not any(marker in lowered for marker in ("not found", "failed to load", "code not found")):
+        return detail
+    for kind, label in (("geosite", "Geosite"), ("geoip", "GeoIP")):
+        if kind not in lowered:
+            continue
+        category = "указанная категория"
+        patterns = (
+            rf"(?i)code not found in {kind}\.dat[: ]+([a-z0-9._@-]+)",
+            rf"(?i){kind}(?:\.dat)?[^\n]*?list not found:\s*([a-z0-9._@-]+)",
+            rf"(?i)failed to load {kind}:\s*([a-z0-9._@-]+)",
+        )
+        for pattern in patterns:
+            match = re.search(pattern, detail)
+            if match:
+                category = match.group(1)
+                break
+        return (
+            f"Категория {label} «{category}» отсутствует в текущем {kind}.dat. "
+            "Выберите совместимый источник в Routing → GeoFiles или измените условие."
+        )
+    return detail
+
+def _service_is_active(name: str) -> bool:
+    try:
+        result = subprocess.run(
+            ["systemctl", "is-active", name],
+            capture_output=True,
+            text=True,
+            timeout=2,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    return result.returncode == 0 and result.stdout.strip() == "active"
+
+
+def _panel_exposure_state(settings: sqlite3.Row, panel_access: dict[str, object]) -> dict[str, object]:
+    mode = str(settings["panel_exposure_mode"] or "direct")
+    hostname = str(settings["cloudflare_hostname"] or "")
+    port = int(panel_access.get("port") or 0)
+    https_ready = panel_access.get("mode") == "https"
+    port_supported = port in CLOUDFLARE_HTTPS_PORTS
+    edge_observed = bool(
+        request.headers.get("CF-Ray") and request.headers.get("CF-Connecting-IP")
+    )
+    tunnel_active = _service_is_active("cloudflared")
+    origin_lockdown = bool(settings["cloudflare_origin_lockdown"])
+    access_enabled = bool(settings["cloudflare_access_enabled"])
+
+    labels = {
+        "direct": "Direct through Nginx",
+        "cloudflare_proxy": "Cloudflare Proxy",
+        "cloudflare_tunnel": "Cloudflare Tunnel + Access",
+    }
+    if mode == "cloudflare_proxy":
+        ready = https_ready and port_supported and origin_lockdown and edge_observed
+        configured = https_ready and port_supported and bool(hostname)
+        status = "ready" if ready else ("configured" if configured else "attention")
+        message = (
+            "Cloudflare edge обнаружен, origin lockdown подтверждён."
+            if ready else
+            "Origin подготовлен; проверьте proxied DNS, Security Group/firewall и реальный запрос через Cloudflare."
+            if configured else
+            "Для Proxy нужен HTTPS hostname и поддерживаемый Cloudflare HTTPS-порт."
+        )
+    elif mode == "cloudflare_tunnel":
+        ready = tunnel_active and access_enabled and bool(hostname)
+        status = "ready" if ready else ("configured" if hostname else "attention")
+        message = (
+            "cloudflared работает, Cloudflare Access отмечен как включённый."
+            if ready else
+            "Укажите hostname, установите cloudflared и защитите приложение политикой Cloudflare Access."
+        )
+    else:
+        status = "ready"
+        message = "Браузер подключается напрямую к Nginx на сервере."
+
+    return {
+        "mode": mode,
+        "label": labels.get(mode, labels["direct"]),
+        "status": status,
+        "message": message,
+        "hostname": hostname,
+        "origin_lockdown": origin_lockdown,
+        "access_enabled": access_enabled,
+        "tunnel_name": str(settings["cloudflare_tunnel_name"] or ""),
+        "https_ready": https_ready,
+        "port": port,
+        "port_supported": port_supported,
+        "supported_ports": ", ".join(str(item) for item in sorted(CLOUDFLARE_HTTPS_PORTS)),
+        "edge_observed": edge_observed,
+        "cloudflared_active": tunnel_active,
+        "client_ip_header": "CF-Connecting-IP" if mode != "direct" else "X-Forwarded-For / remote_addr",
+    }
 
 
 def _read_key_value_file(path: Path) -> dict[str, str]:
@@ -266,9 +427,12 @@ def _validate_panel_access_values(mode: str, host: str, port_text: str) -> tuple
         port = int(port_text)
     except (TypeError, ValueError) as exc:
         raise ValueError("Порт панели должен быть числом") from exc
-    if not 49152 <= port <= 65535:
-        raise ValueError("Публичный порт панели должен быть от 49152 до 65535")
-    if port in {22, 80, 443, 8080, 8443}:
+    if not (49152 <= port <= 65535 or port in PANEL_CLOUDFLARE_PORTS):
+        raise ValueError(
+            "Порт панели должен быть 49152–65535 либо одним из HTTPS-портов Cloudflare: "
+            + ", ".join(str(item) for item in sorted(PANEL_CLOUDFLARE_PORTS))
+        )
+    if port in {22, 80, 443, 8080}:
         raise ValueError(f"Порт {port} зарезервирован для другого назначения")
     return mode, host, port
 
@@ -432,6 +596,14 @@ def create_app(test_config: dict | None = None) -> Flask:
             system_ok = state.returncode == 0 and state.stdout.strip() == "active"
         except Exception:
             system_ok = False
+        try:
+            panel_instance_name = get_instance_name()
+            panel_instance_address = get_instance_address()
+            panel_instance_identity = get_instance_identity()
+        except Exception:
+            panel_instance_name = "SG-Panel"
+            panel_instance_address = ""
+            panel_instance_identity = panel_instance_name
         return {
             "xpanel_version": __version__,
             "format_bytes": format_bytes,
@@ -439,6 +611,9 @@ def create_app(test_config: dict | None = None) -> Flask:
             "expiry_for_form": _expiry_for_form,
             "panel_access_global": _panel_access_state(fallback_host),
             "global_system_ok": system_ok,
+            "instance_name": panel_instance_name,
+            "instance_address": panel_instance_address,
+            "instance_identity": panel_instance_identity,
         }
 
     def client_ip() -> str:
@@ -447,6 +622,21 @@ def create_app(test_config: dict | None = None) -> Flask:
             settings = get_security_settings()
         except Exception:
             return remote
+        exposure_mode = str(settings["panel_exposure_mode"] or "direct")
+        cf_connecting_ip = request.headers.get("CF-Connecting-IP", "").strip()
+        trust_cloudflare = (
+            exposure_mode == "cloudflare_proxy" and bool(settings["cloudflare_origin_lockdown"])
+        ) or (
+            exposure_mode == "cloudflare_tunnel" and bool(settings["cloudflare_access_enabled"])
+        )
+        if (
+            trust_cloudflare
+            and remote in {"127.0.0.1", "::1"}
+            and cf_connecting_ip
+            and request.headers.get("CF-Ray", "").strip()
+        ):
+            return cf_connecting_ip
+
         forwarded = request.headers.get("X-Forwarded-For", "")
         if (
             (settings["trust_proxy_headers"] or app.config["TRUST_PROXY_HEADERS_ENV"])
@@ -539,8 +729,17 @@ def create_app(test_config: dict | None = None) -> Flask:
             "dns_hosts": "SELECT * FROM dns_hosts ORDER BY id",
             "outbounds": "SELECT * FROM outbounds ORDER BY id",
             "warp_settings": (
-                "SELECT id,enabled,outbound_json,route_mode,selected_domains "
+                "SELECT id,enabled,outbound_json,route_mode,selected_domains,selected_ips "
                 "FROM warp_settings ORDER BY id"
+            ),
+            "transport_expert_settings": (
+                "SELECT * FROM transport_expert_settings ORDER BY id"
+            ),
+            "geofiles_settings": (
+                "SELECT id,source,geoip_url,geosite_url,geoip_local_path,"
+                "geosite_local_path,active_source,active_geoip_sha256,"
+                "active_geosite_sha256,last_check_state,last_checked_at,"
+                "last_applied_at FROM geofiles_settings ORDER BY id"
             ),
         }
         snapshot: dict[str, object] = {}
@@ -572,7 +771,7 @@ def create_app(test_config: dict | None = None) -> Flask:
                 validation = validate_generated_config()
                 if not validation["ok"]:
                     detail = str(validation.get("detail") or "неизвестная ошибка")
-                    raise XPanelError("xray run -test завершился с ошибкой:\n" + detail)
+                    raise XPanelError("xray run -test завершился с ошибкой:\n" + _friendly_geodata_error(detail))
                 return {
                     "result": result,
                     "detail": str(validation.get("detail") or "xray run -test: OK"),
@@ -678,7 +877,18 @@ def create_app(test_config: dict | None = None) -> Flask:
     def protect_requests():
         g.client_ip = client_ip()
         endpoint = request.endpoint or ""
-        if endpoint in {"static", "health"}:
+        public_node_endpoints = {
+            "health",
+            "node_agent_installer",
+            "node_agent_source",
+            "node_worker_source",
+            "node_agent_uninstaller",
+            "node_api_register",
+            "node_api_heartbeat",
+            "node_api_job_next",
+            "node_api_job_complete",
+        }
+        if endpoint == "static" or endpoint in public_node_endpoints:
             return None
         settings = get_security_settings()
 
@@ -828,6 +1038,19 @@ def create_app(test_config: dict | None = None) -> Flask:
         session.clear()
         return redirect(url_for("login"))
 
+    @app.post("/system/instance-name")
+    @login_required
+    def system_instance_name():
+        try:
+            value = request.form.get("instance_name", "")
+            _preflight_change(lambda: update_instance_name(value))
+            update_instance_name(value)
+            apply_saved_change("Имя сервера обновлено")
+            flash("Имя сервера сохранено и показывается во всей панели.", "success")
+        except (ValueError, XPanelError, FileNotFoundError, OSError, PermissionError) as exc:
+            flash(str(exc), "error")
+        return redirect(request.form.get("next") or url_for("diagnostics_page", tab="status"))
+
     @app.get("/")
     @login_required
     def dashboard():
@@ -956,12 +1179,24 @@ def create_app(test_config: dict | None = None) -> Flask:
             if selected is not None
             else []
         )
+        selected_deployments = (
+            list_user_deployments(int(selected["id"]))
+            if selected is not None
+            else []
+        )
+        selected_deletion_request = (
+            user_deletion_request(int(selected["id"]))
+            if selected is not None
+            else None
+        )
         return render_template(
             "users.html",
             users=rows,
             all_users=enriched,
             selected_user=selected,
             selected_history=selected_history,
+            selected_deployments=selected_deployments,
+            selected_deletion_request=selected_deletion_request,
             client_stats=summary,
             query=request.args.get("q", "").strip(),
             status_filter=status_filter,
@@ -971,6 +1206,7 @@ def create_app(test_config: dict | None = None) -> Flask:
                 str(server["inbound_profile"]), str(server["inbound_profile"])
             ),
             stats_errors=errors,
+            open_create=request.args.get("create", "").strip() == "1",
         )
 
     @app.get("/users/json")
@@ -1067,7 +1303,13 @@ def create_app(test_config: dict | None = None) -> Flask:
     @app.get("/users/<int:user_id>/edit")
     @login_required
     def user_edit_page(user_id: int):
-        return render_template("user_edit.html", user=find_user(user_id))
+        user = find_user(user_id)
+        return render_template(
+            "user_edit.html",
+            user=user,
+            node_deployments=list_user_deployments(user_id),
+            deletion_request=user_deletion_request(user_id),
+        )
 
     @app.post("/users/<int:user_id>/edit")
     @login_required
@@ -1126,12 +1368,96 @@ def create_app(test_config: dict | None = None) -> Flask:
     @login_required
     def users_delete(user_id: int):
         try:
+            user = find_user(user_id)
+            deployments = [
+                item for item in list_user_deployments(user_id)
+                if str(item.get("state") or "") in {"pending", "active", "error", "removing"}
+            ]
+            offline = [
+                str(item.get("node_name") or "") for item in deployments
+                if str(item.get("node_effective_state") or "") != "online"
+            ]
+            if offline:
+                raise ValueError(
+                    "Сначала верните в сеть ноды: " + ", ".join(offline)
+                )
+
+            # Verify the future local config before any remote operation starts.
             _preflight_change(lambda: delete_user(user_id))
-            user = delete_user(user_id)
-            apply_saved_change(f"Пользователь {user['name']} удалён")
-        except XPanelError as exc:
+
+            job_specs: list[tuple[dict[str, object], dict[str, object], int]] = []
+            for deployment in deployments:
+                node_id = int(deployment["node_id"])
+                current_config = latest_node_config(node_id)
+                if not isinstance(current_config, dict):
+                    raise ValueError(
+                        f"Для {deployment['node_name']} не найдена последняя применённая конфигурация"
+                    )
+                config, removed = _config_without_user(current_config, str(user["uuid"]))
+                if removed <= 0:
+                    raise ValueError(
+                        f"На {deployment['node_name']} UUID пользователя не найден в последней конфигурации"
+                    )
+                count = 0
+                for inbound in config.get("inbounds", []):
+                    if not isinstance(inbound, dict):
+                        continue
+                    settings = inbound.get("settings")
+                    if not isinstance(settings, dict):
+                        continue
+                    values = settings.get("clients") if isinstance(settings.get("clients"), list) else settings.get("users")
+                    if isinstance(values, list):
+                        count += len(values)
+                job_specs.append((deployment, config, count))
+
+            if not job_specs:
+                deleted = delete_user(user_id)
+                apply_saved_change(f"Пользователь {deleted['name']} удалён")
+                return redirect(url_for("users_page"))
+
+            if bool(user["enabled"]):
+                set_user_enabled(user_id, False)
+                apply_saved_change(
+                    f"Пользователь {user['name']} отключён на центральном сервере перед удалением"
+                )
+
+            jobs: list[dict[str, object]] = []
+            for deployment, config, count in job_specs:
+                encoded = json.dumps(config, ensure_ascii=False, sort_keys=True).encode("utf-8")
+                jobs.append(
+                    create_node_job(
+                        int(deployment["node_id"]),
+                        job_type="apply_xray_config",
+                        title=f"Удаление {user['name']} из конфигурации",
+                        payload={
+                            "profile": str(deployment.get("profile") or ""),
+                            "config": config,
+                            "config_sha256": hashlib.sha256(encoded).hexdigest(),
+                            "client_count": count,
+                            "deployment": {
+                                "action": "remove",
+                                "user_id": int(user["id"]),
+                                "user_uuid": str(user["uuid"]),
+                                "user_name": str(user["name"]),
+                                "profile": str(deployment.get("profile") or ""),
+                            },
+                        },
+                    )
+                )
+            deletion = create_user_deletion_request(
+                user_id,
+                user_name=str(user["name"]),
+                user_uuid=str(user["uuid"]),
+                jobs=jobs,
+            )
+            flash(
+                f"Удаление запущено на {len(jobs)} нодах. Пользователь будет удалён из базы после успешной проверки всех серверов.",
+                "success",
+            )
+            return redirect(url_for("user_edit_page", user_id=user_id))
+        except (ValueError, XPanelError, sqlite3.Error) as exc:
             flash(str(exc), "error")
-        return redirect(url_for("users_page"))
+            return redirect(url_for("user_edit_page", user_id=user_id))
 
     @app.get("/users/<int:user_id>/link")
     @login_required
@@ -1155,6 +1481,7 @@ def create_app(test_config: dict | None = None) -> Flask:
         subscription_url = make_subscription_url(
             user_id, request.url_root.rstrip("/")
         )
+        managed_subscription_url = subscription_url + "?format=json"
         subscription_image = qrcode.make(subscription_url)
         subscription_buffer = io.BytesIO()
         subscription_image.save(subscription_buffer, format="PNG")
@@ -1170,8 +1497,10 @@ def create_app(test_config: dict | None = None) -> Flask:
             link=link,
             qr_data=qr_data,
             subscription_url=subscription_url,
+            managed_subscription_url=managed_subscription_url,
             subscription_qr_data=subscription_qr_data,
             subscription_settings=get_subscription_settings(),
+            subscription_json_enabled=bool(get_security_settings()["subscription_json_enabled"]),
             server=get_server(),
         )
 
@@ -1273,6 +1602,9 @@ def create_app(test_config: dict | None = None) -> Flask:
                 "user": user["name"],
                 "link": link,
                 "links": links,
+                "managed": managed_client_export(user["id"]),
+                "managedV2": managed_client_export_v2(user["id"]),
+                "managedPreferred": "managedV2",
                 "generated_at": datetime.now(timezone.utc).isoformat(),
             }
             response = Response(
@@ -1286,6 +1618,8 @@ def create_app(test_config: dict | None = None) -> Flask:
         response.headers["Cache-Control"] = "no-store, max-age=0"
         response.headers["Pragma"] = "no-cache"
         response.headers["X-Content-Type-Options"] = "nosniff"
+        if output_format == "json":
+            response.headers["X-SG-Managed-Profile"] = "v2"
         return response
 
     @app.post("/stats/reset")
@@ -1308,6 +1642,156 @@ def create_app(test_config: dict | None = None) -> Flask:
         except (XPanelError, FileNotFoundError) as exc:
             flash(str(exc), "error")
         return redirect(url_for("users_page", client=user_id))
+
+    @app.get("/settings/advanced")
+    @login_required
+    def settings_advanced_page():
+        return render_template(
+            "advanced.html",
+            expert=get_transport_expert_overview(),
+            server=get_server(),
+        )
+
+    @app.get("/settings/expert")
+    @login_required
+    def settings_expert_page():
+        """Compatibility redirect from RC50/RC51 bookmarks."""
+        return redirect(url_for("settings_advanced_page"), code=302)
+
+    def expert_form_values() -> dict[str, object]:
+        current = get_transport_expert_overview()["settings"]
+        finalmask_present = request.form.get("finalmask_present") == "1"
+        tls_present = request.form.get("tls_present") == "1"
+        ech_present = request.form.get("ech_present") == "1"
+        return {
+            "xhttp_mode": request.form.get("xhttp_mode", str(get_server()["xhttp_mode"] or "auto")),
+            "xhttp_extra_server_json": request.form.get("xhttp_extra_server_json", current["xhttp_extra_server_json"]),
+            "xhttp_extra_client_json": request.form.get("xhttp_extra_client_json", current["xhttp_extra_client_json"]),
+            "finalmask_enabled": (
+                request.form.get("finalmask_enabled") == "1"
+                if finalmask_present else bool(current["finalmask_enabled"])
+            ),
+            "finalmask_server_json": request.form.get("finalmask_server_json", current["finalmask_server_json"]),
+            "finalmask_client_json": request.form.get("finalmask_client_json", current["finalmask_client_json"]),
+            "ech_mode": request.form.get("ech_mode", current["ech_mode"]) if ech_present else current["ech_mode"],
+            "ech_public_name": request.form.get("ech_public_name", current["ech_public_name"]) if ech_present else current["ech_public_name"],
+            "ech_server_keys": request.form.get("ech_server_keys", current["ech_server_keys"]) if ech_present else current["ech_server_keys"],
+            "ech_config_list": request.form.get("ech_config_list", current["ech_config_list"]) if ech_present else current["ech_config_list"],
+            "certificate_pinning_enabled": (
+                request.form.get("certificate_pinning_enabled") == "1"
+                if tls_present else bool(current["certificate_pinning_enabled"])
+            ),
+            "certificate_pinning_sha256": request.form.get("certificate_pinning_sha256", current["certificate_pinning_sha256"]) if tls_present else current["certificate_pinning_sha256"],
+            "certificate_pinning_source": request.form.get("certificate_pinning_source", current["certificate_pinning_source"]) if tls_present else current["certificate_pinning_source"],
+            "tls_verify_name_mode": request.form.get("tls_verify_name_mode", current["tls_verify_name_mode"]) if tls_present else current["tls_verify_name_mode"],
+            "tls_verify_name": request.form.get("tls_verify_name", current["tls_verify_name"]) if tls_present else current["tls_verify_name"],
+            "client_ca_pem": request.form.get("client_ca_pem", current["client_ca_pem"]) if tls_present else current["client_ca_pem"],
+            "client_ca_source": request.form.get("client_ca_source", current["client_ca_source"]) if tls_present else current["client_ca_source"],
+        }
+
+    @app.post("/settings/expert")
+    @app.post("/settings/advanced")
+    @login_required
+    def settings_advanced_save():
+        scope = "settings:advanced"
+        try:
+            values = expert_form_values()
+            if _is_validation_action():
+                return _validation_response(
+                    scope,
+                    lambda: update_transport_expert_settings(**values),
+                    message="Дополнительные параметры транспорта и итоговый config.json корректны.",
+                )
+            _require_validation_token(scope, _draft_payload())
+            update_transport_expert_settings(**values)
+            apply_saved_change("Дополнительные параметры транспорта сохранены и применены")
+        except (ValueError, XPanelError, OSError) as exc:
+            flash(str(exc), "error")
+        return redirect(url_for("settings_advanced_page"))
+
+    @app.post("/settings/expert/generate-ech")
+    @app.post("/settings/advanced/generate-ech")
+    @login_required
+    def settings_advanced_generate_ech():
+        try:
+            result = generate_ech_pair(request.form.get("public_name", ""))
+            return jsonify({"ok": True, **result})
+        except (ValueError, XPanelError, OSError) as exc:
+            return jsonify({"ok": False, "message": str(exc)}), 400
+
+    @app.post("/settings/expert/certificate-pin")
+    @app.post("/settings/advanced/certificate-pin")
+    @login_required
+    def settings_advanced_certificate_pin():
+        try:
+            result = calculate_certificate_pin(request.form.get("cert_path", ""))
+            return jsonify({"ok": True, **result})
+        except (ValueError, XPanelError, OSError) as exc:
+            return jsonify({"ok": False, "message": str(exc)}), 400
+
+
+    @app.post("/settings/expert/import-ca")
+    @app.post("/settings/advanced/import-ca")
+    @login_required
+    def settings_advanced_import_ca():
+        try:
+            result = load_client_ca_pem(request.form.get("ca_path", ""))
+            return jsonify({"ok": True, **result})
+        except (ValueError, XPanelError, OSError) as exc:
+            return jsonify({"ok": False, "message": str(exc)}), 400
+
+    def geofiles_form_values() -> dict[str, object]:
+        return {
+            "source": request.form.get("source", "xray"),
+            "geoip_url": request.form.get("geoip_url", ""),
+            "geosite_url": request.form.get("geosite_url", ""),
+            "geoip_local_path": request.form.get("geoip_local_path", ""),
+            "geosite_local_path": request.form.get("geosite_local_path", ""),
+        }
+
+    @app.get("/routing/geofiles")
+    @login_required
+    def geofiles_page():
+        return render_template(
+            "geofiles.html",
+            geofiles=get_geofiles_overview(),
+            format_bytes=format_bytes,
+        )
+
+    @app.post("/settings/geofiles/check")
+    @app.post("/routing/geofiles/check")
+    @login_required
+    def settings_geofiles_check():
+        try:
+            result = validate_geofiles_source(**geofiles_form_values())
+            flash(
+                "GeoFiles проверены: текущие Routing Rules совместимы; применение разблокировано",
+                "success",
+            )
+            write_audit(
+                "geofiles_checked", detail=str(result.get("source", "")),
+                ip_address=getattr(g, "client_ip", ""),
+                user_agent=request.headers.get("User-Agent", ""), success=True,
+            )
+        except (ValueError, XPanelError, OSError, subprocess.TimeoutExpired) as exc:
+            flash(str(exc), "error")
+        return redirect(url_for("geofiles_page"))
+
+    @app.post("/settings/geofiles/apply")
+    @app.post("/routing/geofiles/apply")
+    @login_required
+    def settings_geofiles_apply():
+        try:
+            result = apply_geofiles_source()
+            flash(f"GeoFiles применены: {result['source']}", "success")
+            write_audit(
+                "geofiles_applied", detail=str(result.get("source", "")),
+                ip_address=getattr(g, "client_ip", ""),
+                user_agent=request.headers.get("User-Agent", ""), success=True,
+            )
+        except (ValueError, XPanelError, OSError) as exc:
+            flash(str(exc), "error")
+        return redirect(url_for("geofiles_page"))
 
     @app.get("/settings")
     @login_required
@@ -1469,7 +1953,7 @@ def create_app(test_config: dict | None = None) -> Flask:
             "private_key": request.form.get("private_key", ""),
             "public_key": request.form.get("public_key", ""),
             "short_id": request.form.get("short_id", ""),
-            "fingerprint": request.form.get("fingerprint", "chrome"),
+            "fingerprint": request.form.get("fingerprint", "firefox"),
             "flow": request.form.get("flow", "xtls-rprx-vision"),
             "loglevel": current["loglevel"],
             "api_listen": current["api_listen"],
@@ -1744,9 +2228,11 @@ def create_app(test_config: dict | None = None) -> Flask:
     @login_required
     def security_page():
         env_values = _read_env_values(Path(app.config["ENV_FILE"]))
+        settings = get_security_settings()
+        panel_access = _panel_access_state(request.host.split(":", 1)[0])
         return render_template(
             "security.html",
-            settings=get_security_settings(),
+            settings=settings,
             overview=security_overview(),
             sessions=list_admin_sessions(),
             login_attempts=recent_login_attempts(50),
@@ -1759,9 +2245,41 @@ def create_app(test_config: dict | None = None) -> Flask:
             panel_port=env_values.get("XPANEL_PORT", str(app.config["PANEL_PORT"])),
             secure_cookies=app.config["SESSION_COOKIE_SECURE"],
             request_is_secure=request.is_secure,
-            panel_access=_panel_access_state(request.host.split(":", 1)[0]),
+            panel_access=panel_access,
+            panel_exposure=_panel_exposure_state(settings, panel_access),
             xray_address=str(get_server()["address"]),
         )
+
+    @app.post("/security/exposure")
+    @login_required
+    def security_exposure_save():
+        try:
+            mode = request.form.get("panel_exposure_mode", "direct")
+            update_panel_exposure_settings(
+                mode=mode,
+                cloudflare_hostname=request.form.get("cloudflare_hostname", ""),
+                cloudflare_origin_lockdown="cloudflare_origin_lockdown" in request.form,
+                cloudflare_access_enabled="cloudflare_access_enabled" in request.form,
+                cloudflare_tunnel_name=request.form.get("cloudflare_tunnel_name", ""),
+            )
+            settings = get_security_settings()
+            state = _panel_exposure_state(
+                settings, _panel_access_state(request.host.split(":", 1)[0])
+            )
+            write_audit(
+                "panel_exposure_updated",
+                detail=f"{state['mode']} {state['hostname']}",
+                ip_address=getattr(g, "client_ip", ""),
+                user_agent=request.headers.get("User-Agent", ""),
+                success=True,
+            )
+            if state["status"] == "ready":
+                flash(f"Panel exposure: {state['label']} настроен", "success")
+            else:
+                flash(f"Panel exposure сохранён. {state['message']}", "warning")
+        except (ValueError, OSError) as exc:
+            flash(str(exc), "error")
+        return redirect(url_for("security_page") + "#panel-exposure")
 
     @app.post("/security/panel-access")
     @login_required
@@ -2838,6 +3356,100 @@ def create_app(test_config: dict | None = None) -> Flask:
             flash(str(exc), "error")
         return redirect(url_for("routing_page"))
 
+    @app.get("/cascade")
+    @login_required
+    def cascade_page():
+        return render_template("cascade.html", cascade=get_cascade_overview())
+
+    @app.post("/cascade/access/create")
+    @login_required
+    def cascade_access_create():
+        try:
+            _preflight_change(ensure_cascade_service_access)
+            ensure_cascade_service_access()
+            apply_saved_change("Служебный доступ Cascade создан")
+            flash("Ссылка для выходного сервера готова.", "success")
+        except (ValueError, XPanelError, FileNotFoundError, OSError, PermissionError) as exc:
+            flash(str(exc), "error")
+        return redirect(url_for("cascade_page"))
+
+    @app.post("/cascade/import")
+    @login_required
+    def cascade_import():
+        link = request.form.get("vless_link", "")
+        try:
+            _preflight_change(lambda: import_cascade_link(link))
+            import_cascade_link(link)
+            apply_saved_change("Выходной сервер Cascade подключён")
+            result = test_cascade()
+            flash(f"Выходной сервер проверен. Выходной IP: {result['ip']}", "success")
+        except (ValueError, XPanelError, FileNotFoundError, OSError, PermissionError) as exc:
+            flash(str(exc), "error")
+        return redirect(url_for("cascade_page"))
+
+    @app.post("/cascade/reset")
+    @login_required
+    def cascade_reset():
+        try:
+            _preflight_change(remove_cascade)
+            remove_cascade()
+            apply_saved_change("Cascade удалён; основной выход direct")
+            flash("Cascade удалён с этого сервера.", "success")
+        except (ValueError, XPanelError, FileNotFoundError, OSError, PermissionError) as exc:
+            flash(str(exc), "error")
+        return redirect(url_for("cascade_page"))
+
+    @app.post("/cascade/select")
+    @login_required
+    def cascade_select():
+        try:
+            outbound_id = int(request.form.get("outbound_id", "0"))
+            select_cascade_outbound(outbound_id)
+            flash("Выход выбран. Теперь выполните полную проверку каскада.", "success")
+        except (ValueError, XPanelError) as exc:
+            flash(str(exc), "error")
+        return redirect(url_for("cascade_page"))
+
+    @app.post("/cascade/test")
+    @login_required
+    def cascade_test():
+        try:
+            result = test_cascade()
+            extra = []
+            if result.get("country"):
+                extra.append(str(result["country"]))
+            if result.get("colo"):
+                extra.append(f"colo {result['colo']}")
+            if result.get("warp") in {"on", "plus"}:
+                extra.append(f"WARP {result['warp']}")
+            suffix = f" ({', '.join(extra)})" if extra else ""
+            flash(f"Каскад проверен. Выходной IP: {result['ip']}{suffix}", "success")
+        except (ValueError, XPanelError, FileNotFoundError, OSError, PermissionError) as exc:
+            flash(str(exc), "error")
+        return redirect(url_for("cascade_page"))
+
+    @app.post("/cascade/enable")
+    @login_required
+    def cascade_enable():
+        try:
+            _preflight_change(lambda: set_cascade_enabled(True))
+            set_cascade_enabled(True)
+            apply_saved_change("Каскад включён")
+        except (ValueError, XPanelError, FileNotFoundError, OSError, PermissionError) as exc:
+            flash(str(exc), "error")
+        return redirect(url_for("cascade_page"))
+
+    @app.post("/cascade/disable")
+    @login_required
+    def cascade_disable():
+        try:
+            _preflight_change(lambda: set_cascade_enabled(False))
+            set_cascade_enabled(False)
+            apply_saved_change("Каскад отключён; основной выход возвращён на direct")
+        except (ValueError, XPanelError, FileNotFoundError, OSError, PermissionError) as exc:
+            flash(str(exc), "error")
+        return redirect(url_for("cascade_page"))
+
     @app.get("/outbounds")
     @login_required
     def outbounds_page():
@@ -2956,15 +3568,17 @@ def create_app(test_config: dict | None = None) -> Flask:
     def warp_routing():
         scope = "warp:routing"
         mode = request.form.get("route_mode", "off")
-        selected = request.form.get("selected_domains", "")
+        selected_domains = request.form.get("selected_domains", "")
+        selected_ips = request.form.get("selected_ips", "")
         try:
             if _is_validation_action():
                 return _validation_response(
-                    scope, lambda: configure_warp_routing(mode, selected),
+                    scope,
+                    lambda: configure_warp_routing(mode, selected_domains, selected_ips),
                     message="Маршрут WARP и итоговый config.json проверены.",
                 )
             _require_validation_token(scope, _draft_payload())
-            configure_warp_routing(mode, selected)
+            configure_warp_routing(mode, selected_domains, selected_ips)
             apply_saved_change("Маршрут WARP сохранён")
         except (ValueError, XPanelError) as exc:
             flash(str(exc), "error")
@@ -2994,7 +3608,7 @@ def create_app(test_config: dict | None = None) -> Flask:
             "server_name": request.form.get("server_name", ""),
             "public_key": request.form.get("public_key", ""),
             "short_id": request.form.get("short_id", ""),
-            "fingerprint": request.form.get("fingerprint", "chrome"),
+            "fingerprint": request.form.get("fingerprint", "firefox"),
             "spider_x": request.form.get("spider_x", ""),
             "xhttp_host": request.form.get("xhttp_host", ""),
             "xhttp_path": request.form.get("xhttp_path", "/"),
@@ -3002,6 +3616,15 @@ def create_app(test_config: dict | None = None) -> Flask:
             "allow_insecure": request.form.get("allow_insecure") == "on",
             "alpn": request.form.get("alpn", ""),
         }
+
+    @app.post("/outbounds/import-vless")
+    @login_required
+    def outbound_import_vless():
+        try:
+            values = parse_vless_share_link(request.form.get("vless_link", ""))
+            return jsonify({"ok": True, "outbound": values})
+        except (ValueError, XPanelError) as exc:
+            return jsonify({"ok": False, "message": str(exc)}), 400
 
     @app.get("/outbounds/json/new")
     @login_required
@@ -3141,6 +3764,640 @@ def create_app(test_config: dict | None = None) -> Flask:
         else:
             flash(f"{outbound['tag']}: TCP-порт недоступен: {result['detail']}", "error")
         return redirect(url_for("outbounds_page"))
+
+
+    def _panel_node_base_url() -> str:
+        state = _panel_access_state(request.host.split(":", 1)[0])
+        url = str(state.get("url") or request.url_root.rstrip("/"))
+        return url.rstrip("/")
+
+    def _single_line_script_command(script_url: str, arguments: str, filename: str) -> str:
+        quoted_url = shlex.quote(script_url)
+        quoted_name = shlex.quote(filename)
+        # This remains one copy/paste command. On a minimal clean Ubuntu it
+        # installs curl itself before downloading the signed release script.
+        bootstrap = (
+            "set -Eeuo pipefail; export DEBIAN_FRONTEND=noninteractive; "
+            "if ! command -v curl >/dev/null 2>&1; then "
+            "apt-get update -qq && apt-get install -y -qq ca-certificates curl; fi; "
+            f"tmp=$(mktemp /tmp/{quoted_name}.XXXXXX); "
+            "trap 'rm -f \"$tmp\"' EXIT; "
+            f"curl -fsSL --retry 5 --retry-delay 2 {quoted_url} -o \"$tmp\"; "
+            "bash -n \"$tmp\"; chmod 700 \"$tmp\"; "
+            f"bash \"$tmp\" {arguments}"
+        )
+        return "sudo bash -c " + shlex.quote(bootstrap)
+
+    def _node_prepare_command() -> str:
+        base = _panel_node_base_url()
+        return _single_line_script_command(
+            base + "/node/install-sg-node.sh",
+            "--panel " + shlex.quote(base),
+            "install-sg-node",
+        )
+
+    def _node_install_command(token: str) -> str:
+        base = _panel_node_base_url()
+        arguments = "--panel " + shlex.quote(base) + " --token " + shlex.quote(token)
+        return _single_line_script_command(
+            base + "/node/connect.sh",
+            arguments,
+            "connect-sg-node",
+        )
+
+    def _node_request_public_address() -> str:
+        remote = (request.remote_addr or "").strip()
+        candidates: list[str] = []
+        if remote in {"127.0.0.1", "::1"}:
+            if request.headers.get("CF-Ray", "").strip():
+                candidates.append(request.headers.get("CF-Connecting-IP", "").strip())
+            candidates.append(request.headers.get("X-Real-IP", "").strip())
+            candidates.append(request.headers.get("X-Forwarded-For", "").split(",", 1)[0].strip())
+        candidates.append(remote)
+        for candidate in candidates:
+            if not candidate:
+                continue
+            try:
+                if ipaddress.ip_address(candidate).is_global:
+                    return candidate
+            except ValueError:
+                continue
+        return ""
+
+    def _node_metadata_with_request_address(metadata: object) -> dict[str, object]:
+        cleaned = dict(metadata) if isinstance(metadata, dict) else {}
+        if not str(cleaned.get("public_address") or "").strip():
+            detected = _node_request_public_address()
+            if detected:
+                cleaned["public_address"] = detected
+        return cleaned
+
+    def _node_runtime_command() -> str:
+        # Kept only for compatibility with older installed nodes.
+        base = _panel_node_base_url()
+        installer_url = shlex.quote(base + "/node/runtime.sh")
+        return (
+            f"curl -fsSL {installer_url} -o /tmp/02-install-node-runtime.sh && "
+            f"bash -n /tmp/02-install-node-runtime.sh && chmod 700 /tmp/02-install-node-runtime.sh && "
+            f"sudo bash /tmp/02-install-node-runtime.sh"
+        )
+
+    def _node_update_command() -> str:
+        return _node_prepare_command()
+
+    def _node_uninstall_command() -> str:
+        base = _panel_node_base_url()
+        uninstaller_url = shlex.quote(base + "/node/uninstall.sh")
+        return (
+            f"curl -fsSL {uninstaller_url} -o /tmp/uninstall-sg-node.sh && "
+            f"bash -n /tmp/uninstall-sg-node.sh && chmod 700 /tmp/uninstall-sg-node.sh && "
+            f"sudo bash /tmp/uninstall-sg-node.sh --yes"
+        )
+
+    def _local_node_overlay(nodes: list[dict[str, object]]) -> list[dict[str, object]]:
+        try:
+            status = get_status()
+        except Exception:
+            status = {}
+        for node in nodes:
+            if not node.get("is_local"):
+                continue
+            system = status.get("system") if isinstance(status, dict) else {}
+            if not isinstance(system, dict):
+                system = {}
+            node["effective_state"] = "online" if status.get("overall_ok") else "offline"
+            node["state_label"] = "В сети" if status.get("overall_ok") else "Требуется проверка"
+            node["agent_state"] = "active"
+            node["worker_version"] = "локальный режим"
+            node["worker_state"] = "active"
+            node["xray_version"] = str(system.get("xray_version") or "")
+            node["xray_state"] = str(status.get("service") or "unknown")
+            node["nginx_state"] = "unknown"
+            node["inbound_profile"] = str(status.get("inbound_profile_label") or "")
+            node["client_count"] = int(status.get("enabled_users") or 0)
+            node["cpu_percent"] = system.get("cpu_percent")
+            node["memory_percent"] = system.get("memory_percent")
+            node["disk_percent"] = system.get("disk_percent")
+            node["last_seen_age"] = "Сейчас"
+            node["last_error"] = str(status.get("config_detail") or "") if not status.get("overall_ok") else ""
+        return nodes
+
+    def _node_detail_template_context(
+        node: dict[str, object],
+        *,
+        enrollment: dict[str, object] | None = None,
+        install_command: str = "",
+    ) -> dict[str, object]:
+        defaults = get_server()
+        reality_target = str(defaults["dest"] or "www.microsoft.com:443").strip()
+        reality_sni = reality_target.rsplit(":", 1)[0] if ":" in reality_target else reality_target
+        deployments = list_node_deployments(int(node["id"]))
+        node_connected = bool(not node.get("is_local") and node.get("effective_state") == "online")
+        xray_state = str(node.get("xray_state") or "").strip()
+        node_ready_for_profile = bool(
+            node_connected
+            and (str(node.get("xray_version") or "").strip() or xray_state in {"active", "inactive", "failed"})
+        )
+        first_profile_pending = bool(node_connected and not deployments and not str(node.get("inbound_profile") or "").strip())
+        return {
+            "node": node,
+            "node_connected": node_connected,
+            "node_ready_for_profile": node_ready_for_profile,
+            "first_profile_pending": first_profile_pending,
+            "events": list_node_events(int(node["id"])),
+            "jobs": list_node_jobs(int(node["id"])),
+            "deployments": deployments,
+            "users": [row for row in list_users() if bool(row["enabled"])],
+            "server_defaults": defaults,
+            "reality_default_server_name": reality_sni,
+            "roles": NODE_ROLE_LABELS,
+            "enrollment": enrollment,
+            "install_command": install_command,
+            "panel_url": _panel_node_base_url(),
+            "prepare_command": _node_prepare_command(),
+            "runtime_command": _node_runtime_command(),
+            "update_command": _node_update_command(),
+            "uninstall_command": _node_uninstall_command(),
+        }
+
+    def _config_without_user(config: dict[str, object], user_uuid: str) -> tuple[dict[str, object], int]:
+        candidate = json.loads(json.dumps(config))
+        removed = 0
+        inbounds = candidate.get("inbounds") if isinstance(candidate, dict) else None
+        if not isinstance(inbounds, list):
+            raise ValueError("На ноде не найден список Inbound")
+        for inbound in inbounds:
+            if not isinstance(inbound, dict):
+                continue
+            settings = inbound.get("settings")
+            if not isinstance(settings, dict):
+                continue
+            for key in ("clients", "users"):
+                values = settings.get(key)
+                if not isinstance(values, list):
+                    continue
+                kept = []
+                for value in values:
+                    if not isinstance(value, dict):
+                        kept.append(value)
+                        continue
+                    identity = str(value.get("id") or value.get("uuid") or "")
+                    if identity == user_uuid:
+                        removed += 1
+                    else:
+                        kept.append(value)
+                settings[key] = kept
+        return candidate, removed
+
+    def _finish_ready_user_deletion(request_info: dict[str, object]) -> None:
+        if str(request_info.get("status") or "") != "pending":
+            return
+        user_id = request_info.get("user_id")
+        if user_id in (None, ""):
+            finish_user_deletion_request(int(request_info["id"]), ok=True)
+            return
+        try:
+            user = find_user(int(user_id))
+            # The user was already disabled and removed from the live local Xray
+            # configuration before remote cleanup started. Finalization therefore
+            # only removes the database identity and subscription metadata.
+            delete_user(int(user_id))
+            finish_user_deletion_request(int(request_info["id"]), ok=True)
+            write_audit(
+                "user_deleted_cluster",
+                detail=f"user={user['name']} request={request_info['id']}",
+                ip_address=request.remote_addr or "node-agent",
+                user_agent=request.headers.get("User-Agent", "SG-Node"),
+                success=True,
+            )
+        except Exception as exc:
+            finish_user_deletion_request(int(request_info["id"]), ok=False, error=str(exc))
+
+
+    @app.get("/network/nodes")
+    @login_required
+    def nodes_page():
+        nodes = _local_node_overlay(list_nodes())
+        return render_template(
+            "nodes.html",
+            nodes=nodes,
+            summary=network_summary(nodes),
+            roles=NODE_ROLE_LABELS,
+            panel_url=_panel_node_base_url(),
+            prepare_command=_node_prepare_command(),
+            uninstall_command=_node_uninstall_command(),
+        )
+
+    @app.post("/network/nodes/add")
+    @login_required
+    def node_add():
+        try:
+            node = create_node(
+                request.form.get("name", ""),
+                role=request.form.get("role", "regional"),
+                location=request.form.get("location", ""),
+                description=request.form.get("description", ""),
+                public_address=request.form.get("public_address"),
+            )
+            enrollment = create_enrollment_token(int(node["id"]))
+            return render_template(
+                "node_detail.html",
+                **_node_detail_template_context(
+                    node,
+                    enrollment=enrollment,
+                    install_command=_node_install_command(str(enrollment["token"])),
+                ),
+            )
+        except (ValueError, sqlite3.Error) as exc:
+            flash(str(exc), "error")
+            return redirect(url_for("nodes_page"))
+
+    @app.get("/network/nodes/<int:node_id>")
+    @login_required
+    def node_detail_page(node_id: int):
+        try:
+            node = find_node(node_id)
+        except ValueError:
+            abort(404)
+        if node.get("is_local"):
+            node = next(
+                item for item in _local_node_overlay([node]) if int(item["id"]) == node_id
+            )
+        return render_template(
+            "node_detail.html",
+            **_node_detail_template_context(node),
+        )
+
+    @app.get("/network/nodes/<int:node_id>/live")
+    @login_required
+    def node_live_status(node_id: int):
+        try:
+            node = find_node(node_id)
+        except ValueError:
+            abort(404)
+        if node.get("is_local"):
+            node = next(
+                item for item in _local_node_overlay([node]) if int(item["id"]) == node_id
+            )
+        jobs = list_node_jobs(node_id)
+        return jsonify(
+            {
+                "ok": True,
+                "enrollment_pending": has_active_enrollment(node_id) if not node.get("is_local") else False,
+                "node": {
+                    "effective_state": node.get("effective_state"),
+                    "state_label": node.get("state_label"),
+                    "last_seen_age": node.get("last_seen_age"),
+                    "public_address": node.get("public_address") or ("Не определён автоматически" if node.get("registered_at") else "Будет определён при подключении"),
+                    "platform": (str(node.get("platform") or "") + " " + str(node.get("platform_version") or "")).strip() or "Ещё не получена",
+                    "architecture": node.get("architecture") or "—",
+                    "agent_version": node.get("agent_version") or ("локальный режим" if node.get("is_local") else "не установлен"),
+                    "agent_state": node.get("agent_state") or ("active" if node.get("effective_state") == "online" else "unknown"),
+                    "worker_version": node.get("worker_version") or "не определён",
+                    "worker_state": node.get("worker_state") or "unknown",
+                    "xray_version": node.get("xray_version") or "не определён",
+                    "xray_state": node.get("xray_state") or "unknown",
+                    "nginx_version": node.get("nginx_version") or "не определён",
+                    "nginx_state": node.get("nginx_state") or "unknown",
+                    "inbound_profile": node.get("inbound_profile") or "Первый профиль ещё не развёрнут",
+                    "first_profile_pending": bool(
+                        node.get("effective_state") == "online"
+                        and not str(node.get("inbound_profile") or "").strip()
+                        and not list_node_deployments(node_id)
+                    ),
+                    "client_count": node.get("client_count") if node.get("client_count") is not None else "—",
+                    "cpu_percent": node.get("cpu_percent"),
+                    "memory_percent": node.get("memory_percent"),
+                    "disk_percent": node.get("disk_percent"),
+                    "load1": node.get("load1"),
+                },
+                "jobs_html": render_template("_node_jobs.html", jobs=jobs),
+                "polling": bool(jobs and jobs[0].get("status") in {"queued", "running"}),
+            }
+        )
+
+    @app.post("/network/nodes/<int:node_id>/deploy/reality")
+    @login_required
+    def node_deploy_reality(node_id: int):
+        try:
+            node = find_node(node_id)
+            if node.get("is_local"):
+                raise ValueError("Для локального сервера используйте обычный раздел Xray Server")
+            if node.get("effective_state") != "online":
+                raise ValueError("Нода должна быть в сети")
+            xray_version = str(node.get("xray_version") or "").strip()
+            xray_state = str(node.get("xray_state") or "").strip()
+            if not xray_version and xray_state not in {"active", "inactive", "failed"}:
+                raise ValueError("Сначала установите Xray Runtime на ноде")
+
+            user_id = int(request.form.get("user_id", "0") or 0)
+            user = find_user(user_id)
+            if not bool(user["enabled"]):
+                raise ValueError("Выбранный клиент отключён")
+
+            public_host = request.form.get("public_host", "").strip()
+            if not public_host or len(public_host) > 255:
+                raise ValueError("Укажите публичный IP или домен ноды")
+            if any(value in public_host for value in ("/", "?", "#", " ")):
+                raise ValueError("Публичный адрес должен быть доменом или IP без протокола")
+
+            port = int(request.form.get("port", "64441") or 64441)
+            if not 1 <= port <= 65535:
+                raise ValueError("Порт должен быть от 1 до 65535")
+            if port in {22, 80, 443, 61443}:
+                raise ValueError("Для первой ноды используйте отдельный порт, например 64441")
+
+            defaults = get_server()
+            dest = request.form.get("dest", str(defaults["dest"])).strip()
+            default_sni = str(defaults["dest"] or "www.microsoft.com:443").rsplit(":", 1)[0]
+            server_name = request.form.get("server_name", default_sni).strip()
+            if not dest or not server_name:
+                raise ValueError("Укажите Reality target и Server Name")
+
+            keys = generate_reality_keys(str(defaults["xray_bin"]))
+            short_id = str(keys["short_id"])
+            config = {
+                "log": {"loglevel": "warning"},
+                "inbounds": [
+                    {
+                        "tag": "sg-node-reality-in",
+                        "listen": "0.0.0.0",
+                        "port": port,
+                        "protocol": "vless",
+                        "settings": {
+                            "clients": [
+                                {
+                                    "id": str(user["uuid"]),
+                                    "email": str(user["name"]),
+                                    "flow": "xtls-rprx-vision",
+                                    "level": 0,
+                                }
+                            ],
+                            "decryption": "none",
+                        },
+                        "streamSettings": {
+                            "network": "tcp",
+                            "security": "reality",
+                            "realitySettings": {
+                                "show": False,
+                                "dest": dest,
+                                "xver": 0,
+                                "serverNames": [server_name],
+                                "privateKey": str(keys["private_key"]),
+                                "shortIds": [short_id],
+                            },
+                        },
+                    }
+                ],
+                "outbounds": [
+                    {"tag": "direct", "protocol": "freedom", "settings": {}}
+                ],
+            }
+            encoded = json.dumps(config, ensure_ascii=False, sort_keys=True).encode("utf-8")
+            query = urlencode(
+                {
+                    "encryption": "none",
+                    "flow": "xtls-rprx-vision",
+                    "security": "reality",
+                    "sni": server_name,
+                    "fp": "firefox",
+                    "pbk": str(keys["public_key"]),
+                    "sid": short_id,
+                    "type": "tcp",
+                }
+            )
+            label = quote(f"{user['name']}/{node['name']}/Primary", safe="")
+            client_link = f"vless://{user['uuid']}@{public_host}:{port}?{query}#{label}"
+            create_node_job(
+                node_id,
+                job_type="apply_xray_config",
+                title=f"VLESS REALITY · {user['name']} · TCP {port}",
+                payload={
+                    "profile": "VLESS REALITY",
+                    "config": config,
+                    "config_sha256": hashlib.sha256(encoded).hexdigest(),
+                    "client_count": 1,
+                    "deployment": {
+                        "action": "upsert",
+                        "user_id": int(user["id"]),
+                        "user_uuid": str(user["uuid"]),
+                        "user_name": str(user["name"]),
+                        "profile": "VLESS REALITY",
+                        "public_host": public_host,
+                        "public_port": port,
+                    },
+                },
+                client_link=client_link,
+            )
+            flash(
+                "Задание отправлено ноде. Она проверит конфигурацию, применит её и выполнит rollback при ошибке.",
+                "success",
+            )
+        except (ValueError, XPanelError, OSError, sqlite3.Error) as exc:
+            flash(str(exc), "error")
+        return redirect(url_for("node_detail_page", node_id=node_id))
+
+    @app.post("/network/nodes/<int:node_id>/edit")
+    @login_required
+    def node_edit(node_id: int):
+        try:
+            update_node(
+                node_id,
+                name=request.form.get("name", ""),
+                role=request.form.get("role", "regional"),
+                location=request.form.get("location", ""),
+                description=request.form.get("description", ""),
+                public_address=request.form.get("public_address"),
+            )
+            flash("Карточка сервера обновлена", "success")
+        except (ValueError, sqlite3.Error) as exc:
+            flash(str(exc), "error")
+        return redirect(url_for("node_detail_page", node_id=node_id))
+
+    @app.post("/network/nodes/<int:node_id>/enrollment")
+    @login_required
+    def node_enrollment_create(node_id: int):
+        try:
+            node = find_node(node_id)
+            if node.get("effective_state") == "revoked":
+                restore_node(node_id)
+                node = find_node(node_id)
+            enrollment = create_enrollment_token(node_id)
+            return render_template(
+                "node_detail.html",
+                **_node_detail_template_context(
+                    node,
+                    enrollment=enrollment,
+                    install_command=_node_install_command(str(enrollment["token"])),
+                ),
+            )
+        except ValueError as exc:
+            flash(str(exc), "error")
+            return redirect(url_for("node_detail_page", node_id=node_id))
+
+    @app.post("/network/nodes/<int:node_id>/revoke")
+    @login_required
+    def node_revoke(node_id: int):
+        try:
+            revoke_node(node_id)
+            flash("Доступ сервера отозван", "success")
+        except ValueError as exc:
+            flash(str(exc), "error")
+        return redirect(url_for("node_detail_page", node_id=node_id))
+
+    @app.post("/network/nodes/<int:node_id>/restore")
+    @login_required
+    def node_restore(node_id: int):
+        try:
+            restore_node(node_id)
+            flash("Сервер снова ожидает подключения", "success")
+        except ValueError as exc:
+            flash(str(exc), "error")
+        return redirect(url_for("node_detail_page", node_id=node_id))
+
+    @app.post("/network/nodes/<int:node_id>/delete")
+    @login_required
+    def node_delete(node_id: int):
+        try:
+            node = find_node(node_id)
+            active_jobs = [
+                item for item in list_node_jobs(node_id)
+                if str(item.get("status") or "") in {"queued", "running"}
+            ]
+            if active_jobs:
+                raise ValueError("Дождитесь завершения текущего задания ноды")
+            revoke_node(node_id) if node.get("registered_at") else None
+            delete_node(node_id)
+            flash("Сервер удалён из Cluster. Xray на удалённой машине не изменён.", "success")
+            return redirect(url_for("nodes_page"))
+        except ValueError as exc:
+            flash(str(exc), "error")
+            return redirect(url_for("node_detail_page", node_id=node_id))
+
+    @app.get("/node/install-sg-node.sh")
+    def node_full_installer():
+        if not NODE_FULL_INSTALLER.exists():
+            abort(404)
+        return Response(
+            NODE_FULL_INSTALLER.read_text(encoding="utf-8"),
+            content_type="text/x-shellscript; charset=utf-8",
+            headers={"Cache-Control": "no-store"},
+        )
+
+    @app.get("/node/connect.sh")
+    def node_connect_installer():
+        if not NODE_CONNECT_INSTALLER.exists():
+            abort(404)
+        return Response(
+            NODE_CONNECT_INSTALLER.read_text(encoding="utf-8"),
+            content_type="text/x-shellscript; charset=utf-8",
+            headers={"Cache-Control": "no-store"},
+        )
+
+    @app.get("/node/install.sh")
+    def node_agent_installer():
+        if not NODE_AGENT_INSTALLER.exists():
+            abort(404)
+        return Response(
+            NODE_AGENT_INSTALLER.read_text(encoding="utf-8"),
+            content_type="text/x-shellscript; charset=utf-8",
+            headers={"Cache-Control": "no-store"},
+        )
+
+    @app.get("/node/runtime.sh")
+    def node_runtime_installer():
+        if not NODE_RUNTIME_INSTALLER.exists():
+            abort(404)
+        return Response(
+            NODE_RUNTIME_INSTALLER.read_text(encoding="utf-8"),
+            content_type="text/x-shellscript; charset=utf-8",
+            headers={"Cache-Control": "no-store"},
+        )
+
+    @app.get("/node/agent.py")
+    def node_agent_source():
+        if not NODE_AGENT_SOURCE.exists():
+            abort(404)
+        return Response(
+            NODE_AGENT_SOURCE.read_text(encoding="utf-8"),
+            content_type="text/x-python; charset=utf-8",
+            headers={"Cache-Control": "no-store"},
+        )
+
+    @app.get("/node/worker.py")
+    def node_worker_source():
+        if not NODE_WORKER_SOURCE.exists():
+            abort(404)
+        return Response(
+            NODE_WORKER_SOURCE.read_text(encoding="utf-8"),
+            content_type="text/x-python; charset=utf-8",
+            headers={"Cache-Control": "no-store"},
+        )
+
+    @app.get("/node/uninstall.sh")
+    def node_agent_uninstaller():
+        if not NODE_AGENT_UNINSTALLER.exists():
+            abort(404)
+        return Response(
+            NODE_AGENT_UNINSTALLER.read_text(encoding="utf-8"),
+            content_type="text/x-shellscript; charset=utf-8",
+            headers={"Cache-Control": "no-store"},
+        )
+
+    @app.post("/api/node/v1/register")
+    def node_api_register():
+        payload = request.get_json(silent=True) or {}
+        try:
+            result = register_node(
+                str(payload.get("enrollment_token") or ""),
+                agent_id=str(payload.get("agent_id") or ""),
+                metadata=_node_metadata_with_request_address(payload.get("metadata")),
+            )
+        except ValueError as exc:
+            return jsonify({"ok": False, "error": str(exc)}), 400
+        return jsonify({"ok": True, **result})
+
+    @app.post("/api/node/v1/heartbeat")
+    def node_api_heartbeat():
+        authorization = request.headers.get("Authorization", "")
+        token = authorization[7:].strip() if authorization.lower().startswith("bearer ") else ""
+        payload = request.get_json(silent=True) or {}
+        try:
+            result = heartbeat_node(token, _node_metadata_with_request_address(payload))
+        except PermissionError as exc:
+            return jsonify({"ok": False, "error": str(exc)}), 401
+        return jsonify(result)
+
+    @app.post("/api/node/v1/jobs/next")
+    def node_api_job_next():
+        authorization = request.headers.get("Authorization", "")
+        token = authorization[7:].strip() if authorization.lower().startswith("bearer ") else ""
+        try:
+            job = claim_node_job(token)
+        except PermissionError as exc:
+            return jsonify({"ok": False, "error": str(exc)}), 401
+        return jsonify({"ok": True, "job": job})
+
+    @app.post("/api/node/v1/jobs/<int:job_id>/complete")
+    def node_api_job_complete(job_id: int):
+        authorization = request.headers.get("Authorization", "")
+        token = authorization[7:].strip() if authorization.lower().startswith("bearer ") else ""
+        payload = request.get_json(silent=True) or {}
+        try:
+            job = complete_node_job(
+                token,
+                job_id,
+                ok=bool(payload.get("ok")),
+                result=payload.get("result") if isinstance(payload.get("result"), dict) else {},
+            )
+            deletion = job.get("deletion_request") if isinstance(job, dict) else None
+            if isinstance(deletion, dict):
+                _finish_ready_user_deletion(deletion)
+        except PermissionError as exc:
+            return jsonify({"ok": False, "error": str(exc)}), 401
+        except ValueError as exc:
+            return jsonify({"ok": False, "error": str(exc)}), 400
+        return jsonify({"ok": True, "job": job})
 
     @app.post("/apply")
     @login_required

@@ -177,7 +177,7 @@ def test_installer_starts_with_password_and_then_runs_without_prompts():
     text = INSTALLER.read_text(encoding="utf-8")
     password_prompt = text.index('prompt_value XPANEL_ADMIN_PASSWORD "Пароль администратора')
     address_prompt = text.index('prompt_value XRAY_ADDRESS "Адрес Xray')
-    first_stage = text.index('stage 1 3 "Подготовка системы"')
+    first_stage = text.index('run_stage "Этап 1/9 · Подготовка памяти и swap"')
     assert password_prompt < address_prompt < first_stage
     assert "Все параметры приняты. Дальнейшая установка не потребует ввода" in text
 
@@ -190,13 +190,13 @@ def test_installer_uses_awg_style_live_progress_and_persistent_log():
         "step_ok(){",
         "run_logged(){",
         "wait_for_apt(){",
-        "stage 1 3",
-        "stage 2 3",
-        "stage 3 3",
+        "Этап 1/9 · Подготовка памяти и swap",
+        "Этап 9/9 · Проверка служб, конфигурации и адреса панели",
         "SG_PANEL_INSTALL_LOG",
         '>>"$LOG_FILE" 2>&1',
         "Последние строки журнала",
     ):
         assert token in text
-    assert "apt-get -o Dpkg::Use-Pty=0 update -qq" in text
+    assert "update -qq" in text
+    assert "dist-upgrade -y" in text
     assert "ЖУРНАЛ" in text

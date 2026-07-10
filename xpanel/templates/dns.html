@@ -1,14 +1,14 @@
 {% extends "base.html" %}
 {% block title %}DNS — SG-Panel{% endblock %}
-{% block section %}NETWORK{% endblock %}
-{% block heading %}Network{% endblock %}
+{% block section %}ROUTING{% endblock %}
+{% block heading %}Routing{% endblock %}
 {% block subtitle %}Upstream-серверы, DoH Local, fallback и статические hosts-записи{% endblock %}
 {% block content %}
 <script>document.body.classList.add('ui-standard-page','dns-page');</script>
 <div class="ui-page ui-page-wide">
   {% set enabled_servers = servers|selectattr('enabled')|list|length %}
   <section class="ui-dashboard-metrics page-context-metrics dns-context-metrics">
-    <article class="ui-status-card"><span>Network</span><strong class="{{ 'text-success' if settings.enabled else 'text-warning' }}">{{ 'Включён' if settings.enabled else 'Выключен' }}</strong><small>Раздел dns в config.json</small></article>
+    <article class="ui-status-card"><span>Routing</span><strong class="{{ 'text-success' if settings.enabled else 'text-warning' }}">{{ 'Включён' if settings.enabled else 'Выключен' }}</strong><small>Раздел dns в config.json</small></article>
     <article class="ui-status-card"><span>Upstream</span><strong>{{ enabled_servers }} / {{ servers|length }}</strong><small>Включено / всего</small></article>
     <article class="ui-status-card"><span>Стратегия</span><strong class="ui-value-compact">{{ settings.query_strategy }}</strong><small>IP family для ответов</small></article>
     <article class="ui-status-card"><span>Hosts</span><strong>{{ hosts|length }}</strong><small>Статические записи</small></article>
@@ -16,7 +16,7 @@
   <div class="ui-page-toolbar"><div><strong>Контекстный JSON DNS</strong><small>Серверы, hosts и глобальные параметры в одном проверяемом документе.</small></div><a class="button secondary" href="{{ url_for('dns_json_page') }}">{ } DNS JSON</a></div>
   <section class="ui-top-grid dns-top-grid">
     <article class="ui-card ui-card-form">
-      <header class="ui-card-heading"><div><p class="panel-kicker">ПАРАМЕТРЫ</p><h2>Общие настройки DNS <a class="context-help-link" href="{{ url_for('help_page') }}#network" title="Справка о DNS" aria-label="Справка о DNS">?</a></h2><p>Включение встроенного DNS Xray и базовая стратегия запросов.</p></div></header>
+      <header class="ui-card-heading"><div><p class="panel-kicker">ПАРАМЕТРЫ</p><h2>Общие настройки DNS <a class="context-help-link" href="{{ url_for('help_page') }}#routing" title="Справка о DNS" aria-label="Справка о DNS">?</a></h2><p>Включение встроенного DNS Xray и базовая стратегия запросов.</p></div></header>
       <form method="post" action="{{ url_for('dns_settings_save') }}" class="ui-form" data-validated-form>
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <label class="ui-toggle-row"><span><strong>Включить встроенный DNS</strong><small>Добавить раздел dns в генерируемый config.json.</small></span><input type="checkbox" name="enabled" {% if settings.enabled %}checked{% endif %}><span class="switch"></span></label>

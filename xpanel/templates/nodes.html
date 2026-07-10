@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block title %}Cluster — SG-Panel{% endblock %}
+{% block section %}CLUSTER{% endblock %}
+{% block heading %}SG-Panel Cluster{% endblock %}
+{% block subtitle %}Пошаговая подготовка, подключение и развёртывание SG-Node{% endblock %}
+{% block content %}
+<script>document.body.classList.add('ui-standard-page','nodes-page');</script>
+<div class="ui-page node-network-page">
+  <section class="ui-card cluster-overview-card">
+    <header class="ui-card-heading">
+      <div><p class="panel-kicker">CLUSTER</p><h2>Подключение SG-Node</h2><p>Подготовьте сервер, добавьте его в Cluster и выполните подключение.</p></div><a class="context-help-link" href="{{ url_for('help_page') }}#multinode" title="Полная инструкция по SG-Node" aria-label="Полная инструкция по SG-Node">?</a>
+    </header>
+  </section>
+
+  <section class="cluster-wizard" aria-label="Мастер подключения SG-Node">
+    <article class="ui-card cluster-step-card is-primary">
+      <div class="cluster-step-number">1</div>
+      <div class="cluster-step-content">
+        <p class="panel-kicker">ШАГ 1</p>
+        <h2>Подготовить чистую Ubuntu как SG-Node</h2>
+        <p>Команда один раз запускается на чистой Ubuntu. Она устанавливает Agent, Worker, Xray, Nginx, Certbot и все зависимости, но пока не подключает сервер к Cluster.</p>
+        <div class="node-command cluster-command"><code id="nodePrepareCommand">{{ prepare_command }}</code></div>
+        <button class="button secondary" type="button" data-copy-node-prepare>Скопировать команду полной установки SG-Node</button>
+        <small>Это одна самодостаточная строка: при необходимости она сама установит curl и выполнит bootstrap.</small>
+      </div>
+    </article>
+
+    <article class="ui-card cluster-step-card">
+      <div class="cluster-step-number">2</div>
+      <div class="cluster-step-content">
+        <p class="panel-kicker">ШАГ 2</p>
+        <h2>Добавить подготовленную SG-Node</h2>
+        <p>Создайте карточку только после завершения полной установки. Здесь будет выпущен новый одноразовый токен; любой ранее неиспользованный токен этой карточки автоматически отзывается.</p>
+        <button class="button primary" type="button" data-open-node-form>Добавить подготовленную SG-Node</button>
+      </div>
+    </article>
+
+    <article class="ui-card cluster-step-card is-guide">
+      <div class="cluster-step-number">3</div>
+      <div class="cluster-step-content"><p class="panel-kicker">ШАГ 3</p><h2>Подключить установленную SG-Node</h2><p>На странице созданной карточки появится кнопка «Скопировать команду подключения». Команда проверит состояние <code>ready_to_connect</code>, зарегистрирует Node, запустит Agent и Worker и подтвердит heartbeat.</p></div>
+    </article>
+
+    <article class="ui-card cluster-step-card is-guide">
+      <div class="cluster-step-number">4</div>
+      <div class="cluster-step-content"><p class="panel-kicker">ШАГ 4</p><h2>Проверить статус</h2><p>Карточка покажет Agent, Worker, heartbeat, публичный адрес, версии компонентов и состояние «В сети». Если адрес не определился автоматически, его можно указать в карточке явно.</p></div>
+    </article>
+
+    <article class="ui-card cluster-step-card is-guide">
+      <div class="cluster-step-number">5</div>
+      <div class="cluster-step-content"><p class="panel-kicker">ШАГ 5</p><h2>Развернуть первый профиль</h2><p>После успешного подключения будет предложен первый профиль: <strong>VLESS REALITY · RAW/TCP · порт 64441 · XTLS Vision · Firefox</strong>.</p></div>
+    </article>
+  </section>
+
+  <section class="node-add-panel" data-node-form hidden>
+    <header>
+      <div><p class="panel-kicker">ШАГ 2 · НОВАЯ SG-NODE</p><h2>Добавить подготовленную SG-Node</h2><p>Убедитесь, что полная установка из шага 1 завершилась сообщением <code>ready_to_connect</code>. После создания карточки сразу появится одноразовая команда подключения.</p></div>
+      <button class="icon-button" type="button" data-close-node-form aria-label="Закрыть">×</button>
+    </header>
+    <form method="post" action="{{ url_for('node_add') }}" class="node-add-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label><span>Имя сервера</span><input name="name" required maxlength="80" placeholder="Например: Germany Backup"></label>
+      <label><span>Роль</span><select name="role">{% for value, label in roles.items() %}<option value="{{ value }}" {% if value == 'regional' %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+      <label><span>Локация</span><input name="location" maxlength="80" placeholder="Германия · Франкфурт"></label>
+      <label><span>Публичный IP или домен <em>необязательно</em></span><input name="public_address" maxlength="255" placeholder="Определится автоматически"><small>Можно указать сразу без https:// или оставить пустым до heartbeat.</small></label>
+      <label class="node-add-wide"><span>Назначение</span><input name="description" maxlength="300" placeholder="Резервный сервер для европейских подключений"></label>
+      <div class="node-add-actions"><button class="button primary" type="submit">Создать карточку и новый токен</button><small>Токен действует 30 минут, используется один раз и не является командой полной установки.</small></div>
+    </form>
+  </section>
+
+  <section class="ui-dashboard-metrics page-context-metrics cluster-context-metrics" aria-label="Сводка Cluster">
+    <article class="ui-status-card"><span>Всего серверов</span><strong>{{ summary.total }}</strong><small>Центральный и удалённые</small></article>
+    <article class="ui-status-card"><span>В сети</span><strong class="text-success">{{ summary.online }}</strong><small>Heartbeat подтверждён</small></article>
+    <article class="ui-status-card"><span>Ожидают подключения</span><strong class="text-warning">{{ summary.pending }}</strong><small>Карточка создана, Node не зарегистрирована</small></article>
+    <article class="ui-status-card"><span>Нет связи</span><strong class="text-danger">{{ summary.offline }}</strong><small>Требуют проверки</small></article>
+  </section>
+
+  <section class="node-card-grid" aria-label="Серверы SG-Panel Cluster">
+    {% for node in nodes %}
+    <a class="node-card state-{{ node.effective_state }}" href="{{ url_for('node_detail_page', node_id=node.id) }}">
+      <header><div class="node-card-identity"><span class="node-server-icon" aria-hidden="true"><i></i><i></i></span><div><strong>{{ node.name }}</strong><small>{{ node.location or ('Текущий сервер панели' if node.is_local else 'Локация не указана') }}</small></div></div><span class="node-state-pill"><i></i>{{ node.state_label }}</span></header>
+      <div class="node-role-line"><span>{{ node.role_label }}</span>{% if node.is_local %}<b>Центральная SG-Panel</b>{% else %}<b>SG-Node Agent</b>{% endif %}</div>
+      <div class="node-card-profile"><span>Активная схема</span><strong>{{ node.inbound_profile or 'Профиль ещё не развёрнут' }}</strong></div>
+      <div class="node-card-metrics"><div><span>Клиенты</span><strong>{{ node.client_count if node.client_count is not none else '—' }}</strong></div><div><span>CPU</span><strong>{{ node.cpu_percent|round|int if node.cpu_percent is not none else '—' }}{% if node.cpu_percent is not none %}%{% endif %}</strong></div><div><span>RAM</span><strong>{{ node.memory_percent|round|int if node.memory_percent is not none else '—' }}{% if node.memory_percent is not none %}%{% endif %}</strong></div><div><span>Диск</span><strong>{{ node.disk_percent|round|int if node.disk_percent is not none else '—' }}{% if node.disk_percent is not none %}%{% endif %}</strong></div></div>
+      <footer><span>{{ node.public_address or node.platform or ('Локальный Controller' if node.is_local else 'Адрес будет определён при подключении') }}</span><strong>{{ node.last_seen_age }}</strong></footer>
+      {% if node.last_error %}<div class="node-card-warning">{{ node.last_error }}</div>{% endif %}
+    </a>
+    {% endfor %}
+  </section>
+</div>
+<script>
+(() => {
+  const copyPrepare = document.querySelector('[data-copy-node-prepare]');
+  copyPrepare?.addEventListener('click', async () => {
+    const text = document.getElementById('nodePrepareCommand')?.textContent || '';
+    const original = copyPrepare.textContent;
+    try { if (navigator.clipboard && window.isSecureContext) await navigator.clipboard.writeText(text); else { const area=document.createElement('textarea'); area.value=text; area.style.position='fixed'; area.style.left='-9999px'; document.body.appendChild(area); area.select(); document.execCommand('copy'); area.remove(); } copyPrepare.textContent='Скопировано'; }
+    catch (_) { copyPrepare.textContent='Не скопировано'; }
+    window.setTimeout(() => { copyPrepare.textContent=original; }, 1600);
+  });
+  const panel=document.querySelector('[data-node-form]');
+  document.querySelector('[data-open-node-form]')?.addEventListener('click',()=>{ panel.hidden=false; panel.querySelector('input[name="name"]')?.focus(); panel.scrollIntoView({behavior:'smooth',block:'center'}); });
+  document.querySelector('[data-close-node-form]')?.addEventListener('click',()=>{ panel.hidden=true; });
+})();
+</script>
+{% endblock %}

@@ -2,7 +2,7 @@
 {% block title %}Справка — SG-Panel{% endblock %}
 {% block section %}HELP{% endblock %}
 {% block heading %}Справка SG-Panel{% endblock %}
-{% block subtitle %}Профили подключения, клиентские ссылки, сеть, безопасность и обслуживание{% endblock %}
+{% block subtitle %}Cascade, Cluster и SG-Node, профили, Routing, безопасность и обслуживание{% endblock %}
 {% block content %}
 <script>document.body.classList.add('ui-standard-page','help-page');</script>
 <div class="ui-page ui-page-wide help-layout">
@@ -10,6 +10,7 @@
     <p class="panel-kicker">РАЗДЕЛЫ</p>
     <nav>
       <a href="#start">Как устроена панель</a>
+      <a href="#multinode">Cluster и SG-Node</a>
       <a href="#profiles">Пять профилей</a>
       <a href="#reality-vision">REALITY и XTLS Vision</a>
       <a href="#xhttp-tls">XHTTP-TLS</a>
@@ -18,7 +19,12 @@
       <a href="#mixed">Смешанный профиль</a>
       <a href="#clients-links">Клиенты и подписки</a>
       <a href="#tls-https">TLS и HTTPS панели</a>
-      <a href="#network">Network: Routing, Outbounds, DNS</a>
+      <a href="#panel-exposure">Доступ к панели и Cloudflare</a>
+      <a href="#routing">Routing: Rules, Outbounds, DNS</a>
+      <a href="#cascade">Каскад через второй сервер</a>
+      <a href="#routing-warp">WARP: настройка и проверка</a>
+      <a href="#routing-geofiles">Routing: GeoFiles</a>
+      <a href="#advanced-transport">Xray Server: Дополнительно</a>
       <a href="#backups">Резервные копии</a>
       <a href="#updates">Обновления</a>
       <a href="#diagnostics">Диагностика</a>
@@ -34,6 +40,88 @@
         <article><strong>Точка входа</strong><p>Публичная комбинация адреса, порта и параметров, по которой подключается клиент.</p></article>
       </div>
       <div class="ui-info-note"><span>i</span><p>Сначала измените настройки, затем нажмите <strong>«Проверить конфигурацию»</strong>. Кнопка применения становится доступна только после успешного теста временной копии базы и итогового <code>config.json</code>.</p></div>
+    </section>
+
+    <section class="ui-card help-section help-section-major" id="multinode">
+      <header class="ui-card-heading"><div><p class="panel-kicker">CLUSTER И SG-NODE</p><h2>Полная установка, подключение и первый профиль</h2><p>Controller и SG-Node подключаются в пять последовательных шагов. Полная установка Node и её регистрация в Cluster — две разные операции.</p></div></header>
+      <div class="help-flow help-flow-wide"><code>Чистая Ubuntu</code><span>→</span><code>Подготовленная SG-Node</code><span>→</span><code>Heartbeat</code><span>→</span><code>VLESS REALITY :64441</code></div>
+      <div class="help-definition-grid">
+        <article><strong>Cluster Controller</strong><p>Полная SG-Panel с центральной базой, карточками Node, очередью заданий и административным интерфейсом.</p></article>
+        <article><strong>SG-Node</strong><p>Удалённый сервер с Agent, Worker, Xray и необходимым runtime. Вторая SG-Panel на нём не устанавливается.</p></article>
+        <article><strong>Независимая работа</strong><p>Если Controller временно недоступен, уже развёрнутый Xray-профиль и клиентский трафик Node продолжают работать.</p></article>
+      </div>
+
+      <h3 class="help-subheading">Перед началом</h3>
+      <ol class="help-steps">
+        <li>Подготовьте отдельный сервер с чистой поддерживаемой Ubuntu LTS и доступом <code>sudo</code>.</li>
+        <li>Убедитесь, что Node может исходящим соединением открыть адрес и порт Controller.</li>
+        <li>Разрешите на Node входящий <code>64441/tcp</code> для первого клиентского профиля. Порт открывается в Security Group Node, а не Controller.</li>
+        <li>Ручные <code>apt update</code>, <code>curl</code>, <code>unzip</code> и отдельная установка Xray не требуются.</li>
+      </ol>
+
+      <h3 class="help-subheading">Шаг 1. Полностью подготовить Ubuntu как SG-Node</h3>
+      <ol class="help-steps help-steps-emphasis">
+        <li>Откройте <strong>Cluster</strong> на Controller.</li>
+        <li>В карточке <strong>«Шаг 1»</strong> нажмите <strong>«Скопировать команду полной установки SG-Node»</strong>.</li>
+        <li>Подключитесь по SSH к чистой Ubuntu Node и запустите скопированную однострочную команду.</li>
+        <li>Дождитесь успешного завершения и состояния <code>STATUS=ready_to_connect</code> в <code>/etc/sg-node/install.env</code>.</li>
+      </ol>
+      <p class="help-note">Полная команда устанавливает Agent, Worker, Xray, Nginx, Certbot, зависимости, службы и журналы. Она не создаёт карточку, не содержит enrollment token и не подключает Node к Cluster.</p>
+
+      <h3 class="help-subheading">Шаг 2. Создать карточку Node</h3>
+      <ol class="help-steps help-steps-emphasis">
+        <li>Вернитесь в <strong>Cluster</strong> и нажмите <strong>«Добавить подготовленную SG-Node»</strong>.</li>
+        <li>Введите имя, роль и локацию. Публичный IP или домен можно оставить пустым — Agent попробует определить его по heartbeat.</li>
+        <li>Нажмите <strong>«Создать карточку и новый токен»</strong>.</li>
+        <li>Откроется карточка Node с одноразовой командой подключения. Токен действует 30 минут и используется один раз.</li>
+      </ol>
+
+      <h3 class="help-subheading">Шаг 3. Подключить уже установленную SG-Node</h3>
+      <ol class="help-steps help-steps-emphasis">
+        <li>На странице карточки нажмите <strong>«Скопировать команду подключения»</strong>.</li>
+        <li>Запустите её на той же Node, где выполнен шаг 1.</li>
+        <li>Команда проверит <code>ready_to_connect</code>, обновит Agent/Worker, зарегистрирует одноразовый token, запустит службы и отправит настоящий heartbeat.</li>
+        <li>После принятого heartbeat страница обновится автоматически: использованная команда исчезнет, а шаг первого профиля станет доступным.</li>
+      </ol>
+      <div class="ui-warning-note"><span>!</span><p><strong>Не запускайте команду подключения на чистой Ubuntu вместо полной установки.</strong> При отсутствии <code>/etc/sg-node/install.env</code> она остановится и попросит сначала подготовить SG-Node.</p></div>
+
+      <h3 class="help-subheading">Шаг 4. Убедиться, что Node действительно подключена</h3>
+      <p>Карточка должна показать состояние <strong>«В сети»</strong>, работающие Agent и Worker, свежий heartbeat, публичный адрес, платформу и версии компонентов.</p>
+      <div class="help-definition-grid help-definition-grid-2">
+        <article><strong>До первого профиля — нормально</strong><p>Xray и Nginx могут показывать <strong>«ожидает первого профиля»</strong>, а серверная схема — <strong>«Первый профиль ещё не развёрнут»</strong>.</p></article>
+        <article><strong>Адрес не определён</strong><p>В карточке введите реальный публичный IPv4 или домен без <code>https://</code> и нажмите <strong>«Сохранить карточку»</strong>. Не используйте Reality SNI как адрес Node.</p></article>
+      </div>
+
+      <h3 class="help-subheading">Шаг 5. Развернуть первый VLESS REALITY</h3>
+      <ol class="help-steps help-steps-emphasis">
+        <li>На Node заранее разрешите входящий <code>64441/tcp</code>.</li>
+        <li>В блоке <strong>«Шаг 5 · Первый профиль»</strong> выберите существующего клиента.</li>
+        <li>Проверьте публичный адрес Node, порт <code>64441</code>, Reality target и Server Name / SNI.</li>
+        <li>Нажмите <strong>«Проверить и развернуть»</strong>.</li>
+        <li>Worker выполнит проверку задания, <code>xray run -test</code>, backup, атомарное применение и rollback при ошибке.</li>
+        <li>После завершения проверьте Xray, порт и реальное подключение клиента.</li>
+      </ol>
+      <div class="help-profile-list">
+        <article><div><strong>Первый профиль Node</strong><small>Подтверждённая стартовая схема</small></div><p>VLESS REALITY · RAW/TCP · <code>64441</code> · XTLS Vision · fingerprint Firefox.</p></article>
+      </div>
+
+      <h3 class="help-subheading">Повторное подключение и обслуживание</h3>
+      <div class="help-definition-grid">
+        <article><strong>«Создать новую команду»</strong><p>Используйте только для повторной регистрации, переноса сервера или ротации токена. Для обычной работающей Node эта кнопка не нужна.</p></article>
+        <article><strong>«Отключить ноду»</strong><p>Останавливает управление из Cluster, но не удаляет рабочий Xray-профиль с сервера.</p></article>
+        <article><strong>«Удалить» карточку</strong><p>Удаляет запись из Cluster. Xray, Nginx и конфигурация на удалённой Node автоматически не уничтожаются.</p></article>
+      </div>
+      <p class="help-note">Команды обновления всех компонентов и удаления только Agent находятся в раскрывающемся блоке <strong>«События и обслуживание»</strong> карточки Node.</p>
+
+      <h3 class="help-subheading">Типовые ошибки</h3>
+      <div class="help-definition-grid help-definition-grid-2">
+        <article><strong>Нет ready_to_connect</strong><p>Проверьте <code>/var/log/sg-node-full-install.log</code> и <code>/etc/sg-node/install.env</code>. Карточку создавайте только после успешной полной установки.</p></article>
+        <article><strong>Токен истёк</strong><p>Нажмите <strong>«Создать новую команду»</strong> или <strong>«Создать команду переподключения»</strong> и используйте новую строку.</p></article>
+        <article><strong>Agent/Worker работают, шаг 5 закрыт</strong><p>Подождите новый heartbeat и обновление версии Xray. Проверьте <code>systemctl status sg-node-agent</code>, <code>sg-node-worker</code> и их journal.</p></article>
+        <article><strong>Профиль есть, клиент не подключается</strong><p>Проверьте <code>64441/tcp</code>, публичный адрес, состояние Xray, журнал задания и совпадение Flow/fingerprint в ссылке.</p></article>
+      </div>
+      <div class="ui-info-note"><span>i</span><p><strong>Журналы Node:</strong> полная установка — <code>/var/log/sg-node-full-install.log</code>; подключение — <code>/var/log/sg-node-connect.log</code>; службы — <code>journalctl -u sg-node-agent</code>, <code>sg-node-worker</code> и <code>xray</code>.</p></div>
+      <div class="ui-actions"><a class="button primary" href="{{ url_for('nodes_page') }}">Открыть Cluster</a></div>
     </section>
 
     <section class="ui-card help-section" id="profiles">
@@ -53,12 +141,22 @@
     </section>
 
     <section class="ui-card help-section" id="reality-vision">
-      <header class="ui-card-heading"><div><p class="panel-kicker">VLESS REALITY</p><h2>REALITY и XTLS Vision</h2><p>REALITY отвечает за внешнюю защиту и маскировку, Vision — за режим обработки VLESS-потока.</p></div></header>
-      <div class="help-compare-grid">
-        <article><span class="help-chip">Без Vision</span><h3>До трёх отдельных Inbound</h3><p>Primary, Backup и Alt создаются как самостоятельные Xray Inbound со своими TCP-портами и Short ID.</p></article>
-        <article><span class="help-chip is-accent">XTLS Vision</span><h3>Один общий Inbound, до трёх точек</h3><p>Клиент получает три отдельные ссылки и Short ID, но Xray обрабатывает их одним общим REALITY/Vision Inbound для стабильной работы.</p></article>
+      <header class="ui-card-heading"><div><p class="panel-kicker">VLESS REALITY</p><h2>REALITY и XTLS Vision — две разные настройки</h2><p>REALITY защищает и маскирует внешнее соединение. Vision задаёт способ обработки VLESS-потока внутри этого соединения.</p></div></header>
+      <div class="help-definition-grid help-definition-grid-2">
+        <article><strong>REALITY</strong><p>Определяет server name, ключи REALITY, Short ID и параметры внешней маскировки. Профиль может работать с Vision или без него.</p></article>
+        <article><strong>XTLS Flow</strong><p><code>xtls-rprx-vision</code> включает Vision. Пустой Flow означает стандартный VLESS через REALITY без Vision.</p></article>
       </div>
-      <p class="help-note"><strong>Что выбрать:</strong> Vision — основной современный режим для совместимого клиента. «Без Vision» остаётся для совместимости, диагностики и отдельных Inbound.</p>
+      <div class="help-compare-grid">
+        <article><span class="help-chip">Стандартный VLESS</span><h3>Flow отсутствует</h3><p>Используйте для совместимости с уже выпущенными ссылками или клиентом, который не поддерживает Vision.</p></article>
+        <article><span class="help-chip is-accent">XTLS Vision — рекомендуется</span><h3>Flow: xtls-rprx-vision</h3><p>Рекомендуемый режим для VLESS REALITY + TCP при использовании совместимого клиента.</p></article>
+      </div>
+      <div class="ui-warning-note"><span>!</span><p><strong>Flow должен совпадать на сервере и в клиентской ссылке.</strong> Если включить Vision только в клиенте, серверный пользователь останется без соответствующего Flow и подключение не заработает. SG-Panel меняет серверную конфигурацию и экспортируемые ссылки одновременно.</p></div>
+      <ol class="help-steps">
+        <li>Откройте <strong>Xray Server → Inbound</strong> и выберите значение в поле <strong>XTLS Flow</strong>.</li>
+        <li>Нажмите <strong>«Проверить конфигурацию»</strong>, затем <strong>«Сохранить и применить»</strong>.</li>
+        <li>Скопируйте новую ссылку или обновите подписку клиента. Старую ссылку с другим Flow не изменяйте вручную.</li>
+      </ol>
+      <p class="help-note"><strong>Ожидаемый результат:</strong> в серверном пользователе и клиентской ссылке присутствует одно и то же значение Flow. Существующая установка не переводится на Vision автоматически, чтобы не сломать ранее выданные ссылки.</p>
     </section>
 
     <section class="ui-card help-section" id="xhttp-tls">
@@ -104,14 +202,334 @@
       <p class="help-note">REALITY и XHTTP-REALITY используют собственную схему защиты и не требуют обычного TLS-сертификата для клиентского соединения.</p>
     </section>
 
-    <section class="ui-card help-section" id="network">
-      <header class="ui-card-heading"><div><p class="panel-kicker">NETWORK</p><h2>Traffic Rules, Outbounds и DNS</h2><p>Три раздела формируют единую серверную маршрутизацию Xray.</p></div></header>
+    <section class="ui-card help-section help-section-major" id="panel-exposure">
+      <header class="ui-card-heading"><div><p class="panel-kicker">SECURITY → PANEL EXPOSURE</p><h2>Как безопасно открыть административную панель</h2><p>Этот блок выбирает архитектуру доступа и проверяет готовность. Он не заменяет настройку Cloudflare, DNS, AWS Security Group или firewall.</p></div></header>
+
+      <h3 class="help-subheading">Текущая архитектура SG-Panel</h3>
+      <div class="help-flow help-flow-wide"><code>Браузер</code><span>→</span><code>публичный Nginx</code><span>→</span><code>SG-Panel backend 127.0.0.1:8080</code></div>
+      <p>Python backend не публикуется напрямую. Публичное HTTP/HTTPS-соединение принимает Nginx и передаёт запрос локальному приложению SG-Panel.</p>
+      <div class="ui-info-note"><span>i</span><p><strong>Что делает SG-Panel:</strong> сохраняет выбранный режим, показывает текущий маршрут, проверяет доступные локальные признаки и выбирает допустимый источник IP посетителя. <strong>Что SG-Panel пока не делает:</strong> не создаёт DNS-записи, не меняет AWS Security Group или внешний firewall, не создаёт Tunnel, Access application и Access policy.</p></div>
+
+      <h3 class="help-subheading">Режим 1. Direct through Nginx</h3>
+      <div class="help-flow help-flow-wide"><code>Браузер</code><span>→</span><code>публичный Nginx :61443</code><span>→</span><code>127.0.0.1:8080</code></div>
+      <p>Это базовый режим: браузер обращается прямо к серверу. Поля Cloudflare hostname и Tunnel не нужны.</p>
+      <ol class="help-steps">
+        <li>Выберите <strong>Direct through Nginx</strong>.</li>
+        <li>Проверьте, что backend слушает только <code>127.0.0.1:8080</code>, а наружу открыт Nginx.</li>
+        <li>Включите HTTPS. Для публичного сервера ограничьте порт своим IP через IP allowlist и внешний firewall.</li>
+        <li>Нажмите <strong>«Сохранить режим и проверить готовность»</strong>.</li>
+      </ol>
+      <p class="help-note"><strong>Ожидаемый результат:</strong> панель открывается по прямому адресу Nginx; Cloudflare-проверки не показываются как ошибки выбранного режима.</p>
+
+      <h3 class="help-subheading">Режим 2. Cloudflare Proxy</h3>
+      <div class="help-flow help-flow-wide"><code>Браузер</code><span>→</span><code>Cloudflare Proxy</code><span>→</span><code>публичный Nginx</code><span>→</span><code>127.0.0.1:8080</code></div>
+      <p>Cloudflare принимает внешний запрос и передаёт его на origin. Для HTTPS Proxy поддерживаются порты <code>443</code>, <code>2053</code>, <code>2083</code>, <code>2087</code>, <code>2096</code> и <code>8443</code>. Стандартный порт SG-Panel <code>61443</code> обычным Cloudflare Proxy не обслуживается.</p>
+      <ol class="help-steps">
+        <li>Создайте в Cloudflare hostname, например <code>panel.example.com</code>, и включите для DNS-записи Proxy — orange cloud.</li>
+        <li>Переведите HTTPS панели на поддерживаемый порт, обычно <code>8443</code>, и сначала проверьте вход через hostname.</li>
+        <li>Во внешнем firewall или AWS Security Group разрешите доступ к origin-порту панели только от сетей Cloudflare. Это называется <strong>origin lockdown</strong>.</li>
+        <li>Повторно проверьте вход через Cloudflare в отдельном приватном окне.</li>
+        <li>Только после реального ограничения origin включите подтверждение <strong>«Я уже ограничил origin во внешнем firewall»</strong>.</li>
+        <li>Сохраните режим. После обнаружения запроса через Cloudflare SG-Panel может использовать <code>CF-Connecting-IP</code> как исходный IP посетителя.</li>
+      </ol>
+      <div class="ui-warning-note"><span>!</span><p><strong>Не доверяйте CF-Connecting-IP при открытом origin.</strong> Пока сервер принимает прямые запросы из интернета, посторонний клиент может прислать похожий заголовок самостоятельно. Сначала закройте прямой доступ, затем подтверждайте origin lockdown.</p></div>
+      <p class="help-note"><strong>Ожидаемый результат:</strong> hostname открывается через Cloudflare, выбранный порт поддерживается, в запросе видны признаки Cloudflare edge, а прямое обращение к origin заблокировано.</p>
+
+      <h3 class="help-subheading">Режим 3. Cloudflare Tunnel + Access</h3>
+      <div class="help-flow help-flow-wide"><code>Браузер</code><span>→</span><code>Cloudflare Access</code><span>→</span><code>Cloudflare Tunnel</code><span>→</span><code>локальный Nginx</code><span>→</span><code>127.0.0.1:8080</code></div>
+      <p><code>cloudflared</code> устанавливает исходящее соединение с Cloudflare. Для самой панели не требуется публично открытый входящий порт, а Access выполняет дополнительную проверку пользователя до штатного входа SG-Panel.</p>
+      <ol class="help-steps">
+        <li>Создайте Tunnel в Cloudflare и установите <code>cloudflared</code> на Controller.</li>
+        <li>Свяжите hostname панели с локальной точкой Nginx, указанной в конфигурации Tunnel.</li>
+        <li>Создайте Cloudflare Access self-hosted application для этого hostname.</li>
+        <li>Создайте Access policy, которая явно разрешает вход нужным пользователям или группам.</li>
+        <li>Откройте hostname в отдельном приватном окне и убедитесь, что сначала появляется проверка Access, а затем логин SG-Panel.</li>
+        <li>В SG-Panel укажите hostname и информационное имя Tunnel. Подтвердите <strong>«Я уже создал Cloudflare Access application и policy»</strong>.</li>
+        <li>Только после успешной проверки закройте публичный порт панели во внешнем firewall.</li>
+      </ol>
+      <p class="help-note"><strong>Ожидаемый результат:</strong> <code>cloudflared</code> работает, Access защищает hostname, панель доступна через Tunnel, а прямой публичный порт больше не требуется.</p>
+
+      <h3 class="help-subheading">Что означают поля и индикаторы</h3>
+      <div class="help-definition-grid help-definition-grid-2 panel-exposure-help-grid">
+        <article><strong>Current route</strong><p>Сохранённая архитектура доступа: Direct, Proxy или Tunnel. Это не автоматический переключатель Cloudflare.</p></article>
+        <article><strong>Origin endpoint</strong><p>Адрес и порт публичного Nginx. Backend рядом должен оставаться локальным.</p></article>
+        <article><strong>Client IP source</strong><p>Источник адреса посетителя. Для Direct используется прямой запрос; для защищённого Cloudflare-маршрута — <code>CF-Connecting-IP</code>.</p></article>
+        <article><strong>Cloudflare hostname</strong><p>Полное доменное имя панели в Cloudflare, а не IP и не URL с протоколом.</p></article>
+        <article><strong>Cloudflare Tunnel name</strong><p>Информационное имя уже созданного Tunnel. Ввод имени не создаёт Tunnel.</p></article>
+        <article><strong>Cloudflare edge</strong><p>Признаки того, что текущий запрос действительно прошёл через Cloudflare. Direct-запрос закономерно их не содержит.</p></article>
+        <article><strong>Origin lockdown</strong><p>Ручное подтверждение уже настроенного внешнего firewall. Переключатель сам правила не меняет.</p></article>
+        <article><strong>Cloudflare Access</strong><p>Ручное подтверждение уже созданных application и policy. Переключатель сам их не создаёт.</p></article>
+      </div>
+
+      <h3 class="help-subheading">Безопасный переход без потери доступа</h3>
+      <ol class="help-steps help-steps-emphasis">
+        <li>Не закрывайте текущий рабочий маршрут и не удаляйте старое правило firewall.</li>
+        <li>Полностью настройте новый hostname, Proxy или Tunnel.</li>
+        <li>Проверьте новый вход в отдельном приватном окне, не закрывая текущую административную сессию.</li>
+        <li>Убедитесь, что можете войти повторно, открыть Security и выполнить обычное действие в панели.</li>
+        <li>Только после этого ограничьте origin или закройте старый публичный порт.</li>
+        <li>Снова проверьте новый маршрут и только затем сохраните соответствующее подтверждение в SG-Panel.</li>
+      </ol>
+
+      <h3 class="help-subheading">Какой режим выбрать</h3>
+      <div class="help-compare-grid help-compare-grid-3">
+        <article><span class="help-chip">Direct</span><h3>Простой базовый доступ</h3><p>Подходит для локальной сети, SSH-туннеля или жёсткого ограничения административного IP.</p></article>
+        <article><span class="help-chip">Proxy</span><h3>Cloudflare перед origin</h3><p>Подходит, когда Nginx остаётся публичным, но origin закрыт сетями Cloudflare.</p></article>
+        <article><span class="help-chip is-accent">Tunnel + Access</span><h3>Закрытый административный вход</h3><p>Предпочтительный вариант, когда публичный входящий порт панели не нужен.</p></article>
+      </div>
+
+      <h3 class="help-subheading">Типичные предупреждения</h3>
+      <div class="help-definition-grid help-definition-grid-2">
+        <article><strong>61443 не поддерживается Proxy</strong><p>Выбран обычный Cloudflare Proxy, но порт не входит в список HTTPS-портов Cloudflare. Используйте, например, 8443 или выберите Tunnel.</p></article>
+        <article><strong>Cloudflare edge не обнаружен</strong><p>Текущая страница открыта напрямую, DNS ещё не proxied или запрос не дошёл через Cloudflare. Проверьте hostname в отдельном окне.</p></article>
+        <article><strong>cloudflared не обнаружен</strong><p>Служба не установлена, не запущена или имеет другое имя. Проверьте Tunnel на Controller.</p></article>
+        <article><strong>Access не подтверждён</strong><p>Создайте self-hosted application и policy, проверьте внешний вход и только затем включите подтверждение.</p></article>
+      </div>
+      <div class="ui-actions"><a class="button primary" href="{{ url_for('security_page') }}#panel-exposure">Открыть Panel exposure</a></div>
+    </section>
+
+    <section class="ui-card help-section" id="routing">
+      <header class="ui-card-heading"><div><p class="panel-kicker">ROUTING</p><h2>Traffic Rules, Outbounds, DNS и GeoFiles</h2><p>Четыре вкладки формируют единую серверную маршрутизацию Xray.</p></div></header>
       <div class="help-definition-grid">
         <article><strong>Traffic Rules</strong><p>Определяют, какой трафик отправлять через конкретный Outbound, напрямую или в блокировку.</p></article>
-        <article><strong>Outbounds</strong><p>Описывают реальные выходы: AWG-Gateway здесь не используется; доступны direct, block, WARP и пользовательские узлы Xray.</p></article>
+        <article><strong>Outbounds</strong><p>Описывают реальные выходы: direct, block, WARP и пользовательские узлы Xray.</p></article>
         <article><strong>DNS</strong><p>Разрешает домены для правил и задаёт upstream-серверы, hosts и стратегию запросов.</p></article>
+        <article><strong>GeoFiles</strong><p>Хранит базы <code>geoip.dat</code> и <code>geosite.dat</code>, на которые ссылаются правила маршрутизации.</p></article>
       </div>
-      <div class="ui-warning-note"><span>!</span><p>Серверная маршрутизация SG-Panel не заменяет клиентские GeoSite/GeoIP-правила SG Client. Это два разных уровня.</p></div>
+      <div class="ui-warning-note"><span>!</span><p>Серверная маршрутизация SG-Panel не заменяет клиентские GeoSite/GeoIP-правила SG Client. Это два независимых уровня.</p></div>
+      <div class="ui-actions"><a class="button primary" href="{{ url_for('routing_page') }}">Открыть Routing</a></div>
+    </section>
+
+    <section class="ui-card help-section help-section-major" id="cascade">
+      <header class="ui-card-heading"><div><p class="panel-kicker">CASCADE</p><h2>Полная настройка входного и выходного серверов</h2><p>Cascade оставляет пользователю обычную ссылку входного сервера, но выпускает его трафик в интернет через вторую SG-Panel.</p></div></header>
+      <div class="help-flow help-flow-wide"><code>Клиент</code><span>→</span><code>Входной сервер</code><span>→</span><code>Выходной сервер</code><span>→</span><code>Интернет</code></div>
+      <div class="help-definition-grid">
+        <article><strong>Входной сервер</strong><p>Принимает обычное клиентское подключение. Именно его ссылка или подписка выдаётся пользователю.</p></article>
+        <article><strong>Выходной сервер</strong><p>Создаёт отдельный управляемый VLESS REALITY-доступ и выпускает трафик в интернет.</p></article>
+        <article><strong>Служебная ссылка</strong><p>Передаётся только между двумя SG-Panel. Конечному пользователю она не нужна.</p></article>
+      </div>
+
+      <h3 class="help-subheading">Перед началом</h3>
+      <ol class="help-steps">
+        <li>Проверьте обычное подключение клиента к будущему входному серверу без Cascade.</li>
+        <li>Убедитесь, что Xray на обоих серверах работает и публичный TCP-порт из служебной ссылки выхода доступен.</li>
+        <li>В <strong>System → Status & Services</strong> задайте понятные имена серверов. Они будут показаны в схеме Cascade.</li>
+      </ol>
+
+      <h3 class="help-subheading">Шаг 1. Создать ссылку на выходном сервере</h3>
+      <ol class="help-steps help-steps-emphasis">
+        <li>Откройте <strong>Cascade</strong> на сервере, через который должен выходить интернет.</li>
+        <li>В левой карточке <strong>«1. Создать ссылку»</strong> нажмите <strong>«Сделать этот сервер выходом»</strong>.</li>
+        <li>Панель сама создаст отдельный служебный VLESS REALITY-доступ.</li>
+        <li>Нажмите <strong>«Скопировать ссылку»</strong>. Если браузер при HTTP не разрешил Clipboard API и кнопка показывает <strong>«Выделено — нажмите Ctrl+C»</strong>, нажмите <code>Ctrl+C</code> вручную.</li>
+      </ol>
+      <p class="help-note">Обычного клиента на выходном сервере специально создавать не нужно. UUID и REALITY-параметры служебного доступа создаёт SG-Panel.</p>
+
+      <h3 class="help-subheading">Шаг 2. Вставить ссылку на входном сервере</h3>
+      <ol class="help-steps help-steps-emphasis">
+        <li>Откройте <strong>Cascade</strong> на входном сервере.</li>
+        <li>В правой карточке <strong>«2. Вставить ссылку»</strong> вставьте служебную ссылку выхода.</li>
+        <li>Нажмите <strong>«Подключить и проверить»</strong>.</li>
+        <li>Панель импортирует адрес, порт, UUID, REALITY public key, Short ID, SNI, fingerprint и Flow, затем выполнит настоящий тест полного маршрута.</li>
+        <li>Успешный результат должен показать <strong>«Соединение работает»</strong> и внешний IP выходного сервера.</li>
+      </ol>
+
+      <h3 class="help-subheading">Шаг 3. Включить Cascade</h3>
+      <ol class="help-steps help-steps-emphasis">
+        <li>После свежей успешной проверки нажмите <strong>«Включить Cascade»</strong> один раз.</li>
+        <li>Вверху страницы должен появиться статус <strong>«Cascade включён»</strong>.</li>
+        <li>Не создавайте Outbound, tag и Default Outbound вручную: SG-Panel сама назначает Cascade основным выходом.</li>
+      </ol>
+
+      <h3 class="help-subheading">Шаг 4. Выдать пользователю правильную ссылку</h3>
+      <ol class="help-steps help-steps-emphasis">
+        <li>На входном сервере нажмите <strong>«Открыть Clients»</strong>.</li>
+        <li>Выберите существующего обычного клиента либо создайте нового.</li>
+        <li>Выдайте его активную ссылку или подписку <strong>входного сервера</strong>.</li>
+        <li>Подключитесь и проверьте IP: сайт должен показать адрес выходного сервера.</li>
+      </ol>
+      <div class="ui-warning-note"><span>!</span><p><strong>служебную ссылку выхода пользователю не выдавайте.</strong> В пользовательской ссылке должен оставаться адрес входного сервера.</p></div>
+
+      <h3 class="help-subheading">Почему слева всё ещё есть «Сделать этот сервер выходом»</h3>
+      <p>После подключения текущей цепочки эта кнопка не нужна. Она используется только если данный сервер хотят сделать выходом для ещё одного входного сервера. Для обычной цепочки из двух серверов повторно нажимать её не следует.</p>
+
+      <h3 class="help-subheading">Проверить, заменить или временно отключить</h3>
+      <div class="help-definition-grid">
+        <article><strong>«Проверить ещё раз»</strong><p>Используйте после перезагрузки выхода, изменения адреса или REALITY-параметров, ошибки соединения либо перед повторным включением.</p></article>
+        <article><strong>«Заменить выходной сервер»</strong><p>Создайте ссылку на новом выходе, раскройте этот блок на входе, вставьте новую ссылку, нажмите <strong>«Подключить и проверить»</strong> и проверьте новый IP.</p></article>
+        <article><strong>«Отключить и вернуть Direct»</strong><p>Возвращает основной выход на <code>direct</code>, но сохраняет импортированные параметры. Те же пользовательские ссылки продолжают работать через IP входного сервера.</p></article>
+      </div>
+
+      <h3 class="help-subheading">Полностью удалить Cascade</h3>
+      <p>Кнопка <strong>«Удалить Cascade»</strong> действует только на текущем сервере.</p>
+      <div class="help-definition-grid help-definition-grid-2">
+        <article><strong>На входном сервере</strong><p>Удаляется локальный Cascade Outbound и возвращается <code>direct</code>. Обычные клиенты, UUID, входные REALITY-ключи и сертификаты сохраняются.</p></article>
+        <article><strong>На выходном сервере</strong><p>Удаляется локальный служебный доступ Cascade. Обычные клиенты и активный серверный профиль не удаляются.</p></article>
+      </div>
+      <p class="help-note">Для полной очистки цепочки удалите Cascade отдельно на входном и выходном серверах.</p>
+
+      <h3 class="help-subheading">Cascade и Traffic Rules</h3>
+      <p>Явные правила Routing выполняются раньше основного выхода Cascade. Поэтому выбранный сайт может идти через <code>warp</code>, <code>direct</code> или <code>blocked</code>, а весь остальной трафик — через Cascade. Правило создаётся на том сервере, где оно должно сработать.</p>
+
+      <h3 class="help-subheading">Типовые ошибки</h3>
+      <div class="help-definition-grid help-definition-grid-2">
+        <article><strong>«Проверка не пройдена»</strong><p>Проверьте адрес и TCP-порт служебной ссылки, Xray на выходе, Security Group/firewall, целостность ссылки, время серверов и не был ли служебный доступ создан заново.</p></article>
+        <article><strong>«Включить Cascade» недоступна</strong><p>Нужна свежая успешная проверка. Нажмите <strong>«Проверить ещё раз»</strong> и дождитесь результата с выходным IP.</p></article>
+        <article><strong>Клиент перестал подключаться</strong><p>Нажмите <strong>«Отключить и вернуть Direct»</strong>, проверьте обычного клиента, затем повторно проверьте Cascade и журналы обоих серверов.</p></article>
+        <article><strong>Сайт показывает IP входа</strong><p>Переподключите клиента, проверьте статус <strong>«Cascade включён»</strong>, отсутствие правила <code>direct</code> для тестового сайта и повторите проверку.</p></article>
+      </div>
+      <div class="ui-info-note"><span>i</span><p><strong>Главное правило:</strong> выход создаёт служебную ссылку, вход импортирует и проверяет её, а конечный пользователь всегда получает обычную ссылку из Clients входного сервера.</p></div>
+      <div class="ui-actions"><a class="button primary" href="{{ url_for('cascade_page') }}">Открыть Cascade</a><a class="button secondary" href="{{ url_for('users_page') }}">Открыть Clients</a><a class="button ghost" href="{{ url_for('diagnostics_page') }}">Открыть диагностику</a></div>
+    </section>
+
+    <section class="ui-card help-section help-section-major" id="routing-warp">
+      <header class="ui-card-heading"><div><p class="panel-kicker">ROUTING → WARP</p><h2>Российские сайты через Cloudflare WARP</h2><p>Полный путь: создать WARP Outbound, проверить его отдельно, добавить два управляемых правила, применить конфигурацию и доказать маршрут контрольным сайтом.</p></div></header>
+
+      <div class="help-definition-grid">
+        <article><strong>WARP Outbound</strong><p>Реальный выход Xray с тегом <code>warp</code>. Его создание ещё не направляет через WARP пользовательский трафик.</p></article>
+        <article><strong>WARP Routing</strong><p>Правила, которые решают, какие домены и IP использовать через <code>warp</code>, а какие оставить на обычном выходе <code>direct</code>.</p></article>
+        <article><strong>Проверка WARP</strong><p>Отдельный тест Outbound подтверждает, что Cloudflare доступен. Контрольное правило подтверждает, что Traffic Rules действительно выбирают этот выход.</p></article>
+      </div>
+
+      <h3 class="help-subheading">Перед началом</h3>
+      <ol class="help-steps">
+        <li>Подключение клиента к текущему серверу должно уже работать без WARP.</li>
+        <li>В <strong>Routing → GeoFiles</strong> должны отображаться установленные <code>geosite.dat</code> и <code>geoip.dat</code>.</li>
+        <li>Запишите публичный IP EC2. Он нужен для сравнения с адресом Cloudflare после проверки.</li>
+      </ol>
+
+      <h3 class="help-subheading">Шаг 1. Создать и проверить WARP Outbound</h3>
+      <ol class="help-steps help-steps-emphasis">
+        <li>Откройте <strong>Routing → Outbounds</strong>.</li>
+        <li>В карточке <strong>WARP Outbound</strong> нажмите <strong>«Создать WARP»</strong>. SG-Panel зарегистрирует учётные данные Cloudflare, соберёт native WireGuard Outbound Xray и проверит итоговый <code>config.json</code>.</li>
+        <li>После создания статус должен стать <strong>«Активен»</strong>, а тег Outbound — <code>warp</code>.</li>
+        <li>Нажмите <strong>«Проверить WARP»</strong>. Панель выполнит отдельный запрос через этот Outbound, не меняя рабочие правила клиента.</li>
+        <li>Успешный результат показывает выходной IP Cloudflare. Это может быть IPv4 или IPv6; IPv6 здесь не является ошибкой.</li>
+      </ol>
+      <div class="ui-warning-note"><span>!</span><p><strong>Проверка WARP и маршрутизация — разные вещи.</strong> Статус «Активен» доказывает работоспособность Outbound, но пользовательский трафик начнёт идти через него только после создания и применения Traffic Rules.</p></div>
+
+      <h3 class="help-subheading">Шаг 2. Выбрать российский пресет</h3>
+      <ol class="help-steps help-steps-emphasis">
+        <li>Нажмите <strong>«Открыть Routing»</strong> и выберите режим <strong>«Только выбранные сайты»</strong>.</li>
+        <li>Для одних российских доменных зон выберите <strong>«Только российские доменные зоны»</strong>: панель подставит <code>geosite:tld-ru</code>, а поле IP оставит пустым.</li>
+        <li>Для широкого охвата выберите <strong>«Российские сайты и IP»</strong>: панель подставит <code>geosite:category-ru</code> и <code>geoip:ru</code>.</li>
+        <li><code>category-ru</code> уже включает <code>tld-ru</code>, поэтому добавлять обе категории одновременно не нужно.</li>
+        <li>Нажмите <strong>«Проверить конфигурацию»</strong>. Только после успешной проверки нажмите <strong>«Сохранить и применить»</strong>.</li>
+      </ol>
+      <div class="help-flow"><code>geosite:category-ru</code><span>→</span><code>warp · priority 40</code><span>+</span><code>geoip:ru</code><span>→</span><code>warp · priority 41</code></div>
+      <p class="help-note"><strong>Почему в широком пресете создаются два правила:</strong> поля Domain и IP внутри одного правила Xray объединяются логическим AND. Два отдельных правила дают нужную логику OR: через WARP проходит трафик, совпавший либо по домену, либо по IP.</p>
+
+      <h3 class="help-subheading">Как добавить отдельный сайт</h3>
+      <p>В режиме <strong>«Только выбранные сайты»</strong> добавьте условие новой строкой в подходящее поле, затем снова выполните проверку и применение.</p>
+      <div class="help-definition-grid help-definition-grid-2">
+        <article><strong>Домены / Geosite</strong><p><code>domain:example.ru</code> — домен и его поддомены.<br><code>full:www.example.ru</code> — только точное имя.<br><code>keyword:example</code> — совпадение по части имени.<br><code>geosite:category-ru</code> — категория из <code>geosite.dat</code>.</p></article>
+        <article><strong>IP / GeoIP / CIDR</strong><p><code>geoip:ru</code> — категория из <code>geoip.dat</code>.<br><code>203.0.113.25</code> — отдельный IP.<br><code>203.0.113.0/24</code> — сеть CIDR.<br>Каждое условие вводится с новой строки, без запятых.</p></article>
+      </div>
+
+      <h3 class="help-subheading">Шаг 3. Проверить созданные правила</h3>
+      <ol class="help-steps">
+        <li>Прокрутите страницу до таблицы <strong>«Правила маршрутизации»</strong>.</li>
+        <li>Убедитесь, что правило с приоритетом <code>40</code> содержит <code>domain: geosite:category-ru</code>, выход <code>warp</code> и состояние <strong>«Включено»</strong>.</li>
+        <li>Убедитесь, что правило с приоритетом <code>41</code> содержит <code>ip: geoip:ru</code>, выход <code>warp</code> и состояние <strong>«Включено»</strong>.</li>
+        <li>Помните: меньшее число приоритета выполняется раньше. Защитные правила с приоритетами <code>10</code> и <code>20</code> должны остаться выше WARP.</li>
+      </ol>
+
+      <h3 class="help-subheading">Шаг 4. Доказать маршрут контрольным правилом</h3>
+      <div class="ui-info-note"><span>i</span><p>В выборочном режиме обычный сайт проверки IP может показать IP EC2 — это нормально: его домен не обязан входить в <code>category-ru</code>. Для однозначного теста временно направьте конкретный проверочный домен через WARP.</p></div>
+      <ol class="help-steps help-steps-emphasis">
+        <li>В таблице правил нажмите <strong>«Добавить правило»</strong>.</li>
+        <li>Введите название <code>WARP test — ifconfig.me</code>.</li>
+        <li>Укажите приоритет <code>39</code>, выход <code>warp</code> и сеть <code>tcp,udp</code>.</li>
+        <li>В поле <strong>«Домены»</strong> введите <code>domain:ifconfig.me</code>. Остальные условия оставьте пустыми.</li>
+        <li>Нажмите <strong>«Проверить конфигурацию»</strong>, затем <strong>«Создать правило»</strong>.</li>
+        <li>Переподключите клиент или откройте новую приватную вкладку и посетите <code>ifconfig.me</code>.</li>
+        <li>Показанный адрес должен отличаться от публичного IP EC2 и соответствовать выходу Cloudflare, который показала кнопка <strong>«Проверить WARP»</strong>.</li>
+        <li>После подтверждения удалите временное правило <code>WARP test — ifconfig.me</code>.</li>
+      </ol>
+
+      <h3 class="help-subheading">Шаг 5. Проверить настоящий российский домен</h3>
+      <ol class="help-steps">
+        <li>Оставьте только управляемые правила <code>40</code> и <code>41</code>.</li>
+        <li>Откройте <code>2ip.ru</code>. В текущем комплекте GeoFiles этот домен попадает под российское правило.</li>
+        <li>Ожидаемый результат: показан адрес Cloudflare/WARP, а не публичный адрес EC2; провайдер может определяться как Cloudflare.</li>
+        <li>Откройте обычный зарубежный сайт проверки IP. При выборочном режиме он должен по-прежнему показывать IP EC2, если для него нет отдельного WARP-правила.</li>
+      </ol>
+
+      <h3 class="help-subheading">Если результат не совпал</h3>
+      <div class="help-definition-grid help-definition-grid-2">
+        <article><strong>Показывается IP EC2</strong><p>Это нормально для домена, который не совпал с правилами. Проверьте контрольное правило, его состояние, выход <code>warp</code> и приоритет.</p></article>
+        <article><strong>Категория не найдена</strong><p>Откройте <strong>Routing → GeoFiles</strong>. Активные файлы должны содержать <code>category-ru</code> и <code>ru</code>. Панель не применит неисправный кандидат.</p></article>
+        <article><strong>Правила есть, но старый маршрут сохраняется</strong><p>Переподключите клиент, закройте старые вкладки или используйте приватное окно. Уже открытое HTTP/3 или TLS-соединение может некоторое время использовать прежний маршрут.</p></article>
+        <article><strong>Сайт использует зарубежный CDN</strong><p>Добавьте его домен отдельной строкой <code>domain:...</code>. Маршрут по <code>geoip:ru</code> сам по себе не охватит зарубежный адрес CDN.</p></article>
+      </div>
+      <div class="ui-actions"><a class="button primary" href="{{ url_for('outbounds_page') }}#warp-title">Открыть WARP Outbound</a><a class="button secondary" href="{{ url_for('routing_page') }}#warp-routing-title">Открыть WARP Routing</a></div>
+    </section>
+
+    <section class="ui-card help-section" id="routing-geofiles">
+      <header class="ui-card-heading"><div><p class="panel-kicker">ROUTING → GEOFILES</p><h2>Фактически используемые geoip.dat и geosite.dat</h2><p>Нейтральное состояние — не пустые поля, а установленный комплект Xray с реальными путями, размерами, датами и SHA-256.</p></div></header>
+      <ol class="help-steps">
+        <li>Откройте <strong>Routing → GeoFiles</strong> и проверьте активный источник и оба файла.</li>
+        <li>Для обычной установки оставьте <strong>Installed Xray package</strong>. Это безопасное значение по умолчанию.</li>
+        <li>Для смены источника явно включите редактирование и выберите поддерживаемый комплект, пользовательские HTTPS URL или локальные файлы.</li>
+        <li>Нажмите <strong>«Проверить GeoFiles»</strong>. SG-Panel проверит файлы и совместимость текущих Routing Rules.</li>
+        <li>Только после успешной проверки примените комплект. При ошибке используется backup/rollback.</li>
+      </ol>
+      <p class="help-note"><strong>Ожидаемый результат:</strong> оба файла существуют, имеют ненулевой размер и SHA-256, а статус проверки показывает, что текущие правила могут быть с ними собраны.</p>
+      <div class="ui-actions"><a class="button primary" href="{{ url_for('geofiles_page') }}">Открыть GeoFiles</a></div>
+    </section>
+
+    <section class="ui-card help-section help-section-major" id="advanced-transport">
+      <header class="ui-card-heading"><div><p class="panel-kicker">XRAY SERVER → ДОПОЛНИТЕЛЬНО</p><h2>Серверно-клиентские параметры без догадок</h2><p>SG-Panel является источником параметров, которые зависят от сервера. SG Client получает их из управляемого JSON-профиля и не должен предлагать обычному пользователю придумывать Flow, ECH, fingerprint или CA PEM.</p></div></header>
+
+      <h3 class="help-subheading">Что видит профиль REALITY</h3>
+      <div class="help-definition-grid help-definition-grid-2">
+        <article><strong>Параметры REALITY</strong><p>В профиль передаются Server Name, public key, short ID, fingerprint клиента и Flow. Для TCP REALITY значение <code>xtls-rprx-vision</code> записывается серверному пользователю и в URI одновременно.</p></article>
+        <article><strong>TLS certificate extras скрыты</strong><p>ECH, SHA-256 сертификата и пользовательская CA/PEM не относятся к обычной проверке сертификата REALITY и не включаются в управляемый профиль.</p></article>
+      </div>
+      <div class="ui-warning-note"><span>!</span><p>Vision нельзя включать только в SG Client. Если Flow отсутствует на сервере или в профиле, локальное включение приведёт к несовместимости соединения.</p></div>
+
+      <h3 class="help-subheading">Что видит профиль TLS</h3>
+      <div class="help-definition-grid help-definition-grid-2">
+        <article><strong>System CA — по умолчанию</strong><p>Для сертификата публичного центра сертификации дополнительные поля не нужны. Клиент проверяет цепочку системным хранилищем и имя из Server Name/SNI.</p></article>
+        <article><strong>verifyPeerCertByName</strong><p>Ручное имя задаётся только для специальной схемы, когда имя подключения отличается от имени сертификата. В обычном режиме оно вычисляется автоматически.</p></article>
+        <article><strong>Certificate SHA-256</strong><p>Отпечаток рассчитывается из конкретного проверенного сертификата или передаётся администратором. SG-Panel не реализует опасный режим «получить с удалённого сервера и сразу доверять».</p></article>
+        <article><strong>Пользовательская CA PEM</strong><p>Нужна главным образом для частной CA. Импортируется полная цепочка без закрытого ключа; системные корневые сертификаты остаются включены.</p></article>
+      </div>
+
+      <h3 class="help-subheading">ECH</h3>
+      <div class="help-definition-grid help-definition-grid-2">
+        <article><strong>Связанная серверно-клиентская пара</strong><p>Владелец сервера создаёт <code>echServerKeys</code> и соответствующую клиентскую <code>ECHConfig</code>. Серверный секрет хранится только на Controller и никогда не экспортируется.</p></article>
+        <article><strong>Получение клиентом</strong><p>SG Client получает готовую ECHConfig из управляемого профиля либо проверенный DNS/DoH-источник. Пользователь не создаёт случайное значение самостоятельно.</p></article>
+      </div>
+      <p class="help-note"><strong>Контекст:</strong> SG-Panel показывает ECH только там, где TLS обрабатывает непосредственно Xray. Для XHTTP-TLS и gRPC-TLS TLS завершается в Nginx, поэтому фиктивная ECH-настройка Xray не предлагается.</p>
+
+      <h3 class="help-subheading">XHTTP Extra и FinalMask</h3>
+      <div class="help-definition-grid help-definition-grid-2">
+        <article><strong>XHTTP Mode и Extra</strong><p><code>Auto</code> и эффективный JSON <code>{}</code> означают стандартное поведение Xray. Server Extra попадает в серверный config, Client Extra — в профиль SG Client.</p></article>
+        <article><strong>FinalMask</strong><p><strong>Выключено — рекомендуется.</strong> Опытный администратор может применить проверенный пресет или согласованные Server/Client JSON. Случайные примеры не применяются автоматически.</p></article>
+      </div>
+
+      <h3 class="help-subheading">Управляемая подписка SG Client</h3>
+      <ol class="help-steps">
+        <li>Откройте страницу клиента и скопируйте адрес <strong>SG Client · управляемый JSON v2</strong>.</li>
+        <li>JSON содержит активные соединения, применимость каждого параметра, источник значения и признак серверного управления.</li>
+        <li>SG Client должен предпочитать объект <code>managedV2</code>. Старый <code>managed</code> v1 сохранён только для совместимости.</li>
+        <li>Для REALITY объект TLS помечается как неприменимый и не содержит ECH, pin или PEM.</li>
+        <li>Для TLS клиент использует System CA по умолчанию и добавляет только значения, реально переданные SG-Panel.</li>
+      </ol>
+      <div class="ui-warning-note"><span>◆</span><p>URL содержит секретный token пользователя. Не публикуйте его. Доступ к JSON можно отключить в <strong>Security → Subscription endpoint</strong>.</p></div>
+
+      <h3 class="help-subheading">Безопасный порядок изменения</h3>
+      <ol class="help-steps help-steps-emphasis">
+        <li>Проверьте эффективные состояния и текущий Inbound.</li>
+        <li>Нажмите <strong>«Включить редактирование»</strong>.</li>
+        <li>Введите только значения от администратора, SG-Panel или проверенного локального файла.</li>
+        <li>Выполните <strong>Validate</strong>; SG-Panel проверит формат и итоговый <code>config.json</code> через <code>xray run -test</code>.</li>
+        <li>После успеха сохраните и примените. При ошибке используется rollback.</li>
+        <li>Повторно импортируйте/обновите профиль в SG Client и проверьте источник каждого значения.</li>
+      </ol>
+      <p class="help-note"><strong>Ожидаемый результат:</strong> обычный пользователь импортирует профиль и подключается без ручного поиска криптографических параметров; эксперт видит их источник и может изменить только разрешённые значения.</p>
+      <div class="ui-actions"><a class="button primary" href="{{ url_for('settings_advanced_page') }}">Открыть «Дополнительно»</a><a class="button secondary" href="{{ url_for('subscriptions_page') }}">Открыть подписки</a></div>
     </section>
 
     <section class="ui-card help-section" id="backups">

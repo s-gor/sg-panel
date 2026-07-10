@@ -175,15 +175,18 @@ def cmd_set_server(args: argparse.Namespace) -> int:
         args.public_key,
         args.short_id,
     )
+    flow = str(getattr(args, "flow", "xtls-rprx-vision") or "").strip()
+    if flow not in {"", "xtls-rprx-vision"}:
+        return fail("flow должен быть пустым или xtls-rprx-vision")
     init_db()
     with connect() as con:
         con.execute(
             """
             INSERT INTO server_settings (
                 id, address, listen, port, dest, server_name,
-                private_key, public_key, short_id, fingerprint,
+                private_key, public_key, short_id, fingerprint, flow,
                 stats_enabled, config_path, xray_bin, xray_service
-            ) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)
+            ) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)
             ON CONFLICT(id) DO UPDATE SET
                 address = excluded.address,
                 listen = excluded.listen,
@@ -208,6 +211,7 @@ def cmd_set_server(args: argparse.Namespace) -> int:
                 args.public_key,
                 args.short_id,
                 args.fingerprint,
+                flow,
                 args.config_path,
                 args.xray_bin,
                 args.xray_service,
@@ -619,7 +623,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--private-key", required=True)
     p.add_argument("--public-key", required=True)
     p.add_argument("--short-id", required=True)
-    p.add_argument("--fingerprint", default="chrome")
+    p.add_argument("--fingerprint", default="firefox")
+    p.add_argument("--flow", choices=("", "xtls-rprx-vision"), default="xtls-rprx-vision", help="XTLS Flow для новой установки; существующее значение при обновлении не перезаписывается")
     p.add_argument("--config-path", default="/usr/local/etc/xray/config.json")
     p.add_argument("--xray-bin", default="/usr/local/bin/xray")
     p.add_argument("--xray-service", default="xray")
@@ -712,7 +717,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--server-name", required=True)
     p.add_argument("--public-key", default="", help="Reality password/public key удалённого сервера")
     p.add_argument("--short-id", default="")
-    p.add_argument("--fingerprint", default="chrome")
+    p.add_argument("--fingerprint", default="firefox")
     p.add_argument("--spider-x", default="")
     p.add_argument("--xhttp-host", default="")
     p.add_argument("--xhttp-path", default="/")

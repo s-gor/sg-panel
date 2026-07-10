@@ -15,6 +15,17 @@
     <article class="ui-status-card"><span>config.json</span><strong class="{{ 'text-success' if diagnostics.config_validation.ok else 'text-danger' }}">{{ 'OK' if diagnostics.config_validation.ok else 'ERROR' }}</strong><small>{{ diagnostics.config_validation.users }} активных пользователей</small></article>
   </section>
 
+  <section class="ui-card instance-settings-card">
+    <header class="ui-card-heading"><div><p class="panel-kicker">ИМЯ СЕРВЕРА</p><h2>Как отличать эту SG-Panel</h2><p>Имя показывается в шапке и на всех страницах. Например: CC1 · Frankfurt или CC2 · Virginia.</p></div></header>
+    <form method="post" action="{{ url_for('system_instance_name') }}" class="instance-name-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="next" value="{{ request.full_path }}">
+      <label><span>Название сервера</span><input name="instance_name" value="{{ instance_name }}" maxlength="64" required placeholder="CC1 · Frankfurt"></label>
+      <div class="instance-address-field"><span>Публичный адрес</span><code>{{ instance_address or 'не определён' }}</code></div>
+      <button class="button primary" type="submit">Сохранить имя</button>
+    </form>
+  </section>
+
   <section class="ui-card diagnostics-controls-card">
     <header class="ui-card-heading ui-card-heading-row"><div><p class="panel-kicker">ОСНОВНЫЕ СЛУЖБЫ</p><h2>Управляемые компоненты <a class="context-help-link" href="{{ url_for('help_page') }}#diagnostics" title="Справка по диагностике" aria-label="Справка по диагностике">?</a></h2><p>Перезапуск нужен только при диагностике. Обычные изменения применяются на своих страницах.</p></div><a class="button ghost" href="{{ url_for('diagnostics_page') }}?tab=status">Обновить данные</a></header>
     <div class="service-list awg-service-list">
@@ -30,7 +41,7 @@
       <div><dt>Публичная точка Xray</dt><dd><code>{{ diagnostics.transport_protocol }} {{ diagnostics.server_address }}:{{ diagnostics.server_port }}</code></dd></div>
       <div><dt>Default Outbound</dt><dd><code>{{ diagnostics.default_outbound_tag }}</code></dd></div>
       <div><dt>Системный DNS</dt><dd class="{{ 'text-success' if diagnostics.dns_test.ok else 'text-danger' }}">{% if diagnostics.dns_test.ok %}OK, {{ diagnostics.dns_test.latency_ms }} мс{% else %}{{ diagnostics.dns_test.detail }}{% endif %}</dd></div>
-      <div><dt>Ресурсы</dt><dd>{{ diagnostics.memory_used_percent }}% RAM · {{ diagnostics.disk_free }} свободно</dd></div>
+      <div><dt>Ресурсы</dt><dd>{{ diagnostics.memory_used_percent }}% RAM · {{ diagnostics.memory_available }} доступно</dd></div>
     </dl>
     <details class="advanced technical-details"><summary>Все технические сведения</summary><dl class="ui-details-list diagnostics-facts-list"><div><dt>WARP</dt><dd>{{ 'не настроен' if not diagnostics.warp.configured else ('отключён' if not diagnostics.warp.enabled else diagnostics.warp.last_test_state) }}</dd></div><div><dt>WARP endpoint</dt><dd><code>{{ diagnostics.warp_endpoint or 'не настроен' }}</code></dd></div><div><dt>Операционная система</dt><dd>{{ diagnostics.os }}</dd></div><div><dt>Kernel / Python</dt><dd><code>{{ diagnostics.kernel }} / {{ diagnostics.python }}</code></dd></div></dl></details>
   </section>

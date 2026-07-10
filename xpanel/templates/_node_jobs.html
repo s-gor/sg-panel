@@ -1,0 +1,40 @@
+{% if jobs %}
+  {% set latest = jobs[0] %}
+  <article class="node-job node-job-current state-{{ latest.status }}" data-current-job-status="{{ latest.status }}">
+    <div>
+      {% if latest.status in ['queued', 'running'] %}<span class="node-job-spinner" aria-hidden="true"></span>{% endif %}
+      <span class="node-job-state">{{ latest.status_label }}</span>
+      <strong>{{ latest.title }}</strong>
+      <small>#{{ latest.id }} · {{ latest.requested_at }}</small>
+    </div>
+    {% if latest.result.message %}<p>{{ latest.result.message }}</p>{% endif %}
+    {% if latest.client_link and latest.status == 'succeeded' %}
+    <div class="node-command">
+      <code id="nodeJobLink{{ latest.id }}">{{ latest.client_link }}</code>
+      <button class="button secondary small" type="button" data-copy-target="nodeJobLink{{ latest.id }}">Копировать ссылку</button>
+    </div>
+    {% endif %}
+  </article>
+  {% if jobs|length > 1 %}
+  <details class="node-job-history">
+    <summary>История заданий <span>{{ jobs|length - 1 }}</span></summary>
+    <div class="node-job-history-list">
+      {% for job in jobs[1:] %}
+      {% set resolved = latest.status == 'succeeded' and job.status == 'failed' %}
+      <article class="node-job state-{{ 'resolved' if resolved else job.status }}">
+        <div>
+          <span class="node-job-state">{{ 'Исправлено' if resolved else job.status_label }}</span>
+          <strong>{{ job.title }}</strong>
+          <small>#{{ job.id }} · {{ job.requested_at }}</small>
+        </div>
+        {% if resolved %}
+        <p>Предыдущее задание исправлено новым успешным развёртыванием.</p>
+        {% elif job.result.message %}<p>{{ job.result.message }}</p>{% endif %}
+      </article>
+      {% endfor %}
+    </div>
+  </details>
+  {% endif %}
+{% else %}
+<p class="muted">Заданий пока нет.</p>
+{% endif %}

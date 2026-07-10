@@ -1,8 +1,8 @@
 {% extends "base.html" %}
 {% from '_fingerprint_select.html' import fingerprint_select %}
 {% block title %}Outbounds — SG-Panel{% endblock %}
-{% block section %}NETWORK{% endblock %}
-{% block heading %}Network{% endblock %}
+{% block section %}ROUTING{% endblock %}
+{% block heading %}Routing{% endblock %}
 {% block subtitle %}Системные и пользовательские выходы Xray{% endblock %}
 {% block content %}
 <script>document.body.classList.add('outbounds-page');</script>
@@ -101,7 +101,7 @@
         <strong>Маршрутизация настраивается отдельно</strong>
         <p>Режим «выбранные сайты» или «весь трафик» находится на странице <b>Routing</b>.</p>
       </div>
-      <a class="button primary" href="{{ url_for('routing_page') }}">Открыть Routing</a>
+      <div class="warp-routing-actions"><a class="button secondary" href="{{ url_for('help_page') }}#routing-warp">Полная инструкция</a><a class="button primary" href="{{ url_for('routing_page') }}#warp-routing-title">Открыть Routing</a></div>
     </div>
   </section>
 
@@ -183,6 +183,32 @@
     <form method="post" action="{{ url_for('outbound_add') }}" class="ob-form outbound-dynamic-form" data-mode="create" data-validated-form>
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <input type="hidden" name="protocol" value="vless">
+
+      <section class="ob-link-import" data-vless-import data-import-url="{{ url_for('outbound_import_vless') }}" aria-labelledby="ob-link-import-title">
+        <div class="ob-link-import-heading">
+          <div>
+            <p class="panel-kicker">БЫСТРОЕ ЗАПОЛНЕНИЕ</p>
+            <h3 id="ob-link-import-title">Импорт из VLESS-ссылки</h3>
+            <p>Скопируйте готовую ссылку с удалённой SG-Panel. Адрес, порт, UUID, транспорт, REALITY/TLS и остальные параметры заполнятся автоматически.</p>
+          </div>
+          <span class="ob-link-import-badge">vless://</span>
+        </div>
+        <div class="ob-link-import-controls">
+          <label>
+            <span>VLESS-ссылка удалённого сервера</span>
+            <textarea data-vless-link-input rows="3" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="vless://UUID@server:port?...#Название"></textarea>
+            <small>Ссылка используется только для разбора, не сохраняется в панели и после успешного импорта очищается.</small>
+          </label>
+          <div class="ob-link-import-actions">
+            <button class="button primary" type="button" data-vless-import-button>Разобрать и заполнить</button>
+            <button class="button secondary" type="button" data-vless-import-clear>Очистить</button>
+          </div>
+        </div>
+        <div class="ob-link-import-result" data-vless-import-result hidden aria-live="polite">
+          <strong data-vless-import-summary></strong>
+          <p data-vless-import-detail></p>
+        </div>
+      </section>
 
       <section class="ob-scheme" aria-label="Схема подключения">
         <div class="ob-scheme-group is-fixed">
@@ -267,7 +293,7 @@
           </header>
           <div class="ob-fields ob-fields-security">
             <label><span>Server name / SNI</span><input name="server_name" required placeholder="www.bing.com"></label>
-            <label><span>Fingerprint браузера</span>{{ fingerprint_select('chrome') }}</label>
+            <label><span>Fingerprint браузера</span>{{ fingerprint_select('firefox') }}</label>
           </div>
 
           <div class="ob-conditional" data-reality-fields>
@@ -313,6 +339,7 @@
     const tlsFields = form.querySelector('[data-tls-fields]');
     const publicKey = form.querySelector('input[name="public_key"]');
     const xhttpPath = form.querySelector('input[name="xhttp_path"]');
+    const importPanel = form.querySelector('[data-vless-import]');
 
     function checked(name) {
       const input = form.querySelector('input[name="' + name + '"]:checked');
@@ -342,12 +369,139 @@
         flow.disabled = true;
       } else {
         flow.disabled = false;
-        if (form.dataset.mode === 'create' && !flow.value) flow.value = 'xtls-rprx-vision';
+        if (form.dataset.mode === 'create' && form.dataset.imported !== 'true' && !flow.value) flow.value = 'xtls-rprx-vision';
       }
+    }
+
+    function setField(name, value) {
+      const field = form.querySelector('[name="' + name + '"]');
+      if (!field) return;
+      if (field.type === 'checkbox') {
+        field.checked = Boolean(value);
+      } else {
+        field.value = value == null ? '' : String(value);
+      }
+    }
+
+    function selectRadio(name, value) {
+      const radio = form.querySelector('input[name="' + name + '"][value="' + value + '"]');
+      if (!radio) return;
+      radio.checked = true;
+      radio.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+
+    function initVlessImport() {
+      if (!importPanel) return;
+      const input = importPanel.querySelector('[data-vless-link-input]');
+      const importButton = importPanel.querySelector('[data-vless-import-button]');
+      const clearButton = importPanel.querySelector('[data-vless-import-clear]');
+      const result = importPanel.querySelector('[data-vless-import-result]');
+      const summary = importPanel.querySelector('[data-vless-import-summary]');
+      const detail = importPanel.querySelector('[data-vless-import-detail]');
+      const endpoint = importPanel.dataset.importUrl;
+
+      function showResult(kind, heading, message) {
+        result.hidden = false;
+        result.classList.toggle('is-error', kind === 'error');
+        result.classList.toggle('is-success', kind === 'success');
+        summary.textContent = heading;
+        detail.textContent = message;
+      }
+
+      function clearResult() {
+        result.hidden = true;
+        result.classList.remove('is-error', 'is-success');
+        summary.textContent = '';
+        detail.textContent = '';
+      }
+
+      async function importLink() {
+        const link = input.value.trim();
+        if (!link) {
+          showResult('error', 'Ссылка не вставлена', 'Скопируйте VLESS-ссылку на удалённой панели и вставьте её в поле выше.');
+          input.focus();
+          return;
+        }
+        importButton.disabled = true;
+        importButton.textContent = 'Разбираю…';
+        clearResult();
+        try {
+          const data = new FormData();
+          data.append('csrf_token', form.querySelector('input[name="csrf_token"]').value);
+          data.append('vless_link', link);
+          const response = await fetch(endpoint, {
+            method: 'POST',
+            body: data,
+            credentials: 'same-origin',
+            headers: { 'Accept': 'application/json' }
+          });
+          const payload = await response.json().catch(function () { return {}; });
+          if (!response.ok || !payload.ok || !payload.outbound) {
+            throw new Error(payload.message || 'Не удалось разобрать VLESS-ссылку.');
+          }
+
+          const outbound = payload.outbound;
+          form.dataset.imported = 'true';
+          selectRadio('network', outbound.network);
+          selectRadio('security', outbound.security);
+          update();
+
+          const tagField = form.querySelector('input[name="tag"]');
+          const nameField = form.querySelector('input[name="name"]');
+          if (tagField && !tagField.value.trim()) tagField.value = outbound.tag || '';
+          if (nameField && !nameField.value.trim()) nameField.value = outbound.name || '';
+
+          setField('address', outbound.address);
+          setField('port', outbound.port);
+          setField('uuid', outbound.uuid);
+          setField('flow', outbound.flow);
+          setField('server_name', outbound.server_name);
+          setField('fingerprint', outbound.fingerprint);
+          setField('public_key', outbound.public_key);
+          setField('short_id', outbound.short_id);
+          setField('spider_x', outbound.spider_x);
+          setField('xhttp_host', outbound.xhttp_host);
+          setField('xhttp_path', outbound.xhttp_path);
+          selectRadio('xhttp_mode', outbound.xhttp_mode || 'auto');
+          setField('allow_insecure', Boolean(outbound.allow_insecure));
+          setField('alpn', outbound.alpn);
+          update();
+
+          const features = [outbound.transport_label, outbound.security_label];
+          if (outbound.vision) features.push('XTLS Vision');
+          features.push(String(outbound.fingerprint || '').toUpperCase());
+          showResult(
+            'success',
+            'Ссылка разобрана: ' + outbound.address + ':' + outbound.port,
+            features.filter(Boolean).join(' · ') + '. Проверьте предложенные тег и название, затем создайте выход.'
+          );
+          input.value = '';
+          if (tagField) tagField.focus({ preventScroll: true });
+        } catch (error) {
+          showResult('error', 'Ссылка не разобрана', error && error.message ? error.message : 'Неизвестная ошибка.');
+        } finally {
+          importButton.disabled = false;
+          importButton.textContent = 'Разобрать и заполнить';
+        }
+      }
+
+      importButton.addEventListener('click', importLink);
+      clearButton.addEventListener('click', function () {
+        input.value = '';
+        clearResult();
+        input.focus();
+      });
+      input.addEventListener('keydown', function (event) {
+        if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+          event.preventDefault();
+          importLink();
+        }
+      });
     }
 
     form.querySelectorAll('input[name="network"], input[name="security"]').forEach(input => input.addEventListener('change', update));
     update();
+    initVlessImport();
   }
 
   const outputToggle = document.querySelector('.ob-output-toggle');
@@ -363,7 +517,7 @@
     if (open && moveFocus) {
       requestAnimationFrame(function () {
         outputForm.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        const firstField = outputForm.querySelector('input[name="tag"]');
+        const firstField = outputForm.querySelector('[data-vless-link-input]') || outputForm.querySelector('input[name="tag"]');
         if (firstField) firstField.focus({ preventScroll: true });
       });
     }

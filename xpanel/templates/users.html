@@ -4,8 +4,9 @@
 {% block heading %}Clients & Traffic Studio{% endblock %}
 {% block subtitle %}Пользователи Xray, готовые конфигурации текущего Inbound и долговременная статистика трафика{% endblock %}
 {% block content %}
-<script>document.body.classList.add('clients-studio-page');</script>
+<script>document.body.classList.add('ui-standard-page','clients-studio-page','clients-network-scale');</script>
 
+<div class="ui-page ui-page-wide clients-page-shell">
 <div class="clients-studio-toolbar">
   <div class="clients-studio-toolbar-copy">
     <span class="clients-live-dot"></span>
@@ -116,60 +117,75 @@
       {% endif %}
     </section>
   </div>
+</div>
 
-  <aside class="client-detail-card">
+<section class="client-detail-card client-detail-standard clients-selected-card ui-card" data-client-wide-card>
     {% if selected_user %}{% set st = selected_user.stats %}
-    <header class="client-detail-header">
-      <div class="client-detail-name"><i class="client-state-dot {{ 'online' if selected_user.online else 'active' if selected_user.effective_enabled else 'off' }}"></i><div><span>CLIENT #{{ selected_user.id }}</span><h2>{{ selected_user.name }}</h2><p>{{ profile_label }}</p></div></div>
-      {% if selected_user.online %}<span class="client-status-badge online">ONLINE</span>{% elif selected_user.effective_enabled %}<span class="client-status-badge active">ACTIVE</span>{% else %}<span class="client-status-badge off">OFF</span>{% endif %}
+    <header class="ui-card-heading ui-card-heading-row client-detail-header">
+      <div class="client-detail-name">
+        <i class="client-state-dot {{ 'online' if selected_user.online else 'active' if selected_user.effective_enabled else 'off' }}"></i>
+        <div><p class="panel-kicker">КЛИЕНТ №{{ selected_user.id }}</p><h2>{{ selected_user.name }}</h2><p>{{ profile_label }}</p></div>
+      </div>
+      {% if selected_user.online %}<span class="client-status-badge online">Онлайн</span>{% elif selected_user.effective_enabled %}<span class="client-status-badge active">Активен</span>{% else %}<span class="client-status-badge off">Отключён</span>{% endif %}
     </header>
 
-    <div class="client-detail-activity"><span>Последняя активность</span><strong>{{ selected_user.activity_text }}</strong><small>{% if st.last_collected_at %}Счётчики обновлены {{ st.last_collected_at[:16]|replace('T',' ') }} UTC{% else %}Ожидается первое измерение{% endif %}</small></div>
-
-    <div class="client-traffic-grid">
-      <article><span>Текущая сессия Xray</span><strong>{{ format_bytes(st.session_total|default(0)) }}</strong><small>↓ {{ format_bytes(st.session_downlink|default(0)) }} · ↑ {{ format_bytes(st.session_uplink|default(0)) }}</small></article>
-      <article><span>Сегодня</span><strong>{{ format_bytes(st.today_total|default(0)) }}</strong><small>↓ {{ format_bytes(st.today_downlink|default(0)) }} · ↑ {{ format_bytes(st.today_uplink|default(0)) }}</small></article>
-      <article><span>Текущий месяц</span><strong>{{ format_bytes(st.month_total|default(0)) }}</strong><small>↓ {{ format_bytes(st.month_downlink|default(0)) }} · ↑ {{ format_bytes(st.month_uplink|default(0)) }}</small></article>
-      <article class="client-traffic-lifetime"><span>За всё время</span><strong>{{ format_bytes(st.lifetime_total|default(0)) }}</strong><small>↓ {{ format_bytes(st.lifetime_downlink|default(0)) }} · ↑ {{ format_bytes(st.lifetime_uplink|default(0)) }}</small></article>
+    <div class="client-quick-grid">
+      <div><span>Последняя активность</span><strong>{{ selected_user.activity_text }}</strong></div>
+      <div><span>Трафик за всё время</span><strong>{{ format_bytes(st.lifetime_total|default(0)) }}</strong></div>
+      <div><span>Срок действия</span><strong>{% if selected_user.expiry_at %}{{ selected_user.expiry_at[:10] }}{% else %}Без срока{% endif %}</strong></div>
     </div>
 
-    <section class="client-history-block">
-      <div class="client-history-heading"><div><strong>Последние 14 дней</strong><small>Дневной суммарный трафик</small></div><span>{{ format_bytes(st.total_bps|default(0)) }}/с</span></div>
-      <div class="client-history-chart" aria-label="Трафик за 14 дней">
-        {% for point in selected_history %}<div class="client-history-column" title="{{ point.day }}: {{ format_bytes(point.total) }}"><i style="height: {{ [point.percent, 4]|max }}%"></i><span>{{ point.label if loop.index in [1,5,9,14] else '' }}</span></div>{% endfor %}
-      </div>
+    {% if selected_deletion_request and selected_deletion_request.status in ['running','pending','failed'] %}
+    <section class="client-delete-progress state-{{ selected_deletion_request.status }}">
+      <strong>{{ {'running':'Удаление выполняется','pending':'Завершается удаление','failed':'Удаление не завершено'}.get(selected_deletion_request.status, 'Удаление пользователя') }}</strong>
+      {% if selected_deletion_request.error %}<span>{{ selected_deletion_request.error }}</span>{% endif %}
     </section>
-
-    <dl class="client-detail-list">
-      <div><dt>Срок действия</dt><dd>{% if selected_user.expiry_at %}{{ selected_user.expiry_at[:16]|replace('T',' ') }} UTC{% else %}Без ограничения{% endif %}</dd></div>
-      <div><dt>Подписка</dt><dd>{{ 'Включена' if selected_user.subscription_enabled else 'Отключена' }} · открытий: {{ selected_user.subscription_access_count }}</dd></div>
-      <div><dt>Комментарий</dt><dd>{{ selected_user.comment or 'Нет комментария' }}</dd></div>
-    </dl>
+    {% endif %}
 
     <div class="client-detail-actions">
-      <a class="button primary" href="{{ url_for('user_link', user_id=selected_user.id) }}">Ссылка, QR и подписка</a>
-      <a class="button secondary" href="{{ url_for('user_edit_page', user_id=selected_user.id) }}">Изменить клиента</a>
-      <a class="button ghost" href="{{ url_for('users_json_page') }}">Открыть JSON пользователей</a>
-      <form method="post" action="{{ url_for('user_traffic_reset', user_id=selected_user.id) }}" onsubmit="return confirm('Сбросить накопленный трафик клиента {{ selected_user.name }}? Клиент, ссылка и конфигурация останутся без изменений.')">
+      <a class="button primary" href="{{ url_for('user_link', user_id=selected_user.id) }}">Ссылка и QR</a>
+      <a class="button secondary" href="{{ url_for('user_edit_page', user_id=selected_user.id) }}">Изменить</a>
+      <form method="post" action="{{ url_for('users_toggle', user_id=selected_user.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button ghost" type="submit">{{ 'Отключить' if selected_user.enabled else 'Включить' }}</button></form>
+      <button class="button danger" type="button" data-client-delete-open {% if selected_deletion_request and selected_deletion_request.status in ['running','pending'] %}disabled{% endif %}>Удалить</button>
+      <form class="client-reset-action" method="post" action="{{ url_for('user_traffic_reset', user_id=selected_user.id) }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <button class="button danger-outline" type="submit">Сбросить трафик клиента</button>
+        <button class="button danger-outline small" type="submit">Сбросить трафик</button>
       </form>
-      <form method="post" action="{{ url_for('users_toggle', user_id=selected_user.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button ghost" type="submit">{{ 'Отключить доступ' if selected_user.enabled else 'Включить доступ' }}</button></form>
     </div>
 
+    <section class="inline-confirm client-delete-confirm" data-client-delete-confirm hidden>
+      <div><strong>Удалить пользователя «{{ selected_user.name }}» со всех серверов?</strong><span>Ссылки этого пользователя перестанут работать.</span></div>
+      <form method="post" action="{{ url_for('users_delete', user_id=selected_user.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button class="button ghost" type="button" data-client-delete-cancel>Отмена</button>
+        <button class="button danger" type="submit">Удалить</button>
+      </form>
+    </section>
+
     <details class="client-technical-details">
-      <summary>Технические данные и обслуживание</summary>
-      <dl><div><dt>UUID / Auth</dt><dd><code>{{ selected_user.uuid }}</code></dd></div><div><dt>Создан</dt><dd>{{ selected_user.created_at }}</dd></div><div><dt>Последний сброс трафика</dt><dd>{{ st.reset_at or 'Никогда' }}</dd></div></dl>
+      <summary>Дополнительно</summary>
+      <div class="client-extra-grid">
+        <section class="client-extra-item client-extra-uuid">
+          <span>UUID / Auth</span>
+          <div class="client-copy-row"><code id="selectedClientUuid">{{ selected_user.uuid }}</code><button class="button secondary small" type="button" data-copy-client-uuid>Копировать</button></div>
+        </section>
+        <section class="client-extra-item"><span>Подписка</span><strong>{{ 'Включена' if selected_user.subscription_enabled else 'Отключена' }}</strong></section>
+        <section class="client-extra-item"><span>Комментарий</span><strong>{{ selected_user.comment or 'Нет комментария' }}</strong></section>
+        <section class="client-extra-item client-extra-deployments">
+          <span>Развёрнут на серверах</span>
+          <div class="client-deployment-chips"><b>Основной сервер</b>{% for deployment in selected_deployments %}<b>{{ deployment.node_name }}</b>{% endfor %}</div>
+        </section>
+      </div>
     </details>
     {% else %}
-    <div class="client-detail-empty"><strong>Выберите клиента</strong><p>Здесь появятся его состояние, трафик и быстрые действия.</p></div>
+    <div class="client-detail-empty"><strong>Выберите клиента</strong><p>Здесь появятся его состояние и основные действия.</p></div>
     {% endif %}
-  </aside>
-</div>
+</section>
 
 <section class="clients-maintenance-strip">
   <div><strong>Долговременная статистика SG-Panel</strong><span>Кнопки сброса очищают историю «сегодня / месяц / всё время», но не удаляют клиентов, ссылки или конфигурации. Текущие счётчики Xray используются как новая точка отсчёта.</span></div>
 </section>
+</div>
 
 <dialog id="add-client-dialog" class="clients-dialog" aria-labelledby="add-client-title">
   <header><div><p class="panel-kicker">CLIENTS / CREATE</p><h2 id="add-client-title">Добавить клиента</h2><p>Создайте отдельный доступ для одного устройства. UUID/Auth формируется автоматически.</p></div><button type="button" class="clients-dialog-close" onclick="this.closest('dialog').close()" aria-label="Закрыть">×</button></header>
@@ -192,6 +208,9 @@
 (() => {
   const dialog = document.getElementById('add-client-dialog');
   dialog?.addEventListener('click', (event) => { if (event.target === dialog) dialog.close(); });
+  {% if open_create %}
+  window.requestAnimationFrame(() => { if (dialog && !dialog.open) dialog.showModal(); });
+  {% endif %}
   const form = document.querySelector('[data-expiry-form]');
   if (!form) return;
   const period = form.querySelector('[data-expiry-period]');
@@ -205,6 +224,57 @@
   };
   form.querySelectorAll('input[name="expiration_mode"]').forEach(item => item.addEventListener('change', sync));
   sync();
+})();
+
+(() => {
+  const open = document.querySelector('[data-client-delete-open]');
+  const panel = document.querySelector('[data-client-delete-confirm]');
+  const cancel = document.querySelector('[data-client-delete-cancel]');
+  if (open && panel) {
+    open.addEventListener('click', () => {
+      panel.hidden = false;
+      open.setAttribute('aria-expanded', 'true');
+      panel.scrollIntoView({behavior: 'smooth', block: 'nearest'});
+    });
+    cancel?.addEventListener('click', () => {
+      panel.hidden = true;
+      open.setAttribute('aria-expanded', 'false');
+      open.focus();
+    });
+  }
+
+  const copyButton = document.querySelector('[data-copy-client-uuid]');
+  const copyText = async (value) => {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(value);
+      return;
+    }
+    const area = document.createElement('textarea');
+    area.value = value;
+    area.setAttribute('readonly', '');
+    area.style.position = 'fixed';
+    area.style.left = '-9999px';
+    document.body.appendChild(area);
+    area.focus();
+    area.select();
+    const ok = document.execCommand('copy');
+    area.remove();
+    if (!ok) throw new Error('copy failed');
+  };
+  copyButton?.addEventListener('click', async () => {
+    const original = copyButton.textContent.trim();
+    copyButton.disabled = true;
+    try {
+      await copyText(document.getElementById('selectedClientUuid')?.textContent || '');
+      copyButton.textContent = 'Скопировано';
+    } catch (_) {
+      copyButton.textContent = 'Не скопировано';
+    }
+    window.setTimeout(() => {
+      copyButton.textContent = original;
+      copyButton.disabled = false;
+    }, 1600);
+  });
 })();
 </script>
 {% endblock %}

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ipaddress
+import hashlib
 import json
 import os
 import platform
@@ -18,7 +19,7 @@ import uuid as uuidlib
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from urllib.parse import quote, urlparse
+from urllib.parse import parse_qs, quote, unquote, urlparse
 
 from .db import PROJECT_ROOT, connect, db_path, init_db, use_db_path
 from .security import get_security_settings, security_overview
@@ -65,6 +66,7 @@ DEFAULT_BACKUP_DIR = PROJECT_ROOT / "backups"
 WARP_TAG = "warp"
 WARP_IPV4_ENDPOINT = "162.159.192.1:2408"
 WARP_RULE_NAME = "Cloudflare WARP"
+WARP_IP_RULE_NAME = "Cloudflare WARP — IP"
 WARP_DIR = Path(os.environ.get("XPANEL_WARP_DIR", "/etc/xpanel-mvp/warp"))
 HYSTERIA_TLS_DIR = Path(os.environ.get("XPANEL_HYSTERIA_TLS_DIR", "/usr/local/etc/xray/sg-panel-tls"))
 HYSTERIA_MAX_INBOUNDS = 3
@@ -90,6 +92,51 @@ REALITY_EDGE_STATE = Path(os.environ.get("XPANEL_REALITY_EDGE_STATE", "/etc/xpan
 REALITY_EDGE_XRAY_PORT = 8444
 REALITY_EDGE_WEB_PORT = 10443
 REALITY_EDGE_LEGACY_WEB_PORT = 9443
+
+GEOFILES_SOURCES: dict[str, dict[str, str]] = {
+    "xray": {
+        "label": "Комплект установленного Xray",
+        "description": "Текущие geoip.dat и geosite.dat из каталога ресурсов Xray.",
+        "geoip_url": "",
+        "geosite_url": "",
+    },
+    "v2fly": {
+        "label": "V2Fly",
+        "description": "Базовые community GeoIP и domain-list-community.",
+        "geoip_url": "https://github.com/v2fly/geoip/releases/latest/download/geoip.dat",
+        "geosite_url": "https://github.com/v2fly/domain-list-community/releases/latest/download/dlc.dat",
+    },
+    "loyalsoldier": {
+        "label": "Loyalsoldier",
+        "description": "Расширенный популярный комплект v2ray-rules-dat.",
+        "geoip_url": "https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geoip.dat",
+        "geosite_url": "https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geosite.dat",
+    },
+    "runetfreedom": {
+        "label": "RunetFreedom",
+        "description": "Специализированные российские категории и списки блокировок.",
+        "geoip_url": "https://raw.githubusercontent.com/runetfreedom/russia-v2ray-rules-dat/release/geoip.dat",
+        "geosite_url": "https://raw.githubusercontent.com/runetfreedom/russia-v2ray-rules-dat/release/geosite.dat",
+    },
+    "custom": {
+        "label": "Пользовательские URL",
+        "description": "Отдельные HTTPS URL для geoip.dat и geosite.dat.",
+        "geoip_url": "",
+        "geosite_url": "",
+    },
+    "local": {
+        "label": "Локальные файлы",
+        "description": "Файлы, уже находящиеся на сервере.",
+        "geoip_url": "",
+        "geosite_url": "",
+    },
+}
+GEOFILES_STATE_DIR = Path(os.environ.get("XPANEL_GEOFILES_STATE_DIR", "/var/lib/sg-panel/geofiles"))
+
+WARP_RUSSIA_TLDS = "geosite:tld-ru"
+WARP_RUSSIA_DOMAINS = "geosite:category-ru"
+WARP_RUSSIA_IPS = "geoip:ru"
+
 WARP_DEFAULT_DOMAINS = """domain:google.com
 domain:googleapis.com
 domain:gstatic.com
@@ -104,6 +151,9 @@ domain:openai.com
 domain:chatgpt.com
 domain:oaistatic.com
 domain:oaiusercontent.com"""
+
+
+CASCADE_SERVICE_COMMENT = "SG-Panel managed Cascade service access"
 
 
 def require_root() -> None:
@@ -130,6 +180,58 @@ def get_server() -> sqlite3.Row:
     if row is None:
         raise XPanelError("настройки сервера ещё не заданы; выполните set-server")
     return row
+
+
+def _normalise_instance_name(value: str) -> str:
+    name = re.sub(r"\s+", " ", str(value or "").strip())
+    if not name:
+        raise ValueError("укажите имя сервера")
+    if len(name) > 64:
+        raise ValueError("имя сервера не должно быть длиннее 64 символов")
+    if any(ord(char) < 32 for char in name):
+        raise ValueError("имя сервера содержит недопустимые символы")
+    return name
+
+
+def get_instance_name() -> str:
+    server = get_server()
+    value = str(server["instance_name"] or "").strip()
+    return value or "SG-Panel"
+
+
+def get_instance_address() -> str:
+    server = get_server()
+    return str(server["address"] or "").strip()
+
+
+def get_instance_identity() -> str:
+    name = get_instance_name()
+    address = get_instance_address()
+    if not address or address.casefold() in name.casefold():
+        return name
+    return f"{name} · {address}"
+
+
+def update_instance_name(value: str) -> str:
+    name = _normalise_instance_name(value)
+    with connect() as con:
+        con.execute("UPDATE server_settings SET instance_name = ? WHERE id = 1", (name,))
+        settings = con.execute("SELECT service_user_id FROM cascade_settings WHERE id = 1").fetchone()
+        service_user_id = int(settings["service_user_id"] or 0) if settings else 0
+        if service_user_id:
+            user = con.execute("SELECT id FROM users WHERE id = ?", (service_user_id,)).fetchone()
+            desired = f"Cascade · {name}"[:80]
+            if user is not None:
+                collision = con.execute(
+                    "SELECT 1 FROM users WHERE name = ? COLLATE NOCASE AND id != ?",
+                    (desired, service_user_id),
+                ).fetchone()
+                if collision is None:
+                    con.execute(
+                        "UPDATE users SET name = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                        (desired, service_user_id),
+                    )
+    return name
 
 
 def list_hysteria_inbounds() -> list[sqlite3.Row]:
@@ -1150,6 +1252,10 @@ def validate_domains(value: str | None) -> str:
     for item in result:
         if any(ch.isspace() for ch in item):
             raise ValueError(f"доменное условие не должно содержать пробелы: {item}")
+        if item.startswith(("geoip:", "!geoip:")):
+            raise ValueError(
+                f"условие {item} относится к GeoIP. Перенесите его в поле «IP / GeoIP / CIDR»"
+            )
         if item.startswith(allowed_prefixes):
             continue
         if len(item) > 512:
@@ -1160,6 +1266,10 @@ def validate_domains(value: str | None) -> str:
 def validate_ips(value: str | None) -> str:
     result = split_values(value)
     for item in result:
+        if item.startswith(("geosite:", "!geosite:")):
+            raise ValueError(
+                f"условие {item} относится к Geosite. Перенесите его в поле «Домены / Geosite»"
+            )
         if item.startswith(("geoip:", "!geoip:", "ext:")):
             continue
         try:
@@ -2102,12 +2212,20 @@ def build_warp_outbound() -> dict[str, object]:
 def get_warp_overview() -> dict[str, object]:
     row = get_warp_settings()
     configured = bool(str(row["outbound_json"] or "").strip())
+    managed_rules = [
+        dict(rule) for rule in (_find_warp_rule(WARP_RULE_NAME), _find_warp_rule(WARP_IP_RULE_NAME))
+        if rule is not None and bool(rule["enabled"])
+    ]
     return {
         **dict(row),
         "configured": configured,
         "enabled": bool(row["enabled"]) and configured,
         "helper_installed": _warp_binary().is_file(),
         "default_domains": WARP_DEFAULT_DOMAINS,
+        "russia_tlds": WARP_RUSSIA_TLDS,
+        "russia_domains": WARP_RUSSIA_DOMAINS,
+        "russia_ips": WARP_RUSSIA_IPS,
+        "managed_rules": managed_rules,
     }
 
 
@@ -2127,6 +2245,7 @@ def warp_json_document() -> str:
         "enabled": bool(row["enabled"]),
         "routeMode": str(row["route_mode"]),
         "selectedDomains": split_values(row["selected_domains"]),
+        "selectedIps": split_values(row["selected_ips"]),
         "note": "_sgPanel хранит состояние GUI и не передаётся Xray.",
     }
     return json.dumps(result, ensure_ascii=False, indent=2) + "\n"
@@ -2150,6 +2269,11 @@ def update_warp_json_document(text: str) -> dict[str, object]:
         selected_domains = "\n".join(str(item) for item in selected)
     else:
         selected_domains = str(selected or "")
+    selected_ip_values = meta.get("selectedIps", [])
+    if isinstance(selected_ip_values, list):
+        selected_ips = "\n".join(str(item) for item in selected_ip_values)
+    else:
+        selected_ips = str(selected_ip_values or "")
     clean = _strip_sgpanel_metadata(document)
     outbound = _normalise_warp_outbound(clean)
     with connect() as con:
@@ -2163,7 +2287,7 @@ def update_warp_json_document(text: str) -> dict[str, object]:
                 json.dumps(outbound, ensure_ascii=False, separators=(",", ":")),
             ),
         )
-    configure_warp_routing(route_mode if enabled else "off", selected_domains)
+    configure_warp_routing(route_mode if enabled else "off", selected_domains, selected_ips)
     return get_warp_overview()
 
 
@@ -2221,7 +2345,7 @@ def _clear_warp_candidate() -> None:
         con.execute(
             """
             UPDATE warp_settings SET enabled = 0, outbound_json = '', account_json = '',
-                route_mode = 'off', selected_domains = '', last_test_state = '',
+                route_mode = 'off', selected_domains = '', selected_ips = '', last_test_state = '',
                 last_test_ip = '', last_test_at = NULL, created_at = NULL,
                 updated_at = CURRENT_TIMESTAMP WHERE id = 1
             """
@@ -2304,16 +2428,18 @@ def set_warp_enabled(enabled: bool) -> dict[str, object]:
     return get_warp_overview()
 
 
-def _find_warp_rule() -> sqlite3.Row | None:
+def _find_warp_rule(name: str = WARP_RULE_NAME) -> sqlite3.Row | None:
     init_db()
     with connect() as con:
         return con.execute(
             "SELECT * FROM routing_rules WHERE name = ? COLLATE NOCASE",
-            (WARP_RULE_NAME,),
+            (name,),
         ).fetchone()
 
 
-def configure_warp_routing(mode: str, selected_domains: str = "") -> dict[str, object]:
+def configure_warp_routing(
+    mode: str, selected_domains: str = "", selected_ips: str = ""
+) -> dict[str, object]:
     mode = (mode or "off").strip().lower()
     if mode not in {"off", "selected", "all"}:
         raise ValueError("режим WARP должен быть off, selected или all")
@@ -2321,9 +2447,58 @@ def configure_warp_routing(mode: str, selected_domains: str = "") -> dict[str, o
     if mode != "off" and not warp["enabled"]:
         raise XPanelError("включите WARP перед настройкой маршрута")
     domains = validate_domains(selected_domains)
-    if mode == "selected" and not domains:
-        raise ValueError("укажите хотя бы один домен для WARP")
-    rule = _find_warp_rule()
+    ips = validate_ips(selected_ips)
+    if mode == "selected" and not domains and not ips:
+        raise ValueError("укажите хотя бы одно условие: домен/Geosite или IP/GeoIP/CIDR")
+
+    domain_rule = _find_warp_rule(WARP_RULE_NAME)
+    ip_rule = _find_warp_rule(WARP_IP_RULE_NAME)
+
+    def upsert_rule(
+        con: sqlite3.Connection, *, existing: sqlite3.Row | None, name: str,
+        priority: int, domains_value: str = "", ips_value: str = ""
+    ) -> None:
+        active = bool(domains_value or ips_value)
+        if not active:
+            if existing is not None:
+                con.execute(
+                    "UPDATE routing_rules SET enabled = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                    (int(existing["id"]),),
+                )
+            return
+        config: dict[str, object] = {
+            "type": "field", "outboundTag": WARP_TAG, "network": "tcp,udp",
+        }
+        if domains_value:
+            config["domain"] = split_values(domains_value)
+        if ips_value:
+            config["ip"] = split_values(ips_value)
+        config_json = json.dumps(config, ensure_ascii=False, separators=(",", ":"))
+        if existing is None:
+            con.execute(
+                """
+                INSERT INTO routing_rules
+                    (name, priority, enabled, outbound_tag, target_type, domains, ips, network,
+                     config_json)
+                VALUES (?, ?, 1, ?, 'outbound', ?, ?, 'tcp,udp', ?)
+                """,
+                (name, priority, WARP_TAG, domains_value, ips_value, config_json),
+            )
+            return
+        con.execute(
+            """
+            UPDATE routing_rules SET name = ?, priority = ?, enabled = 1, outbound_tag = ?,
+                target_type = 'outbound', domains = ?, ips = ?, ports = '',
+                network = 'tcp,udp', protocols = '', inbound_tags = '', users = '',
+                config_json = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+            """,
+            (
+                name, priority, WARP_TAG, domains_value, ips_value, config_json,
+                int(existing["id"]),
+            ),
+        )
+
     with connect() as con:
         if mode == "all":
             con.execute(
@@ -2337,49 +2512,28 @@ def configure_warp_routing(mode: str, selected_domains: str = "") -> dict[str, o
                 "updated_at = CURRENT_TIMESTAMP WHERE id = 1 AND default_outbound_tag = ?",
                 (WARP_TAG,),
             )
+
         if mode == "selected":
-            config = {
-                "type": "field", "outboundTag": WARP_TAG,
-                "domain": split_values(domains), "network": "tcp,udp",
-            }
-            if rule is None:
-                con.execute(
-                    """
-                    INSERT INTO routing_rules
-                        (name, priority, enabled, outbound_tag, target_type, domains, network,
-                         config_json)
-                    VALUES (?, 40, 1, ?, 'outbound', ?, 'tcp,udp', ?)
-                    """,
-                    (
-                        WARP_RULE_NAME, WARP_TAG, domains,
-                        json.dumps(config, ensure_ascii=False, separators=(",", ":")),
-                    ),
-                )
-            else:
-                con.execute(
-                    """
-                    UPDATE routing_rules SET enabled = 1, outbound_tag = ?, target_type = 'outbound',
-                        domains = ?, ips = '', ports = '', network = 'tcp,udp', protocols = '',
-                        inbound_tags = '', users = '', config_json = ?, updated_at = CURRENT_TIMESTAMP
-                    WHERE id = ?
-                    """,
-                    (
-                        WARP_TAG, domains,
-                        json.dumps(config, ensure_ascii=False, separators=(",", ":")),
-                        int(rule["id"]),
-                    ),
-                )
-        elif rule is not None:
-            con.execute(
-                "UPDATE routing_rules SET enabled = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-                (int(rule["id"]),),
+            # Xray combines fields inside one rule with logical AND. Keep domain
+            # and IP conditions in separate managed rules so either can match.
+            upsert_rule(
+                con, existing=domain_rule, name=WARP_RULE_NAME, priority=40,
+                domains_value=domains,
             )
+            upsert_rule(
+                con, existing=ip_rule, name=WARP_IP_RULE_NAME, priority=41,
+                ips_value=ips,
+            )
+        else:
+            upsert_rule(con, existing=domain_rule, name=WARP_RULE_NAME, priority=40)
+            upsert_rule(con, existing=ip_rule, name=WARP_IP_RULE_NAME, priority=41)
+
         con.execute(
             """
-            UPDATE warp_settings SET route_mode = ?, selected_domains = ?,
+            UPDATE warp_settings SET route_mode = ?, selected_domains = ?, selected_ips = ?,
                 updated_at = CURRENT_TIMESTAMP WHERE id = 1
             """,
-            (mode, domains),
+            (mode, domains, ips),
         )
     return get_warp_overview()
 
@@ -2593,9 +2747,9 @@ def _validate_outbound_tag(tag: str) -> str:
 
 
 def normalise_fingerprint_profile(value: str | None) -> str:
-    profile = (value or "chrome").strip()
+    profile = (value or "firefox").strip()
     if not profile:
-        return "chrome"
+        return "firefox"
     lowered = profile.lower()
     if lowered in STANDARD_FINGERPRINTS:
         return lowered
@@ -2622,6 +2776,129 @@ def _normalise_alpn(value: str) -> str:
     return ",".join(unique)
 
 
+
+def _first_link_query_value(query: dict[str, list[str]], *names: str) -> str:
+    for name in names:
+        values = query.get(name)
+        if values:
+            return str(values[0]).strip()
+    return ""
+
+
+def _suggest_outbound_tag(label: str, address: str) -> str:
+    label = unquote(label or "").strip()
+    tag_label = re.sub(r"/(?:Primary|Backup|Alt|#\d+)$", "", label, flags=re.IGNORECASE).strip()
+    cascade_match = re.search(
+        r"(?:^|[^a-z0-9])cascade(?:[^a-z0-9]+.*)?(?:-to-|\s+to\s+)([a-z0-9._-]+)$",
+        tag_label.lower(),
+    )
+    if cascade_match:
+        candidate = f"cascade-{cascade_match.group(1)}"
+    else:
+        source = tag_label or address or "vless-exit"
+        candidate = re.sub(r"[^A-Za-z0-9._-]+", "-", source).strip("-._").lower()
+    if not candidate:
+        candidate = "vless-exit"
+    if not candidate[0].isalnum():
+        candidate = f"vless-{candidate}"
+    candidate = candidate[:64].rstrip("-._") or "vless-exit"
+    if candidate in RESERVED_OUTBOUND_TAGS:
+        candidate = f"{candidate}-exit"
+    return candidate
+
+
+def parse_vless_share_link(link: str) -> dict[str, object]:
+    """Parse a VLESS share link into values accepted by the outbound form.
+
+    The link is only decoded and validated. It is not written to the database.
+    """
+    source = str(link or "").strip()
+    if not source:
+        raise ValueError("вставьте VLESS-ссылку")
+    if len(source) > 16384:
+        raise ValueError("VLESS-ссылка слишком длинная")
+
+    parsed = urlparse(source)
+    if parsed.scheme.lower() != "vless":
+        raise ValueError("поддерживаются только ссылки, начинающиеся с vless://")
+    user_uuid = unquote(parsed.username or "").strip()
+    address = str(parsed.hostname or "").strip()
+    try:
+        port = parsed.port
+    except ValueError as exc:
+        raise ValueError("в VLESS-ссылке указан некорректный порт") from exc
+    if not user_uuid:
+        raise ValueError("в VLESS-ссылке не найден UUID")
+    if not address:
+        raise ValueError("в VLESS-ссылке не найден адрес сервера")
+    if port is None:
+        raise ValueError("в VLESS-ссылке не найден порт сервера")
+
+    try:
+        query = parse_qs(parsed.query, keep_blank_values=True, max_num_fields=64)
+    except ValueError as exc:
+        raise ValueError("не удалось разобрать параметры VLESS-ссылки") from exc
+
+    network_value = _first_link_query_value(query, "type", "network").lower() or "tcp"
+    if network_value in {"tcp", "raw"}:
+        network = "raw"
+    elif network_value == "xhttp":
+        network = "xhttp"
+    else:
+        raise ValueError(
+            f"транспорт {network_value or 'не указан'} пока не поддерживается; "
+            "нужен RAW/TCP или XHTTP"
+        )
+
+    security = _first_link_query_value(query, "security").lower() or "reality"
+    if security not in ALLOWED_OUTBOUND_SECURITY:
+        raise ValueError("в ссылке должна использоваться защита REALITY или TLS")
+
+    label = unquote(parsed.fragment or "").strip()
+    fingerprint = _first_link_query_value(query, "fp", "fingerprint") or "firefox"
+    flow = _first_link_query_value(query, "flow")
+    if network == "xhttp":
+        flow = ""
+
+    public_key = _first_link_query_value(query, "pbk", "publicKey", "public_key")
+    short_id = _first_link_query_value(query, "sid", "shortId", "short_id")
+    spider_x = _first_link_query_value(query, "spx", "spiderX")
+    if security == "reality" and not spider_x:
+        spider_x = "/"
+
+    allow_insecure_value = _first_link_query_value(query, "allowInsecure", "insecure").lower()
+    allow_insecure = allow_insecure_value in {"1", "true", "yes", "on"}
+    alpn = _first_link_query_value(query, "alpn")
+
+    suggested_name = label or f"VLESS через {address}"
+    suggested_tag = _suggest_outbound_tag(label, address)
+    values = validate_vless_outbound_values(
+        tag=suggested_tag,
+        name=suggested_name,
+        address=address,
+        port=int(port),
+        user_uuid=user_uuid,
+        flow=flow,
+        network=network,
+        security=security,
+        server_name=_first_link_query_value(query, "sni", "serverName", "servername"),
+        public_key=public_key,
+        short_id=short_id,
+        fingerprint=fingerprint,
+        spider_x=spider_x,
+        xhttp_host=_first_link_query_value(query, "host"),
+        xhttp_path=_first_link_query_value(query, "path") or "/",
+        xhttp_mode=_first_link_query_value(query, "mode") or "auto",
+        allow_insecure=allow_insecure,
+        alpn=alpn,
+    )
+    values["source_label"] = label
+    values["transport_label"] = "RAW / TCP" if network == "raw" else "XHTTP"
+    values["security_label"] = security.upper()
+    values["vision"] = values["flow"] in {"xtls-rprx-vision", "xtls-rprx-vision-udp443"}
+    return values
+
+
 def validate_vless_outbound_values(
     *,
     tag: str,
@@ -2635,7 +2912,7 @@ def validate_vless_outbound_values(
     server_name: str,
     public_key: str = "",
     short_id: str = "",
-    fingerprint: str = "chrome",
+    fingerprint: str = "firefox",
     spider_x: str = "",
     xhttp_host: str = "",
     xhttp_path: str = "/",
@@ -2924,7 +3201,7 @@ def outbound_json_document(row: sqlite3.Row | None = None) -> str:
                 "security": "reality",
                 "realitySettings": {
                     "serverName": "www.bing.com",
-                    "fingerprint": "chrome",
+                    "fingerprint": "firefox",
                     "password": "PUBLIC_KEY",
                     "shortId": "0123456789abcdef",
                     "spiderX": "",
@@ -3003,7 +3280,7 @@ def parse_outbound_json_document(
             reality.get("password", reality.get("publicKey", reality.get("public_key", "")))
         ),
         short_id=str(reality.get("shortId", "")),
-        fingerprint=str(security_settings.get("fingerprint", "chrome")),
+        fingerprint=str(security_settings.get("fingerprint", "firefox")),
         spider_x=str(reality.get("spiderX", "")),
         xhttp_host=str(xhttp.get("host", "")),
         xhttp_path=str(xhttp.get("path", "/")),
@@ -3195,6 +3472,510 @@ def build_outbound_json(row: sqlite3.Row) -> dict[str, object]:
     }
     return _merge_outbound_config(_json_object(row["config_json"]), cleaned)
 
+
+
+
+def _cascade_signature(outbound: sqlite3.Row) -> str:
+    payload = {
+        "id": int(outbound["id"]),
+        "tag": str(outbound["tag"]),
+        "enabled": int(outbound["enabled"]),
+        "address": str(outbound["address"]),
+        "port": int(outbound["port"]),
+        "uuid": str(outbound["uuid"]),
+        "flow": str(outbound["flow"]),
+        "network": str(outbound["network"]),
+        "security": str(outbound["security"]),
+        "server_name": str(outbound["server_name"]),
+        "public_key": str(outbound["public_key"]),
+        "short_id": str(outbound["short_id"]),
+        "fingerprint": str(outbound["fingerprint"]),
+        "spider_x": str(outbound["spider_x"]),
+        "xhttp_host": str(outbound["xhttp_host"]),
+        "xhttp_path": str(outbound["xhttp_path"]),
+        "xhttp_mode": str(outbound["xhttp_mode"]),
+        "allow_insecure": int(outbound["allow_insecure"]),
+        "alpn": str(outbound["alpn"]),
+        "config_json": str(outbound["config_json"]),
+    }
+    encoded = json.dumps(
+        payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _cascade_settings_row() -> sqlite3.Row:
+    init_db()
+    with connect() as con:
+        row = con.execute("SELECT * FROM cascade_settings WHERE id = 1").fetchone()
+    if row is None:
+        raise XPanelError("настройки каскада не инициализированы")
+    return row
+
+
+def _cascade_candidate_outbound(settings: sqlite3.Row | None = None) -> sqlite3.Row | None:
+    settings = settings or _cascade_settings_row()
+    outbound_id = int(settings["outbound_id"] or 0)
+    if outbound_id:
+        try:
+            return find_outbound(outbound_id)
+        except XPanelError:
+            pass
+
+    routing = get_routing_settings()
+    default_tag = str(routing["default_outbound_tag"] or "")
+    rows = list_custom_outbounds()
+    for row in rows:
+        tag = str(row["tag"])
+        name = str(row["name"])
+        if (
+            tag == default_tag
+            and default_tag not in RESERVED_OUTBOUND_TAGS
+            and (tag.lower().startswith("cascade-") or "cascade" in name.lower() or "каскад" in name.lower())
+        ):
+            return row
+    for row in rows:
+        tag = str(row["tag"])
+        name = str(row["name"])
+        if tag.lower().startswith("cascade-") or "cascade" in name.lower() or "каскад" in name.lower():
+            return row
+    return None
+
+
+def _cascade_exit_name_from_label(label: str, address: str) -> str:
+    value = unquote(str(label or "")).strip()
+    value = re.sub(r"/(?:Primary|Backup|Alt|#\d+)$", "", value, flags=re.IGNORECASE).strip()
+    value = re.sub(r"^Cascade\s*[·:|-]\s*", "", value, flags=re.IGNORECASE).strip()
+    return value or str(address or "Выходной сервер")
+
+
+def _cascade_service_access() -> dict[str, object]:
+    settings = _cascade_settings_row()
+    user_id = int(settings["service_user_id"] or 0)
+    result: dict[str, object] = {
+        "configured": False, "ready": False, "user_id": 0, "link": "",
+        "error": "", "name": "",
+    }
+    if not user_id:
+        return result
+    try:
+        user = find_user(user_id)
+    except XPanelError:
+        return result
+    result.update({"configured": True, "user_id": user_id, "name": str(user["name"])})
+    try:
+        server = get_server()
+        if str(server["inbound_profile"] or "") != "raw_reality":
+            raise XPanelError("для выходного сервера Cascade выберите VLESS REALITY · RAW/TCP")
+        if str(server["flow"] or "") != "xtls-rprx-vision":
+            raise XPanelError("для выходного сервера Cascade включите XTLS Vision")
+        links = make_links(user_id, allow_disabled=True)
+        link = next(
+            (str(item["link"]) for item in links if item.get("kind") == "reality"),
+            "",
+        )
+        if not link:
+            raise XPanelError("не удалось сформировать VLESS REALITY-ссылку")
+        result.update({"ready": True, "link": link})
+    except (ValueError, XPanelError, FileNotFoundError, OSError) as exc:
+        result["error"] = str(exc)
+    return result
+
+
+def ensure_cascade_service_access() -> dict[str, object]:
+    server = get_server()
+    if str(server["inbound_profile"] or "") != "raw_reality":
+        raise XPanelError("сначала выберите VLESS REALITY · RAW/TCP на этом сервере")
+    if str(server["flow"] or "") != "xtls-rprx-vision":
+        raise XPanelError("сначала включите XTLS Vision на этом сервере")
+    settings = _cascade_settings_row()
+    user_id = int(settings["service_user_id"] or 0)
+    user = None
+    if user_id:
+        try:
+            user = find_user(user_id)
+        except XPanelError:
+            user = None
+    if user is None:
+        for candidate in list_users():
+            if str(candidate["comment"] or "") == CASCADE_SERVICE_COMMENT:
+                user = candidate
+                break
+    desired = f"Cascade · {get_instance_name()}"[:80]
+    if user is None:
+        base = desired
+        names = {str(item["name"]).casefold() for item in list_users()}
+        number = 2
+        while desired.casefold() in names:
+            suffix = f" {number}"
+            desired = base[: 80 - len(suffix)] + suffix
+            number += 1
+        user = add_user(desired, comment=CASCADE_SERVICE_COMMENT)
+    else:
+        if not bool(user["enabled"]):
+            user = set_user_enabled(int(user["id"]), True)
+        if str(user["comment"] or "") != CASCADE_SERVICE_COMMENT or str(user["name"]) != desired:
+            collision = next(
+                (item for item in list_users() if int(item["id"]) != int(user["id"]) and str(item["name"]).casefold() == desired.casefold()),
+                None,
+            )
+            if collision is None:
+                user = update_user(
+                    int(user["id"]), name=desired, user_uuid=str(user["uuid"]),
+                    comment=CASCADE_SERVICE_COMMENT, expiry_at=user["expiry_at"],
+                )
+    with connect() as con:
+        con.execute(
+            "UPDATE cascade_settings SET service_user_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = 1",
+            (int(user["id"]),),
+        )
+    access = _cascade_service_access()
+    if not access["ready"]:
+        raise XPanelError(str(access["error"] or "не удалось создать доступ Cascade"))
+    return access
+
+
+def remove_cascade() -> dict[str, object]:
+    settings = _cascade_settings_row()
+    outbound = _cascade_candidate_outbound(settings)
+    service_user_id = int(settings["service_user_id"] or 0)
+    routing = get_routing_settings()
+    if outbound is not None and str(routing["default_outbound_tag"]) == str(outbound["tag"]):
+        update_routing_settings(
+            domain_strategy=str(routing["domain_strategy"]),
+            default_outbound_tag="direct",
+            sniffing_enabled=bool(routing["sniffing_enabled"]),
+            sniffing_route_only=bool(routing["sniffing_route_only"]),
+            sniff_http=bool(routing["sniff_http"]),
+            sniff_tls=bool(routing["sniff_tls"]),
+            sniff_quic=bool(routing["sniff_quic"]),
+        )
+    if outbound is not None:
+        delete_outbound(int(outbound["id"]))
+    if service_user_id:
+        try:
+            user = find_user(service_user_id)
+            if str(user["comment"] or "") == CASCADE_SERVICE_COMMENT:
+                delete_user(service_user_id)
+        except XPanelError:
+            pass
+    with connect() as con:
+        con.execute(
+            """
+            UPDATE cascade_settings SET outbound_id = NULL, exit_name = '', service_user_id = NULL,
+                last_test_state = '', last_test_ip = '', last_test_country = '',
+                last_test_colo = '', last_test_warp = '', last_test_detail = '',
+                tested_signature = '', last_test_at = NULL, enabled_at = NULL,
+                updated_at = CURRENT_TIMESTAMP WHERE id = 1
+            """
+        )
+    return get_cascade_overview()
+
+
+def get_cascade_overview() -> dict[str, object]:
+    settings = _cascade_settings_row()
+    outbound = _cascade_candidate_outbound(settings)
+    service_access = _cascade_service_access()
+    routing = get_routing_settings()
+    enabled = bool(
+        outbound is not None
+        and bool(outbound["enabled"])
+        and str(routing["default_outbound_tag"]) == str(outbound["tag"])
+    )
+    signature = _cascade_signature(outbound) if outbound is not None else ""
+    test_state = str(settings["last_test_state"] or "")
+    test_fresh = bool(
+        outbound is not None
+        and test_state == "ok"
+        and str(settings["tested_signature"] or "") == signature
+    )
+    if test_state == "ok" and not test_fresh:
+        display_state = "stale"
+    elif test_state.startswith("error"):
+        display_state = "error"
+    elif test_fresh:
+        display_state = "ok"
+    else:
+        display_state = "untested"
+
+    custom = []
+    for row in list_custom_outbounds():
+        custom.append({
+            "id": int(row["id"]),
+            "tag": str(row["tag"]),
+            "name": str(row["name"]),
+            "address": str(row["address"]),
+            "port": int(row["port"]),
+            "enabled": bool(row["enabled"]),
+            "selected": bool(outbound is not None and int(row["id"]) == int(outbound["id"])),
+        })
+
+    return {
+        "configured": outbound is not None,
+        "instance_name": get_instance_name(),
+        "exit_name": str(settings["exit_name"] or (outbound["name"] if outbound is not None else "")),
+        "service_access": service_access,
+        "enabled": enabled,
+        "outbound": dict(outbound) if outbound is not None else None,
+        "default_outbound_tag": str(routing["default_outbound_tag"]),
+        "test_state": display_state,
+        "test_fresh": test_fresh,
+        "last_test_ip": str(settings["last_test_ip"] or ""),
+        "last_test_country": str(settings["last_test_country"] or ""),
+        "last_test_colo": str(settings["last_test_colo"] or ""),
+        "last_test_warp": str(settings["last_test_warp"] or ""),
+        "last_test_detail": str(settings["last_test_detail"] or ""),
+        "last_test_at": settings["last_test_at"],
+        "enabled_at": settings["enabled_at"],
+        "available_outbounds": custom,
+    }
+
+
+def _unique_cascade_tag(preferred: str, *, ignore_id: int | None = None) -> str:
+    base = _validate_outbound_tag(preferred)
+    with connect() as con:
+        rows = con.execute("SELECT id, tag FROM outbounds").fetchall()
+    existing = {
+        str(row["tag"]).lower()
+        for row in rows
+        if ignore_id is None or int(row["id"]) != int(ignore_id)
+    }
+    if base.lower() not in existing:
+        return base
+    for number in range(2, 100):
+        suffix = f"-{number}"
+        candidate = (base[: 64 - len(suffix)].rstrip("-._") + suffix)
+        if candidate.lower() not in existing:
+            return candidate
+    raise XPanelError("не удалось подобрать уникальный tag для каскада")
+
+
+def select_cascade_outbound(outbound_id: int) -> dict[str, object]:
+    outbound = find_outbound(outbound_id)
+    if not bool(outbound["enabled"]):
+        raise XPanelError("сначала включите выбранный Outbound")
+    with connect() as con:
+        con.execute(
+            """
+            UPDATE cascade_settings SET outbound_id = ?, exit_name = ?, last_test_state = '',
+                last_test_ip = '', last_test_country = '', last_test_colo = '',
+                last_test_warp = '', last_test_detail = '', tested_signature = '',
+                last_test_at = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = 1
+            """,
+            (outbound_id, str(outbound["name"])),
+        )
+    return get_cascade_overview()
+
+
+def import_cascade_link(link: str) -> dict[str, object]:
+    values = parse_vless_share_link(link)
+    current = _cascade_candidate_outbound()
+    routing = get_routing_settings()
+    was_enabled = bool(
+        current is not None
+        and str(routing["default_outbound_tag"]) == str(current["tag"])
+    )
+
+    if was_enabled:
+        with connect() as con:
+            con.execute(
+                "UPDATE routing_settings SET default_outbound_tag = 'direct', "
+                "updated_at = CURRENT_TIMESTAMP WHERE id = 1"
+            )
+
+    values = dict(values)
+    values["user_uuid"] = values.pop("uuid")
+    source_label = str(values.pop("source_label", ""))
+    values.pop("transport_label", None)
+    values.pop("security_label", None)
+    values.pop("vision", None)
+    exit_name = _cascade_exit_name_from_label(source_label, str(values.get("address") or ""))
+    values["name"] = exit_name
+
+    if current is not None:
+        values["tag"] = str(current["tag"])
+        outbound = update_vless_outbound(int(current["id"]), **values)
+    else:
+        values["tag"] = _unique_cascade_tag("cascade-exit")
+        outbound = add_vless_outbound(**values)
+
+    with connect() as con:
+        con.execute(
+            """
+            UPDATE cascade_settings SET outbound_id = ?, exit_name = ?, last_test_state = '',
+                last_test_ip = '', last_test_country = '', last_test_colo = '',
+                last_test_warp = '', last_test_detail = '', tested_signature = '',
+                last_test_at = NULL, enabled_at = NULL, updated_at = CURRENT_TIMESTAMP
+            WHERE id = 1
+            """,
+            (int(outbound["id"]), exit_name),
+        )
+    result = get_cascade_overview()
+    result["was_disabled_for_safety"] = was_enabled
+    return result
+
+
+def test_cascade() -> dict[str, object]:
+    require_root()
+    settings = _cascade_settings_row()
+    outbound = _cascade_candidate_outbound(settings)
+    if outbound is None:
+        raise XPanelError("сначала вставьте VLESS-ссылку выходного сервера")
+    if not bool(outbound["enabled"]):
+        raise XPanelError("выходной сервер отключён")
+
+    server = get_server()
+    xray_bin = str(server["xray_bin"])
+    if not Path(xray_bin).is_file():
+        raise FileNotFoundError(f"не найден Xray: {xray_bin}")
+    curl = shutil.which("curl")
+    if curl is None:
+        raise FileNotFoundError("не найден curl")
+
+    port = _free_local_port()
+    test_inbound = "cascade-test-in"
+    document = {
+        "log": {"loglevel": "warning"},
+        "inbounds": [{
+            "tag": test_inbound,
+            "listen": "127.0.0.1",
+            "port": port,
+            "protocol": "socks",
+            "settings": {"udp": True},
+        }],
+        "outbounds": [build_outbound_json(outbound)],
+        "routing": {"rules": [{
+            "type": "field",
+            "inboundTag": [test_inbound],
+            "outboundTag": str(outbound["tag"]),
+        }]},
+    }
+    fd, name = tempfile.mkstemp(prefix="sg-panel-cascade-test-", suffix=".json")
+    os.close(fd)
+    path = Path(name)
+    proc: subprocess.Popen[str] | None = None
+    ip = country = colo = warp_state = ""
+    detail = ""
+    state = "error"
+    signature = _cascade_signature(outbound)
+    try:
+        path.write_text(json.dumps(document, ensure_ascii=False), encoding="utf-8")
+        proc = subprocess.Popen(
+            [xray_bin, "run", "-config", str(path)],
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        deadline = time.monotonic() + 8
+        ready = False
+        while time.monotonic() < deadline:
+            if proc.poll() is not None:
+                stderr = proc.stderr.read() if proc.stderr else ""
+                raise XPanelError(
+                    stderr.strip() or "тестовый Xray завершился раньше времени"
+                )
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+                sock.settimeout(0.3)
+                if sock.connect_ex(("127.0.0.1", port)) == 0:
+                    ready = True
+                    break
+            time.sleep(0.15)
+        if not ready:
+            raise XPanelError("не открылся временный SOCKS-порт проверки каскада")
+
+        result = _run(
+            [
+                curl, "--silent", "--show-error", "--max-time", "25",
+                "--socks5-hostname", f"127.0.0.1:{port}",
+                "https://www.cloudflare.com/cdn-cgi/trace",
+            ],
+            timeout=30,
+        )
+        if result.returncode != 0:
+            raise XPanelError(
+                (result.stderr or result.stdout).strip()
+                or "запрос через выходной сервер не выполнен"
+            )
+        values: dict[str, str] = {}
+        for line in result.stdout.splitlines():
+            if "=" in line:
+                key, value = line.split("=", 1)
+                values[key.strip()] = value.strip()
+        ip = values.get("ip", "")
+        country = values.get("loc", "")
+        colo = values.get("colo", "")
+        warp_state = values.get("warp", "off")
+        if not ip:
+            raise XPanelError("выходной сервер ответил, но внешний IP не определён")
+        state = "ok"
+        detail = f"REALITY-соединение работает. Выходной IP: {ip}"
+        return {
+            "ok": True,
+            "ip": ip,
+            "country": country,
+            "colo": colo,
+            "warp": warp_state,
+            "detail": detail,
+        }
+    except Exception as exc:
+        detail = str(exc)
+        raise
+    finally:
+        if proc is not None and proc.poll() is None:
+            proc.terminate()
+            try:
+                proc.wait(timeout=3)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+        path.unlink(missing_ok=True)
+        with connect() as con:
+            con.execute(
+                """
+                UPDATE cascade_settings SET outbound_id = ?, last_test_state = ?, last_test_ip = ?,
+                    last_test_country = ?, last_test_colo = ?, last_test_warp = ?,
+                    last_test_detail = ?, tested_signature = ?,
+                    last_test_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+                WHERE id = 1
+                """,
+                (
+                    int(outbound["id"]),
+                    state if state == "ok" else ("error: " + detail)[:250],
+                    ip, country, colo, warp_state, detail[:500],
+                    signature if state == "ok" else "",
+                ),
+            )
+
+
+def set_cascade_enabled(enabled: bool) -> dict[str, object]:
+    overview = get_cascade_overview()
+    outbound = overview["outbound"]
+    if outbound is None:
+        raise XPanelError("сначала подключите выходной сервер")
+    current = get_routing_settings()
+    if enabled:
+        if not overview["test_fresh"]:
+            raise XPanelError(
+                "сначала выполните полную проверку REALITY-соединения"
+            )
+        target = str(outbound["tag"])
+    else:
+        target = "direct"
+
+    update_routing_settings(
+        domain_strategy=str(current["domain_strategy"]),
+        default_outbound_tag=target,
+        sniffing_enabled=bool(current["sniffing_enabled"]),
+        sniffing_route_only=bool(current["sniffing_route_only"]),
+        sniff_http=bool(current["sniff_http"]),
+        sniff_tls=bool(current["sniff_tls"]),
+        sniff_quic=bool(current["sniff_quic"]),
+    )
+    with connect() as con:
+        con.execute(
+            "UPDATE cascade_settings SET enabled_at = ?, updated_at = CURRENT_TIMESTAMP WHERE id = 1",
+            (datetime.now(timezone.utc).isoformat() if enabled else None,),
+        )
+    return get_cascade_overview()
 
 def _validate_api_listen(value: str) -> str:
     value = value.strip()
@@ -4483,36 +5264,874 @@ def add_geo_policy(
     return [find_routing_rule(rule_id) for rule_id in ids]
 
 
-def get_geodata_status() -> list[dict[str, object]]:
+def _json_object_text(value: object, *, label: str) -> tuple[dict[str, object], str]:
+    text = str(value or "{}").strip() or "{}"
+    try:
+        parsed = json.loads(text)
+    except json.JSONDecodeError as exc:
+        raise ValueError(
+            f"{label}: JSON, строка {exc.lineno}, столбец {exc.colno}: {exc.msg}"
+        ) from exc
+    if not isinstance(parsed, dict):
+        raise ValueError(f"{label}: корень JSON должен быть объектом")
+    return parsed, json.dumps(parsed, ensure_ascii=False, indent=2) + "\n"
+
+
+def _validate_finalmask_object(value: dict[str, object], *, label: str) -> None:
+    """Validate the documented streamSettings.finalmask object shape."""
+    allowed = {"tcp", "udp", "quicParams"}
+    unknown = sorted(set(value) - allowed)
+    if unknown:
+        raise ValueError(
+            f"{label}: неизвестные поля верхнего уровня: {', '.join(unknown)}; "
+            "разрешены tcp, udp и quicParams"
+        )
+
+    configured = False
+    for family in ("tcp", "udp"):
+        if family not in value:
+            continue
+        entries = value[family]
+        if not isinstance(entries, list):
+            raise ValueError(f"{label}: {family} должен быть массивом масок")
+        if entries:
+            configured = True
+        for index, entry in enumerate(entries, start=1):
+            if not isinstance(entry, dict):
+                raise ValueError(
+                    f"{label}: {family}[{index}] должен быть JSON-объектом"
+                )
+            mask_type = entry.get("type")
+            if not isinstance(mask_type, str) or not mask_type.strip():
+                raise ValueError(
+                    f"{label}: {family}[{index}].type должен быть непустой строкой"
+                )
+            settings = entry.get("settings", {})
+            if not isinstance(settings, dict):
+                raise ValueError(
+                    f"{label}: {family}[{index}].settings должен быть JSON-объектом"
+                )
+            extra = sorted(set(entry) - {"type", "settings"})
+            if extra:
+                raise ValueError(
+                    f"{label}: {family}[{index}] содержит неизвестные поля: "
+                    f"{', '.join(extra)}"
+                )
+
+    if "quicParams" in value:
+        if not isinstance(value["quicParams"], dict):
+            raise ValueError(f"{label}: quicParams должен быть JSON-объектом")
+        if value["quicParams"]:
+            configured = True
+
+    if value and not configured:
+        raise ValueError(
+            f"{label}: укажите хотя бы одну TCP/UDP-маску или непустой quicParams"
+        )
+
+
+def _normalise_cert_pin(value: object) -> str:
+    raw = str(value or "").strip()
+    if not raw:
+        return ""
+    result: list[str] = []
+    for item in raw.split(","):
+        cleaned = re.sub(r"[^0-9A-Fa-f]", "", item)
+        if len(cleaned) != 64:
+            raise ValueError(
+                "Certificate pinning: каждый SHA-256 должен содержать 64 HEX-символа"
+            )
+        result.append(cleaned.lower())
+    return ",".join(dict.fromkeys(result))
+
+
+def _normalise_tls_verify_name(mode: object, value: object) -> tuple[str, str]:
+    selected = str(mode or "auto").strip().lower()
+    if selected not in {"auto", "manual"}:
+        raise ValueError("Проверка имени сертификата: выберите auto или manual")
+    if selected == "auto":
+        return selected, ""
+    raw = str(value or "").strip()
+    if not raw:
+        raise ValueError("Проверка имени сертификата: укажите имя для ручного режима")
+    names: list[str] = []
+    for item in raw.split(","):
+        name = item.strip().rstrip(".")
+        if not name:
+            continue
+        if name == "FromMitM":
+            names.append(name)
+            continue
+        candidate = name.strip("[]")
+        try:
+            ipaddress.ip_address(candidate)
+        except ValueError:
+            if not _hostname_candidate(candidate):
+                raise ValueError(
+                    "Проверка имени сертификата: используйте доменные имена или IP через запятую"
+                )
+        names.append(name)
+    if not names:
+        raise ValueError("Проверка имени сертификата: список имён пуст")
+    return selected, ",".join(dict.fromkeys(names))
+
+
+def _normalise_client_ca_pem(
+    value: object, source: object = ""
+) -> tuple[str, str, str]:
+    text = str(value or "").strip()
+    label = str(source or "").strip()[:240]
+    if not text:
+        return "", label, ""
+    if len(text.encode("utf-8")) > 262144:
+        raise ValueError("Пользовательский CA PEM не должен превышать 256 КБ")
+    if "PRIVATE KEY" in text:
+        raise ValueError("Пользовательский CA PEM не должен содержать закрытый ключ")
+    blocks = re.findall(
+        r"-----BEGIN CERTIFICATE-----.*?-----END CERTIFICATE-----",
+        text,
+        flags=re.S,
+    )
+    if not blocks:
+        raise ValueError("Пользовательский CA PEM: не найден сертификат PEM")
+    normalised = "\n".join(block.strip() for block in blocks) + "\n"
+    if shutil.which("openssl"):
+        temp_name = ""
+        try:
+            with tempfile.NamedTemporaryFile("w", encoding="utf-8", delete=False) as handle:
+                handle.write(normalised)
+                temp_name = handle.name
+            check = subprocess.run(
+                ["openssl", "crl2pkcs7", "-nocrl", "-certfile", temp_name, "-outform", "PEM"],
+                capture_output=True,
+                timeout=15,
+                check=False,
+            )
+            if check.returncode != 0:
+                detail = check.stderr.decode("utf-8", "replace").strip()
+                raise ValueError(detail or "Пользовательский CA PEM не прошёл проверку OpenSSL")
+        finally:
+            if temp_name:
+                Path(temp_name).unlink(missing_ok=True)
+    return normalised, label, hashlib.sha256(normalised.encode("utf-8")).hexdigest()
+
+
+def load_client_ca_pem(path_value: object) -> dict[str, str]:
+    path = Path(str(path_value or "").strip()).expanduser()
+    if not path.is_file():
+        raise ValueError(f"CA PEM не найден: {path}")
+    try:
+        raw = path.read_text(encoding="utf-8")
+    except UnicodeDecodeError as exc:
+        raise ValueError("CA PEM должен быть текстовым PEM-файлом") from exc
+    pem, source, sha256 = _normalise_client_ca_pem(raw, str(path))
+    return {"pem": pem, "source": source, "sha256": sha256}
+
+
+def _validate_ech_dns_source(value: str) -> None:
+    raw = str(value or "").strip()
+    resolver = raw
+    if "+" in raw:
+        lookup_name, resolver = raw.split("+", 1)
+        if not _hostname_candidate(lookup_name.strip()):
+            raise ValueError("ECH DNS: перед '+' укажите корректное доменное имя")
+    parsed = urlparse(resolver)
+    if parsed.scheme not in {"udp", "https", "h2c"} or not parsed.hostname:
+        raise ValueError("ECH DNS: используйте udp://, https:// или h2c:// источник")
+    if parsed.username or parsed.password:
+        raise ValueError("ECH DNS: источник не должен содержать логин или пароль")
+
+
+def get_transport_expert_settings() -> sqlite3.Row:
+    init_db()
+    with connect() as con:
+        row = con.execute(
+            "SELECT * FROM transport_expert_settings WHERE id = 1"
+        ).fetchone()
+    if row is None:
+        raise XPanelError("экспертные настройки транспорта не инициализированы")
+    return row
+
+
+def update_transport_expert_settings(
+    *,
+    xhttp_mode: object = "auto",
+    xhttp_extra_server_json: object = "{}",
+    xhttp_extra_client_json: object = "{}",
+    finalmask_enabled: bool = False,
+    finalmask_server_json: object = "{}",
+    finalmask_client_json: object = "{}",
+    ech_mode: str = "off",
+    ech_public_name: object = "",
+    ech_server_keys: object = "",
+    ech_config_list: object = "",
+    certificate_pinning_enabled: bool = False,
+    certificate_pinning_sha256: object = "",
+    certificate_pinning_source: object = "",
+    tls_verify_name_mode: object = "auto",
+    tls_verify_name: object = "",
+    client_ca_pem: object = "",
+    client_ca_source: object = "",
+) -> sqlite3.Row:
+    mode_xhttp = str(xhttp_mode or "auto").strip().lower()
+    if mode_xhttp not in ALLOWED_XHTTP_MODES:
+        raise ValueError("XHTTP Mode: разрешены auto, packet-up, stream-up и stream-one")
+    _, xhttp_server = _json_object_text(
+        xhttp_extra_server_json, label="XHTTP Server Extra"
+    )
+    _, xhttp_client = _json_object_text(
+        xhttp_extra_client_json, label="XHTTP Client Extra"
+    )
+    finalmask_server_obj, finalmask_server = _json_object_text(
+        finalmask_server_json, label="FinalMask Server"
+    )
+    finalmask_client_obj, finalmask_client = _json_object_text(
+        finalmask_client_json, label="FinalMask Client"
+    )
+    if finalmask_enabled and not finalmask_server_obj:
+        raise ValueError("FinalMask: Server JSON не может быть пустым при включении")
+    if finalmask_enabled and not finalmask_client_obj:
+        raise ValueError("FinalMask: Client JSON не может быть пустым при включении")
+    if finalmask_enabled:
+        _validate_finalmask_object(finalmask_server_obj, label="FinalMask Server")
+        _validate_finalmask_object(finalmask_client_obj, label="FinalMask Client")
+
+    mode = str(ech_mode or "off").strip().lower()
+    if mode not in {"off", "generated", "existing", "dns"}:
+        raise ValueError("ECH: неизвестный режим")
+    public_name = str(ech_public_name or "").strip()
+    server_keys = str(ech_server_keys or "").strip()
+    config_list = str(ech_config_list or "").strip()
+    if mode != "off":
+        if not public_name:
+            raise ValueError("ECH: укажите Outer Server Name")
+        if not server_keys:
+            raise ValueError("ECH: отсутствует echServerKeys для серверной стороны")
+        if not config_list:
+            raise ValueError("ECH: отсутствует echConfigList для клиентской стороны")
+    if mode == "dns":
+        _validate_ech_dns_source(config_list)
+
+    pin = _normalise_cert_pin(certificate_pinning_sha256)
+    if certificate_pinning_enabled and not pin:
+        raise ValueError("Certificate pinning: сначала рассчитайте или укажите SHA-256")
+    pin_source = str(certificate_pinning_source or "").strip()[:240]
+    verify_mode, verify_name = _normalise_tls_verify_name(
+        tls_verify_name_mode, tls_verify_name
+    )
+    ca_pem, ca_source, ca_sha256 = _normalise_client_ca_pem(
+        client_ca_pem, client_ca_source
+    )
+
+    with connect() as con:
+        con.execute("UPDATE server_settings SET xhttp_mode=? WHERE id=1", (mode_xhttp,))
+        con.execute(
+            """
+            UPDATE transport_expert_settings SET
+                xhttp_extra_server_json=?, xhttp_extra_client_json=?,
+                finalmask_enabled=?, finalmask_server_json=?, finalmask_client_json=?,
+                ech_mode=?, ech_public_name=?, ech_server_keys=?, ech_config_list=?,
+                certificate_pinning_enabled=?, certificate_pinning_sha256=?,
+                certificate_pinning_source=?, tls_verify_name_mode=?, tls_verify_name=?,
+                client_ca_pem=?, client_ca_source=?, client_ca_sha256=?,
+                last_validation_state='ok',
+                last_validation_message='Серверные и клиентские форматы проверены',
+                last_validation_at=CURRENT_TIMESTAMP, updated_at=CURRENT_TIMESTAMP
+            WHERE id=1
+            """,
+            (
+                xhttp_server, xhttp_client, int(bool(finalmask_enabled)),
+                finalmask_server, finalmask_client, mode, public_name,
+                server_keys, config_list, int(bool(certificate_pinning_enabled)),
+                pin, pin_source, verify_mode, verify_name,
+                ca_pem, ca_source, ca_sha256,
+            ),
+        )
+    return get_transport_expert_settings()
+
+def _profile_expert_status(profile: str, expert: sqlite3.Row) -> dict[str, dict[str, str]]:
+    is_xhttp = profile in {"xhttp_tls", "xhttp_reality", "xhttp_hysteria_tls"}
+    is_tls = profile in CERTIFICATE_INBOUND_PROFILES
+    # XHTTP/gRPC TLS is terminated by Nginx. Direct Xray TLS is used by Hysteria 2.
+    ech_applicable = profile in HYSTERIA_ACTIVE_PROFILES
+    xhttp_extra_configured = any(
+        str(expert[name] or "").strip() not in {"", "{}"}
+        for name in ("xhttp_extra_server_json", "xhttp_extra_client_json")
+    )
+    pinning = bool(expert["certificate_pinning_enabled"])
+    custom_ca = bool(str(expert["client_ca_pem"] or "").strip())
+    manual_name = str(expert["tls_verify_name_mode"] or "auto") == "manual"
+    if not is_tls:
+        tls_state, tls_label = "not_applicable", "Не применимо"
+    elif pinning:
+        tls_state, tls_label = "configured", "SHA-256 закреплён"
+    elif custom_ca:
+        tls_state, tls_label = "configured", "Пользовательский CA"
+    elif manual_name:
+        tls_state, tls_label = "configured", "System CA + отдельное имя"
+    else:
+        tls_state, tls_label = "neutral", "System CA — рекомендуется"
+    return {
+        "xhttp_extra": {
+            "state": "configured" if is_xhttp and xhttp_extra_configured else ("neutral" if is_xhttp else "not_applicable"),
+            "label": "Настроено" if is_xhttp and xhttp_extra_configured else ("Стандартные значения" if is_xhttp else "Не применимо"),
+        },
+        "finalmask": {
+            "state": "configured" if bool(expert["finalmask_enabled"]) else "neutral",
+            "label": "Настроено" if bool(expert["finalmask_enabled"]) else "Выключено — рекомендуется",
+        },
+        "ech": {
+            "state": "configured" if ech_applicable and expert["ech_mode"] != "off" else ("neutral" if ech_applicable else "not_applicable"),
+            "label": "Настроено" if ech_applicable and expert["ech_mode"] != "off" else ("Off — стандартный TLS" if ech_applicable else "Не применимо к текущей схеме"),
+        },
+        "pinning": {"state": tls_state, "label": tls_label},
+        "tls_verification": {"state": tls_state, "label": tls_label},
+    }
+
+
+def get_transport_expert_overview() -> dict[str, object]:
+    server = get_server()
+    expert = get_transport_expert_settings()
+    profile = str(server["inbound_profile"] or "raw_reality")
+    mode = str(server["xhttp_mode"] or "auto")
+    mode_labels = {
+        "auto": "Auto — рекомендуется",
+        "packet-up": "Packet Up",
+        "stream-up": "Stream Up",
+        "stream-one": "Stream One",
+    }
+    tls_applicable = profile in CERTIFICATE_INBOUND_PROFILES
+    ech_applicable = profile in HYSTERIA_ACTIVE_PROFILES
+    xhttp_applicable = profile in {"xhttp_tls", "xhttp_reality", "xhttp_hysteria_tls"}
+    verify_mode = str(expert["tls_verify_name_mode"] or "auto")
+    verify_override = str(expert["tls_verify_name"] or "").strip()
+    default_verify_name = str(server["server_name"] or "").strip() if tls_applicable else ""
+    effective_verify_name = verify_override if verify_mode == "manual" else default_verify_name
+    ca_pem = str(expert["client_ca_pem"] or "")
+    effective = {
+        "xhttp_mode": mode,
+        "xhttp_mode_label": mode_labels.get(mode, mode),
+        "xhttp_server_extra": str(expert["xhttp_extra_server_json"] or "{}").strip() or "{}",
+        "xhttp_client_extra": str(expert["xhttp_extra_client_json"] or "{}").strip() or "{}",
+        "finalmask_server": str(expert["finalmask_server_json"] or "{}").strip() or "{}",
+        "finalmask_client": str(expert["finalmask_client_json"] or "{}").strip() or "{}",
+        "finalmask_enabled": bool(expert["finalmask_enabled"]),
+        "ech_mode": str(expert["ech_mode"] or "off"),
+        "ech_public_name": str(expert["ech_public_name"] or ""),
+        "pinning_enabled": bool(expert["certificate_pinning_enabled"]),
+        "pinning_sha256": str(expert["certificate_pinning_sha256"] or ""),
+        "tls_verify_name_mode": verify_mode,
+        "tls_verify_name": verify_override,
+        "tls_verify_name_effective": effective_verify_name,
+        "client_ca_enabled": bool(ca_pem.strip()),
+        "client_ca_sha256": str(expert["client_ca_sha256"] or ""),
+        "client_ca_source": str(expert["client_ca_source"] or ""),
+    }
+    return {
+        "settings": expert,
+        "effective": effective,
+        "profile": profile,
+        "context": {
+            "is_reality": profile in REALITY_INBOUND_PROFILES,
+            "tls_applicable": tls_applicable,
+            "ech_applicable": ech_applicable,
+            "xhttp_applicable": xhttp_applicable,
+            "tls_terminated_by_nginx": profile in TLS_INBOUND_PROFILES,
+        },
+        "statuses": _profile_expert_status(profile, expert),
+        "xhttp_server_example": json.dumps(
+            {"xmux": {"maxConcurrency": "16-32", "maxConnections": 4}},
+            ensure_ascii=False, indent=2,
+        ),
+        "xhttp_client_example": json.dumps(
+            {"xmux": {"maxConcurrency": "8-16", "maxConnections": 2}},
+            ensure_ascii=False, indent=2,
+        ),
+        "finalmask_example": json.dumps(
+            {
+                "tcp": [
+                    {
+                        "type": "fragment",
+                        "settings": {
+                            "packets": "tlshello",
+                            "lengths": ["3-5", "6-8"],
+                            "delays": ["10-20"],
+                            "maxSplit": "3-6",
+                        },
+                    }
+                ]
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
+    }
+
+def generate_ech_pair(public_name: str) -> dict[str, str]:
+    server = get_server()
+    name = str(public_name or "").strip()
+    if not name or len(name) > 253 or any(ch.isspace() for ch in name):
+        raise ValueError("ECH: укажите корректное внешнее Server Name")
+    proc = _run([str(server["xray_bin"]), "tls", "ech", "--serverName", name], timeout=20)
+    output = (proc.stdout or "") + "\n" + (proc.stderr or "")
+    if proc.returncode != 0:
+        raise XPanelError(output.strip() or "Xray не смог сгенерировать ECH")
+    lines = [line.strip() for line in output.splitlines() if line.strip()]
+    server_key = ""
+    config = ""
+    for line in lines:
+        lower = line.lower()
+        value = line.split(":", 1)[1].strip() if ":" in line else line
+        if "server" in lower and "key" in lower:
+            server_key = value
+        elif "config" in lower and "server" not in lower:
+            config = value
+    # Current Xray prints two opaque base64-like values; retain a robust fallback.
+    opaque = [line for line in lines if re.fullmatch(r"[A-Za-z0-9+/=_-]{32,}", line)]
+    if not server_key and opaque:
+        server_key = opaque[0]
+    if not config and len(opaque) > 1:
+        config = opaque[1]
+    if not server_key or not config:
+        raise XPanelError(
+            "Xray сгенерировал ECH, но формат вывода не распознан; полный вывод сохранён в журнале"
+        )
+    return {"public_name": name, "server_keys": server_key, "config_list": config}
+
+
+def calculate_certificate_pin(cert_path: str | None = None) -> dict[str, str]:
+    server = get_server()
+    path = Path(str(cert_path or server["tls_cert_path"] or "")).expanduser()
+    if not path.is_file():
+        raise ValueError(f"TLS certificate не найден: {path}")
+    proc = subprocess.run(
+        ["openssl", "x509", "-in", str(path), "-outform", "DER"],
+        capture_output=True, timeout=15, check=False,
+    )
+    if proc.returncode != 0 or not proc.stdout:
+        detail = proc.stderr.decode("utf-8", "replace").strip()
+        raise XPanelError(detail or "не удалось прочитать TLS certificate")
+    return {
+        "sha256": hashlib.sha256(proc.stdout).hexdigest(),
+        "source": str(path),
+    }
+
+
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _current_asset_paths() -> tuple[Path, Path]:
     roots: list[Path] = []
     env_root = os.environ.get("XRAY_LOCATION_ASSET", "").strip()
     if env_root:
         roots.append(Path(env_root))
     roots.extend([Path("/usr/local/share/xray"), Path("/usr/share/xray")])
-    result: list[dict[str, object]] = []
-    for filename in ("geoip.dat", "geosite.dat"):
-        found: Path | None = None
-        for root in roots:
-            candidate = root / filename
-            if candidate.is_file():
-                found = candidate
-                break
-        if found:
-            stat = found.stat()
-            result.append(
-                {
-                    "name": filename,
-                    "installed": True,
-                    "path": str(found),
-                    "size": stat.st_size,
-                    "updated_at": datetime.fromtimestamp(stat.st_mtime, timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
-                }
+    for root in roots:
+        geoip = root / "geoip.dat"
+        geosite = root / "geosite.dat"
+        if geoip.is_file() or geosite.is_file():
+            return geoip, geosite
+    return Path("/usr/local/share/xray/geoip.dat"), Path("/usr/local/share/xray/geosite.dat")
+
+
+def _original_asset_paths() -> tuple[Path, Path]:
+    original = GEOFILES_STATE_DIR / "original-xray"
+    return original / "geoip.dat", original / "geosite.dat"
+
+
+def _preserve_original_xray_assets() -> None:
+    original_geoip, original_geosite = _original_asset_paths()
+    if original_geoip.is_file() and original_geosite.is_file():
+        return
+    active_geoip, active_geosite = _current_asset_paths()
+    if not active_geoip.is_file() or not active_geosite.is_file():
+        return
+    original_geoip.parent.mkdir(parents=True, exist_ok=True)
+    if not original_geoip.is_file():
+        shutil.copy2(active_geoip, original_geoip)
+    if not original_geosite.is_file():
+        shutil.copy2(active_geosite, original_geosite)
+
+
+def _xray_bundle_paths() -> tuple[Path, Path]:
+    original_geoip, original_geosite = _original_asset_paths()
+    if original_geoip.is_file() and original_geosite.is_file():
+        return original_geoip, original_geosite
+    return _current_asset_paths()
+
+
+def get_geofiles_settings() -> sqlite3.Row:
+    init_db()
+    with connect() as con:
+        row = con.execute("SELECT * FROM geofiles_settings WHERE id=1").fetchone()
+    if row is None:
+        raise XPanelError("настройки GeoFiles не инициализированы")
+    return row
+
+
+def supported_geofiles_sources() -> dict[str, dict[str, str]]:
+    return {key: dict(value) for key, value in GEOFILES_SOURCES.items()}
+
+
+def _geofile_info(path: Path) -> dict[str, object]:
+    if not path.is_file():
+        return {
+            "installed": False,
+            "path": str(path),
+            "size": 0,
+            "sha256": "",
+            "updated_at": "",
+        }
+    stat = path.stat()
+    return {
+        "installed": True,
+        "path": str(path),
+        "size": stat.st_size,
+        "sha256": _sha256_file(path),
+        "updated_at": datetime.fromtimestamp(
+            stat.st_mtime, timezone.utc
+        ).strftime("%Y-%m-%d %H:%M UTC"),
+    }
+
+
+def _source_values(
+    source: str,
+    geoip_url: str = "",
+    geosite_url: str = "",
+    geoip_local_path: str = "",
+    geosite_local_path: str = "",
+) -> dict[str, str]:
+    key = str(source or "xray").strip().lower()
+    if key not in GEOFILES_SOURCES:
+        raise ValueError("неизвестный источник GeoFiles")
+    preset = GEOFILES_SOURCES[key]
+    result = {
+        "source": key,
+        "geoip_url": str(geoip_url or preset.get("geoip_url", "")).strip(),
+        "geosite_url": str(geosite_url or preset.get("geosite_url", "")).strip(),
+        "geoip_local_path": str(geoip_local_path or "").strip(),
+        "geosite_local_path": str(geosite_local_path or "").strip(),
+    }
+    if key in {"v2fly", "loyalsoldier", "runetfreedom", "custom"}:
+        for label, value in (
+            ("GeoIP URL", result["geoip_url"]),
+            ("GeoSite URL", result["geosite_url"]),
+        ):
+            parsed = urlparse(value)
+            if parsed.scheme != "https" or not parsed.netloc:
+                raise ValueError(f"{label}: разрешён только полный HTTPS URL")
+            if parsed.username or parsed.password:
+                raise ValueError(f"{label}: URL с логином или паролем не разрешён")
+    if key == "local":
+        for label, value in (
+            ("geoip.dat", result["geoip_local_path"]),
+            ("geosite.dat", result["geosite_local_path"]),
+        ):
+            path = Path(value).expanduser()
+            if not path.is_file():
+                raise ValueError(f"{label}: локальный файл не найден: {path}")
+    return result
+
+
+def configure_geofiles_source(**values: object) -> sqlite3.Row:
+    cleaned = _source_values(
+        str(values.get("source", "xray")),
+        str(values.get("geoip_url", "")),
+        str(values.get("geosite_url", "")),
+        str(values.get("geoip_local_path", "")),
+        str(values.get("geosite_local_path", "")),
+    )
+    with connect() as con:
+        con.execute(
+            """
+            UPDATE geofiles_settings SET source=?, geoip_url=?, geosite_url=?,
+                geoip_local_path=?, geosite_local_path=?, staged_manifest_json='{}',
+                last_check_state='', last_check_message='', last_checked_at=NULL,
+                updated_at=CURRENT_TIMESTAMP WHERE id=1
+            """,
+            (
+                cleaned["source"],
+                cleaned["geoip_url"],
+                cleaned["geosite_url"],
+                cleaned["geoip_local_path"],
+                cleaned["geosite_local_path"],
+            ),
+        )
+    return get_geofiles_settings()
+
+
+def _copy_or_download_geofile(source: str, value: str, destination: Path) -> None:
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    if source == "local":
+        shutil.copy2(Path(value).expanduser(), destination)
+        return
+    proc = _run(
+        [
+            "curl",
+            "--fail",
+            "--location",
+            "--silent",
+            "--show-error",
+            "--proto",
+            "=https",
+            "--tlsv1.2",
+            "--max-time",
+            "120",
+            "--output",
+            str(destination),
+            value,
+        ],
+        timeout=135,
+    )
+    if proc.returncode != 0:
+        raise XPanelError(
+            (proc.stderr or proc.stdout).strip() or f"не удалось скачать {value}"
+        )
+
+
+def _record_geofiles_check_failure(message: str) -> None:
+    with connect() as con:
+        con.execute(
+            """
+            UPDATE geofiles_settings SET last_check_state='error',
+                last_check_message=?, last_checked_at=CURRENT_TIMESTAMP,
+                staged_manifest_json='{}', updated_at=CURRENT_TIMESTAMP WHERE id=1
+            """,
+            (str(message)[:1000],),
+        )
+
+
+def validate_geofiles_source(**values: object) -> dict[str, object]:
+    settings = configure_geofiles_source(**values)
+    source = str(settings["source"])
+    stage = GEOFILES_STATE_DIR / "staging"
+    try:
+        if stage.exists():
+            shutil.rmtree(stage)
+        stage.mkdir(parents=True, exist_ok=True)
+        geoip_stage = stage / "geoip.dat"
+        geosite_stage = stage / "geosite.dat"
+        if source == "xray":
+            source_geoip, source_geosite = _xray_bundle_paths()
+            if not source_geoip.is_file() or not source_geosite.is_file():
+                raise XPanelError(
+                    "в сохранённом комплекте Xray отсутствуют geoip.dat или geosite.dat"
+                )
+            shutil.copy2(source_geoip, geoip_stage)
+            shutil.copy2(source_geosite, geosite_stage)
+        elif source == "local":
+            _copy_or_download_geofile(
+                source, str(settings["geoip_local_path"]), geoip_stage
+            )
+            _copy_or_download_geofile(
+                source, str(settings["geosite_local_path"]), geosite_stage
             )
         else:
-            result.append(
-                {"name": filename, "installed": False, "path": "", "size": 0, "updated_at": ""}
+            _copy_or_download_geofile(
+                source, str(settings["geoip_url"]), geoip_stage
             )
-    return result
+            _copy_or_download_geofile(
+                source, str(settings["geosite_url"]), geosite_stage
+            )
+        for label, path in (("geoip.dat", geoip_stage), ("geosite.dat", geosite_stage)):
+            if not path.is_file() or path.stat().st_size < 1024:
+                raise XPanelError(f"{label}: файл отсутствует или слишком мал")
+
+        # Missing categories and malformed files are detected by Xray itself using
+        # the exact current managed config and the staged asset directory.
+        server = get_server()
+        config_text, _, _ = render_text()
+        with tempfile.TemporaryDirectory(prefix="sg-geofiles-test-") as temp_dir:
+            cfg = Path(temp_dir) / "config.json"
+            cfg.write_text(config_text, encoding="utf-8")
+            env = os.environ.copy()
+            env["XRAY_LOCATION_ASSET"] = str(stage)
+            proc = subprocess.run(
+                [str(server["xray_bin"]), "run", "-test", "-config", str(cfg)],
+                text=True,
+                capture_output=True,
+                timeout=30,
+                env=env,
+                check=False,
+            )
+        if proc.returncode != 0:
+            raise XPanelError(
+                (proc.stderr or proc.stdout).strip() or "Xray не принял GeoFiles"
+            )
+        manifest = {
+            "source": source,
+            "source_label": GEOFILES_SOURCES[source]["label"],
+            "geoip_url": str(settings["geoip_url"]),
+            "geosite_url": str(settings["geosite_url"]),
+            "geoip_local_path": str(settings["geoip_local_path"]),
+            "geosite_local_path": str(settings["geosite_local_path"]),
+            "geoip": _geofile_info(geoip_stage),
+            "geosite": _geofile_info(geosite_stage),
+            "checked_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        }
+        with connect() as con:
+            con.execute(
+                """
+                UPDATE geofiles_settings SET staged_manifest_json=?,
+                    last_check_state='ok',
+                    last_check_message='GeoFiles и текущие Routing Rules совместимы',
+                    last_checked_at=CURRENT_TIMESTAMP,
+                    updated_at=CURRENT_TIMESTAMP WHERE id=1
+                """,
+                (json.dumps(manifest, ensure_ascii=False),),
+            )
+        return manifest
+    except Exception as exc:
+        _record_geofiles_check_failure(str(exc))
+        if stage.exists():
+            shutil.rmtree(stage, ignore_errors=True)
+        raise
+
+
+def apply_geofiles_source() -> dict[str, object]:
+    require_root()
+    settings = get_geofiles_settings()
+    if settings["last_check_state"] != "ok":
+        raise XPanelError("сначала выполните проверку выбранного источника GeoFiles")
+    try:
+        manifest = json.loads(settings["staged_manifest_json"] or "{}")
+    except json.JSONDecodeError as exc:
+        raise XPanelError("повреждён staged manifest GeoFiles") from exc
+    stage = GEOFILES_STATE_DIR / "staging"
+    staged_geoip = stage / "geoip.dat"
+    staged_geosite = stage / "geosite.dat"
+    if not staged_geoip.is_file() or not staged_geosite.is_file():
+        raise XPanelError(
+            "проверенные временные GeoFiles отсутствуют; выполните проверку снова"
+        )
+    if (
+        _sha256_file(staged_geoip) != manifest.get("geoip", {}).get("sha256")
+        or _sha256_file(staged_geosite)
+        != manifest.get("geosite", {}).get("sha256")
+    ):
+        raise XPanelError("GeoFiles изменились после проверки; применение заблокировано")
+
+    active_geoip, active_geosite = _current_asset_paths()
+    active_geoip.parent.mkdir(parents=True, exist_ok=True)
+    active_geosite.parent.mkdir(parents=True, exist_ok=True)
+    _preserve_original_xray_assets()
+
+    backup = GEOFILES_STATE_DIR / "backups" / datetime.now(timezone.utc).strftime(
+        "%Y%m%d-%H%M%S-%f"
+    )
+    backup.mkdir(parents=True, exist_ok=True)
+    existed = {
+        active_geoip: active_geoip.is_file(),
+        active_geosite: active_geosite.is_file(),
+    }
+    for current in (active_geoip, active_geosite):
+        if current.is_file():
+            shutil.copy2(current, backup / current.name)
+    (backup / "manifest.json").write_text(
+        json.dumps(
+            {
+                "active_source": str(settings["active_source"] or "xray"),
+                "created_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    tmp_geoip = active_geoip.with_name(active_geoip.name + ".sg-new")
+    tmp_geosite = active_geosite.with_name(active_geosite.name + ".sg-new")
+    try:
+        shutil.copy2(staged_geoip, tmp_geoip)
+        shutil.copy2(staged_geosite, tmp_geosite)
+        os.replace(tmp_geoip, active_geoip)
+        os.replace(tmp_geosite, active_geosite)
+        validation = validate_generated_config()
+        if not validation["ok"]:
+            raise XPanelError(str(validation["detail"]))
+        restart_xray()
+    except Exception:
+        for current in (active_geoip, active_geosite):
+            previous = backup / current.name
+            if previous.is_file():
+                shutil.copy2(previous, current)
+            elif not existed[current]:
+                current.unlink(missing_ok=True)
+        for tmp in (tmp_geoip, tmp_geosite):
+            tmp.unlink(missing_ok=True)
+        try:
+            restart_xray()
+        except Exception:
+            pass
+        raise
+
+    geoip_info = _geofile_info(active_geoip)
+    geosite_info = _geofile_info(active_geosite)
+    with connect() as con:
+        con.execute(
+            """
+            UPDATE geofiles_settings SET active_geoip_path=?,
+                active_geosite_path=?, active_geoip_sha256=?,
+                active_geosite_sha256=?, active_geoip_size=?,
+                active_geosite_size=?, active_source=?,
+                last_applied_at=CURRENT_TIMESTAMP,
+                last_check_message='GeoFiles применены и Xray перезапущен',
+                updated_at=CURRENT_TIMESTAMP WHERE id=1
+            """,
+            (
+                str(active_geoip),
+                str(active_geosite),
+                geoip_info["sha256"],
+                geosite_info["sha256"],
+                geoip_info["size"],
+                geosite_info["size"],
+                str(settings["source"]),
+            ),
+        )
+    return {
+        "source": str(settings["source"]),
+        "backup": str(backup),
+        "geoip": geoip_info,
+        "geosite": geosite_info,
+    }
+
+
+def get_geofiles_overview() -> dict[str, object]:
+    settings = get_geofiles_settings()
+    active_geoip, active_geosite = _current_asset_paths()
+    source_key = str(settings["active_source"] or "xray")
+    selected_key = str(settings["source"] or "xray")
+    try:
+        staged_manifest = json.loads(settings["staged_manifest_json"] or "{}")
+    except json.JSONDecodeError:
+        staged_manifest = {}
+    return {
+        "settings": settings,
+        "sources": supported_geofiles_sources(),
+        "selected_source": selected_key,
+        "selected_label": GEOFILES_SOURCES.get(selected_key, {}).get(
+            "label", selected_key
+        ),
+        "active_source": source_key,
+        "active_label": GEOFILES_SOURCES.get(source_key, {}).get(
+            "label", source_key
+        ),
+        "geoip": _geofile_info(active_geoip),
+        "geosite": _geofile_info(active_geosite),
+        "staged_manifest": staged_manifest,
+    }
+
+def get_geodata_status() -> list[dict[str, object]]:
+    overview = get_geofiles_overview()
+    return [
+        {"name": "geoip.dat", **overview["geoip"], "source": overview["active_label"]},
+        {"name": "geosite.dat", **overview["geosite"], "source": overview["active_label"]},
+    ]
 
 
 def _active_users(rows: list[sqlite3.Row]) -> list[sqlite3.Row]:
@@ -4538,10 +6157,63 @@ def _reality_settings(
     }
 
 
+def _merge_dicts(base: dict[str, object], overlay: dict[str, object]) -> dict[str, object]:
+    result = _copy_json_object(base)
+    for key, value in overlay.items():
+        if isinstance(value, dict) and isinstance(result.get(key), dict):
+            result[key] = _merge_dicts(result[key], value)  # type: ignore[arg-type]
+        else:
+            result[key] = value
+    return result
+
+
+def _expert_json(name: str) -> dict[str, object]:
+    row = get_transport_expert_settings()
+    value = row[name]
+    try:
+        parsed = json.loads(str(value or "{}"))
+    except json.JSONDecodeError as exc:
+        raise XPanelError(f"повреждён {name}: {exc}") from exc
+    return parsed if isinstance(parsed, dict) else {}
+
+
+def _apply_transport_expert_to_inbound(inbound: dict[str, object]) -> None:
+    stream = inbound.get("streamSettings")
+    if not isinstance(stream, dict):
+        return
+    expert = get_transport_expert_settings()
+    if str(stream.get("network", "")) == "xhttp":
+        xhttp = stream.get("xhttpSettings")
+        xhttp = xhttp if isinstance(xhttp, dict) else {}
+        extra = _expert_json("xhttp_extra_server_json")
+        if extra:
+            existing = xhttp.get("extra")
+            xhttp["extra"] = _merge_dicts(existing if isinstance(existing, dict) else {}, extra)
+        else:
+            xhttp.pop("extra", None)
+        stream["xhttpSettings"] = xhttp
+    if bool(expert["finalmask_enabled"]):
+        custom = _expert_json("finalmask_server_json")
+        existing = stream.get("finalmask")
+        stream["finalmask"] = _merge_dicts(existing if isinstance(existing, dict) else {}, custom)
+    # ECH is a server-side Xray TLS feature. XHTTP-TLS in SG-Panel is terminated
+    # by Nginx, so only direct Xray TLS inbounds receive echServerKeys here.
+    if str(stream.get("security", "")) == "tls" and str(expert["ech_mode"]) in {"generated", "existing", "dns"}:
+        keys = str(expert["ech_server_keys"] or "").strip()
+        if keys:
+            tls = stream.get("tlsSettings")
+            tls = tls if isinstance(tls, dict) else {}
+            tls["echServerKeys"] = keys
+            stream["tlsSettings"] = tls
+
+
 def _xhttp_settings(server: sqlite3.Row) -> dict[str, object]:
     settings: dict[str, object] = {"path": server["xhttp_path"]}
     if server["xhttp_mode"] and server["xhttp_mode"] != "auto":
         settings["mode"] = server["xhttp_mode"]
+    extra = _expert_json("xhttp_extra_server_json")
+    if extra:
+        settings["extra"] = extra
     return settings
 
 
@@ -4938,6 +6610,9 @@ def _build_managed_config() -> tuple[dict, sqlite3.Row, list[sqlite3.Row]]:
         )
     else:
         inbounds = [_build_primary_inbound(server, clients)]
+
+    for inbound in inbounds:
+        _apply_transport_expert_to_inbound(inbound)
 
     if settings["sniffing_enabled"]:
         dest_override = []
@@ -5456,7 +7131,7 @@ def _parse_full_config_server(
     address = str(meta.get("address") or current["address"])
     public_port = int(meta.get("publicPort") or current["port"] or 443)
     server_name = str(meta.get("serverName") or current["server_name"] or address)
-    fingerprint = str(meta.get("fingerprint") or current["fingerprint"] or "chrome")
+    fingerprint = str(meta.get("fingerprint") or current["fingerprint"] or "firefox")
     public_key = str(meta.get("publicKey") or current["public_key"])
     dest = str(current["dest"])
     private_key = str(current["private_key"])
@@ -7621,6 +9296,295 @@ def _client_link_title(user_name: str, instance_id: int | None = None) -> str:
     return f"{name}/{role}"
 
 
+def _compact_json_query(value: dict[str, object]) -> str:
+    return quote(json.dumps(value, ensure_ascii=False, separators=(",", ":")), safe="")
+
+
+def _client_expert_query(profile: str) -> str:
+    expert = get_transport_expert_settings()
+    parts: list[str] = []
+    if profile in {"xhttp_tls", "xhttp_reality"}:
+        extra = _expert_json("xhttp_extra_client_json")
+        if extra:
+            parts.append("extra=" + _compact_json_query(extra))
+    if bool(expert["finalmask_enabled"]):
+        finalmask = _expert_json("finalmask_client_json")
+        if finalmask:
+            parts.append("fm=" + _compact_json_query(finalmask))
+    if profile in {"xhttp_tls", "grpc_tls"}:
+        if bool(expert["certificate_pinning_enabled"]):
+            pin = str(expert["certificate_pinning_sha256"] or "").strip()
+            if pin:
+                parts.append("pcs=" + quote(pin, safe=""))
+        if str(expert["tls_verify_name_mode"] or "auto") == "manual":
+            verify_name = str(expert["tls_verify_name"] or "").strip()
+            if verify_name:
+                parts.append("vcn=" + quote(verify_name, safe=""))
+        # ECH is not added for XHTTP/gRPC here because SG-Panel terminates
+        # their TLS in Nginx and does not configure an ECH-capable frontend.
+    return ("&" + "&".join(parts)) if parts else ""
+
+
+def _geofiles_client_metadata() -> dict[str, object]:
+    geofiles = get_geofiles_overview()
+    return {
+        "source": geofiles["active_source"],
+        "sourceLabel": geofiles["active_label"],
+        "geoipUrl": str(geofiles["settings"]["geoip_url"] or ""),
+        "geositeUrl": str(geofiles["settings"]["geosite_url"] or ""),
+        "geoip": {
+            "sha256": geofiles["geoip"]["sha256"],
+            "size": geofiles["geoip"]["size"],
+            "updatedAt": geofiles["geoip"]["updated_at"],
+        },
+        "geosite": {
+            "sha256": geofiles["geosite"]["sha256"],
+            "size": geofiles["geosite"]["size"],
+            "updatedAt": geofiles["geosite"]["updated_at"],
+        },
+    }
+
+
+def _tls_client_contract(
+    profile: str, server: sqlite3.Row, expert: sqlite3.Row
+) -> dict[str, object]:
+    applicable = profile in CERTIFICATE_INBOUND_PROFILES
+    if not applicable:
+        return {
+            "applicable": False,
+            "reason": "REALITY использует собственные serverName, public key и short ID; TLS certificate extras не применяются.",
+        }
+
+    server_name = _link_sni_for_profile(server, profile)
+    verify_mode = str(expert["tls_verify_name_mode"] or "auto")
+    verify_override = (
+        str(expert["tls_verify_name"] or "").strip()
+        if verify_mode == "manual"
+        else ""
+    )
+    pin_enabled = bool(expert["certificate_pinning_enabled"])
+    pin = str(expert["certificate_pinning_sha256"] or "").strip() if pin_enabled else ""
+    ca_pem = str(expert["client_ca_pem"] or "").strip()
+    if pin and ca_pem:
+        verification_mode = "pinned_sha256_and_custom_ca"
+    elif pin:
+        verification_mode = "pinned_sha256"
+    elif ca_pem:
+        verification_mode = "custom_ca_plus_system_ca"
+    else:
+        verification_mode = "system_ca"
+
+    ech_applicable = profile in HYSTERIA_ACTIVE_PROFILES
+    ech_mode = str(expert["ech_mode"] or "off")
+    ech_enabled = ech_applicable and ech_mode != "off"
+    ech_source = "disabled"
+    if ech_enabled:
+        ech_source = "dns_https_record" if ech_mode == "dns" else "sg_panel_profile"
+
+    return {
+        "applicable": True,
+        "source": "SG-Panel",
+        "serverName": server_name,
+        "verification": {
+            "mode": verification_mode,
+            "systemCaEnabled": True,
+            "expectedCertificateName": verify_override or server_name,
+            "verifyPeerCertByName": verify_override,
+            "verifyPeerCertByNameSource": "administrator" if verify_override else "serverName",
+            "pinnedPeerCertSha256": pin,
+            "pinnedPeerCertSha256Source": str(expert["certificate_pinning_source"] or "") if pin else "",
+            "customCaPem": ca_pem,
+            "customCaPemSha256": str(expert["client_ca_sha256"] or "") if ca_pem else "",
+            "customCaPemSource": str(expert["client_ca_source"] or "") if ca_pem else "",
+            "disableSystemRoot": False,
+        },
+        "ech": {
+            "applicable": ech_applicable,
+            "enabled": ech_enabled,
+            "mode": ech_mode if ech_applicable else "off",
+            "publicName": str(expert["ech_public_name"] or "") if ech_enabled else "",
+            "configList": str(expert["ech_config_list"] or "") if ech_enabled else "",
+            "source": ech_source,
+            "note": (
+                "TLS этого профиля завершается в Nginx; ECH Xray для него не экспортируется."
+                if not ech_applicable
+                else ""
+            ),
+        },
+    }
+
+
+def managed_client_export(identifier: str | int) -> dict[str, object]:
+    """Backward-compatible managed profile used by RC50-RC52 clients."""
+    server = get_server()
+    user = find_user(identifier)
+    expert = get_transport_expert_settings()
+    profile = str(server["inbound_profile"] or "raw_reality")
+    tls_contract = _tls_client_contract(profile, server, expert)
+    tls_applicable = bool(tls_contract.get("applicable"))
+    tls_verification = tls_contract.get("verification", {}) if tls_applicable else {}
+    ech = tls_contract.get("ech", {}) if tls_applicable else {}
+    return {
+        "schema": "sg-panel-managed-profile-v1",
+        "managedBy": "SG-Panel",
+        "generatedAt": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "user": {"id": int(user["id"]), "name": str(user["name"]), "uuid": str(user["uuid"])},
+        "server": {
+            "address": str(server["address"]),
+            "profile": profile,
+            "serverName": str(server["server_name"]),
+            "flow": str(server["flow"] or "") if profile == "raw_reality" else "",
+        },
+        "xhttp": {
+            "applicable": profile in {"xhttp_tls", "xhttp_reality", "xhttp_hysteria_tls"},
+            "mode": str(server["xhttp_mode"] or "auto"),
+            "serverExtra": _expert_json("xhttp_extra_server_json"),
+            "clientExtra": _expert_json("xhttp_extra_client_json"),
+        },
+        "finalMask": {
+            "enabled": bool(expert["finalmask_enabled"]),
+            "server": _expert_json("finalmask_server_json"),
+            "client": _expert_json("finalmask_client_json"),
+            "source": "SG-Panel" if bool(expert["finalmask_enabled"]) else "disabled",
+        },
+        "ech": {
+            "applicable": bool(ech.get("applicable")),
+            "enabled": bool(ech.get("enabled")),
+            "mode": str(ech.get("mode") or "off"),
+            "publicName": str(ech.get("publicName") or ""),
+            "configList": str(ech.get("configList") or ""),
+            "source": str(ech.get("source") or "disabled"),
+            "note": str(ech.get("note") or ""),
+        },
+        "certificatePinning": {
+            "applicable": tls_applicable,
+            "enabled": bool(tls_verification.get("pinnedPeerCertSha256")),
+            "pinnedPeerCertSha256": str(tls_verification.get("pinnedPeerCertSha256") or ""),
+            "source": str(tls_verification.get("pinnedPeerCertSha256Source") or ""),
+        },
+        "tlsVerification": tls_verification if tls_applicable else {
+            "applicable": False,
+            "reason": str(tls_contract.get("reason") or "Не применимо"),
+        },
+        "geoFiles": _geofiles_client_metadata(),
+    }
+
+
+def _managed_connection_contract(
+    item: dict[str, object],
+    server: sqlite3.Row,
+    user: sqlite3.Row,
+    expert: sqlite3.Row,
+) -> dict[str, object]:
+    profile = str(item.get("profile") or server["inbound_profile"] or "raw_reality")
+    transport_map = {
+        "raw_reality": "tcp",
+        "xhttp_tls": "xhttp",
+        "xhttp_reality": "xhttp",
+        "grpc_tls": "grpc",
+        "hysteria2_tls": "hysteria2",
+    }
+    security = "reality" if profile in REALITY_INBOUND_PROFILES else "tls"
+    finalmask_enabled = bool(expert["finalmask_enabled"])
+    connection: dict[str, object] = {
+        "id": str(item.get("key") or f"{profile}-{item.get('id', 1)}"),
+        "title": str(item.get("client_title") or user["name"]),
+        "profile": profile,
+        "protocol": "hysteria2" if profile == "hysteria2_tls" else "vless",
+        "transport": transport_map.get(profile, str(item.get("kind") or "unknown")),
+        "security": security,
+        "endpoint": {
+            "address": str(server["address"]),
+            "port": int(item.get("port") or server["port"]),
+        },
+        "uri": str(item.get("link") or ""),
+        "active": True,
+        "credential": {
+            "type": "auth" if profile == "hysteria2_tls" else "uuid",
+            "value": str(item.get("auth") or user["uuid"]),
+            "source": "SG-Panel",
+        },
+        "managedFields": {
+            "serverAuthoritative": [
+                "security", "transport", "endpoint", "credential", "serverName",
+                "flow", "reality", "tls", "xhttp", "grpc"
+            ],
+            "ordinaryUserEditable": [],
+            "expertOverrideAllowed": ["finalMask"],
+        },
+        "finalMask": {
+            "enabled": finalmask_enabled,
+            "config": _expert_json("finalmask_client_json") if finalmask_enabled else {},
+            "source": "SG-Panel" if finalmask_enabled else "disabled",
+        },
+    }
+    if profile == "hysteria2_tls" and item.get("authority_ports"):
+        connection["endpoint"]["portSpec"] = str(item["authority_ports"])
+    if profile in {"xhttp_tls", "xhttp_reality"}:
+        connection["xhttp"] = {
+            "mode": str(server["xhttp_mode"] or "auto"),
+            "extra": _expert_json("xhttp_extra_client_json"),
+            "path": str(item.get("path") or server["xhttp_path"] or ""),
+            "source": "SG-Panel",
+        }
+    if profile == "grpc_tls":
+        connection["grpc"] = {
+            "serviceName": str(server["grpc_service_name"] or ""),
+            "source": "SG-Panel",
+        }
+    if profile in REALITY_INBOUND_PROFILES:
+        connection["reality"] = {
+            "source": "SG-Panel",
+            "serverName": _link_sni_for_profile(server, profile),
+            "publicKey": str(server["public_key"]),
+            "shortId": str(item.get("short_id") or server["short_id"]),
+            "fingerprint": fingerprint_for_xray(str(server["fingerprint"])),
+            "spiderX": "/",
+            "flow": str(server["flow"] or "") if profile == "raw_reality" else "",
+            "flowSource": "SG-Panel",
+        }
+        connection["tls"] = {
+            "applicable": False,
+            "reason": "REALITY profile: ECH, certificate SHA-256 and CA PEM are intentionally absent.",
+        }
+    else:
+        connection["tls"] = _tls_client_contract(profile, server, expert)
+    return connection
+
+
+def managed_client_export_v2(identifier: str | int) -> dict[str, object]:
+    """Authoritative SG Client contract with per-connection applicability."""
+    server = get_server()
+    user = find_user(identifier)
+    expert = get_transport_expert_settings()
+    links = make_links(user["id"], allow_disabled=True)
+    return {
+        "schema": "sg-panel-managed-profile-v2",
+        "contractVersion": 2,
+        "managedBy": "SG-Panel",
+        "generatedAt": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "user": {
+            "id": int(user["id"]),
+            "name": str(user["name"]),
+            "uuid": str(user["uuid"]),
+        },
+        "server": {
+            "address": str(server["address"]),
+            "activeProfile": str(server["inbound_profile"] or "raw_reality"),
+        },
+        "contract": {
+            "ordinaryUserAction": "import_and_connect",
+            "serverDependentValues": "must_not_be_invented_or_enabled_locally",
+            "trustOnFirstUse": False,
+        },
+        "connections": [
+            _managed_connection_contract(dict(item), server, user, expert)
+            for item in links
+        ],
+        "geoFiles": _geofiles_client_metadata(),
+    }
+
+
 def _link_sni_for_profile(server: sqlite3.Row, profile: str) -> str:
     current = str(server["inbound_profile"] or "raw_reality")
     if profile in REALITY_INBOUND_PROFILES:
@@ -7654,11 +9618,12 @@ def _make_links_for_profile(
             query = (
                 f"type=tcp&security=reality&pbk={quote(server['public_key'], safe='-_')}"
                 f"&fp={fp}&sni={sni}&sid={quote(str(instance['short_id']), safe='')}"
-                f"{flow}&spx=%2F"
+                f"{flow}&spx=%2F{_client_expert_query(profile)}"
             )
             result.append({
                 "id": instance_id,
                 "key": f"reality-{instance_id}",
+                "profile": profile,
                 "kind": "reality",
                 "name": str(instance["name"]),
                 "client_title": title,
@@ -7687,11 +9652,12 @@ def _make_links_for_profile(
             query = (
                 f"type=xhttp&security=tls&fp={fp}&sni={sni}"
                 f"&host={quote(server['address'], safe='')}"
-                f"&path={quote(str(instance['path']), safe='')}{mode}"
+                f"&path={quote(str(instance['path']), safe='')}{mode}{_client_expert_query(profile)}"
             )
             result.append({
                 "id": instance_id,
                 "key": f"xhttp-{instance_id}",
+                "profile": profile,
                 "kind": "xhttp",
                 "name": str(instance["name"]),
                 "client_title": title,
@@ -7722,12 +9688,15 @@ def _make_links_for_profile(
             result.append({
                 "id": inbound_id,
                 "key": f"hysteria-{inbound_id}",
+                "profile": profile,
                 "kind": "hysteria",
                 "name": str(instance["name"]),
                 "client_title": title,
                 "tag": str(instance["tag"]),
                 "listen": str(instance["listen"]),
                 "port": int(instance["port"]),
+                "authority_ports": authority_ports,
+                "auth": auths[inbound_id][int(user["id"])],
                 "link": (
                     f"hysteria2://{auth}@{host}:{authority_ports}/"
                     f"?sni={sni}&insecure=0#{quote(title, safe='')}"
@@ -7748,18 +9717,20 @@ def _make_links_for_profile(
         query = (
             f"type=xhttp&security=reality&pbk={quote(server['public_key'], safe='-_')}"
             f"&fp={fp}&sni={sni}&sid={quote(server['short_id'], safe='')}"
-            f"&path={quote(server['xhttp_path'], safe='')}{mode}&spx=%2F"
+            f"&path={quote(server['xhttp_path'], safe='')}{mode}&spx=%2F{_client_expert_query(profile)}"
         )
     elif profile == "grpc_tls":
         query = (
             f"type=grpc&security=tls&fp={fp}&sni={sni}"
             f"&serviceName={quote(server['grpc_service_name'], safe='-_')}"
+            f"{_client_expert_query(profile)}"
         )
     else:
         raise XPanelError(f"неподдерживаемый профиль inbound: {profile}")
     return [{
         "id": 1,
         "key": f"{profile}-1",
+        "profile": profile,
         "kind": "vless",
         "name": "Основной профиль",
         "client_title": str(user["name"]),

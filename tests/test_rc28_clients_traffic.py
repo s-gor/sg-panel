@@ -154,19 +154,22 @@ def test_clients_studio_ui_and_collector_timer_are_packaged() -> None:
     timer = (ROOT / "deploy/install-maintenance.sh").read_text(encoding="utf-8")
     for marker in (
         "Clients & Traffic Studio",
-        "Текущая сессия Xray",
-        "Текущий месяц",
-        "За всё время",
-        "Последние 14 дней",
+        "Последняя активность",
+        "Трафик за всё время",
+        "Срок",
+        "Развёрнут на серверах",
         "Добавить клиента",
         "Истекают в течение 7 дней",
     ):
         assert marker in html
     assert ".clients-studio-layout" in css
+    assert "grid-template-columns: 1fr" in css
+    assert "client-detail-standard" in html
+    assert "Последние 14 дней" not in html
     assert "xpanel-traffic.timer" in timer
     assert "OnUnitActiveSec=60s" in timer
     assert "collect-traffic --online" in timer
-    assert "Сбросить трафик клиента" in html
+    assert "Сбросить трафик" in html
     assert "Сбросить весь трафик" in html
     assert "Пользователи, ссылки и конфигурации останутся без изменений" in html
-    assert html.index("Сбросить трафик клиента") < html.index("Технические данные и обслуживание")
+    assert html.index("Сбросить трафик") < html.index("Дополнительно")

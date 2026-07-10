@@ -17,7 +17,7 @@ def test_rc34_documentation_describes_real_update_workflow():
     maintenance = (ROOT / "docs" / "MAINTENANCE.md").read_text(encoding="utf-8")
     release = (ROOT / "RELEASE-NOTES-RC34.md").read_text(encoding="utf-8")
 
-    assert "v0.10.0-rc45" in readme
+    assert "v0.10.0-rc70" in readme
     assert "Maintenance → Updates" in readme
     assert "Проверить сейчас" in readme
     assert "автоматический rollback" in readme

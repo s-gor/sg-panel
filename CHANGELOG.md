@@ -1,4 +1,248 @@
+## v0.10.0-rc70 — Complete Cascade and SG-Node help
+
+- Встроенная Help получила полную пошаговую инструкцию по Cascade: создание, проверка, включение, выдача клиентской ссылки, замена выхода, Direct, удаление и ошибки.
+- Раздел Cluster и SG-Node теперь объясняет все пять шагов, heartbeat, первый профиль `64441`, повторное подключение, журналы и обслуживание.
+- Добавлены контекстные ссылки из Cascade, Cluster и карточки Node прямо в нужные якоря Help.
+- Добавлен отдельный `docs/CASCADE.md`; актуализированы MULTI-NODE, USER-GUIDE, START-HERE, PANEL и индекс документации.
+- Сетевая логика, клиенты, ключи, сертификаты, темы и рабочие конфигурации RC69 не изменялись.
+
+## v0.10.0-rc69 — Cluster completion hotfix
+
+- После успешного heartbeat мастер автоматически завершает шаг подключения и открывает первый профиль SG-Node.
+- Использованная одноразовая команда исчезает; повторное подключение стало второстепенным действием обслуживания.
+- Xray и Nginx до первого профиля показываются как «ожидает первого профиля».
+- Исправлена длинная горизонтальная полоса прокрутки на странице SG-Node.
+- Темы, Cascade, WARP, Routing, клиенты и серверные ключи не изменялись.
+
+## v0.10.0-rc68 — Latte light theme preview
+
+- Тёмная тема «Графит» оставлена без изменений.
+- Светлая тема переработана в тёплую контрастную тему «Латте».
+- Убраны белёсые и холодно-голубые поверхности; добавлены кофейно-графитовые фон, карточки, поля и кнопки.
+- Серверная логика и сетевые функции RC67 не изменялись.
+
+## v0.10.0-rc67 — Light Fog and cleaner Routing
+
+- Экспериментальная пользовательская форма HTTP/SOCKS и точечная proxy-карточка удалены из Routing и Outbounds.
+- Интерфейс Routing возвращён к понятной структуре RC65 без лишних кнопок и промежуточных мастеров.
+- Российские WARP-пресеты разделены на `geosite:tld-ru` и `geosite:category-ru` + `geoip:ru` без дублирования.
+- Сохранены исправления Cascade: резервное копирование ссылки по HTTP, компактные кнопки и понятное объяснение ролей серверов.
+- Светлая тема переработана в холодную светло-графитовую тему «Туман»; тёмный «Графит» не изменён.
+- Чистая установка, Cluster, managed profile v2, существующие клиенты, ключи и сертификаты сохранены.
+
+## v0.10.0-rc65 — Visible server address
+
+- Имя экземпляра и публичный адрес теперь показываются вместе в общей шапке и на странице входа.
+- Если имя не задано, интерфейс показывает `SG-Panel · <address>`.
+- Если IP уже входит в пользовательское имя, адрес повторно не дублируется.
+- В System → Status & Services публичный адрес виден отдельно рядом с редактируемым именем.
+- Функциональность Cascade, WARP, Cluster и установщика RC64 сохранена.
+
 # Changelog
+
+## v0.10.0-rc64 — Bootstrap before questions
+
+- Самодостаточный установщик с первой секунды показывает зелёную вертушку `| / - \`.
+- До ввода параметров он ожидает cloud-init/apt, обновляет Ubuntu и устанавливает все обязательные системные компоненты.
+- Публичный IPv4 определяется после bootstrap, когда гарантированно доступны Python и `curl`.
+- Только после готовности системы мастер один раз запрашивает параметры панели и затем продолжает установку без дополнительного ввода.
+- Весь технический вывод остаётся в журналах; в терминале видны только этапы, время, `[OK]` и понятные ошибки.
+- Функциональность RC63, Cascade, имя сервера, WARP, Cluster, пользователи, UUID, ключи и сертификаты не менялась.
+
+## v0.10.0-rc63 — Надёжное определение публичного IP
+
+- Чистый установщик определяет публичный IPv4 до вопросов через AWS IMDSv2 с помощью системного Python и больше не зависит от заранее установленного `curl`.
+- Добавлены резервные способы определения через cloud-init, `checkip.amazonaws.com` и `api.ipify.org`.
+- Команда запуска больше не привязана к `/home/ubuntu`: установщик можно запускать из любого каталога и под любым штатным пользователем Ubuntu через `sudo bash ./063-INSTALL-SG-PANEL-RC63.sh`.
+- Если адрес определить всё же невозможно, мастер явно просит скопировать `Public IPv4 address` из AWS EC2 вместо повторяющейся непонятной ошибки.
+- Зелёная вертушка `| / - \` остаётся с первой секунды запуска.
+- Функциональность RC62, Cascade, имя сервера, WARP, Cluster и SG Client не менялась.
+
+## v0.10.0-rc62 — Spinner from the first second
+
+- Самораспаковывающийся установщик показывает зелёную вертушку `| / - \` сразу после запуска, ещё во время подготовки и проверки встроенного комплекта.
+- Перед вопросами мастер отдельно показывает живой этап запуска и автоматического определения публичного адреса.
+- Безмолвной паузы до первого вопроса больше нет.
+- Безопасное обновление также начинает показывать вертушку до preflight-проверок.
+- Функциональность RC61, Cascade, имя сервера, WARP, Cluster и SG Client не менялись.
+
+## v0.10.0-rc61 — Simple Cascade, instance name and classic spinner
+
+- Оставлен отдельный верхнеуровневый раздел **Cascade**, оформленный в общем стиле панели.
+- На выходном сервере одна кнопка создаёт управляемый служебный VLESS REALITY-доступ и готовую ссылку.
+- На входном сервере ссылка вставляется одной строкой; адрес, UUID, REALITY, Vision, SNI, ключ и Short ID импортируются автоматически.
+- После импорта выполняется полный запрос `Entry → Exit → Internet`; включение блокируется до получения реального выходного IP.
+- Схема и подсказки используют пользовательские имена серверов, а не жёсткие `CC1`/`CC2`.
+- Добавлено редактируемое имя экземпляра: задаётся при установке и постоянно видно в шапке и на странице входа.
+- Локальная кнопка удаления безопасно возвращает `direct` и удаляет только управляемый выход либо служебный доступ текущего сервера.
+- В чистой установке, обновлении и rollback восстановлена зелёная вертушка `| / - \`; технический вывод остаётся в журнале.
+- Ручные Outbounds и Traffic Rules сохранены как экспертный режим; WARP, Cluster, клиенты и SG Client не изменены.
+
+## v0.10.0-rc59 — Импорт VLESS-ссылки в Outbound
+
+- Добавлен быстрый импорт готовой `vless://`-ссылки в форму пользовательского Outbound.
+- Автоматически заполняются адрес, порт, UUID, транспорт, защита, Vision, SNI, fingerprint, Public Key, Short ID, Spider X и XHTTP/TLS-параметры.
+- Для каскадного имени `Cascade-CC1-to-CC2` предлагается тег `cascade-cc2`.
+- Ссылка не сохраняется в базе и очищается после успешного разбора.
+- Импорт не обходит validate-first: Outbound создаётся только после отдельного подтверждения и проверки итогового Xray config.
+- Тихий установщик RC58, WARP RC56–RC57, Cluster и SG Client не изменены.
+
+## v0.10.0-rc58 — Единый тихий установщик
+
+- Добавлен один самодостаточный мастер чистой установки со встроенным точным комплектом RC58 — без отдельного ZIP, предварительных `apt`, `unzip` и ручной распаковки.
+- Все вопросы задаются до начала системных изменений; после старта остаются только этапы, зелёная вертушка, время и `[OK]`.
+- Вывод `apt`, `dpkg`, `curl`, Python, Xray, Nginx и systemd направляется в журналы.
+- GitHub bootstrap теперь загружает и запускает тот же `install.sh`, а не отдельный устаревший сценарий.
+- Прямой EC2 installer и ручное обновление переведены на единый формат этапов.
+- Rollback обновления получил отдельную вертушку и явный итог восстановления.
+- WARP Routing RC56–RC57, Cluster RC54–RC56 и managed profile v2 RC53 не изменены.
+
+## v0.10.0-rc57 — Подробная настройка и проверка WARP
+
+- Добавлена полная пошаговая инструкция в Help и сворачиваемая памятка на странице WARP Routing.
+- Описаны создание Outbound, российский пресет, правила 40/41, временный тест ifconfig.me и проверка 2ip.ru.
+- Объяснено, почему выборочный режим может корректно показывать IP EC2 на обычном IP-checker.
+
+## v0.10.0-rc56 — Russian sites through WARP
+
+- Split WARP selective routing into separate Domain/Geosite and IP/GeoIP/CIDR inputs.
+- Added the ready preset «Российские сайты через WARP» using `geosite:category-ru` and `geoip:ru`.
+- Generate separate managed Xray rules for domains and IPs so both condition groups work independently instead of being combined with logical AND.
+- Show the effective managed WARP rules in the interface and return a clear GeoFiles category error before applying an invalid candidate.
+- Added forward-compatible `selected_ips` storage while preserving existing WARP domains and settings.
+- Simplified the Cluster wizard heading to «Подключение SG-Node».
+- SG Client, Cluster runtime, managed profile v2, certificates, users and existing REALITY profiles are unchanged.
+
+## v0.10.0-rc55 — Compact SG-Node deployment action
+
+- Replaced the full-width first-profile deployment bar with a compact action button.
+- Shortened the label to «Проверить и развернуть» and aligned the action to the right.
+- Preserved full-width behavior only on narrow mobile layouts.
+- No Cluster workflow, Node runtime, managed-profile or SG Client behavior was changed.
+
+## v0.10.0-rc54 — Guided SG-Node onboarding
+
+- Rebuilt Cluster as an explicit five-step workflow: prepare, add, connect, verify and deploy.
+- Separated the tokenless full SG-Node installer from the one-time-token connection command.
+- Public install and connect commands are self-contained one-line bootstrap commands for clean Ubuntu.
+- Connect now refuses an unprepared server with a clear `ready_to_connect` error.
+- Added Agent and Worker states, heartbeat details and public-address detection with a manual fallback.
+- The first SG-Node deployment is VLESS REALITY RAW/TCP on `64441`, with XTLS Vision and Firefox fingerprint.
+- New REALITY profiles default to Firefox; existing stored fingerprints are preserved during upgrade.
+- Fixed System → Status & Services so the RAM line shows available memory instead of free disk space.
+- SG-Node Agent and Worker report version `0.5.0`.
+- SG Client and the managed profile v2 contract are not changed.
+
+## v0.10.0-rc53 — Authoritative SG Client managed profile
+
+- Added `sg-panel-managed-profile-v2` with per-connection applicability and source metadata.
+- Added a dedicated managed JSON URL on the client access page while retaining v1 compatibility.
+- REALITY exports Flow and REALITY parameters but intentionally omits ECH, certificate pins and CA PEM.
+- TLS profiles use system CA by default and can carry an explicit certificate name, verified SHA-256 and private CA chain.
+- Added safe CA PEM import with private-key rejection, validation, source and SHA-256 metadata.
+- ECH server keys remain server-only; clients receive only the matching ECHConfig or resolver source.
+- Rebuilt Advanced UI so irrelevant TLS fields are hidden instead of shown as empty controls.
+- Expanded Help and documentation for the SG-Panel → SG Client contract.
+
+## v0.10.0-rc52 — Contextual Advanced, Routing GeoFiles and guided Panel exposure
+
+- Removed the standalone Expert navigation item and the oversized Expert card from Xray Server.
+- Moved XHTTP Extra, FinalMask, ECH and certificate pinning to Xray Server → Дополнительно.
+- Renamed Network to Routing and added GeoFiles as the fourth tab after DNS.
+- Rebuilt Panel exposure so only checks and controls for the selected Direct, Proxy or Tunnel mode are visible.
+- Added explicit external-action confirmations for origin lockdown and Cloudflare Access.
+- Added a detailed Russian Help chapter with safe migration steps and diagnostics.
+- New first installations use `xtls-rprx-vision`; existing Flow values and issued links are preserved during upgrade.
+
+
+## v0.10.0-rc51 — Prominent Expert & Panel exposure
+
+- Expert Transport & GeoFiles вынесен отдельным пунктом главного меню;
+- на Xray Server добавлена заметная статусная карточка Expert;
+- безопасные эффективные значения `Auto`, `{}`, `Off` и «Не применимо» отображаются вместо пустоты;
+- Expert editing по умолчанию выключен;
+- в Security добавлены Direct through Nginx, Cloudflare Proxy и Cloudflare Tunnel + Access;
+- добавлена проверка готовности origin и осторожное использование `CF-Connecting-IP`;
+- сохранены все функции RC50; SG Client не изменён.
+
+## v0.10.0-rc50 — Expert Transport & GeoFiles
+
+- добавлен раздел XHTTP Mode, Server/Client Extra, FinalMask, ECH и certificate pinning;
+- FinalMask использует документированную структуру `tcp`/`udp`/`quicParams`; неизвестные верхнеуровневые поля блокируются до применения;
+- экспертные значения проходят validate-first и полный `xray run -test`;
+- клиентские метаданные экспортируются без раскрытия `echServerKeys`;
+- VLESS URI поддерживает `extra`, `fm` и `pcs` там, где они применимы;
+- добавлены источники GeoFiles: комплект Xray, V2Fly, Loyalsoldier, RunetFreedom, пользовательские HTTPS URL и локальные файлы;
+- показаны активный источник, пути, размеры, SHA-256, даты и состояние проверки;
+- GeoFiles проверяются текущими Routing Rules, применяются атомарно с backup и rollback;
+- добавлены встроенная справка и отдельная документация;
+- SG Client не изменён.
+
+## RC46 Preview 3 Hotfix 15
+
+- Блок Multi-REALITY приведён к единой внутренней сетке: убраны лишний разделитель и большой разрыв перед проверкой.
+- Кнопка генерации REALITY-ключей получила стандартные внутренние поля.
+- Технические подписи REALITY переведены на русский язык и выровнены.
+
+
+## RC46 Preview 3 Hotfix 7
+
+- Network закреплён как визуальный эталон для Clients и Cluster.
+- Карточка выбранного клиента возвращена к нормальному полноразмерному масштабу.
+- Увеличена типографика UUID/Auth, подписки, комментария, серверов развёртывания и страницы ноды.
+- Удалён отдельный счётчик «Ноды» из верхней статистики клиента.
+- Системные `confirm()` для удаления пользователя и ноды заменены встроенным коротким подтверждением.
+- Cluster использует стандартные заголовки, метрики, карточки, поля и отступы SG-Panel.
+- Добавлено копирование UUID с HTTP fallback и автоматическим возвратом текста кнопки.
+
+
+## RC46 Preview 3 Hotfix 6
+
+- Удаление пользователя и ноды теперь выполняется обычной кнопкой и одним коротким подтверждением.
+- Убраны «Опасные зоны», ввод точного имени и дополнительный checkbox.
+- Cluster и страницы нод приведены к общей ширине и рабочему масштабу SG-Panel.
+- Журнал ноды и служебная команда агента перенесены в один компактный сворачиваемый блок.
+- Clients больше не использует длинную правую колонку; выбранный клиент показан компактным полноширинным блоком.
+- Исправлен возврат кнопок копирования в исходное состояние.
+- SG-Node Agent 0.4.0 получает публичный IPv4 EC2 через IMDSv2 и не подменяет его приватным адресом.
+
+
+## RC46 Preview 3 Hotfix 5
+
+- Исправлена передача пути к распакованным исходникам между этапами единого установщика.
+- Исправлен вывод правильного внутреннего журнала при сбое.
+## v0.10.0-rc46 — Preview 3 Hotfix 4
+
+- Единый установщик автоматически определяет публичный IPv4 EC2 до начала установки.
+- Определённый IPv4 показывается как значение по умолчанию; Enter принимает его без ошибки.
+- Домен по-прежнему можно указать вручную вместо автоматически найденного IP.
+- Добавлена строгая проверка IPv4, чтобы частный или некорректный адрес не принимался как hostname.
+
+## v0.10.0-rc46 — Preview 3 Hotfix 3
+
+- Добавлен единый `install.sh` для чистой Ubuntu Server 24.04 LTS.
+- Все вопросы задаются до `apt update`, `dist-upgrade` и установки компонентов.
+- Обновление Ubuntu, зависимости, Nginx, Xray и SG-Panel устанавливаются с зелёной живой строкой и журналом.
+
+## v0.10.0-rc46 — Preview 3 Hotfix 2
+
+- Кнопка безопасного удаления пользователя вынесена прямо в основную карточку клиента на странице Clients.
+- Добавлены видимый расчёт затрагиваемых нод и статус мультинодового удаления.
+
+# Changelog
+
+## v0.10.0-rc46 — Preview 3
+
+- Раздел «Сеть» переименован в **Cluster**.
+- Добавлены компактные карточки центрального сервера и SG-Node.
+- Реализовано фоновое обновление статусов, ресурсов и заданий без полной перезагрузки страницы.
+- Добавлено пилотное безопасное развёртывание VLESS REALITY через Agent/Worker.
+- Исправлены права Agent, установка Worker и имя временного Xray JSON.
+- Исправлены кнопки копирования при HTTP-доступе.
+- Последнее задание отделено от сворачиваемой истории; старая исправленная ошибка больше не выглядит текущей.
+- Добавлено безопасное удаление пользователей из центрального сервера и связанных нод.
+- Добавлено защищённое удаление ноды из Cluster с отзывом Agent и подтверждением активных развёртываний.
+- Bootstrap, прямое обновление SG-Panel и установщик ноды используют зелёную живую строку и постоянные журналы.
 
 ## v0.10.0-rc45
 
@@ -536,3 +780,71 @@
 - внутренний loopback-порт заглушки перенесён с `127.0.0.1:9443` на `127.0.0.1:10443`;
 - существующий `/etc/xpanel-mvp/reality-edge.env` автоматически мигрирует при обновлении;
 - добавлена явная проверка конфликтов дополнительных REALITY-портов с внутренними listener.
+
+## v0.10.0-rc46-preview2
+
+- Added the first safe remote Xray deployment pipeline for SG-Node.
+- Added an unprivileged Agent plus a separate privileged Worker.
+- Added remote `xray run -test`, atomic apply, backup and rollback.
+- Added a pilot VLESS REALITY deployment and generated client link.
+- Fixed SG-Node directory permissions and copy-button fallback.
+
+## RC46 Preview 3 Hotfix 3
+
+- Добавлен единый `install.sh` для чистой Ubuntu 24.04 EC2.
+- Все вопросы задаются до `apt update`, `dist-upgrade` и установки пакетов.
+- Установщик показывает зелёную живую вертушку на каждом крупном действии.
+- Технический вывод полностью сохраняется в журнале.
+- Устанавливаются Nginx, Python, unzip, Xray и все зависимости без ручной подготовки.
+- В конце выводится готовый адрес панели.
+- Поддержан интерактивный запуск через GitHub pipe благодаря `/dev/tty`.
+
+## RC46 Preview 3 Hotfix 8
+
+- карточка выбранного клиента структурно вынесена из прежней боковой сетки и всегда занимает полную ширину рабочей области;
+- добавлена отдельная ревизия CSS для гарантированного обновления браузерного кэша;
+- увеличены подписи и значения блока «Дополнительно»;
+- UUID/Auth оформлен крупным моноширинным полем с копированием;
+- «Подписка» и «Комментарий» собраны в компактную сетку;
+- «Сбросить трафик» перенесён в строку основных действий;
+- подпись клиента приведена к формату «КЛИЕНТ №…».
+
+## RC46 Preview 3 Hotfix 9
+
+- исправлена главная ошибка Hotfix 8: теперь расширена не только карточка выбранного клиента, а вся страница Clients;
+- Clients помещён в тот же полноразмерный рабочий контейнер шириной до 1540 px, который используется Xray Server и Network;
+- панель действий, четыре сводные карточки, фильтры, таблица клиентов, выбранный клиент и служебная строка занимают общую ширину страницы;
+- увеличены строки таблицы, аватары, статусы, значения, подписи и кнопки до масштаба Network;
+- на широком экране кнопки верхней панели больше не переносятся в случайную вторую строку;
+- добавлена ревизия CSS `preview3-hotfix9`, исключающая загрузку старого оформления из кэша.
+
+## RC46 Preview 3 Hotfix 10
+
+- размеры карточки «Правила маршрутизации» и общий внутренний отступ шапки сохранены без изменений;
+- правая группа действий в шапке сдвинута внутрь на 10 px;
+- промежутки между счётчиком и кнопками слегка уменьшены, чтобы последняя кнопка не прижималась к рамке;
+- добавлена ревизия CSS `preview3-hotfix10`.
+
+
+## RC46 Preview 3 Hotfix 11
+
+- исправлен реальный правый столбец действий в таблице правил маршрутизации;
+- кнопки строк получили безопасный отступ от рамки без изменения размеров карточки;
+- добавлена ревизия CSS `preview3-hotfix11`.
+
+## RC46 Preview 3 Hotfix 12
+
+- на странице ссылок клиента добавлены кнопки возврата к списку и создания следующего клиента;
+- переход создания следующего клиента автоматически открывает штатное окно добавления пользователя;
+- сохранённые неактивные ссылки отделены от активных коричнево-янтарным оформлением в обеих темах;
+- зелёные статус и кнопка копирования у неактивных ссылок заменены на состояние внимания;
+- сохранены широкая компоновка Clients и внутренний отступ кнопок таблицы маршрутизации;
+- добавлена ревизия CSS `preview3-hotfix12`.
+
+## RC46 Preview 3 Hotfix 21
+
+- Полная установка SG-Node одной командой: Agent, Worker, Xray, Nginx, Certbot и зависимости.
+- Подключение и переподключение одной командой без ручной замены токенов.
+- Успех подключения только после подтверждённого heartbeat.
+- Упрощён интерфейс Cluster и удалён отдельный runtime-этап.
+- Порт первого профиля SG-Node по умолчанию: 64441/TCP.

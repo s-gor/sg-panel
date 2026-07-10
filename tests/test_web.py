@@ -289,8 +289,8 @@ class V096StyleTest(WebTest):
     def test_versioned_stylesheet_and_compact_actions(self):
         response = self.client.get("/login")
         self.assertEqual(response.status_code, 200)
-        self.assertIn(b"app.css?v=0.10.0-rc45", response.data)
-        self.assertIn(b"favicon.svg?v=0.10.0-rc45", response.data)
+        self.assertIn(b"app.css?v=0.10.0-rc70", response.data)
+        self.assertIn(b"favicon.svg?v=0.10.0-rc70", response.data)
         css = (Path(__file__).parents[1] / "xpanel" / "static" / "app.css").read_text(encoding="utf-8")
         self.assertIn("Calm Slate", css)
         self.assertIn("v0.9.7 — unified readable interface", css)
@@ -664,15 +664,9 @@ class RC5NavigationAndSeparationWebTest(WebTest):
         response = self.client.get("/settings")
         self.assertEqual(response.status_code, 200)
         html = response.data.decode("utf-8")
-        labels = [
-            ">Inbound<",
-            ">Outbounds<",
-            ">Routing<",
-            ">DNS<",
-            ">Xray Config<",
-        ]
-        positions = [html.index(label) for label in labels]
-        self.assertEqual(positions, sorted(positions))
+        workflow = '<span>Inbound</span><span>Дополнительно</span><span>Traffic Rules</span><span>Outbounds</span><span>DNS</span><span>GeoFiles</span><span>Xray Config</span>'
+        self.assertIn(workflow, html)
+        self.assertIn('<b>Routing</b>', html)
         self.assertNotIn(">Сервер<", html)
         self.assertNotIn(">Выходы<", html)
         self.assertNotIn(">Маршрутизация<", html)

@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import stat
+import sqlite3
 import subprocess
 import tempfile
 import unittest
@@ -117,21 +118,29 @@ class WarpServiceTest(unittest.TestCase):
             "domain:example.com",
             "geosite:spotify",
         ]
+        document["_sgPanel"]["selectedIps"] = ["geoip:ru"]
         document["settings"]["mtu"] = 1360
         result = update_warp_json_document(json.dumps(document))
         self.assertTrue(result["enabled"])
         self.assertEqual(result["route_mode"], "selected")
         self.assertIn("domain:example.com", result["selected_domains"])
+        self.assertEqual(result["selected_ips"], "geoip:ru")
         outbound = build_warp_outbound()
         self.assertEqual(outbound["settings"]["mtu"], 1360)
         config, _server, _users = build_config()
-        rule = next(
+        rules = [
             item for item in config["routing"]["rules"]
             if item.get("outboundTag") == "warp"
-        )
+        ]
+        self.assertEqual(len(rules), 2)
+        domain_rule = next(item for item in rules if "domain" in item)
+        ip_rule = next(item for item in rules if "ip" in item)
         self.assertEqual(
-            rule["domain"], ["domain:example.com", "geosite:spotify"]
+            domain_rule["domain"], ["domain:example.com", "geosite:spotify"]
         )
+        self.assertEqual(ip_rule["ip"], ["geoip:ru"])
+        self.assertNotIn("ip", domain_rule)
+        self.assertNotIn("domain", ip_rule)
 
     def test_selected_domains_create_managed_rule(self):
         self.enable_sample()
@@ -146,6 +155,88 @@ class WarpServiceTest(unittest.TestCase):
         self.assertEqual(rule["network"], "tcp,udp")
         self.assertEqual(rule["domain"], ["domain:google.com", "domain:spotify.com"])
         self.assertEqual(get_routing_settings()["default_outbound_tag"], "direct")
+
+    def test_russian_sites_preset_creates_separate_domain_and_ip_rules(self):
+        self.enable_sample()
+        result = configure_warp_routing(
+            "selected", service.WARP_RUSSIA_DOMAINS, service.WARP_RUSSIA_IPS
+        )
+        self.assertEqual(result["selected_domains"], "geosite:category-ru")
+        self.assertEqual(result["selected_ips"], "geoip:ru")
+        self.assertEqual(len(result["managed_rules"]), 2)
+
+        config, _server, _users = build_config()
+        rules = [
+            item for item in config["routing"]["rules"]
+            if item.get("outboundTag") == "warp"
+        ]
+        self.assertEqual(len(rules), 2)
+        self.assertEqual(
+            next(item for item in rules if "domain" in item)["domain"],
+            ["geosite:category-ru"],
+        )
+        self.assertEqual(
+            next(item for item in rules if "ip" in item)["ip"],
+            ["geoip:ru"],
+        )
+        self.assertFalse(any("domain" in item and "ip" in item for item in rules))
+
+    def test_selected_mode_accepts_ip_only(self):
+        self.enable_sample()
+        configure_warp_routing("selected", "", "geoip:ru")
+        config, _server, _users = build_config()
+        rules = [
+            item for item in config["routing"]["rules"]
+            if item.get("outboundTag") == "warp"
+        ]
+        self.assertEqual(rules, [
+            {
+                "type": "field",
+                "outboundTag": "warp",
+                "network": "tcp,udp",
+                "ip": ["geoip:ru"],
+            }
+        ])
+
+    def test_geoip_in_domain_field_has_clear_guidance(self):
+        self.enable_sample()
+        with self.assertRaisesRegex(ValueError, "IP / GeoIP / CIDR"):
+            configure_warp_routing("selected", "geoip:ru", "")
+
+    def test_geosite_in_ip_field_has_clear_guidance(self):
+        self.enable_sample()
+        with self.assertRaisesRegex(ValueError, "Домены / Geosite"):
+            configure_warp_routing("selected", "", "geosite:category-ru")
+
+    def test_rc55_database_migrates_selected_ips_without_resetting_domains(self):
+        legacy_path = self.root / "legacy-rc55.db"
+        with sqlite3.connect(legacy_path) as con:
+            con.execute(
+                """
+                CREATE TABLE warp_settings (
+                    id INTEGER PRIMARY KEY, enabled INTEGER NOT NULL DEFAULT 0,
+                    outbound_json TEXT NOT NULL DEFAULT '', account_json TEXT NOT NULL DEFAULT '',
+                    route_mode TEXT NOT NULL DEFAULT 'off', selected_domains TEXT NOT NULL DEFAULT '',
+                    last_test_state TEXT NOT NULL DEFAULT '', last_test_ip TEXT NOT NULL DEFAULT '',
+                    last_test_at TEXT, created_at TEXT, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+            )
+            con.execute(
+                "INSERT INTO warp_settings (id, route_mode, selected_domains) VALUES (1, 'selected', 'domain:example.com')"
+            )
+        current = os.environ["XPANEL_DB"]
+        os.environ["XPANEL_DB"] = str(legacy_path)
+        try:
+            init_db()
+            with connect() as con:
+                row = con.execute(
+                    "SELECT selected_domains, selected_ips FROM warp_settings WHERE id=1"
+                ).fetchone()
+            self.assertEqual(row["selected_domains"], "domain:example.com")
+            self.assertEqual(row["selected_ips"], "")
+        finally:
+            os.environ["XPANEL_DB"] = current
 
     def test_all_traffic_makes_warp_default(self):
         self.enable_sample()

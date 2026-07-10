@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% block title %}GeoFiles — SG-Panel{% endblock %}
+{% block section %}ROUTING{% endblock %}
+{% block heading %}Routing{% endblock %}
+{% block subtitle %}Правила направления трафика, выходы, DNS и используемые GeoFiles{% endblock %}
+{% block content %}
+<script>document.body.classList.add('ui-standard-page','routing-page','geofiles-page');</script>
+<div class="ui-page ui-page-wide">
+  <section class="ui-card geofiles-overview-card">
+    <header class="ui-card-heading ui-card-heading-row">
+      <div>
+        <p class="panel-kicker">GEOFILES</p>
+        <h2>Фактически используемые geoip.dat и geosite.dat <a class="context-help-link" href="{{ url_for('help_page') }}#routing-geofiles" title="Справка по GeoFiles" aria-label="Справка по GeoFiles">?</a></h2>
+        <p>GeoFiles используются правилами Routing. SG-Panel показывает реальные файлы, их пути, размеры, даты и SHA-256.</p>
+      </div>
+      <span class="pill {{ 'enabled' if geofiles.geoip.installed and geofiles.geosite.installed else 'warning' }}"><i></i>{{ 'ГОТОВЫ' if geofiles.geoip.installed and geofiles.geosite.installed else 'ТРЕБУЕТСЯ ПРОВЕРКА' }}</span>
+    </header>
+    <div class="geofiles-active-grid">
+      <article><span>Текущий источник</span><strong>{{ geofiles.active_label }}</strong><small>{{ geofiles.active_source }}</small><small>Последнее применение: {{ geofiles.settings.last_applied_at or 'ещё не выполнялось' }}</small></article>
+      <article><span>geoip.dat</span><strong>{{ format_bytes(geofiles.geoip.size) if geofiles.geoip.installed else 'Не найден' }}</strong><code title="{{ geofiles.geoip.sha256 }}">{{ geofiles.geoip.sha256 or 'SHA-256 отсутствует' }}</code><small>{{ geofiles.geoip.path }}</small><small>Изменён: {{ geofiles.geoip.updated_at or 'неизвестно' }}</small></article>
+      <article><span>geosite.dat</span><strong>{{ format_bytes(geofiles.geosite.size) if geofiles.geosite.installed else 'Не найден' }}</strong><code title="{{ geofiles.geosite.sha256 }}">{{ geofiles.geosite.sha256 or 'SHA-256 отсутствует' }}</code><small>{{ geofiles.geosite.path }}</small><small>Изменён: {{ geofiles.geosite.updated_at or 'неизвестно' }}</small></article>
+      <article><span>Последняя проверка</span><strong>{{ 'Пройдена' if geofiles.settings.last_check_state == 'ok' else ('Ошибка' if geofiles.settings.last_check_state == 'error' else 'Не выполнялась') }}</strong><small>{{ geofiles.settings.last_check_message or 'Новый источник ещё не проверялся' }}</small><small>{{ geofiles.settings.last_checked_at or '' }}</small></article>
+    </div>
+  </section>
+
+  <section class="ui-card geofiles-edit-control" data-geofiles-lock-card>
+    <div>
+      <p class="panel-kicker">VALIDATE FIRST</p>
+      <h2>Смена источника защищена от случайного применения</h2>
+      <p>Сначала выберите источник и нажмите «Проверить источник». Активные файлы при проверке не меняются. Кнопка применения станет доступна только после успешного теста текущего <code>config.json</code>.</p>
+    </div>
+    <div class="advanced-safety-actions">
+      <span class="expert-lock-state" data-geofiles-lock-state>Только чтение</span>
+      <button class="button secondary" type="button" data-geofiles-edit-toggle>Включить выбор источника</button>
+    </div>
+  </section>
+
+  <section class="ui-card geofiles-card">
+    <header class="ui-card-heading"><div><p class="panel-kicker">ИСТОЧНИК</p><h2>Выбрать и проверить комплект</h2><p>Поддерживаются установленный комплект Xray, предустановленные HTTPS-источники, пользовательские URL и локальные файлы.</p></div></header>
+    <form method="post" action="{{ url_for('settings_geofiles_check') }}" class="ui-form geofiles-form is-readonly" id="geofiles-source-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <fieldset data-geofiles-edit-fieldset disabled>
+        <div class="geofiles-source-grid">
+          {% for key, item in geofiles.sources.items() %}
+          <label class="geofiles-source-card"><input type="radio" name="source" value="{{ key }}" {% if geofiles.selected_source == key %}checked{% endif %}><span><strong>{{ item.label }}</strong><small>{{ item.description }}</small></span></label>
+          {% endfor %}
+        </div>
+        <div class="ui-field-grid geofiles-custom-fields" data-geo-source="custom">
+          <label><span>GeoIP URL</span><input name="geoip_url" value="{{ geofiles.settings.geoip_url }}" placeholder="https://.../geoip.dat"></label>
+          <label><span>GeoSite URL</span><input name="geosite_url" value="{{ geofiles.settings.geosite_url }}" placeholder="https://.../geosite.dat"></label>
+        </div>
+        <div class="ui-field-grid geofiles-local-fields" data-geo-source="local">
+          <label><span>Local geoip.dat</span><input name="geoip_local_path" value="{{ geofiles.settings.geoip_local_path }}" placeholder="/opt/geofiles/geoip.dat"></label>
+          <label><span>Local geosite.dat</span><input name="geosite_local_path" value="{{ geofiles.settings.geosite_local_path }}" placeholder="/opt/geofiles/geosite.dat"></label>
+        </div>
+        <div class="ui-info-note"><span>i</span><p>Проверка рассчитывает SHA-256, проверяет размеры и запускает текущий <code>config.json</code> через <code>xray run -test</code> с выбранными файлами. Так выявляются отсутствующие категории, используемые действующими Routing Rules.</p></div>
+        <details class="expert-example"><summary>Показать допустимый формат источника</summary><pre>HTTPS URL:
+https://example.org/releases/geoip.dat
+https://example.org/releases/geosite.dat
+
+Local files:
+/opt/geofiles/geoip.dat
+/opt/geofiles/geosite.dat</pre><p>Пример не подставляется автоматически.</p></details>
+        <div class="ui-actions"><button class="button secondary" type="submit">Проверить источник</button></div>
+      </fieldset>
+    </form>
+
+    {% if geofiles.settings.last_check_state %}
+    <div class="geofiles-check-result {{ 'is-success' if geofiles.settings.last_check_state == 'ok' else 'is-error' }}"><strong>{{ 'Проверка пройдена' if geofiles.settings.last_check_state == 'ok' else 'Проверка не пройдена' }}</strong><span>{{ geofiles.settings.last_check_message }}</span><small>{{ geofiles.settings.last_checked_at or '' }}</small></div>
+    {% endif %}
+
+    <form method="post" action="{{ url_for('settings_geofiles_apply') }}" class="ui-actions geofiles-apply-actions">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button class="button primary" type="submit" {% if geofiles.settings.last_check_state != 'ok' %}disabled{% endif %}>Применить проверенные GeoFiles</button>
+      <small>Перед заменой создаётся backup; при ошибке Xray выполняется rollback.</small>
+    </form>
+  </section>
+</div>
+<script>
+(() => {
+  const form = document.getElementById('geofiles-source-form');
+  const fieldset = document.querySelector('[data-geofiles-edit-fieldset]');
+  const toggle = document.querySelector('[data-geofiles-edit-toggle]');
+  const state = document.querySelector('[data-geofiles-lock-state]');
+  const setEditing = (enabled) => {
+    if (!form || !fieldset || !toggle) return;
+    fieldset.disabled = !enabled;
+    form.classList.toggle('is-readonly', !enabled);
+    toggle.textContent = enabled ? 'Выключить выбор источника' : 'Включить выбор источника';
+    toggle.classList.toggle('danger', enabled);
+    if (state) state.textContent = enabled ? 'Редактирование включено' : 'Только чтение';
+  };
+  toggle?.addEventListener('click', () => setEditing(fieldset?.disabled));
+  setEditing(false);
+
+  const updateGeoFields = () => {
+    const source = document.querySelector('input[name="source"]:checked')?.value || 'xray';
+    document.querySelectorAll('[data-geo-source]').forEach(node => node.hidden = node.dataset.geoSource !== source);
+  };
+  document.querySelectorAll('input[name="source"]').forEach(input => input.addEventListener('change', updateGeoFields));
+  updateGeoFields();
+})();
+</script>
+{% endblock %}

@@ -27,7 +27,7 @@ def test_help_template_covers_profiles_and_operational_sections() -> None:
         'id="mixed"',
         'id="clients-links"',
         'id="tls-https"',
-        'id="network"',
+        'id="routing"',
         'id="backups"',
         'id="updates"',
         'id="diagnostics"',
@@ -51,6 +51,7 @@ def test_context_help_links_point_to_exact_sections() -> None:
     assert "#tls-https" in settings
     assert "#clients-links" in subscriptions
     assert "#tls-https" in security
+    assert "#panel-exposure" in security
 
 
 def test_help_page_is_authenticated_and_renders() -> None:

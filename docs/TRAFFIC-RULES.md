@@ -109,7 +109,7 @@ QUIC:        включён
 
 ## Пользовательский Outbound
 
-Создайте его в `Network → Outbounds`, проверьте соединение, затем укажите tag в правиле или Default Outbound.
+Создайте его в `Routing → Outbounds`, проверьте соединение, затем укажите tag в правиле или Default Outbound.
 
 ## Block
 

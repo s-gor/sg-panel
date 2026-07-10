@@ -58,14 +58,14 @@ class UpdateVersionTest(unittest.TestCase):
             return_value=FakeResponse(
                 [
                     {"name": "v0.10.0-rc30-final-docs1"},
-                    {"name": "v0.10.0-rc46"},
+                    {"name": "v0.10.0-rc70"},
                     {"name": "not-a-release"},
                 ]
             ),
         ):
             result = check_for_updates(force=True)
-        self.assertEqual(result["latest"], "v0.10.0-rc46")
-        self.assertEqual(result["latest_ref"], "v0.10.0-rc46")
+        self.assertEqual(result["latest"], "v0.10.0-rc70")
+        self.assertEqual(result["latest_ref"], "v0.10.0-rc70")
         self.assertTrue(result["available"])
 
     def test_update_check_does_not_report_an_older_remote_tag_as_latest(self):
@@ -76,9 +76,9 @@ class UpdateVersionTest(unittest.TestCase):
             return_value=FakeResponse([{"name": "v0.10.0-rc30-final-docs1"}]),
         ):
             result = check_for_updates(force=True)
-        self.assertEqual(result["current"], "v0.10.0-rc45")
-        self.assertEqual(result["latest"], "v0.10.0-rc45")
-        self.assertEqual(result["latest_ref"], "v0.10.0-rc45")
+        self.assertEqual(result["current"], "v0.10.0-rc70")
+        self.assertEqual(result["latest"], "v0.10.0-rc70")
+        self.assertEqual(result["latest_ref"], "v0.10.0-rc70")
         self.assertFalse(result["available"])
 
     def test_cached_check_is_ignored_after_installed_version_changes(self):
@@ -98,12 +98,12 @@ class UpdateVersionTest(unittest.TestCase):
             )
             with patch(
                 "xpanel.update_manager.urllib.request.urlopen",
-                return_value=FakeResponse([{"name": "v0.10.0-rc45"}]),
+                return_value=FakeResponse([{"name": "v0.10.0-rc70"}]),
             ) as request:
                 result = check_for_updates(force=False)
         request.assert_called_once()
-        self.assertEqual(result["current"], "v0.10.0-rc45")
-        self.assertEqual(result["latest"], "v0.10.0-rc45")
+        self.assertEqual(result["current"], "v0.10.0-rc70")
+        self.assertEqual(result["latest"], "v0.10.0-rc70")
 
     def test_start_rejects_unsafe_ref_before_systemd(self):
         with self.assertRaises(ValueError):
@@ -137,7 +137,7 @@ class UpdateVersionTest(unittest.TestCase):
                 "xpanel.update_manager.subprocess.run", side_effect=completed
             ):
                 with self.assertRaisesRegex(Exception, "launch failed"):
-                    start_panel_update("v0.10.0-rc46", "v0.10.0-rc46")
+                    start_panel_update("v0.10.0-rc70", "v0.10.0-rc70")
             payload = json.loads((state / "status.json").read_text(encoding="utf-8"))
             self.assertEqual(payload["state"], "error")
             self.assertIn("launch failed", payload["message"])
@@ -168,12 +168,12 @@ class UpdateVersionTest(unittest.TestCase):
             ), patch(
                 "xpanel.update_manager.subprocess.run", side_effect=fake_run
             ):
-                result = start_panel_update("v0.10.0-rc46", "v0.10.0-rc46")
+                result = start_panel_update("v0.10.0-rc70", "v0.10.0-rc70")
             self.assertEqual(result["unit"], "sg-panel-update.service")
             command = calls[-1]
             self.assertIn("--unit=sg-panel-update", command)
             self.assertIn("--collect", command)
-            self.assertIn("--setenv=XPANEL_UPDATE_VERSION=v0.10.0-rc46", command)
+            self.assertIn("--setenv=XPANEL_UPDATE_VERSION=v0.10.0-rc70", command)
             self.assertEqual(command[-2:], ["/bin/bash", str(script)])
 
 
@@ -238,8 +238,8 @@ class UpdateWebTest(unittest.TestCase):
             "xpanel.web.check_for_updates",
             return_value={
                 "current": "v0.10.0-rc39",
-                "latest": "v0.10.0-rc45",
-                "latest_ref": "v0.10.0-rc45",
+                "latest": "v0.10.0-rc46",
+                "latest_ref": "v0.10.0-rc46",
                 "available": True,
                 "checked_at": "2026-07-03T12:00:00+00:00",
                 "error": "",
@@ -275,8 +275,8 @@ class UpdateWebTest(unittest.TestCase):
         self.login()
         info = {
             "current": "v0.10.0-rc39",
-            "latest": "v0.10.0-rc45",
-            "latest_ref": "v0.10.0-rc45",
+            "latest": "v0.10.0-rc46",
+            "latest_ref": "v0.10.0-rc46",
             "available": True,
             "checked_at": "2026-07-03T12:00:00+00:00",
             "error": "",
@@ -287,20 +287,20 @@ class UpdateWebTest(unittest.TestCase):
             "xpanel.web.start_panel_update",
             return_value={
                 "unit": "sg-panel-update.service",
-                "version": "v0.10.0-rc45",
-                "ref": "v0.10.0-rc45",
+                "version": "v0.10.0-rc46",
+                "ref": "v0.10.0-rc46",
             },
         ) as start:
             response = self.client.post(
                 "/updates/start",
                 data={
                     "csrf_token": self.csrf(),
-                    "version": "v0.10.0-rc45",
-                    "ref": "v0.10.0-rc45",
+                    "version": "v0.10.0-rc46",
+                    "ref": "v0.10.0-rc46",
                 },
             )
         self.assertEqual(response.status_code, 302)
-        start.assert_called_once_with("v0.10.0-rc45", "v0.10.0-rc45")
+        start.assert_called_once_with("v0.10.0-rc46", "v0.10.0-rc46")
 
 
 class UpdatePackageTest(unittest.TestCase):

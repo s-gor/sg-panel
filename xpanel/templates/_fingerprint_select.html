@@ -1,4 +1,4 @@
-{% macro fingerprint_select(value='chrome', name='fingerprint') -%}
+{% macro fingerprint_select(value='firefox', name='fingerprint') -%}
 {% set known = ['chrome','brave','edge','firefox','safari','ios','android','opera','vivaldi','360','qq','random','randomized','unsafe'] %}
 <select name="{{ name }}" required class="fingerprint-select">
   <optgroup label="Браузеры">

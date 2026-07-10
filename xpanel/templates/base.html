@@ -19,14 +19,17 @@
   <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}?v={{ xpanel_version }}">
   <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='apple-touch-icon.png') }}?v={{ xpanel_version }}">
 <title>{% block title %}SG-Panel{% endblock %}</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}?v={{ xpanel_version }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}?v={{ xpanel_version }}-sg070">
 </head>
 <body class="app-body ui-v097-standard rc20-awg-shell">
 {% set endpoint = request.endpoint or '' %}
 {% set is_system = endpoint == 'dashboard' or endpoint.startswith('diagnostics_') %}
+{% set is_nodes = endpoint == 'nodes_page' or endpoint.startswith('node_') %}
+{% set is_cascade = endpoint.startswith('cascade_') or endpoint == 'cascade_page' %}
 {% set is_clients = endpoint.startswith('user_') or endpoint.startswith('users_') or endpoint == 'users_page' or endpoint.startswith('subscriptions_') or endpoint == 'subscriptions_page' or endpoint == 'stats_reset' %}
-{% set is_xray = endpoint.startswith('settings_') or endpoint == 'settings_page' or endpoint.startswith('config_') or endpoint == 'config_page' %}
-{% set is_network = endpoint.startswith('routing_') or endpoint == 'routing_page' or endpoint.startswith('outbound_') or endpoint == 'outbounds_page' or endpoint.startswith('warp_') or endpoint.startswith('dns_') or endpoint == 'dns_page' %}
+{% set is_advanced = endpoint.startswith('settings_advanced') %}
+{% set is_xray = endpoint == 'settings_page' or is_advanced or endpoint.startswith('config_') or endpoint == 'config_page' %}
+{% set is_routing = endpoint.startswith('routing_') or endpoint == 'routing_page' or endpoint.startswith('outbound_') or endpoint == 'outbounds_page' or endpoint.startswith('warp_') or endpoint.startswith('dns_') or endpoint == 'dns_page' or endpoint == 'geofiles_page' or endpoint.startswith('settings_geofiles') %}
 {% set is_security = endpoint.startswith('security_') or endpoint == 'security_page' or endpoint.startswith('panel_access_') %}
 {% set is_maintenance = endpoint.startswith('backups_') or endpoint == 'backups_page' or endpoint.startswith('updates_') or endpoint == 'updates_page' %}
 {% set is_help = endpoint == 'help_page' %}
@@ -37,13 +40,21 @@
       <div class="brand-mark" aria-hidden="true">
         <svg viewBox="0 0 48 48"><path d="M24 3 42 13v22L24 45 6 35V13L24 3Z"/><text x="24" y="29" text-anchor="middle">SG</text></svg>
       </div>
-      <div class="brand-copy"><strong>SG-Panel</strong><small>УПРАВЛЕНИЕ XRAY</small></div>
+      <div class="brand-copy"><strong>SG-Panel</strong><small>{{ instance_identity }}</small></div>
     </div>
 
     <nav class="main-nav grouped-main-nav" aria-label="Основная навигация">
       <a href="{{ url_for('dashboard') }}" class="{% if is_system %}active{% endif %}">
         <svg viewBox="0 0 24 24"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z"/></svg>
         <span><b>System</b><small>Ресурсы и состояние</small></span>
+      </a>
+      <a href="{{ url_for('nodes_page') }}" class="{% if is_nodes %}active{% endif %}">
+        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="6" rx="2"/><rect x="3" y="15" width="18" height="6" rx="2"/><path d="M7 6h.01M7 18h.01M11 6h6M11 18h6M12 9v6"/></svg>
+        <span><b>Cluster</b><small>Серверы и SG-Node</small></span>
+      </a>
+      <a href="{{ url_for('cascade_page') }}" class="{% if is_cascade %}active{% endif %}">
+        <svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="2"/><circle cx="19" cy="12" r="2"/><path d="M7 12h3l2-4 2 8 2-4h1"/></svg>
+        <span><b>Cascade</b><small>Выход через второй сервер</small></span>
       </a>
       <a href="{{ url_for('users_page') }}" class="{% if is_clients %}active{% endif %}">
         <svg viewBox="0 0 24 24"><path d="M16 20v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 10a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM22 20v-2a4 4 0 0 0-3-3.87M16 2.13a4 4 0 0 1 0 7.75"/></svg>
@@ -53,9 +64,9 @@
         <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56V21h-4v-.07A1.7 1.7 0 0 0 8.97 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.53-1.03H3v-4h.07A1.7 1.7 0 0 0 4.6 8.94a1.7 1.7 0 0 0-.34-1.88L4.2 7l2.83-2.83.06.06a1.7 1.7 0 0 0 1.88.34A1.7 1.7 0 0 0 10 3.04V3h4v.07a1.7 1.7 0 0 0 1.03 1.53 1.7 1.7 0 0 0 1.88-.34l.06-.06L19.8 7l-.06.06a1.7 1.7 0 0 0-.34 1.88A1.7 1.7 0 0 0 20.93 10H21v4h-.07A1.7 1.7 0 0 0 19.4 15Z"/></svg>
         <span><b>Xray Server</b><small>Inbound и конфигурация</small></span>
       </a>
-      <a href="{{ url_for('routing_page') }}" class="{% if is_network %}active{% endif %}">
+      <a href="{{ url_for('routing_page') }}" class="{% if is_routing %}active{% endif %}">
         <svg viewBox="0 0 24 24"><circle cx="6" cy="6" r="2"/><circle cx="18" cy="6" r="2"/><circle cx="12" cy="18" r="2"/><path d="M8 6h8M7.5 7.5l3.3 8M16.5 7.5l-3.3 8"/></svg>
-        <span><b>Network</b><small>Правила, Outbounds и DNS</small></span>
+        <span><b>Routing</b><small>Правила, выходы, DNS и GeoFiles</small></span>
       </a>
       <a href="{{ url_for('security_page') }}" class="{% if is_security %}active{% endif %}">
         <svg viewBox="0 0 24 24"><path d="M12 2 20 5v6c0 5.2-3.4 9.2-8 11-4.6-1.8-8-5.8-8-11V5l8-3Z"/><path d="M9 12l2 2 4-5"/></svg>
@@ -71,7 +82,7 @@
       </a>
     </nav>
     {# Stable technical workflow markers retained for compatibility and automated audits. #}
-    <div class="workflow-order-compat" hidden aria-hidden="true"><span>Inbound</span><span>Outbounds</span><span>Routing</span><span>DNS</span><span>Xray Config</span></div>
+    <div class="workflow-order-compat" hidden aria-hidden="true"><span>Inbound</span><span>Дополнительно</span><span>Traffic Rules</span><span>Outbounds</span><span>DNS</span><span>GeoFiles</span><span>Xray Config</span></div>
 
     <div class="sidebar-spacer"></div>
     <a href="{{ url_for('diagnostics_page') }}?tab=status" class="sidebar-system" title="Открыть System → Status & Services">
@@ -90,13 +101,13 @@
     <header class="topbar awg-style-topbar">
       <div class="topbar-heading"><p class="eyebrow">SG-PANEL / {% block section %}CONTROL{% endblock %}</p><h1>{% block heading %}Панель управления{% endblock %}</h1><p class="page-subtitle">{% block subtitle %}Локальное управление конфигурацией Xray{% endblock %}</p></div>
       <div class="topbar-actions">
-        <span class="topbar-version">v{{ xpanel_version }}</span>
+        <span class="instance-badge" title="Имя и публичный адрес этого сервера">{{ instance_identity }}</span><span class="topbar-version">v{{ xpanel_version }}</span>
         <a class="system-pill {{ 'ok' if global_system_ok else 'attention' }}" href="{{ url_for('diagnostics_page') }}?tab=status" title="Открыть System → Status & Services"><span class="status-dot"></span><span>{{ 'СИСТЕМА В НОРМЕ' if global_system_ok else 'ТРЕБУЕТСЯ ПРОВЕРКА' }}</span></a>
         <div class="theme-control" data-theme-control>
           <button class="icon-button theme-button" type="button" aria-label="Сменить тему" title="Тема: Графит" data-theme-button><span data-theme-icon>◒</span></button>
           <div class="theme-menu" data-theme-menu>
             <button type="button" data-theme-choice="graphite"><span>◒</span><b>Графит</b></button>
-            <button type="button" data-theme-choice="light"><span>☀</span><b>Светлая</b></button>
+            <button type="button" data-theme-choice="light"><span>☀</span><b>Латте</b></button>
           </div>
         </div>
         <a class="icon-button" href="{{ url_for('help_page') }}" aria-label="Открыть справку" title="Справка SG-Panel">?</a>
@@ -115,16 +126,24 @@
         <a class="{% if endpoint == 'dashboard' %}active{% endif %}" href="{{ url_for('dashboard') }}">Resources</a>
         <a class="{% if endpoint.startswith('diagnostics_') and request.args.get('tab','status') != 'logs' %}active{% endif %}" href="{{ url_for('diagnostics_page') }}?tab=status">Status &amp; Services</a>
         <a class="{% if endpoint.startswith('diagnostics_') and request.args.get('tab') == 'logs' %}active{% endif %}" href="{{ url_for('diagnostics_page') }}?tab=logs">Logs &amp; Diagnostics</a>
+      {% elif is_nodes %}
+        <a class="{% if endpoint == 'nodes_page' %}active{% endif %}" href="{{ url_for('nodes_page') }}">Все серверы</a>
+        {% if endpoint.startswith('node_') and endpoint != 'nodes_page' %}<a class="active" href="{{ request.path }}">Карточка сервера</a>{% endif %}
+      {% elif is_cascade %}
+        <a class="active" href="{{ url_for('cascade_page') }}">Каскад</a>
+        <a href="{{ url_for('outbounds_page') }}">Экспертные Outbounds</a>
       {% elif is_clients %}
         <a class="{% if not endpoint.startswith('subscriptions_') and endpoint != 'subscriptions_page' and not endpoint.startswith('user_subscription_') %}active{% endif %}" href="{{ url_for('users_page') }}">Clients</a>
         <a class="{% if endpoint.startswith('subscriptions_') or endpoint == 'subscriptions_page' or endpoint.startswith('user_subscription_') %}active{% endif %}" href="{{ url_for('subscriptions_page') }}">Subscriptions</a>
       {% elif is_xray %}
-        <a class="{% if endpoint.startswith('settings_') or endpoint == 'settings_page' %}active{% endif %}" href="{{ url_for('settings_page') }}">Inbound</a>
+        <a class="{% if endpoint == 'settings_page' %}active{% endif %}" href="{{ url_for('settings_page') }}">Inbound</a>
         <a class="{% if endpoint.startswith('config_') or endpoint == 'config_page' %}active{% endif %}" href="{{ url_for('config_page') }}">Xray Config</a>
-      {% elif is_network %}
+        <a class="{% if is_advanced %}active{% endif %}" href="{{ url_for('settings_advanced_page') }}">Дополнительно</a>
+      {% elif is_routing %}
         <a class="{% if endpoint.startswith('routing_') or endpoint == 'routing_page' %}active{% endif %}" href="{{ url_for('routing_page') }}">Traffic Rules</a>
         <a class="{% if endpoint.startswith('outbound_') or endpoint == 'outbounds_page' or endpoint.startswith('warp_') %}active{% endif %}" href="{{ url_for('outbounds_page') }}">Outbounds</a>
         <a class="{% if endpoint.startswith('dns_') or endpoint == 'dns_page' %}active{% endif %}" href="{{ url_for('dns_page') }}">DNS</a>
+        <a class="{% if endpoint == 'geofiles_page' or endpoint.startswith('settings_geofiles') %}active{% endif %}" href="{{ url_for('geofiles_page') }}">GeoFiles</a>
       {% elif is_security %}
         <a class="active" href="{{ url_for('security_page') }}">Panel Access &amp; Security</a>
       {% elif is_maintenance %}
@@ -150,7 +169,7 @@
 <script>
 (() => {
   const root = document.documentElement;
-  const choices = {graphite: ['◒', 'Графит'], light: ['☀', 'Светлая']};
+  const choices = {graphite: ['◒', 'Графит'], light: ['☀', 'Латте']};
   const apply = mode => {
     const safe = choices[mode] ? mode : 'graphite';
     root.dataset.theme = safe;
@@ -162,7 +181,7 @@
     if (button) button.title = 'Тема: ' + choices[safe][1];
     document.querySelectorAll('[data-theme-choice]').forEach(item => item.classList.toggle('active', item.dataset.themeChoice === safe));
     const meta = document.getElementById('themeColorMeta');
-    if (meta) meta.content = safe === 'graphite' ? '#0E1723' : '#edf1f2';
+    if (meta) meta.content = safe === 'graphite' ? '#0E1723' : '#D8CEC2';
   };
   apply(root.dataset.theme || 'graphite');
   const themeControl = document.querySelector('[data-theme-control]');

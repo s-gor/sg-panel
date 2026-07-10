@@ -231,9 +231,10 @@
               <label><span>Публичный порт</span><input name="port" type="number" min="1" max="65535" value="{{ server.port }}" required></label>
               <label><span>Server name / SNI</span><input name="server_name" value="{{ server.server_name }}" required></label>
               <label data-profile-section="raw_reality xhttp_tls xhttp_reality grpc_tls xhttp_hysteria_tls"><span>Fingerprint браузера</span>{{ fingerprint_select(server.fingerprint) }}</label>
-              <label data-profile-section="raw_reality"><span>REALITY Flow <a class="context-help-link context-help-inline" href="{{ url_for('help_page') }}#reality-vision" title="Чем отличается Vision" aria-label="Справка о REALITY и Vision">?</a></span><select name="flow"><option value="" {% if not server.flow %}selected{% endif %}>Без Vision</option><option value="xtls-rprx-vision" {% if server.flow == 'xtls-rprx-vision' %}selected{% endif %}>XTLS Vision</option></select><small>Без Vision создаются отдельные Inbound. При нескольких точках Vision использует один общий Xray Inbound.</small></label>
+              <label data-profile-section="raw_reality"><span>XTLS Flow <a class="context-help-link context-help-inline" href="{{ url_for('help_page') }}#reality-vision" title="Чем отличается Vision" aria-label="Справка о REALITY и Vision">?</a></span><select name="flow"><option value="xtls-rprx-vision" {% if server.flow == 'xtls-rprx-vision' %}selected{% endif %}>XTLS Vision — рекомендуется</option><option value="" {% if not server.flow %}selected{% endif %}>Стандартный VLESS без Vision</option></select><small>SG-Panel задаёт Flow одновременно серверу и клиентской ссылке. Не включайте Vision только в клиенте.</small></label>
             </div>
           </section>
+          <div class="ui-info-note flow-consistency-note" data-profile-section="raw_reality"><span>i</span><p><strong>Vision — серверно-клиентская настройка.</strong> После изменения SG-Panel обновит серверный <code>flow</code> и все новые ссылки. Старые ссылки с другим Flow перестанут соответствовать серверу.</p></div>
           <section class="inbound-field-group inbound-field-group-server">
             <header><span>На сервере</span><small>Технический интерфейс, на котором Xray принимает прямое подключение.</small></header>
             <div class="ui-field-grid server-listen-grid">
@@ -296,7 +297,7 @@
                 <label><span>Listen</span><input name="hysteria_instance_{{ item.id }}_listen" value="{{ item.listen }}"></label>
                 <label><span>UDP-порт</span><input name="hysteria_instance_{{ item.id }}_port" type="number" min="1" max="65535" value="{{ item.port }}"></label>
               </div>
-              <div class="hysteria-instance-meta"><span>Tag</span><code>{{ item.tag }}</code></div>
+              <div class="hysteria-instance-meta"><span>Тег</span><code>{{ item.tag }}</code></div>
             </article>
             {% endfor %}
           </div>
@@ -390,8 +391,8 @@
         <header><span>3</span><div><h3>REALITY</h3><p>Общие ключи, маскировочный target и отдельные TCP-listener.</p></div></header>
         <div class="ui-field-grid server-reality-grid">
           <label><span>Reality target</span><input name="dest" value="{{ server.dest }}"></label>
-          <label class="ui-field-wide"><span>Reality private key</span><input id="private-key" name="private_key" type="password" value="{{ server.private_key }}"></label>
-          <label><span>Reality public key / password</span><input name="public_key" value="{{ server.public_key }}"></label>
+          <label class="ui-field-wide"><span>Закрытый ключ REALITY</span><input id="private-key" name="private_key" type="password" value="{{ server.private_key }}"></label>
+          <label><span>Открытый ключ REALITY / пароль</span><input name="public_key" value="{{ server.public_key }}"></label>
           <label data-profile-section="xhttp_reality"><span>Short ID</span><input name="short_id" data-exclusive-profile-field value="{{ server.short_id }}"></label>
         </div>
 
@@ -400,27 +401,27 @@
           <div class="ui-info-note"><span>i</span><p>Основной Inbound сохраняет прежний порт и Short ID. Резервный и дополнительный после обновления выключены. В AWS открывайте TCP только для реально включённых портов.</p></div>
           <div class="hysteria-instance-grid reality-instance-grid">
             <article class="hysteria-instance-card reality-instance-card is-required is-enabled">
-              <div class="hysteria-instance-card-head"><div><b>Основной</b><small>Сохраняет прежние UUID, порт, tag и Short ID</small></div><span class="pill enabled"><i></i><span data-reality-status>{{ 'Работает' if server.inbound_profile == 'raw_reality' else 'Готов к применению' }}</span></span></div>
+              <div class="hysteria-instance-card-head"><div><b>Основной</b><small>Сохраняет прежние UUID, порт, тег и Short ID</small></div><span class="pill enabled"><i></i><span data-reality-status>{{ 'Работает' if server.inbound_profile == 'raw_reality' else 'Готов к применению' }}</span></span></div>
               <label><span>Название</span><input name="reality_instance_1_name" maxlength="80" value="{{ reality_inbounds[0].name }}"></label>
               <div class="ui-field-grid reality-instance-fields">
                 <label><span>Short ID</span><input name="short_id" data-exclusive-profile-field value="{{ reality_inbounds[0].short_id or server.short_id }}"></label>
               </div>
-              <div class="hysteria-instance-meta"><span>Tag</span><code>{{ reality_inbounds[0].tag }}</code></div>
+              <div class="hysteria-instance-meta"><span>Тег</span><code>{{ reality_inbounds[0].tag }}</code></div>
               <div class="hysteria-instance-meta"><span>Публично</span><strong>{{ server.address }}:{{ server.port }}/TCP</strong></div>
             </article>
             {% for item in reality_inbounds[1:] %}
             <article class="hysteria-instance-card reality-instance-card {{ 'is-enabled' if item.enabled else '' }}">
               <div class="hysteria-instance-card-head">
-                <div><b>{{ 'Резервный' if item.id == 2 else 'Дополнительный' }}</b><small>Собственные TCP-порт, tag и Short ID</small></div>
+                <div><b>{{ 'Резервный' if item.id == 2 else 'Дополнительный' }}</b><small>Собственные TCP-порт, тег и Short ID</small></div>
                 <label class="switch-row compact" data-reality-instance-toggle><input type="checkbox" name="reality_instance_{{ item.id }}_enabled" value="1" {% if item.enabled %}checked{% endif %}><span class="switch" aria-hidden="true"></span><div><strong>{{ 'Отключить' if item.enabled else 'Включить' }}</strong><small data-reality-status>{{ 'Работает' if server.inbound_profile == 'raw_reality' and item.enabled else ('Готов к применению' if item.enabled else 'Выключен') }}</small></div></label>
               </div>
               <label><span>Название</span><input name="reality_instance_{{ item.id }}_name" maxlength="80" value="{{ item.name }}"></label>
               <div class="ui-field-grid reality-instance-fields">
-                <label><span>Listen</span><input name="reality_instance_{{ item.id }}_listen" value="{{ item.listen }}"></label>
-                <label><span>Публичный TCP-порт</span><input name="reality_instance_{{ item.id }}_port" type="number" min="1" max="65535" value="{{ item.port }}"></label>
+                <label><span>Адрес прослушивания</span><input name="reality_instance_{{ item.id }}_listen" value="{{ item.listen }}"></label>
+                <label><span>Публичный порт</span><input name="reality_instance_{{ item.id }}_port" type="number" min="1" max="65535" value="{{ item.port }}"></label>
                 <label><span>Short ID</span><input name="reality_instance_{{ item.id }}_short_id" value="{{ item.short_id }}"></label>
               </div>
-              <div class="hysteria-instance-meta"><span>Tag</span><code>{{ item.tag }}</code></div>
+              <div class="hysteria-instance-meta"><span>Тег</span><code>{{ item.tag }}</code></div>
               <div class="hysteria-instance-meta"><span>Публично</span><strong>{{ server.address }}:{{ item.port }}/TCP</strong></div>
             </article>
             {% endfor %}
@@ -467,7 +468,7 @@
               <label><span>Listen</span><input name="xhttp_instance_{{ item.id }}_listen" value="{{ item.listen }}"></label>
               <label><span>Локальный TCP-порт</span><input name="xhttp_instance_{{ item.id }}_port" type="number" min="1" max="65535" value="{{ item.port }}"></label>
             </div>
-            <div class="hysteria-instance-meta"><span>Tag</span><code>{{ item.tag }}</code></div>
+            <div class="hysteria-instance-meta"><span>Тег</span><code>{{ item.tag }}</code></div>
             <div class="hysteria-instance-meta"><span>Публично</span><strong>{{ server.address }}:{{ server.port }}{{ item.path }}</strong></div>
           </article>
           {% endfor %}
@@ -483,26 +484,28 @@
         </div>
       </section>
 
-      <div class="ui-actions"><button class="button primary" type="submit">Сохранить и применить</button><button type="button" class="button ghost reality-key-toggle" onclick="const e=document.getElementById('private-key');e.type=e.type==='password'?'text':'password';this.textContent=e.type==='password'?'Показать private key':'Скрыть private key'">Показать private key</button></div>
+      <div class="ui-actions"><button class="button primary" type="submit">Сохранить и применить</button><button type="button" class="button ghost reality-key-toggle" onclick="const e=document.getElementById('private-key');e.type=e.type==='password'?'text':'password';this.textContent=e.type==='password'?'Показать закрытый ключ':'Скрыть закрытый ключ'">Показать закрытый ключ</button></div>
     </form>
   </section>
 
   <section class="ui-card ui-action-card reality-action-card inbound-reality-actions">
-    <header class="ui-card-heading"><div><p class="panel-kicker">КЛЮЧИ REALITY</p><h2>Сгенерировать новый комплект</h2><p>Заменяет private key, public key и Short ID в базе данных.</p></div></header>
+    <header class="ui-card-heading"><div><p class="panel-kicker">КЛЮЧИ REALITY</p><h2>Сгенерировать новый комплект</h2><p>Заменяет закрытый ключ, открытый ключ и Short ID в базе данных.</p></div></header>
     <div class="ui-warning-note"><span>!</span><p>После применения текущие REALITY-ссылки перестанут работать.</p></div>
-    <details class="reality-key-inline-confirm" data-reality-key-confirm>
-      <summary class="button danger">Сгенерировать новые ключи</summary>
-      <div class="reality-key-inline-confirm-body">
-        <div><strong>Подтвердите генерацию нового комплекта</strong><p>Private key, public key и Short ID будут заменены. После применения конфигурации прежние REALITY-ссылки перестанут работать.</p></div>
-        <form method="post" action="{{ url_for('settings_generate_reality') }}">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-          <div class="ui-actions">
-            <button class="button danger" type="submit">Да, сгенерировать</button>
-            <button class="button ghost" type="button" data-reality-key-cancel>Отмена</button>
-          </div>
-        </form>
-      </div>
-    </details>
+    <div class="reality-key-action-row">
+      <details class="reality-key-inline-confirm" data-reality-key-confirm>
+        <summary class="button danger">Сгенерировать новые ключи</summary>
+        <div class="reality-key-inline-confirm-body">
+          <div><strong>Подтвердите генерацию нового комплекта</strong><p>Закрытый ключ, открытый ключ и Short ID будут заменены. После применения конфигурации прежние REALITY-ссылки перестанут работать.</p></div>
+          <form method="post" action="{{ url_for('settings_generate_reality') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="ui-actions">
+              <button class="button danger" type="submit">Да, сгенерировать</button>
+              <button class="button ghost" type="button" data-reality-key-cancel>Отмена</button>
+            </div>
+          </form>
+        </div>
+      </details>
+    </div>
   </section>
 </div>
 <script>
@@ -745,6 +748,9 @@
       node.hidden = !visible;
       node.querySelectorAll('[data-exclusive-profile-field]').forEach((field) => { field.disabled = !visible; });
     });
+    const visibleProfileSections = [...form.querySelectorAll(':scope > .ui-form-section.profile-section:not([hidden])')];
+    form.querySelectorAll(':scope > .ui-form-section.profile-section').forEach((section) => section.classList.remove('is-last-visible-profile-section'));
+    visibleProfileSections.at(-1)?.classList.add('is-last-visible-profile-section');
     if (useDefaults) applyProfileDefaults(profile, false);
     document.querySelectorAll('.inbound-profile-card').forEach((card) => {
       const value = card.querySelector('input[name="inbound_profile"]')?.value;

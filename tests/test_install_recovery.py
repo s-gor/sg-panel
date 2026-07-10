@@ -55,8 +55,8 @@ class InstallRecoveryTest(unittest.TestCase):
         self.assertIn("run_stage(){", text)
         self.assertIn("[SG-Panel] [%sOK%s] %s (%s сек)", text)
         self.assertIn("[SG-Panel] [%s%s%s] %s (%s сек)", text)
-        self.assertIn(r"local frames='|/-\\'", text)
-        self.assertIn('stage 3 3 "Финальная проверка"', text)
+        self.assertIn("local frames='|/-\\'", text)
+        self.assertIn('run_stage "Этап 9/9 · Проверка служб, конфигурации и адреса панели"', text)
         self.assertIn("Панель:", text)
         self.assertIn("$PANEL_URL", text)
 
@@ -72,8 +72,7 @@ class InstallRecoveryTest(unittest.TestCase):
         ec2_text = EC2.read_text(encoding="utf-8")
         bootstrap_text = BOOTSTRAP.read_text(encoding="utf-8")
         self.assertIn("--reconfigure", ec2_text)
-        self.assertIn('INSTALLER_ARGS=("$@")', bootstrap_text)
-        self.assertIn('"${INSTALLER_ARGS[@]}"', bootstrap_text)
+        self.assertIn('bash "$TMP_INSTALLER" "$@"', bootstrap_text)
 
     def test_existing_password_and_panel_access_are_preserved(self):
         text = EC2.read_text(encoding="utf-8")

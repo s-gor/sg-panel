@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-EXPECTED_VERSION="0.10.0-rc45"
+EXPECTED_VERSION="0.10.0-rc70"
 SOURCE_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 XRAY_VERSION="v26.5.9"
 DEFAULT_PANEL_PORT="61443"
@@ -9,6 +9,7 @@ DEFAULT_BACKEND_PORT="8080"
 DEFAULT_REALITY_DEST="www.bing.com:443"
 DEFAULT_REALITY_SNI="www.bing.com"
 DEFAULT_USER="sg-admin"
+DEFAULT_INSTANCE_NAME="SG-Panel"
 TARGET="/opt/xpanel-mvp"
 SERVICE="xpanel-web"
 INSTALL_STATE_DIR="/etc/xpanel-mvp"
@@ -33,7 +34,6 @@ else
 fi
 
 log(){
-  printf '[SG-Panel] %s\n' "$*"
   if [[ -e "$LOG_FILE" ]]; then
     printf '[SG-Panel] %s\n' "$*" >>"$LOG_FILE"
   fi
@@ -54,7 +54,7 @@ stop_spinner(){
 
 spinner_loop(){
   local label="$1" started="$2" frame_index=0 elapsed
-  local frames='|/-\\'
+  local frames='|/-\'
   while true; do
     elapsed=$((SECONDS - started))
     printf '\r[SG-Panel] [%s%s%s] %s (%s сек)' \
@@ -342,6 +342,8 @@ EOF_MARKER
   chmod 600 "$INSTALL_MARKER"
 }
 
+step_begin "Запуск мастера SG-Panel RC70"
+
 if existing_install_is_complete && [[ $RECONFIGURE -eq 0 ]]; then
   CURRENT_VERSION="$(cd "$TARGET" && .venv/bin/python -m xpanel --version 2>/dev/null | awk '{print $2}' || true)"
   CURRENT_VERSION="${CURRENT_VERSION:-неизвестна}"
@@ -357,12 +359,13 @@ if existing_install_is_complete && [[ $RECONFIGURE -eq 0 ]]; then
     systemctl is-active --quiet nginx
   }
 
-  stage 1 2 "Подготовка обновления"
-  run_stage "Проверка установленного Xray" ensure_xray_version
-  run_stage "Миграция внутреннего порта REALITY fallback" migrate_reality_edge_web_port
-  stage 2 2 "Обновление SG-Panel"
-  run_stage "Обновление приложения с сохранением данных и доступа" update_panel_stage
-  run_stage "Финальная проверка служб и версии" validate_updated_panel_stage
+  step_ok
+  printf '[SG-Panel] Обнаружена SG-Panel %s. Запускаю безопасное обновление.\n' "$CURRENT_VERSION"
+  printf '[SG-Panel] Технический журнал: %s\n\n' "$LOG_FILE"
+  run_stage "Этап 1/4 · Проверка установленного Xray" ensure_xray_version
+  run_stage "Этап 2/4 · Подготовка совместимости и миграций" migrate_reality_edge_web_port
+  run_stage "Этап 3/4 · Обновление SG-Panel с резервной копией" update_panel_stage
+  run_stage "Этап 4/4 · Финальная проверка служб и версии" validate_updated_panel_stage
   NEW_VERSION="$(cd "$TARGET" && .venv/bin/python -m xpanel --version | awk '{print $2}')"
   detect_panel_access
   PANEL_HOST="${PANEL_HOST:-localhost}"
@@ -470,19 +473,26 @@ detect_default_address(){
 CURRENT_XRAY_ADDRESS="$(existing_db_value 'SELECT address FROM server_settings WHERE id = 1;')"
 CURRENT_REALITY_DEST="$(existing_db_value 'SELECT dest FROM server_settings WHERE id = 1;')"
 CURRENT_REALITY_SNI="$(existing_db_value 'SELECT server_name FROM server_settings WHERE id = 1;')"
+CURRENT_INSTANCE_NAME="$(existing_db_value 'SELECT instance_name FROM server_settings WHERE id = 1;')"
 CURRENT_FIRST_USER="$(existing_db_value 'SELECT name FROM users ORDER BY id LIMIT 1;')"
 AUTO_ADDRESS="$(detect_default_address)"
+step_ok
 XRAY_ADDRESS_DEFAULT="${CURRENT_XRAY_ADDRESS:-$AUTO_ADDRESS}"
+INSTANCE_NAME_DEFAULT="${CURRENT_INSTANCE_NAME:-$DEFAULT_INSTANCE_NAME}"
 FIRST_USER_DEFAULT="${CURRENT_FIRST_USER:-$DEFAULT_USER}"
 REALITY_DEST_DEFAULT="${CURRENT_REALITY_DEST:-$DEFAULT_REALITY_DEST}"
 REALITY_SNI_DEFAULT="${CURRENT_REALITY_SNI:-$DEFAULT_REALITY_SNI}"
 
-printf '%s\n' \
-  "Сначала задайте пароль администратора. Затем установщик соберёт остальные параметры" \
-  "и выполнит все действия автоматически без дополнительных вопросов." \
-  "Начальная установка работает по HTTP; HTTPS можно включить позже в панели." \
-  "Чтобы принять значение в квадратных скобках, нажмите Enter." \
-  ""
+if [[ "${SG_PANEL_INPUTS_PRECOLLECTED:-0}" == "1" ]]; then
+  printf '[SG-Panel] Параметры заранее приняты единым мастером. Дополнительных вопросов не будет.\n\n'
+else
+  printf '%s\n' \
+    "Сначала задайте пароль администратора. Затем установщик соберёт остальные параметры" \
+    "и выполнит все действия автоматически без дополнительных вопросов." \
+    "Начальная установка работает по HTTP; HTTPS можно включить позже в панели." \
+    "Чтобы принять значение в квадратных скобках, нажмите Enter." \
+    ""
+fi
 
 # На новой установке пароль — самый первый вопрос мастера.
 if [[ -f /etc/xpanel-mvp/web.env ]]; then
@@ -502,18 +512,23 @@ elif [[ -z "${XPANEL_ADMIN_PASSWORD:-}" ]]; then
   done
 fi
 
-prompt_value XRAY_ADDRESS "Адрес Xray для клиентов (публичный IP или домен)" "$XRAY_ADDRESS_DEFAULT"
 if [[ $PRESERVE_PANEL_ACCESS -eq 0 ]]; then
   prompt_value PANEL_PUBLIC_PORT "Публичный HTTP-порт панели" "$DEFAULT_PANEL_PORT"
 fi
+prompt_value XRAY_ADDRESS "Адрес Xray для клиентов (публичный IP или домен)" "$XRAY_ADDRESS_DEFAULT"
+prompt_value INSTANCE_NAME "Имя этого сервера в панели" "$INSTANCE_NAME_DEFAULT"
 prompt_value FIRST_USER "Имя первого пользователя" "$FIRST_USER_DEFAULT"
 prompt_value REALITY_DEST "Reality target" "$REALITY_DEST_DEFAULT"
 prompt_value REALITY_SNI "Reality SNI" "$REALITY_SNI_DEFAULT"
 
 log "Все параметры приняты. Дальнейшая установка не потребует ввода"
 log "Журнал: $LOG_FILE"
+printf '[SG-Panel] Все параметры приняты. Дальнейшая установка не потребует ввода.\n'
+printf '[SG-Panel] Технический журнал: %s\n\n' "$LOG_FILE"
 
 [[ -n "$XRAY_ADDRESS" && "$XRAY_ADDRESS" =~ ^[A-Za-z0-9._:-]+$ ]] || fail "некорректный IP или домен Xray"
+[[ -n "$INSTANCE_NAME" ]] || fail "имя сервера не может быть пустым"
+[[ ${#INSTANCE_NAME} -le 64 ]] || fail "имя сервера не должно быть длиннее 64 символов"
 [[ -n "$FIRST_USER" ]] || fail "имя пользователя не может быть пустым"
 [[ "$REALITY_DEST" == *:* ]] || fail "Reality target должен иметь вид host:port"
 if [[ $PRESERVE_PANEL_ACCESS -eq 0 ]]; then
@@ -536,13 +551,25 @@ ensure_swap(){
 }
 
 install_system_packages(){
+  if [[ "${SG_PANEL_SYSTEM_READY:-0}" == "1" ]]; then
+    local required
+    for required in curl unzip rsync python3 sqlite3 jq nginx certbot openssl; do
+      command -v "$required" >/dev/null 2>&1 || {
+        echo "после системного этапа не найден обязательный компонент: $required" >&2
+        return 1
+      }
+    done
+    return 0
+  fi
+
   export DEBIAN_FRONTEND=noninteractive
   export NEEDRESTART_MODE=a
   wait_for_apt
   dpkg --configure -a
-  apt-get -o Dpkg::Use-Pty=0 update -qq
-  apt-get -o Dpkg::Use-Pty=0 install -y \
-    curl ca-certificates unzip rsync zstd \
+  apt-get -o DPkg::Lock::Timeout=900 -o Dpkg::Use-Pty=0 update -qq
+  apt-get -o DPkg::Lock::Timeout=900 -o Dpkg::Use-Pty=0 dist-upgrade -y
+  apt-get -o DPkg::Lock::Timeout=900 -o Dpkg::Use-Pty=0 install -y \
+    curl ca-certificates unzip rsync zstd psmisc \
     python3 python3-venv python3-pip \
     sqlite3 jq iproute2 dnsutils \
     nginx libnginx-mod-stream certbot openssl
@@ -581,7 +608,8 @@ configure_panel_data_stage(){
       --private-key "$PRIVATE_KEY" \
       --public-key "$PUBLIC_KEY" \
       --short-id "$SHORT_ID" \
-      --fingerprint chrome >/dev/null
+      --fingerprint firefox \
+      --flow xtls-rprx-vision >/dev/null
     rm -f "$tmp_env"
     unset PRIVATE_KEY PUBLIC_KEY SHORT_ID
   elif [[ $PARTIAL_INSTALL -eq 1 || $RECONFIGURE -eq 1 ]]; then
@@ -596,6 +624,16 @@ with sqlite3.connect(path) as con:
     )
 PY_UPDATE_SERVER
   fi
+
+  python3 - data/panel.db "$INSTANCE_NAME" <<'PY_INSTANCE_NAME'
+import sqlite3
+import sys
+path, instance_name = sys.argv[1:]
+with sqlite3.connect(path) as con:
+    columns = {row[1] for row in con.execute("PRAGMA table_info(server_settings)")}
+    if "instance_name" in columns:
+        con.execute("UPDATE server_settings SET instance_name=? WHERE id=1", (instance_name.strip(),))
+PY_INSTANCE_NAME
 
   user_count="$(sqlite3 data/panel.db 'SELECT COUNT(*) FROM users;' 2>/dev/null || echo 0)"
   if [[ "$user_count" == "0" ]]; then
@@ -654,21 +692,16 @@ check_panel_port_stage(){
 
 apply_and_publish_stage(){ apply_xray_stage; configure_panel_access_stage; }
 
-stage 1 3 "Подготовка системы"
-run_stage "Подготовка памяти и swap" ensure_swap
-run_stage "Обновление системы и установка пакетов" install_system_packages
-run_stage "Проверка публичного порта панели" check_panel_port_stage
-run_stage "Установка или проверка Xray" install_xray_stage
-
-stage 2 3 "Установка и настройка"
-run_stage "Установка SG-Panel" install_panel_stage
+run_stage "Этап 1/9 · Подготовка памяти и swap" ensure_swap
+run_stage "Этап 2/9 · Обновление системы и установка пакетов" install_system_packages
+run_stage "Этап 3/9 · Проверка публичного порта панели" check_panel_port_stage
+run_stage "Этап 4/9 · Установка или проверка Xray" install_xray_stage
+run_stage "Этап 5/9 · Установка SG-Panel" install_panel_stage
 unset XPANEL_ADMIN_PASSWORD XPANEL_ADMIN_PASSWORD_2 2>/dev/null || true
-run_stage "Настройка сервера и первого пользователя" configure_panel_data_stage
-run_stage "Миграция внутреннего порта REALITY fallback" migrate_reality_edge_web_port
-run_stage "Применение Xray и публикация панели" apply_and_publish_stage
-
-stage 3 3 "Финальная проверка"
-run_stage "Проверка служб, конфигурации и адреса панели" validate_installation_stage
+run_stage "Этап 6/9 · Настройка сервера и первого пользователя" configure_panel_data_stage
+run_stage "Этап 7/9 · Подготовка REALITY fallback" migrate_reality_edge_web_port
+run_stage "Этап 8/9 · Применение Xray и публикация панели" apply_and_publish_stage
+run_stage "Этап 9/9 · Проверка служб, конфигурации и адреса панели" validate_installation_stage
 
 cd "$TARGET"
 CLI_VERSION="$(.venv/bin/python -m xpanel --version | awk '{print $2}')"

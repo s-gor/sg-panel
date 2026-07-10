@@ -15,7 +15,7 @@ def test_grouped_navigation_matches_awg_workflow_order() -> None:
         "<b>System</b>",
         "<b>Clients</b>",
         "<b>Xray Server</b>",
-        "<b>Network</b>",
+        "<b>Routing</b>",
         "<b>Security</b>",
         "<b>Maintenance</b>",
     ]
