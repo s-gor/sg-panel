@@ -753,41 +753,13 @@ validate_result(){
 }
 
 show_result(){
-  local marker="/etc/xpanel-mvp/install-complete.env" mode host port url
-  mode="$(grep -E '^PANEL_ACCESS_MODE=' "$marker" | tail -1 | cut -d= -f2-)"
-  host="$(grep -E '^PANEL_PUBLIC_HOST=' "$marker" | tail -1 | cut -d= -f2-)"
-  port="$(grep -E '^PANEL_PUBLIC_PORT=' "$marker" | tail -1 | cut -d= -f2-)"
-  url="${mode}://${host}:${port}"
-
-  cat <<EOF_RESULT
-
-============================================================
- SG-Panel $EXPECTED_RELEASE_LABEL ($EXPECTED_BUILD; core $EXPECTED_VERSION) — установка завершена успешно
-============================================================
-
-ПАНЕЛЬ
-  Имя сервера:     $INSTANCE_NAME
-  Адрес:           $url
-  Порт:            $port
-  Состояние:       active
-
-XRAY REALITY
-  Адрес клиентов:  $XRAY_ADDRESS:443
-  Первый клиент:   $FIRST_USER
-  Ссылка клиента:  /root/sg-panel-first-user.txt
-
-СЛУЖБЫ
-  SG-Panel:        active
-  Nginx:           active
-  Xray:            active
-
-ЖУРНАЛЫ
-  Мастер:          $LOG_FILE
-  Внутренняя установка: $CORE_LOG
-
-Откройте указанный адрес панели и войдите с заданным паролем.
-============================================================
-EOF_RESULT
+  printf '
+[SG-Panel] SG-Panel: %sactive%s
+' "$C_GREEN" "$C_RESET"
+  printf '[SG-Panel] Nginx:    %sactive%s
+' "$C_GREEN" "$C_RESET"
+  printf '[SG-Panel] Xray:     %sactive%s
+' "$C_GREEN" "$C_RESET"
 }
 
 main(){

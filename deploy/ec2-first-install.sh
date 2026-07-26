@@ -646,7 +646,7 @@ install_panel_stage(){
   if [[ -n "${XPANEL_ADMIN_PASSWORD:-}" ]]; then
     export XPANEL_ADMIN_PASSWORD
   fi
-  bash "$SOURCE_DIR/install-or-upgrade.sh"
+  SG_PANEL_SUPPRESS_SUCCESS_SUMMARY=1 bash "$SOURCE_DIR/install-or-upgrade.sh"
 }
 
 configure_panel_data_stage(){
@@ -827,39 +827,10 @@ else
 fi
 ACTIVE_XRAY_VERSION="v$(/usr/local/bin/xray version | awk 'NR==1 {print $2}' | sed 's/^v//')"
 
-cat <<EOF_RESULT
-
-============================================================
- SG-Panel $EXPECTED_RELEASE_LABEL ($EXPECTED_BUILD; core $EXPECTED_VERSION) — установка завершена успешно
-============================================================
-
-ПАНЕЛЬ УПРАВЛЕНИЯ
-  Адрес:           $PANEL_URL
-  Режим:           ${PANEL_MODE^^}
-  Backend:         127.0.0.1:$DEFAULT_BACKEND_PORT
-  HTTPS:           $PANEL_HTTPS_STATUS
-
-XRAY REALITY
-  Сервер:          $XRAY_ADDRESS:443
-  Пользователь:    $FIRST_USER
-  VLESS-ссылка:    $LINK_FILE
-  Показать ссылку: cat $LINK_FILE
-
-ПРОВЕРКИ
-  SG-Panel:        active
-  Nginx:           active — :$PANEL_PUBLIC_PORT
-  Xray:            active — $ACTIVE_XRAY_VERSION — Reality :443
-
-FIREWALL / SECURITY GROUP
-  22/tcp           $SSH_SOURCE
-  443/tcp          клиенты Xray
-  $PANEL_PUBLIC_PORT/tcp       только ваш IP или локальная сеть
-  $DEFAULT_BACKEND_PORT/tcp         НЕ ОТКРЫВАТЬ
-  80/tcp           нужен только при последующем включении Let's Encrypt
-
-ЖУРНАЛ
-  $LOG_FILE
-
-Откройте панель и войдите с заданным паролем.
-============================================================
-EOF_RESULT
+printf '
+[SG-Panel] SG-Panel: %sactive%s
+' "$COLOR_GREEN" "$COLOR_RESET"
+printf '[SG-Panel] Nginx:    %sactive%s
+' "$COLOR_GREEN" "$COLOR_RESET"
+printf '[SG-Panel] Xray:     %sactive%s
+' "$COLOR_GREEN" "$COLOR_RESET"
