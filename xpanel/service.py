@@ -597,6 +597,9 @@ def update_reality_inbounds(
     )
     with connect() as con:
         for item in cleaned:
+            stored_obfs_password = _hysteria_obfs_password_for_storage(
+                con, item["obfs_password"]
+            )
             con.execute(
                 """
                 INSERT INTO reality_inbounds (id, name, tag, enabled, listen, port, short_id)
@@ -855,6 +858,19 @@ def _normalise_hysteria_instances(
     return result
 
 
+def _hysteria_obfs_password_for_storage(
+    con: sqlite3.Connection, password: str | None
+) -> str | None:
+    """Keep writes compatible with a short-lived NOT NULL pre-release schema."""
+    if password is not None:
+        return password
+    not_null = any(
+        str(row[1]) == "obfs_password" and bool(row[3])
+        for row in con.execute("PRAGMA table_info(hysteria_inbounds)").fetchall()
+    )
+    return "" if not_null else None
+
+
 def update_hysteria_inbounds(
     values: list[dict[str, object]] | None,
     *,
@@ -894,7 +910,7 @@ def update_hysteria_inbounds(
                 (
                     int(item["id"]), str(item["name"]), str(item["tag"]),
                     int(bool(item["enabled"])), str(item["listen"]), int(item["port"]),
-                    str(item["obfs_mode"]), item["obfs_password"],
+                    str(item["obfs_mode"]), stored_obfs_password,
                     str(item.get("obfs_updated_by") or "")[:80],
                 ),
             )
@@ -926,6 +942,9 @@ def update_hysteria_obfuscation(
             str(current["obfs_mode"] or "none") != clean_mode
             or str(current["obfs_password"] or "") != str(clean_password or "")
         )
+        stored_obfs_password = _hysteria_obfs_password_for_storage(
+            con, clean_password
+        )
         con.execute(
             """
             UPDATE hysteria_inbounds
@@ -936,7 +955,7 @@ def update_hysteria_obfuscation(
             WHERE id=?
             """,
             (
-                clean_mode, clean_password, int(changed), int(changed),
+                clean_mode, stored_obfs_password, int(changed), int(changed),
                 str(actor or "admin")[:80], inbound_id,
             ),
         )

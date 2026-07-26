@@ -228,31 +228,7 @@ ensure_xray_version(){
     return 1
   fi
   systemctl enable xray >/dev/null 2>&1 || true
-
-  # На совершенно новой Ubuntu официальный Xray-install создаёт временный
-  # config.json со значением {}. Такой placeholder синтаксически корректен,
-  # но Xray может завершиться сразу, потому что рабочих inbound/outbound ещё нет.
-  # Настоящий конфиг SG-Panel создаётся на этапе 8/9; там же служба обязана
-  # запуститься и затем строго проверяется на этапе 9/9.
-  local bootstrap_placeholder=0
-  if [[ ! -d "$TARGET" && -s "$config" ]]; then
-    if python3 - "$config" <<'PY_XRAY_PLACEHOLDER'
-import json
-import sys
-
-try:
-    with open(sys.argv[1], "r", encoding="utf-8") as handle:
-        value = json.load(handle)
-except Exception:
-    raise SystemExit(1)
-raise SystemExit(0 if value == {} else 1)
-PY_XRAY_PLACEHOLDER
-    then
-      bootstrap_placeholder=1
-    fi
-  fi
-
-  if [[ -s "$config" && "$bootstrap_placeholder" -eq 0 ]]; then
+  if [[ -s "$config" ]]; then
     systemctl restart xray
     sleep 1
     systemctl is-active --quiet xray || {
@@ -260,9 +236,6 @@ PY_XRAY_PLACEHOLDER
       rollback_xray
       return 1
     }
-  else
-    systemctl stop xray >/dev/null 2>&1 || true
-    log "Xray $XRAY_VERSION установлен; запуск отложен до создания рабочего конфига SG-Panel"
   fi
 }
 
@@ -646,7 +619,7 @@ install_panel_stage(){
   if [[ -n "${XPANEL_ADMIN_PASSWORD:-}" ]]; then
     export XPANEL_ADMIN_PASSWORD
   fi
-  SG_PANEL_SUPPRESS_SUCCESS_SUMMARY=1 bash "$SOURCE_DIR/install-or-upgrade.sh"
+  bash "$SOURCE_DIR/install-or-upgrade.sh"
 }
 
 configure_panel_data_stage(){
@@ -827,10 +800,39 @@ else
 fi
 ACTIVE_XRAY_VERSION="v$(/usr/local/bin/xray version | awk 'NR==1 {print $2}' | sed 's/^v//')"
 
-printf '
-[SG-Panel] SG-Panel: %sactive%s
-' "$COLOR_GREEN" "$COLOR_RESET"
-printf '[SG-Panel] Nginx:    %sactive%s
-' "$COLOR_GREEN" "$COLOR_RESET"
-printf '[SG-Panel] Xray:     %sactive%s
-' "$COLOR_GREEN" "$COLOR_RESET"
+cat <<EOF_RESULT
+
+============================================================
+ SG-Panel $EXPECTED_RELEASE_LABEL ($EXPECTED_BUILD; core $EXPECTED_VERSION) — установка завершена успешно
+============================================================
+
+ПАНЕЛЬ УПРАВЛЕНИЯ
+  Адрес:           $PANEL_URL
+  Режим:           ${PANEL_MODE^^}
+  Backend:         127.0.0.1:$DEFAULT_BACKEND_PORT
+  HTTPS:           $PANEL_HTTPS_STATUS
+
+XRAY REALITY
+  Сервер:          $XRAY_ADDRESS:443
+  Пользователь:    $FIRST_USER
+  VLESS-ссылка:    $LINK_FILE
+  Показать ссылку: cat $LINK_FILE
+
+ПРОВЕРКИ
+  SG-Panel:        active
+  Nginx:           active — :$PANEL_PUBLIC_PORT
+  Xray:            active — $ACTIVE_XRAY_VERSION — Reality :443
+
+FIREWALL / SECURITY GROUP
+  22/tcp           $SSH_SOURCE
+  443/tcp          клиенты Xray
+  $PANEL_PUBLIC_PORT/tcp       только ваш IP или локальная сеть
+  $DEFAULT_BACKEND_PORT/tcp         НЕ ОТКРЫВАТЬ
+  80/tcp           нужен только при последующем включении Let's Encrypt
+
+ЖУРНАЛ
+  $LOG_FILE
+
+Откройте панель и войдите с заданным паролем.
+============================================================
+EOF_RESULT

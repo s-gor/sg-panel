@@ -65,3 +65,18 @@ def test_dns_page_has_no_summary_cards_or_detached_priority_column() -> None:
     assert '<p class="panel-kicker">UPSTREAM</p><h2>DNS-серверы</h2>' not in dns
     assert "Контекстный JSON DNS" in dns
     assert dns.index("Контекстный JSON DNS") < dns.index("Общие настройки DNS")
+
+
+def test_fix40_does_not_touch_routing_contract_files() -> None:
+    base_manifest = ROOT / "FIX40-BASE-UNCHANGED-SHA256.txt"
+    assert base_manifest.is_file()
+    text = base_manifest.read_text(encoding="utf-8")
+    for relative in (
+        "xpanel/templates/routing.html",
+        "xpanel/templates/_geofiles_panel_fix39.html",
+        "xpanel/static/routing-sgclient096-fix39.css",
+        "xpanel/service.py",
+        "xpanel/node_manager.py",
+        "xpanel/xray_encryption_runtime.py",
+    ):
+        assert relative in text

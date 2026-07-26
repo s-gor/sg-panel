@@ -1014,22 +1014,16 @@ def _migrate(con: sqlite3.Connection) -> None:
         "UPDATE hysteria_inbounds SET obfs_mode='none' "
         "WHERE obfs_mode IS NULL OR obfs_mode NOT IN ('none','salamander')"
     )
-    # Some early Hysteria2 schemas created obfs_password as NOT NULL.
-    # SQLite cannot relax that constraint with ALTER TABLE, so keep an empty
-    # string for those legacy tables while new databases use NULL. Both values
-    # are normalised as "not configured" by the service layer.
-    password_column = next(
-        (
-            row
-            for row in con.execute("PRAGMA table_info(hysteria_inbounds)").fetchall()
-            if str(row["name"]) == "obfs_password"
-        ),
-        None,
+    # A short-lived pre-release used ``obfs_password TEXT NOT NULL``.
+    # Preserve compatibility with those databases: use an empty string when
+    # the existing column rejects NULL, while new/current schemas keep NULL.
+    obfs_password_not_null = any(
+        str(row[1]) == "obfs_password" and bool(row[3])
+        for row in con.execute("PRAGMA table_info(hysteria_inbounds)").fetchall()
     )
-    disabled_password = "" if password_column is not None and int(password_column["notnull"]) else None
     con.execute(
         "UPDATE hysteria_inbounds SET obfs_password=? WHERE obfs_mode='none'",
-        (disabled_password,),
+        ("" if obfs_password_not_null else None,),
     )
     con.execute(
         "UPDATE hysteria_inbounds SET obfs_updated_by='' "

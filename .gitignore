@@ -13,14 +13,3 @@ data/*.db-*
 backups/*
 !backups/.gitkeep
 !data/.gitkeep
-
-# Local build and release artifacts must not return to GitHub main.
-/RELEASE-NOTES-*
-/BUILD-*
-/TEST-RESULTS-*
-/STATIC-VALIDATION-*
-/MANIFEST-*
-/*-AUDIT.txt
-/*-SHA256.txt
-/SG-PANEL-*.run
-/SG-PANEL-*.zip

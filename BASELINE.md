@@ -1,21 +1,20 @@
-# Clean GitHub baseline
+# SG-Panel UI23 Repair 1
 
-Repository baseline:
+Current candidate baseline reconstructed from:
 
-- core version: `v0.10.0-rc70`;
-- build: `FIX40`;
-- UI line: `Preview 9 · FIX40 · UI23`;
-- Xray policy: `v26.6.27`;
-- SG-Node Agent: `0.5.0`;
-- SG-Node Worker: `0.7.0`.
+- accepted SG-Panel FIX40 UI22 source;
+- reviewed Salamander delta from the original UI23 source;
+- the complete UI22 regression test tree plus the dedicated Salamander tests.
 
-This tree was prepared from the cumulative UI23 application plus the stable clean-install bootstrap. Rejected Routing UI25 and experimental UI24 installer wrappers are not included.
+Rejected lines are not included as a development base:
 
-Removed from the repository root:
+- UI24 / UI24 FIX1 / UI24 FIX2;
+- UI25 Routing redesign;
+- UI23 REBUILT1 reduced-test baseline.
 
-- historical `RELEASE-NOTES-*` files;
-- generated `BUILD-*`, `TEST-RESULTS-*` and `STATIC-VALIDATION-*` reports;
-- old package manifests, SHA-256 lists and audit files;
-- temporary caches and compiled Python files.
+Status:
 
-Functional source, installers, documentation, assets and regression tests remain.
+- source candidate only;
+- full GitHub Actions test result still required;
+- full installer and clean EC2 acceptance not yet confirmed;
+- real Hysteria2 + Salamander client connection not yet confirmed.
