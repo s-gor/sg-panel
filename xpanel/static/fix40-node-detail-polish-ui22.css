@@ -1,0 +1,159 @@
+/* SG-Panel Preview 9 · FIX40 · UI22
+   Node Detail Polish: remove the inherited gray slabs from "Дополнительно"
+   and restore compact Graphite/Jade surfaces without changing runtime logic. */
+
+.node-restore-ui21 .node-simple-advanced-body {
+  gap: 11px;
+  padding: 16px 20px 20px;
+  background: transparent !important;
+  background-color: transparent !important;
+}
+.node-restore-ui21 .node-simple-tech-grid { gap: 11px; }
+.node-restore-ui21 .node-simple-tech-grid > article,
+.node-restore-ui21 .node-simple-inner-details,
+.node-restore-ui21 .node-simple-danger {
+  border-radius: 13px;
+  box-shadow: none !important;
+  background: #162231 !important;
+  background-color: #162231 !important;
+  background-image: none !important;
+}
+.node-restore-ui21 .node-simple-tech-grid > article { padding: 16px 18px; }
+.node-restore-ui21 .node-simple-tech-grid h3 {
+  margin: 0 0 10px;
+  font-size: 18px;
+  letter-spacing: -.02em;
+}
+.node-restore-ui21 .node-tech-list > div,
+.node-restore-ui21 .node-tech-services > div {
+  min-height: 39px;
+  padding: 8px 0;
+  gap: 10px;
+}
+.node-restore-ui21 .node-tech-list dt,
+.node-restore-ui21 .node-tech-services span {
+  font-size: 10px;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+.node-restore-ui21 .node-tech-list dd,
+.node-restore-ui21 .node-tech-services strong {
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+.node-restore-ui21 .node-tech-services > div {
+  grid-template-columns: minmax(86px, .42fr) minmax(0, 1.58fr) auto;
+}
+.node-restore-ui21 .node-service-state {
+  min-width: 76px;
+  text-align: right;
+  font-size: 9px;
+  font-weight: 850;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+.node-restore-ui21 .node-simple-inner-details > summary {
+  display: flex;
+  align-items: center;
+  min-height: 50px;
+  padding: 13px 18px;
+  border-radius: 12px;
+  font-size: 14px;
+  transition: border-color .16s ease, background-color .16s ease;
+  background: #172535 !important;
+  background-color: #172535 !important;
+  color: #edf3f8 !important;
+}
+.node-restore-ui21 .node-simple-inner-details > summary::marker { color: var(--accent); }
+.node-restore-ui21 .node-simple-inner-details[open] > summary {
+  border-radius: 12px 12px 0 0;
+}
+.node-restore-ui21 .node-simple-form-grid,
+.node-restore-ui21 .node-simple-action-list,
+.node-restore-ui21 .node-simple-history { padding: 16px 18px 18px; }
+.node-restore-ui21 .node-simple-danger {
+  min-height: 76px;
+  padding: 15px 18px;
+  border-color: #5b343b !important;
+  background: #251b23 !important;
+  background-color: #251b23 !important;
+}
+.node-restore-ui21 .node-simple-danger strong { font-size: 14px; }
+.node-restore-ui21 .node-simple-danger small { font-size: 10px; line-height: 1.45; }
+
+/* Graphite/dark: explicit page-scoped colors win over old global theme gradients. */
+html[data-resolved-theme="dark"] body.node-detail-page .node-simple-tech-grid > article,
+html[data-resolved-theme="dark"] body.node-detail-page .node-simple-inner-details {
+  border-color: #2a3a4d !important;
+  background: #162231 !important;
+  background-color: #162231 !important;
+}
+html[data-resolved-theme="dark"] body.node-detail-page .node-simple-tech-grid > article:hover,
+html[data-resolved-theme="dark"] body.node-detail-page .node-simple-inner-details:hover {
+  border-color: #354b63 !important;
+  background: #182737 !important;
+  background-color: #182737 !important;
+}
+html[data-resolved-theme="dark"] body.node-detail-page .node-simple-inner-details[open] {
+  border-color: #35506a !important;
+  background: #14202d !important;
+  background-color: #14202d !important;
+}
+html[data-resolved-theme="dark"] body.node-detail-page .node-simple-inner-details > summary {
+  background: #172535 !important;
+  background-color: #172535 !important;
+  color: #edf3f8 !important;
+}
+html[data-resolved-theme="dark"] body.node-detail-page .node-simple-inner-details[open] > summary {
+  background: #1a2b3d !important;
+  background-color: #1a2b3d !important;
+}
+html[data-resolved-theme="dark"] body.node-detail-page .node-simple-danger {
+  border-color: #5b343b !important;
+  background: #251b23 !important;
+  background-color: #251b23 !important;
+}
+html[data-resolved-theme="dark"] body.node-detail-page .node-tech-list > div,
+html[data-resolved-theme="dark"] body.node-detail-page .node-tech-services > div,
+html[data-resolved-theme="dark"] body.node-detail-page .node-simple-action-list form {
+  border-color: #2a394a !important;
+}
+html[data-resolved-theme="dark"] body.node-detail-page .node-tech-list dt,
+html[data-resolved-theme="dark"] body.node-detail-page .node-tech-services span {
+  color: #8190a2 !important;
+}
+html[data-resolved-theme="dark"] body.node-detail-page .node-tech-list dd,
+html[data-resolved-theme="dark"] body.node-detail-page .node-tech-services strong {
+  color: #e7edf3 !important;
+}
+html[data-resolved-theme="dark"] body.node-detail-page .node-service-state.state-active { color: #56c995 !important; }
+html[data-resolved-theme="dark"] body.node-detail-page .node-service-state.state-inactive { color: #e4b965 !important; }
+html[data-resolved-theme="dark"] body.node-detail-page .node-service-state.state-failed { color: #e47b84 !important; }
+
+/* Latte/Jade light: keep the same hierarchy without muddy gray panels. */
+html[data-resolved-theme="light"] body.node-detail-page .node-simple-tech-grid > article,
+html[data-resolved-theme="light"] body.node-detail-page .node-simple-inner-details {
+  border-color: #c7d3d9 !important;
+  background: #f4f7f8 !important;
+  background-color: #f4f7f8 !important;
+}
+html[data-resolved-theme="light"] body.node-detail-page .node-simple-inner-details > summary {
+  background: #edf3f5 !important;
+  background-color: #edf3f5 !important;
+  color: #25333e !important;
+}
+html[data-resolved-theme="light"] body.node-detail-page .node-simple-inner-details[open] > summary {
+  background: #e3ecef !important;
+  background-color: #e3ecef !important;
+}
+html[data-resolved-theme="light"] body.node-detail-page .node-simple-danger {
+  border-color: #d8aeb2 !important;
+  background: #f5e8e9 !important;
+  background-color: #f5e8e9 !important;
+}
+
+@media (max-width: 860px) {
+  .node-restore-ui21 .node-simple-advanced-body { padding-left: 16px; padding-right: 16px; }
+  .node-restore-ui21 .node-tech-services > div { grid-template-columns: 78px minmax(0, 1fr); }
+  .node-restore-ui21 .node-service-state { grid-column: 2; text-align: left; }
+}

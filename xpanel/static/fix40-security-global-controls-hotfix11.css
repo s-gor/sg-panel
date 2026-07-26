@@ -1,0 +1,136 @@
+/* SG-Panel Preview 9 · FIX40 · Security and Global Controls Hotfix 11
+   Confirmed small-step corrections:
+   - Security summary strip removed in the template;
+   - section buttons keep one identical material regardless of active state;
+   - destructive actions use one muted red palette with white labels;
+   - Enable/Disable actions use semantic, non-black controls;
+   - the theme button is a direct moon/sun switch with no theme names. */
+
+/* Same material for every section button. Active is not darker. */
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .section-tabs a,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .section-tabs a:hover,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .section-tabs a:active,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .section-tabs a.active {
+  color: #fffdf7 !important;
+  -webkit-text-fill-color: #fffdf7 !important;
+  border-color: var(--jade-champagne, #b88a45) !important;
+  background: linear-gradient(180deg, var(--jade-action-top, #709a84) 0%, var(--jade-action-bottom, #4d7864) 100%) !important;
+  box-shadow: var(--jade-top-light, inset 0 1px 0 rgba(255,255,255,.60)), var(--jade-button-shadow, 0 2px 12px rgba(43,52,46,.20)) !important;
+  text-shadow: 0 1px 1px rgba(24,48,38,.24) !important;
+  transform: none !important;
+}
+html[data-resolved-theme="dark"] body.preview-9-rc6-typography .section-tabs a,
+html[data-resolved-theme="dark"] body.preview-9-rc6-typography .section-tabs a:hover,
+html[data-resolved-theme="dark"] body.preview-9-rc6-typography .section-tabs a:active,
+html[data-resolved-theme="dark"] body.preview-9-rc6-typography .section-tabs a.active {
+  color: #fff !important;
+  -webkit-text-fill-color: #fff !important;
+  border-color: #587087 !important;
+  background: linear-gradient(180deg, #4a637b 0%, #3d5368 100%) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.10), 0 5px 14px rgba(5,12,20,.24) !important;
+  transform: none !important;
+}
+
+/* One restrained danger palette everywhere. */
+body.preview-9-rc6-typography .button.danger,
+body.preview-9-rc6-typography .button.danger-outline,
+body.preview-9-rc6-typography button.danger-text,
+body.preview-9-rc6-typography a.danger-text,
+body.preview-9-rc6-typography .client-management-delete .danger-outline {
+  color: #fff !important;
+  -webkit-text-fill-color: #fff !important;
+  border: 1px solid #87484f !important;
+  background: linear-gradient(180deg, #b66a70 0%, #965159 100%) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.20), 0 3px 10px rgba(92,42,48,.18) !important;
+}
+body.preview-9-rc6-typography .button.danger:hover,
+body.preview-9-rc6-typography .button.danger-outline:hover,
+body.preview-9-rc6-typography button.danger-text:hover,
+body.preview-9-rc6-typography a.danger-text:hover,
+body.preview-9-rc6-typography .client-management-delete .danger-outline:hover {
+  color: #fff !important;
+  border-color: #793c44 !important;
+  background: linear-gradient(180deg, #aa5b63 0%, #87454d 100%) !important;
+}
+body.preview-9-rc6-typography :is(.button.danger,.button.danger-outline,button.danger-text,a.danger-text):disabled {
+  color: #e8e8e8 !important;
+  border-color: #a4a4a4 !important;
+  background: #8b8b8b !important;
+  box-shadow: none !important;
+  opacity: .62 !important;
+}
+html[data-resolved-theme="dark"] body.preview-9-rc6-typography :is(.button.danger,.button.danger-outline,button.danger-text,a.danger-text) {
+  border-color: #9d5a64 !important;
+  background: linear-gradient(180deg, #834852 0%, #693842 100%) !important;
+}
+
+/* Enable and Disable are never black. */
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .button.toggle-enable,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .table-action-menu button.toggle-enable,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .r096-rule-menu button.toggle-enable {
+  color: #fff !important;
+  border-color: var(--jade-champagne, #b88a45) !important;
+  background: linear-gradient(180deg, #709a84 0%, #4d7864 100%) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.46), 0 3px 10px rgba(43,52,46,.16) !important;
+}
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .button.toggle-disable,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .table-action-menu button.toggle-disable,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .r096-rule-menu button.toggle-disable {
+  color: #303833 !important;
+  border-color: #b9b5aa !important;
+  background: linear-gradient(180deg, #fffdf7 0%, #e9e3d8 100%) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.78), 0 3px 10px rgba(53,56,52,.12) !important;
+}
+html[data-resolved-theme="dark"] body.preview-9-rc6-typography .button.toggle-enable,
+html[data-resolved-theme="dark"] body.preview-9-rc6-typography .button.toggle-disable,
+html[data-resolved-theme="dark"] body.preview-9-rc6-typography .table-action-menu :is(button.toggle-enable,button.toggle-disable),
+html[data-resolved-theme="dark"] body.preview-9-rc6-typography .r096-rule-menu :is(button.toggle-enable,button.toggle-disable) {
+  color: #fff !important;
+  border-color: #587087 !important;
+  background: linear-gradient(180deg, #4a637b 0%, #3d5368 100%) !important;
+}
+
+/* Toggle switches: neutral when off, jade when on. */
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .switch {
+  border-color: #aaa99f !important;
+  background: #d7d5ce !important;
+}
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .switch::after { background: #777b76 !important; }
+html[data-resolved-theme="light"] body.preview-9-rc6-typography :is(.switch-row,.ui-toggle-row) input:checked + .switch {
+  border-color: #4d7864 !important;
+  background: #709a84 !important;
+}
+html[data-resolved-theme="light"] body.preview-9-rc6-typography :is(.switch-row,.ui-toggle-row) input:checked + .switch::after {
+  background: #fff !important;
+  box-shadow: 0 1px 4px rgba(26,61,47,.28) !important;
+}
+html[data-resolved-theme="dark"] body.preview-9-rc6-typography .switch {
+  border-color: #587087 !important;
+  background: #2f4052 !important;
+}
+
+/* Direct theme switch: moon on light, sun on dark. */
+body.preview-9-rc6-typography .theme-control-direct .theme-button {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 42px !important;
+  min-width: 42px !important;
+  height: 38px !important;
+  min-height: 38px !important;
+  padding: 0 !important;
+}
+body.preview-9-rc6-typography .theme-mode-icon {
+  width: 20px !important;
+  height: 20px !important;
+  fill: none !important;
+  stroke: currentColor !important;
+  stroke-width: 1.8 !important;
+  stroke-linecap: round !important;
+  stroke-linejoin: round !important;
+}
+body.preview-9-rc6-typography .theme-mode-icon-moon path { fill: currentColor !important; stroke: none !important; }
+html[data-resolved-theme="light"] .theme-mode-icon-sun { display: none !important; }
+html[data-resolved-theme="light"] .theme-mode-icon-moon { display: block !important; }
+html[data-resolved-theme="dark"] .theme-mode-icon-moon { display: none !important; }
+html[data-resolved-theme="dark"] .theme-mode-icon-sun { display: block !important; }

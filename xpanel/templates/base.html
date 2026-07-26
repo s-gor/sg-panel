@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="ru" data-theme="graphite">
 <head>
+  <!-- Cumulative base: SG-Panel Preview 9 FIX40; current UI: Cluster Restore UI21; includes Cascade Steps UI20 -->
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#121722" id="themeColorMeta">
@@ -19,17 +20,46 @@
   <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}?v={{ xpanel_version }}">
   <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='apple-touch-icon.png') }}?v={{ xpanel_version }}">
 <title>{% block title %}SG-Panel{% endblock %}</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}?v={{ xpanel_version }}-sg070">
+  <!-- compatibility lineage: sg070-preview7; current page rebuild: sg070-preview9-fix23-xray-profile-polish -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}?v={{ xpanel_version }}-sg070-preview9-fix39-routing-geofiles">
+  {% if request.endpoint == 'cascade_page' %}<link rel="stylesheet" href="{{ url_for('static', filename='cascade-rc6.css') }}?v={{ xpanel_version }}-sg070-preview9-fix39-routing-geofiles">{% endif %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='rc6-typography.css') }}?v={{ xpanel_version }}-sg070-preview9-fix39-routing-geofiles">
+  <link rel="stylesheet" href="{{ url_for('static', filename='luxury-jade-depth.css') }}?v={{ xpanel_version }}-sg070-preview9-fix39-routing-geofiles">
+  <link rel="stylesheet" href="{{ url_for('static', filename='global-layout-buttons.css') }}?v={{ xpanel_version }}-sg070-preview9-fix39-routing-geofiles">
+  {% if request.endpoint == 'settings_page' %}<link rel="stylesheet" href="{{ url_for('static', filename='xray-server-card-fix.css') }}?v={{ xpanel_version }}-sg070-preview9-fix39-routing-geofiles">{% endif %}
+  {% if request.endpoint in ['routing_page', 'geofiles_page'] %}<link rel="stylesheet" href="{{ url_for('static', filename='routing-sgclient096-fix39.css') }}?v={{ xpanel_version }}-sg070-preview9-fix39-routing-geofiles">{% endif %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='fix35-full-recovery.css') }}?v={{ xpanel_version }}-sg070-preview9-fix39-routing-geofiles">
+  <link rel="stylesheet" href="{{ url_for('static', filename='fix40-ui-repair.css') }}?v={{ xpanel_version }}-{{ xpanel_build|lower }}-clients-dns-sidebar">
+  {% if request.endpoint == 'users_page' %}<link rel="stylesheet" href="{{ url_for('static', filename='fix40-clients-layout-hotfix3.css') }}?v={{ xpanel_version }}-{{ xpanel_build|lower }}-clients-layout-hotfix3">{% endif %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='fix40-global-jade-routing-vision-hotfix4.css') }}?v={{ xpanel_version }}-{{ xpanel_build|lower }}-global-jade-routing-vision-hotfix4">
+  <link rel="stylesheet" href="{{ url_for('static', filename='fix40-interface-cleanup-hotfix5.css') }}?v={{ xpanel_version }}-{{ xpanel_build|lower }}-interface-cleanup-hotfix5">
+  <link rel="stylesheet" href="{{ url_for('static', filename='fix40-ui-compact-hotfix6.css') }}?v={{ xpanel_version }}-{{ xpanel_build|lower }}-ui-compact-hotfix6">
+  <link rel="stylesheet" href="{{ url_for('static', filename='fix40-global-tabs-dark-buttons-hotfix7.css') }}?v={{ xpanel_version }}-{{ xpanel_build|lower }}-global-tabs-dark-buttons-hotfix7">
+  <link rel="stylesheet" href="{{ url_for('static', filename='fix40-interface-verification-hotfix8.css') }}?v={{ xpanel_version }}-{{ xpanel_build|lower }}-interface-verification-hotfix8">
+  <link rel="stylesheet" href="{{ url_for('static', filename='fix40-light-buttons-theme-icon-hotfix9.css') }}?v={{ xpanel_version }}-{{ xpanel_build|lower }}-light-buttons-theme-icon-hotfix9">
+  <link rel="stylesheet" href="{{ url_for('static', filename='fix40-security-global-controls-hotfix11.css') }}?v={{ xpanel_version }}-{{ xpanel_build|lower }}-security-global-controls-hotfix11">
+  <link rel="stylesheet" href="{{ url_for('static', filename='fix40-diagnostics-service-controls-hotfix13.css') }}?v={{ xpanel_version }}-{{ xpanel_build|lower }}-diagnostics-service-controls-hotfix13">
+  <link rel="stylesheet" href="{{ url_for('static', filename='fix40-diagnostics-log-spacing-hotfix16.css') }}?v={{ xpanel_version }}-{{ xpanel_build|lower }}-diagnostics-log-spacing-hotfix16">
+  <link rel="stylesheet" href="{{ url_for('static', filename='fix40-diagnostics-log-polish-hotfix17.css') }}?v={{ xpanel_version }}-{{ xpanel_build|lower }}-diagnostics-log-polish-hotfix17">
+  <link rel="stylesheet" href="{{ url_for('static', filename='fix40-node-simple-hotfix18.css') }}?v={{ xpanel_version }}-{{ xpanel_build|lower }}-node-simple-hotfix18">
+  {% if request.endpoint == 'nodes_page' or (request.endpoint or '').startswith('node_') %}<link rel="stylesheet" href="{{ url_for('static', filename='fix40-cluster-restore-ui21.css') }}?v={{ xpanel_version }}-{{ xpanel_build|lower }}-cluster-restore-ui21">{% endif %}
+  {% if request.endpoint == 'node_detail_page' %}<link rel="stylesheet" href="{{ url_for('static', filename='fix40-node-detail-polish-ui22.css') }}?v={{ xpanel_version }}-{{ xpanel_build|lower }}-node-detail-polish-ui22">{% endif %}
+  {% if request.endpoint == 'cascade_page' %}<link rel="stylesheet" href="{{ url_for('static', filename='fix40-cascade-steps-ui20.css') }}?v={{ xpanel_version }}-{{ xpanel_build|lower }}-cascade-steps-ui20">{% endif %}
 </head>
-<body class="app-body ui-v097-standard rc20-awg-shell">
+<body class="app-body ui-v097-standard rc20-awg-shell preview-2-awg-graphite preview-3-sidebar-polish preview-5-awg-clients-cascade preview-6-awg-clients-cascade-scale preview-7-awg-exact preview-9-rc6-typography {% if request.endpoint == 'cascade_page' %}sg-awg-cascade-rc6{% endif %} {% if request.endpoint == 'users_page' %}awg-clients-page{% endif %} {% if request.endpoint == 'nodes_page' %}awg-cluster-page{% endif %}">
+{% from "_country_flag.html" import country_flag %}
 {% set endpoint = request.endpoint or '' %}
 {% set is_system = endpoint == 'dashboard' or endpoint.startswith('diagnostics_') %}
 {% set is_nodes = endpoint == 'nodes_page' or endpoint.startswith('node_') %}
 {% set is_cascade = endpoint.startswith('cascade_') or endpoint == 'cascade_page' %}
-{% set is_clients = endpoint.startswith('user_') or endpoint.startswith('users_') or endpoint == 'users_page' or endpoint.startswith('subscriptions_') or endpoint == 'subscriptions_page' or endpoint == 'stats_reset' %}
+{% set is_clients = endpoint.startswith('device_') or endpoint.startswith('user_') or endpoint.startswith('users_') or endpoint == 'users_page' or endpoint.startswith('subscriptions_') or endpoint == 'subscriptions_page' or endpoint == 'stats_reset' %}
 {% set is_advanced = endpoint.startswith('settings_advanced') %}
-{% set is_xray = endpoint == 'settings_page' or is_advanced or endpoint.startswith('config_') or endpoint == 'config_page' %}
-{% set is_routing = endpoint.startswith('routing_') or endpoint == 'routing_page' or endpoint.startswith('outbound_') or endpoint == 'outbounds_page' or endpoint.startswith('warp_') or endpoint.startswith('dns_') or endpoint == 'dns_page' or endpoint == 'geofiles_page' or endpoint.startswith('settings_geofiles') %}
+{% set is_expert_inbound = endpoint.startswith('settings_expert_inbound') %}
+{% set is_expert = is_advanced or endpoint.startswith('settings_expert_inbound') or endpoint.startswith('config_') or endpoint == 'config_page' or endpoint.startswith('inbound_json') or endpoint.startswith('users_json') or endpoint.startswith('routing_json') or endpoint.startswith('outbound_json') or endpoint.startswith('section_json') %}
+{% set is_xray = endpoint == 'settings_page' %}
+{% set is_routing = (endpoint.startswith('routing_') and not endpoint.startswith('routing_json')) or endpoint == 'routing_page' or endpoint == 'geofiles_page' or endpoint.startswith('settings_geofiles') %}
+{% set is_outbounds = endpoint == 'outbounds_page' or endpoint.startswith('warp_') or (endpoint.startswith('outbound_') and not endpoint.startswith('outbound_json')) %}
+{% set is_dns = endpoint == 'dns_page' or endpoint.startswith('dns_') %}
 {% set is_security = endpoint.startswith('security_') or endpoint == 'security_page' or endpoint.startswith('panel_access_') %}
 {% set is_maintenance = endpoint.startswith('backups_') or endpoint == 'backups_page' or endpoint.startswith('updates_') or endpoint == 'updates_page' %}
 {% set is_help = endpoint == 'help_page' %}
@@ -40,7 +70,7 @@
       <div class="brand-mark" aria-hidden="true">
         <svg viewBox="0 0 48 48"><path d="M24 3 42 13v22L24 45 6 35V13L24 3Z"/><text x="24" y="29" text-anchor="middle">SG</text></svg>
       </div>
-      <div class="brand-copy"><strong>SG-Panel</strong><small>{{ instance_identity }}</small></div>
+      <div class="brand-copy"><strong>SG-Panel</strong><small>{{ xpanel_release_label }}</small></div>
     </div>
 
     <nav class="main-nav grouped-main-nav" aria-label="Основная навигация">
@@ -64,9 +94,21 @@
         <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56V21h-4v-.07A1.7 1.7 0 0 0 8.97 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.53-1.03H3v-4h.07A1.7 1.7 0 0 0 4.6 8.94a1.7 1.7 0 0 0-.34-1.88L4.2 7l2.83-2.83.06.06a1.7 1.7 0 0 0 1.88.34A1.7 1.7 0 0 0 10 3.04V3h4v.07a1.7 1.7 0 0 0 1.03 1.53 1.7 1.7 0 0 0 1.88-.34l.06-.06L19.8 7l-.06.06a1.7 1.7 0 0 0-.34 1.88A1.7 1.7 0 0 0 20.93 10H21v4h-.07A1.7 1.7 0 0 0 19.4 15Z"/></svg>
         <span><b>Xray Server</b><small>Inbound и конфигурация</small></span>
       </a>
+      <a href="{{ url_for('settings_advanced_page') }}" class="{% if is_expert %}active{% endif %}">
+        <svg viewBox="0 0 24 24"><path d="M12 2a4 4 0 0 0-4 4v2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8a2 2 0 0 0-2-2h-2V6a4 4 0 0 0-4-4Zm-2 6V6a2 2 0 1 1 4 0v2h-4Zm2 4a2 2 0 0 1 1 3.73V18h-2v-2.27A2 2 0 0 1 12 12Z"/></svg>
+        <span><b>Expert</b><small>Подключения, резервные Inbound и JSON</small></span>
+      </a>
       <a href="{{ url_for('routing_page') }}" class="{% if is_routing %}active{% endif %}">
         <svg viewBox="0 0 24 24"><circle cx="6" cy="6" r="2"/><circle cx="18" cy="6" r="2"/><circle cx="12" cy="18" r="2"/><path d="M8 6h8M7.5 7.5l3.3 8M16.5 7.5l-3.3 8"/></svg>
-        <span><b>Routing</b><small>Правила, выходы, DNS и GeoFiles</small></span>
+        <span><b>Routing</b><small>Маршрутизация и GeoFiles</small></span>
+      </a>
+      <a href="{{ url_for('outbounds_page') }}" class="{% if is_outbounds %}active{% endif %}">
+        <svg viewBox="0 0 24 24"><path d="M4 12h12M12 6l6 6-6 6"/><circle cx="5" cy="12" r="2"/></svg>
+        <span><b>Outbounds</b><small>Direct, Block, WARP и Cascade</small></span>
+      </a>
+      <a href="{{ url_for('dns_page') }}" class="{% if is_dns %}active{% endif %}">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18"/></svg>
+        <span><b>DNS</b><small>Резолверы, правила и hosts</small></span>
       </a>
       <a href="{{ url_for('security_page') }}" class="{% if is_security %}active{% endif %}">
         <svg viewBox="0 0 24 24"><path d="M12 2 20 5v6c0 5.2-3.4 9.2-8 11-4.6-1.8-8-5.8-8-11V5l8-3Z"/><path d="M9 12l2 2 4-5"/></svg>
@@ -87,8 +129,13 @@
     <div class="sidebar-spacer"></div>
     <a href="{{ url_for('diagnostics_page') }}?tab=status" class="sidebar-system" title="Открыть System → Status & Services">
       <div class="system-row"><span class="system-dot"></span><span>СОБСТВЕННЫЙ СЕРВЕР</span></div>
-      <div class="system-meta"><span>SG-Panel Core</span><strong>v{{ xpanel_version }}</strong></div>
+      <div class="system-server-line">
+        <span class="system-server-name">{{ country_flag(instance_country_code, "country-flag country-flag-sidebar") }}<strong>{{ instance_name }}</strong></span>
+        <strong class="system-server-version">{{ xpanel_build }}</strong>
+      </div>
+      <div class="system-server-subline"><span>SG-Panel Core</span><span>{{ instance_address or 'Адрес не определён' }}</span></div>
     </a>
+    <button class="sidebar-collapse" type="button" data-sidebar-toggle aria-label="Свернуть меню" title="Свернуть меню"><span aria-hidden="true">←</span><b>Свернуть меню</b></button>
     <form method="post" action="{{ url_for('logout') }}" class="logout-form">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <button class="logout-button" type="submit">
@@ -97,20 +144,19 @@
     </form>
   </aside>
 
-  <main class="content">
-    <header class="topbar awg-style-topbar">
-      <div class="topbar-heading"><p class="eyebrow">SG-PANEL / {% block section %}CONTROL{% endblock %}</p><h1>{% block heading %}Панель управления{% endblock %}</h1><p class="page-subtitle">{% block subtitle %}Локальное управление конфигурацией Xray{% endblock %}</p></div>
+  <div class="workspace">
+    <header class="global-topbar">
+      <div class="global-topbar-spacer"></div>
       <div class="topbar-actions">
-        <span class="instance-badge" title="Имя и публичный адрес этого сервера">{{ instance_identity }}</span><span class="topbar-version">v{{ xpanel_version }}</span>
+        <span class="instance-badge" title="Имя и публичный адрес этого сервера"><small>ТЕКУЩИЙ СЕРВЕР</small><b>{{ country_flag(instance_country_code, "country-flag country-flag-topbar") }}{{ instance_name }}</b><em>{{ instance_address or 'Адрес не определён' }}</em></span>
+        <span class="topbar-version">{{ xpanel_build }}</span>
         <a class="system-pill {{ 'ok' if global_system_ok else 'attention' }}" href="{{ url_for('diagnostics_page') }}?tab=status" title="Открыть System → Status & Services"><span class="status-dot"></span><span>{{ 'СИСТЕМА В НОРМЕ' if global_system_ok else 'ТРЕБУЕТСЯ ПРОВЕРКА' }}</span></a>
-        <div class="theme-control" data-theme-control>
-          <button class="icon-button theme-button" type="button" aria-label="Сменить тему" title="Тема: Графит" data-theme-button><span data-theme-icon>◒</span></button>
-          <div class="theme-menu" data-theme-menu>
-            <button type="button" data-theme-choice="graphite"><span>◒</span><b>Графит</b></button>
-            <button type="button" data-theme-choice="light"><span>☀</span><b>Латте</b></button>
-          </div>
+        <div class="theme-control theme-control-direct" data-theme-control>
+          <button class="theme-chip theme-button theme-icon-only" type="button" aria-label="Включить тёмную тему" title="Включить тёмную тему" data-theme-button>
+            <svg class="theme-mode-icon theme-mode-icon-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.2 15.2A8.4 8.4 0 0 1 8.8 3.8a8.8 8.8 0 1 0 11.4 11.4Z"></path></svg>
+            <svg class="theme-mode-icon theme-mode-icon-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.65 17.65l1.42 1.42M2 12h2M20 12h2M4.93 19.07l1.42-1.42M17.65 6.35l1.42-1.42"></path></svg>
+          </button>
         </div>
-        <a class="icon-button" href="{{ url_for('help_page') }}" aria-label="Открыть справку" title="Справка SG-Panel">?</a>
         <div class="account-control" data-account-control>
           <button class="account-button" type="button" data-account-button><span>admin</span><span>⌄</span></button>
           <div class="account-menu" data-account-menu>
@@ -121,39 +167,45 @@
       </div>
     </header>
 
+    <main class="content">
+      <header class="topbar page-header awg-style-topbar">
+        <div class="topbar-heading"><p class="eyebrow">SG-PANEL / {% block section %}CONTROL{% endblock %}</p><h1>{% block heading %}Панель управления{% endblock %}</h1><p class="page-subtitle">{% block subtitle %}Локальное управление конфигурацией Xray{% endblock %}</p></div>
+        <div class="topbar-page-actions">{% block page_actions %}{% endblock %}</div>
+      </header>
+
+    {% if not is_xray and not is_routing and (is_system or is_nodes or is_cascade or is_clients or is_expert or is_security or is_maintenance or is_help) %}
     <nav class="section-tabs" aria-label="Раздел">
       {% if is_system %}
-        <a class="{% if endpoint == 'dashboard' %}active{% endif %}" href="{{ url_for('dashboard') }}">Resources</a>
-        <a class="{% if endpoint.startswith('diagnostics_') and request.args.get('tab','status') != 'logs' %}active{% endif %}" href="{{ url_for('diagnostics_page') }}?tab=status">Status &amp; Services</a>
-        <a class="{% if endpoint.startswith('diagnostics_') and request.args.get('tab') == 'logs' %}active{% endif %}" href="{{ url_for('diagnostics_page') }}?tab=logs">Logs &amp; Diagnostics</a>
+        <a class="{% if endpoint == 'dashboard' %}active{% endif %}" href="{{ url_for('dashboard') }}"><span class="section-tab-label">Resources</span></a>
+        <a class="{% if endpoint.startswith('diagnostics_') and request.args.get('tab','status') != 'logs' %}active{% endif %}" href="{{ url_for('diagnostics_page') }}?tab=status"><span class="section-tab-label">Status &amp; Services</span></a>
+        <a class="{% if endpoint.startswith('diagnostics_') and request.args.get('tab') == 'logs' %}active{% endif %}" href="{{ url_for('diagnostics_page') }}?tab=logs"><span class="section-tab-label">Logs &amp; Diagnostics</span></a>
       {% elif is_nodes %}
-        <a class="{% if endpoint == 'nodes_page' %}active{% endif %}" href="{{ url_for('nodes_page') }}">Все серверы</a>
-        {% if endpoint.startswith('node_') and endpoint != 'nodes_page' %}<a class="active" href="{{ request.path }}">Карточка сервера</a>{% endif %}
+        <a class="{% if endpoint == 'nodes_page' %}active{% endif %}" href="{{ url_for('nodes_page') }}"><span class="section-tab-label">Все серверы</span></a>
+        {% if endpoint.startswith('node_') and endpoint != 'nodes_page' %}<a class="active" href="{{ request.path }}"><span class="section-tab-label">Карточка сервера</span></a>{% endif %}
       {% elif is_cascade %}
-        <a class="active" href="{{ url_for('cascade_page') }}">Каскад</a>
-        <a href="{{ url_for('outbounds_page') }}">Экспертные Outbounds</a>
+        <a class="active" href="{{ url_for('cascade_page') }}"><span class="section-tab-label">Каскад</span></a>
+        <a href="{{ url_for('outbounds_page') }}"><span class="section-tab-label">Экспертные Outbounds</span></a>
       {% elif is_clients %}
-        <a class="{% if not endpoint.startswith('subscriptions_') and endpoint != 'subscriptions_page' and not endpoint.startswith('user_subscription_') %}active{% endif %}" href="{{ url_for('users_page') }}">Clients</a>
-        <a class="{% if endpoint.startswith('subscriptions_') or endpoint == 'subscriptions_page' or endpoint.startswith('user_subscription_') %}active{% endif %}" href="{{ url_for('subscriptions_page') }}">Subscriptions</a>
-      {% elif is_xray %}
-        <a class="{% if endpoint == 'settings_page' %}active{% endif %}" href="{{ url_for('settings_page') }}">Inbound</a>
-        <a class="{% if endpoint.startswith('config_') or endpoint == 'config_page' %}active{% endif %}" href="{{ url_for('config_page') }}">Xray Config</a>
-        <a class="{% if is_advanced %}active{% endif %}" href="{{ url_for('settings_advanced_page') }}">Дополнительно</a>
-      {% elif is_routing %}
-        <a class="{% if endpoint.startswith('routing_') or endpoint == 'routing_page' %}active{% endif %}" href="{{ url_for('routing_page') }}">Traffic Rules</a>
-        <a class="{% if endpoint.startswith('outbound_') or endpoint == 'outbounds_page' or endpoint.startswith('warp_') %}active{% endif %}" href="{{ url_for('outbounds_page') }}">Outbounds</a>
-        <a class="{% if endpoint.startswith('dns_') or endpoint == 'dns_page' %}active{% endif %}" href="{{ url_for('dns_page') }}">DNS</a>
-        <a class="{% if endpoint == 'geofiles_page' or endpoint.startswith('settings_geofiles') %}active{% endif %}" href="{{ url_for('geofiles_page') }}">GeoFiles</a>
+        <a class="{% if not endpoint.startswith('subscriptions_') and endpoint != 'subscriptions_page' and not endpoint.startswith('user_subscription_') %}active{% endif %}" href="{{ url_for('users_page') }}"><span class="section-tab-label">Clients</span></a>
+        <a class="{% if endpoint.startswith('subscriptions_') or endpoint == 'subscriptions_page' or endpoint.startswith('user_subscription_') %}active{% endif %}" href="{{ url_for('subscriptions_page') }}"><span class="section-tab-label">Subscriptions</span></a>
+      {% elif is_expert %}
+        <a class="{% if is_advanced %}active{% endif %}" href="{{ url_for('settings_advanced_page') }}"><span class="section-tab-label">Подключения</span></a>
+        <a class="{% if is_expert_inbound %}active{% endif %}" href="{{ url_for('settings_expert_inbound_page') }}"><span class="section-tab-label">Резервные Inbound</span></a>
+        <a class="{% if endpoint.startswith('config_') or endpoint == 'config_page' %}active{% endif %}" href="{{ url_for('config_page') }}"><span class="section-tab-label">Xray Config</span></a>
       {% elif is_security %}
-        <a class="active" href="{{ url_for('security_page') }}">Panel Access &amp; Security</a>
+        <a class="active" data-security-tab="access" href="{{ url_for('security_page') }}#panel-access"><span class="section-tab-label">Доступ к панели</span></a>
+        <a data-security-tab="credentials" href="{{ url_for('security_page') }}#password-ip"><span class="section-tab-label">Пароль и IP</span></a>
+        <a data-security-tab="sessions" href="{{ url_for('security_page') }}#sessions"><span class="section-tab-label">Сессии</span></a>
+        <a data-security-tab="history" href="{{ url_for('security_page') }}#login-history"><span class="section-tab-label">Журнал входов</span></a>
       {% elif is_maintenance %}
-        <a class="{% if endpoint.startswith('backups_') or endpoint == 'backups_page' %}active{% endif %}" href="{{ url_for('backups_page') }}">Backups</a>
-        <a class="{% if endpoint.startswith('updates_') or endpoint == 'updates_page' %}active{% endif %}" href="{{ url_for('updates_page') }}">Updates</a>
+        <a class="{% if endpoint.startswith('backups_') or endpoint == 'backups_page' %}active{% endif %}" href="{{ url_for('backups_page') }}"><span class="section-tab-label">Backups</span></a>
+        <a class="{% if endpoint.startswith('updates_') or endpoint == 'updates_page' %}active{% endif %}" href="{{ url_for('updates_page') }}"><span class="section-tab-label">Updates</span></a>
       {% elif is_help %}
-        <a class="active" href="{{ url_for('help_page') }}">Справка SG-Panel</a>
-        <a href="{{ url_for('diagnostics_page') }}?tab=status">Диагностика</a>
+        <a class="active" href="{{ url_for('help_page') }}"><span class="section-tab-label">Справка SG-Panel</span></a>
+        <a href="{{ url_for('diagnostics_page') }}?tab=status"><span class="section-tab-label">Диагностика</span></a>
       {% endif %}
     </nav>
+    {% endif %}
 
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% if messages %}<div class="flash-stack" aria-live="polite">
@@ -164,32 +216,107 @@
     {% block content %}{% endblock %}
 
     <footer class="app-footer"><span>© 2026 SG-Panel · Ser.Gor</span><span>Собственный Xray-сервер · SQLite · validate-first</span></footer>
-  </main>
+    </main>
+  </div>
 </div>
+<dialog id="sg-global-dialog" class="sg-global-dialog" aria-labelledby="sg-global-dialog-title">
+  <form method="dialog">
+    <header><span class="sg-dialog-mark" data-sg-dialog-mark>?</span><div><p class="panel-kicker">SG-PANEL</p><h2 id="sg-global-dialog-title" data-sg-dialog-title>Подтверждение</h2></div></header>
+    <p data-sg-dialog-message></p>
+    <div class="ui-actions"><button class="button ghost" value="cancel" data-sg-dialog-cancel>Отмена</button><button class="button primary" value="ok" data-sg-dialog-ok>Продолжить</button></div>
+  </form>
+</dialog>
+  <span class="instance-identity-compat" hidden>{{ instance_identity }}</span>
+<script>
+(() => {
+  const dialog = document.getElementById('sg-global-dialog');
+  const title = dialog?.querySelector('[data-sg-dialog-title]');
+  const message = dialog?.querySelector('[data-sg-dialog-message]');
+  const mark = dialog?.querySelector('[data-sg-dialog-mark]');
+  const cancel = dialog?.querySelector('[data-sg-dialog-cancel]');
+  const ok = dialog?.querySelector('[data-sg-dialog-ok]');
+  let resolveCurrent = null;
+  const open = (text, options={}) => new Promise(resolve => {
+    if (!dialog) { resolve(options.alert ? true : false); return; }
+    if (dialog.open) dialog.close('cancel');
+    resolveCurrent = resolve;
+    title.textContent = options.title || (options.alert ? 'Сообщение' : 'Подтверждение действия');
+    message.textContent = String(text || '');
+    mark.textContent = options.alert ? 'i' : '!';
+    cancel.hidden = Boolean(options.alert);
+    ok.textContent = options.okLabel || (options.alert ? 'Закрыть' : 'Продолжить');
+    dialog.showModal();
+  });
+  dialog?.addEventListener('close', () => { const value=dialog.returnValue==='ok'; const resolve=resolveCurrent; resolveCurrent=null; if(resolve) resolve(value); });
+  window.sgDialogConfirm = (text, options={}) => open(text, options);
+  window.sgDialogAlert = (text, options={}) => open(text, {...options, alert:true});
+  document.addEventListener('click', async event => {
+    const button=event.target.closest('[data-confirm-button]');
+    if(!button) return;
+    event.preventDefault();
+    const accepted=await window.sgDialogConfirm(button.dataset.confirmButton);
+    if(accepted) button.closest('form')?.requestSubmit(button);
+  });
+  document.addEventListener('submit', async event => {
+    const form=event.target.closest('form[data-confirm]');
+    if(!form || form.dataset.confirmApproved==='1') return;
+    event.preventDefault();
+    const accepted=await window.sgDialogConfirm(form.dataset.confirm, {okLabel: form.dataset.confirmLabel || 'Продолжить'});
+    if(!accepted) return;
+    form.dataset.confirmApproved='1';
+    if(form.requestSubmit) form.requestSubmit(event.submitter || undefined); else form.submit();
+  });
+})();
+</script>
+<script>
+(() => {
+  const shell = document.querySelector('.shell');
+  const button = document.querySelector('[data-sidebar-toggle]');
+  if (!shell || !button) return;
+  const apply = (collapsed) => {
+    shell.classList.toggle('sidebar-collapsed', collapsed);
+    button.setAttribute('aria-label', collapsed ? 'Развернуть меню' : 'Свернуть меню');
+    button.title = collapsed ? 'Развернуть меню' : 'Свернуть меню';
+    const icon = button.querySelector('span');
+    const label = button.querySelector('b');
+    if (icon) icon.textContent = collapsed ? '→' : '←';
+    if (label) label.textContent = collapsed ? 'Развернуть меню' : 'Свернуть меню';
+  };
+  apply(localStorage.getItem('sg-panel-sidebar') === 'collapsed');
+  button.addEventListener('click', () => {
+    const collapsed = !shell.classList.contains('sidebar-collapsed');
+    localStorage.setItem('sg-panel-sidebar', collapsed ? 'collapsed' : 'expanded');
+    apply(collapsed);
+  });
+})();
+</script>
 <script>
 (() => {
   const root = document.documentElement;
-  const choices = {graphite: ['◒', 'Графит'], light: ['☀', 'Латте']};
   const apply = mode => {
-    const safe = choices[mode] ? mode : 'graphite';
+    const safe = mode === 'light' ? 'light' : 'graphite';
     root.dataset.theme = safe;
     root.dataset.resolvedTheme = safe === 'light' ? 'light' : 'dark';
     localStorage.setItem('sg-panel-theme', safe);
-    const icon = document.querySelector('[data-theme-icon]');
     const button = document.querySelector('[data-theme-button]');
-    if (icon) icon.textContent = choices[safe][0];
-    if (button) button.title = 'Тема: ' + choices[safe][1];
-    document.querySelectorAll('[data-theme-choice]').forEach(item => item.classList.toggle('active', item.dataset.themeChoice === safe));
+    const nextIsDark = safe === 'light';
+    if (button) {
+      const text = nextIsDark ? 'Включить тёмную тему' : 'Включить светлую тему';
+      button.title = text;
+      button.setAttribute('aria-label', text);
+    }
     const meta = document.getElementById('themeColorMeta');
-    if (meta) meta.content = safe === 'graphite' ? '#0E1723' : '#D8CEC2';
+    if (meta) meta.content = safe === 'graphite' ? '#111B28' : '#E5ECE7';
   };
   apply(root.dataset.theme || 'graphite');
-  const themeControl = document.querySelector('[data-theme-control]');
   const accountControl = document.querySelector('[data-account-control]');
-  document.querySelector('[data-theme-button]')?.addEventListener('click', event => { event.stopPropagation(); themeControl?.classList.toggle('open'); accountControl?.classList.remove('open'); });
-  document.querySelector('[data-account-button]')?.addEventListener('click', event => { event.stopPropagation(); accountControl?.classList.toggle('open'); themeControl?.classList.remove('open'); });
-  document.querySelectorAll('[data-theme-choice]').forEach(button => button.addEventListener('click', () => { apply(button.dataset.themeChoice); themeControl?.classList.remove('open'); }));
-  document.addEventListener('click', () => { themeControl?.classList.remove('open'); accountControl?.classList.remove('open'); });
+  document.querySelector('[data-theme-button]')?.addEventListener('click', event => {
+    event.stopPropagation();
+    apply(root.dataset.theme === 'light' ? 'graphite' : 'light');
+    accountControl?.classList.remove('open');
+  });
+  document.querySelector('[data-account-button]')?.addEventListener('click', event => { event.stopPropagation(); accountControl?.classList.toggle('open'); });
+  document.addEventListener('click', () => accountControl?.classList.remove('open'));
 })();
 </script>
 <script>

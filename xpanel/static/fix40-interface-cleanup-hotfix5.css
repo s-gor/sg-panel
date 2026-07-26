@@ -1,0 +1,120 @@
+/* SG-Panel Preview 9 · FIX40 Interface Cleanup Hotfix 5
+   Confirmed visual corrections only: System tabs, diagnostics logs, Cluster onboarding,
+   Outbounds identity/summary cleanup and Routing workspace cleanup. */
+
+/* System navigation: three equal real buttons, no underline. */
+body.preview-9-rc6-typography:is(.dashboard-page,.diagnostics-page) .section-tabs {
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 180px)) !important;
+  justify-content: start !important;
+  gap: 10px !important;
+  width: min(100%, 560px) !important;
+  max-width: none !important;
+  margin: -4px 0 24px !important;
+  padding: 0 !important;
+  overflow: visible !important;
+  border: 0 !important;
+  background: transparent !important;
+}
+body.preview-9-rc6-typography:is(.dashboard-page,.diagnostics-page) .section-tabs a {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-sizing: border-box !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  min-height: 44px !important;
+  padding: 10px 12px !important;
+  color: #fff !important;
+  border: 1px solid color-mix(in srgb, var(--sg-jade) 78%, #20382f) !important;
+  border-radius: 10px !important;
+  background: color-mix(in srgb, var(--sg-jade) 88%, #6f8c7d) !important;
+  box-shadow: 0 5px 14px rgba(38, 66, 54, .14) !important;
+  font-size: 12px !important;
+  font-weight: 800 !important;
+  text-align: center !important;
+}
+body.preview-9-rc6-typography:is(.dashboard-page,.diagnostics-page) .section-tabs a:hover {
+  color: #fff !important;
+  background: color-mix(in srgb, var(--sg-jade-strong) 92%, #718d80) !important;
+}
+body.preview-9-rc6-typography:is(.dashboard-page,.diagnostics-page) .section-tabs a.active {
+  color: #fff !important;
+  border-color: color-mix(in srgb, var(--sg-jade-strong) 82%, #223d32) !important;
+  background: var(--sg-jade-strong) !important;
+  box-shadow: 0 6px 16px rgba(38, 66, 54, .20) !important;
+}
+html[data-resolved-theme="dark"] body.preview-9-rc6-typography:is(.dashboard-page,.diagnostics-page) .section-tabs a {
+  color: #fff !important;
+  border-color: #587087 !important;
+  background: #41586f !important;
+  box-shadow: 0 5px 14px rgba(5, 12, 20, .24) !important;
+}
+html[data-resolved-theme="dark"] body.preview-9-rc6-typography:is(.dashboard-page,.diagnostics-page) .section-tabs a:hover {
+  background: #4b6680 !important;
+}
+html[data-resolved-theme="dark"] body.preview-9-rc6-typography:is(.dashboard-page,.diagnostics-page) .section-tabs a.active {
+  border-color: #7892aa !important;
+  background: #58738d !important;
+}
+
+/* Logs: the gaps between cards must never expose the dark console background. */
+body.diagnostics-page .diagnostics-log-console {
+  background: var(--panel) !important;
+}
+body.diagnostics-page .diagnostic-log-accordion-list {
+  gap: 10px !important;
+  background: transparent !important;
+}
+html[data-resolved-theme="light"] body.diagnostics-page .diagnostics-log-console {
+  background: var(--lux-surface-hi, #f7f3eb) !important;
+}
+html[data-resolved-theme="light"] body.diagnostics-page .diagnostic-log-panel {
+  background: var(--lux-surface-mid, #eee7dc) !important;
+}
+
+/* Cluster: onboarding is permanently visible; no reveal badge or close button. */
+.cluster-stage4-onboarding.is-always-open {
+  overflow: hidden !important;
+  padding: 0 !important;
+}
+.cluster-stage4-onboarding-header {
+  display: flex !important;
+  align-items: center !important;
+  min-height: 78px !important;
+  padding: 17px 20px !important;
+  border-bottom: 1px solid var(--line-soft) !important;
+}
+.cluster-stage4-onboarding-header > div { min-width: 0; }
+.cluster-stage4-onboarding-header strong,
+.cluster-stage4-onboarding-header small { display: block; }
+.cluster-stage4-onboarding-header strong {
+  margin-top: 3px;
+  color: var(--text) !important;
+  font-size: 15px;
+}
+.cluster-stage4-onboarding-header small {
+  margin-top: 4px;
+  color: var(--muted) !important;
+  font-size: 10.5px;
+}
+.cluster-stage4-onboarding.is-always-open .cluster-stage4-onboarding-body {
+  padding-top: 18px !important;
+  border-top: 0 !important;
+}
+
+/* Outbounds and Routing: start with useful content, not duplicate summaries. */
+body.outbounds-page .outbound-context-metrics { display: none !important; }
+body.routing-fix40-simple .routing-simple-tabs,
+body.routing-fix40-simple .routing-status-strip,
+body.routing-fix40-simple .routing-simple-footer { display: none !important; }
+body.routing-fix40-simple .routing-clean-workspace {
+  gap: 14px !important;
+}
+
+@media (max-width: 720px) {
+  body.preview-9-rc6-typography:is(.dashboard-page,.diagnostics-page) .section-tabs {
+    grid-template-columns: 1fr !important;
+    width: 100% !important;
+  }
+}

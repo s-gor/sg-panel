@@ -17,11 +17,12 @@ from pathlib import Path
 from typing import Any
 
 AGENT_VERSION = "0.5.0"
-WORKER_VERSION = "0.5.0"
+WORKER_VERSION = "0.7.0"
 CONFIG_PATH = Path(os.environ.get("SG_NODE_CONFIG", "/etc/sg-node/agent.json"))
 DEFAULT_INTERVAL = 30
 JOBS_DIR = Path("/var/lib/sg-node/jobs")
 XRAY_CONFIG = Path("/usr/local/etc/xray/config.json")
+GEOFILES_ACTIVE_MANIFEST = Path("/var/lib/sg-node/geofiles/active-manifest.json")
 
 
 def load_config() -> dict[str, Any]:
@@ -262,8 +263,10 @@ def inspect_xray_config() -> tuple[str, int | None]:
         stream = inbound.get("streamSettings")
         network = str(stream.get("network") or "").lower() if isinstance(stream, dict) else ""
         security = str(stream.get("security") or "").lower() if isinstance(stream, dict) else ""
-        if protocol == "vless" and security == "reality":
-            profiles.add("VLESS REALITY")
+        if protocol == "vless" and network == "xhttp" and security == "reality":
+            profiles.add("VLESS XHTTP REALITY")
+        elif protocol == "vless" and security == "reality":
+            profiles.add("VLESS REALITY TCP")
         elif protocol == "vless" and network == "xhttp":
             profiles.add("VLESS XHTTP")
         elif protocol == "hysteria":
@@ -280,6 +283,33 @@ def inspect_xray_config() -> tuple[str, int | None]:
     return " + ".join(sorted(profiles)), len(clients)
 
 
+def inspect_geofiles() -> dict[str, str]:
+    try:
+        manifest = json.loads(GEOFILES_ACTIVE_MANIFEST.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {
+            "geofiles_generation": "",
+            "geofiles_source": "",
+            "geofiles_geoip_sha256": "",
+            "geofiles_geosite_sha256": "",
+        }
+    if not isinstance(manifest, dict):
+        return {
+            "geofiles_generation": "",
+            "geofiles_source": "",
+            "geofiles_geoip_sha256": "",
+            "geofiles_geosite_sha256": "",
+        }
+    geoip = manifest.get("geoip") if isinstance(manifest.get("geoip"), dict) else {}
+    geosite = manifest.get("geosite") if isinstance(manifest.get("geosite"), dict) else {}
+    return {
+        "geofiles_generation": str(manifest.get("generation") or "")[:128],
+        "geofiles_source": str(manifest.get("source") or "")[:80],
+        "geofiles_geoip_sha256": str(geoip.get("sha256") or "")[:64],
+        "geofiles_geosite_sha256": str(geosite.get("sha256") or "")[:64],
+    }
+
+
 def collect_metadata(last_error: str = "") -> dict[str, Any]:
     os_name, os_version = read_os_release()
     try:
@@ -287,6 +317,7 @@ def collect_metadata(last_error: str = "") -> dict[str, Any]:
     except (AttributeError, OSError):
         load1 = 0.0
     inbound_profile, client_count = inspect_xray_config()
+    geofiles = inspect_geofiles()
     return {
         "public_address": public_address(),
         "platform": os_name,
@@ -302,6 +333,7 @@ def collect_metadata(last_error: str = "") -> dict[str, Any]:
         "nginx_version": command_version(["nginx", "-v"]),
         "nginx_state": service_state("nginx.service"),
         "inbound_profile": inbound_profile,
+        **geofiles,
         "client_count": client_count,
         "cpu_percent": cpu_percent(),
         "memory_percent": memory_percent(),

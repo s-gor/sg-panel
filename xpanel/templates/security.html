@@ -5,15 +5,11 @@
 {% block subtitle %}Безопасность панели: доступ, сессии, IP allowlist и подписки{% endblock %}
 {% block content %}
 <!-- ADMIN SESSIONS -->
-<script>document.body.classList.add('ui-standard-page','security-page');</script>
+<script>document.body.classList.add('ui-standard-page','security-page','latte-compact-page');</script>
 <div class="ui-page ui-page-wide">
-  <section class="ui-security-summary">
-    <article class="ui-status-card"><span>Активные сессии</span><strong>{{ overview.active_sessions }}</strong><small>Текущая отмечена в таблице</small></article>
-    <article class="ui-status-card"><span>Ошибки входа, 24 ч</span><strong>{{ overview.failed_logins_24h }}</strong><small>Блокировка работает по IP</small></article>
-    <article class="ui-status-card"><span>Panel exposure</span><strong class="{{ 'text-success' if panel_exposure.status == 'ready' else 'text-warning' }}">{{ panel_exposure.label }}</strong><small>{{ panel_access.mode|upper }} · {{ panel_access.host }}:{{ panel_access.port }}</small></article>
-    <article class="ui-status-card"><span>Panel backend</span><strong class="ui-value-compact mono">{{ panel_bind }}:{{ panel_port }}</strong><small>Текущий IP: {{ current_ip }}</small></article>
-  </section>
-
+  <div class="ui-card security-status-card security-status-card-wide" hidden></div>
+  <section class="security-tab-panel is-active" data-security-tab-panel="access">
+  <div class="security-access-grid" id="panel-access">
   <section class="ui-card ui-action-card panel-access-card">
     <header class="ui-card-heading ui-card-heading-row">
       <div>
@@ -180,7 +176,11 @@
   })();
   </script>
 
-  <section class="ui-card ui-action-card security-password-card">
+  </div>
+  </section>
+
+  <section class="security-tab-panel" data-security-tab-panel="credentials">
+  <section class="ui-card ui-action-card security-password-card" id="password-ip">
     <header class="ui-card-heading"><div><p class="panel-kicker">ДОСТУП К ПАНЕЛИ</p><h2>Сменить пароль</h2><p>После смены пароля все административные сессии будут завершены.</p></div></header>
     <form method="post" action="{{ url_for('settings_password') }}" class="ui-form ui-password-form">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -193,7 +193,7 @@
     </form>
   </section>
 
-  <section class="ui-card security-status-card security-status-card-wide">
+  <details class="ui-card security-status-card security-status-card-wide security-technical-summary"><summary><span><b>Техническое состояние доступа</b><small>Backend, secure cookie, allowlist и SSH-туннель</small></span><em>Открыть</em></summary><div class="security-technical-body">
     <header class="ui-card-heading"><div><p class="panel-kicker">СОСТОЯНИЕ</p><h2>Текущие предупреждения</h2><p>Проверка основных параметров доступа к панели.</p></div></header>
     <div class="security-checks security-checks-grid">
       <div class="security-check {% if panel_access.mode == 'https' %}ok{% else %}warn{% endif %}"><strong>Public access</strong><span>{{ panel_access.mode|upper }} · {{ panel_access.host }}:{{ panel_access.port }}</span></div>
@@ -205,12 +205,13 @@
       <div class="ui-warning-note"><span>!</span><p>HTTP подходит для локальной VM или доступа через SSH-туннель. Для публичного сервера включите HTTPS либо ограничьте порт своим IP.</p></div>
       <pre class="command-box">ssh -L {{ panel_access.port }}:127.0.0.1:{{ panel_access.port }} user@SERVER_IP</pre>
     </div>
-  </section>
+    </div>
+  </details>
 
-  <form method="post" action="{{ url_for('security_settings_save') }}" class="ui-form security-settings-stack">
+  <form method="post" action="{{ url_for('security_settings_save') }}" class="ui-form security-settings-stack" id="security-policy-form">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
-    <section class="ui-card security-settings-card">
+    <section class="ui-card security-settings-card" id="password-ip-policy">
       <header class="ui-card-heading"><div><p class="panel-kicker">ПОЛИТИКА ДОСТУПА</p><h2>Вход и сессии</h2><p>Ограничения входа, срок сессии и сетевой доступ к панели.</p></div></header>
       <div class="security-settings-body">
         <div class="ui-field-grid security-fields">
@@ -225,7 +226,7 @@
       </div>
     </section>
 
-    <section class="ui-card security-settings-card security-subscriptions-card">
+    <section class="ui-card security-settings-card">
       <header class="ui-card-heading"><div><p class="panel-kicker">ПОДПИСКИ</p><h2>Публичные подписки</h2><p>Форматы выдачи и отдельные сетевые ограничения для клиентских ссылок.</p></div></header>
       <div class="security-settings-body">
         <div class="security-subscription-options">
@@ -238,15 +239,19 @@
       </div>
     </section>
   </form>
+  </section>
 
-  <section class="ui-card ui-table-card">
-    <header class="ui-card-heading ui-card-heading-row"><div><p class="panel-kicker">СЕССИИ</p><h2>Активные и завершённые сессии</h2><p>История входов и возможность немедленно закрыть доступ.</p></div><div class="ui-actions"><form method="post" action="{{ url_for('security_sessions_revoke_all') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button ghost small" type="submit">Завершить остальные</button></form><form method="post" action="{{ url_for('security_sessions_revoke_all') }}" onsubmit="return confirm('Будет завершена и текущая сессия. Продолжить?')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="include_current" value="1"><button class="button danger small" type="submit">Завершить все</button></form></div></header>
+  <section class="security-tab-panel" data-security-tab-panel="sessions">
+  <section class="ui-card ui-table-card" id="sessions">
+    <header class="ui-card-heading ui-card-heading-row"><div><p class="panel-kicker">СЕССИИ</p><h2>Активные и завершённые сессии</h2><p>История входов и возможность немедленно закрыть доступ.</p></div><div class="ui-actions"><form method="post" action="{{ url_for('security_sessions_revoke_all') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button ghost small" type="submit">Завершить остальные</button></form><form method="post" action="{{ url_for('security_sessions_revoke_all') }}" data-confirm="Будет завершена и текущая сессия. Продолжить?"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="include_current" value="1"><button class="button danger small" type="submit">Завершить все</button></form></div></header>
     <div class="table-wrap"><table><thead><tr><th>Состояние</th><th>IP</th><th>Создана</th><th>Последняя активность</th><th>Браузер</th><th></th></tr></thead><tbody>
     {% for item in sessions %}<tr><td>{% if item.id == current_session_id %}<span class="pill enabled"><i></i>Текущая</span>{% elif not item.revoked_at %}<span class="pill enabled"><i></i>Активна</span>{% else %}<span class="pill disabled"><i></i>Завершена</span>{% endif %}</td><td class="mono">{{ item.ip_address }}</td><td>{{ item.created_at }}</td><td>{{ item.last_seen_at }}</td><td class="ua-cell">{{ item.user_agent or '—' }}</td><td>{% if not item.revoked_at %}<form method="post" action="{{ url_for('security_session_revoke', session_id=item.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button danger small" type="submit">Завершить</button></form>{% endif %}</td></tr>{% endfor %}
     </tbody></table></div>
   </section>
+  </section>
 
-  <section class="ui-top-grid security-history-grid">
+  <section class="security-tab-panel" data-security-tab-panel="history">
+  <section class="ui-top-grid security-history-grid" id="login-history">
     <article class="ui-card ui-table-card security-history-card">
       <header class="ui-card-heading"><div><p class="panel-kicker">ВХОДЫ</p><h2>Последние попытки входа</h2><p>Успешные и неуспешные попытки.</p></div></header>
       <div class="security-history-table-shell">
@@ -264,5 +269,26 @@
       </div>
     </article>
   </section>
+  </section>
 </div>
+<script>
+(() => {
+  const panels = [...document.querySelectorAll('[data-security-tab-panel]')];
+  const links = [...document.querySelectorAll('[data-security-tab]')];
+  if (!panels.length || !links.length) return;
+  const hashMap = {'#panel-access':'access','#password-ip':'credentials','#password-ip-policy':'credentials','#sessions':'sessions','#login-history':'history'};
+  const activate = (name, updateHash = false) => {
+    if (!panels.some((panel) => panel.dataset.securityTabPanel === name)) name = 'access';
+    panels.forEach((panel) => { panel.hidden = panel.dataset.securityTabPanel !== name; panel.classList.toggle('is-active', panel.dataset.securityTabPanel === name); });
+    links.forEach((link) => link.classList.toggle('active', link.dataset.securityTab === name));
+    if (updateHash) {
+      const target = links.find((link) => link.dataset.securityTab === name);
+      if (target) history.replaceState(null, '', target.hash);
+    }
+  };
+  links.forEach((link) => link.addEventListener('click', (event) => { event.preventDefault(); activate(link.dataset.securityTab, true); window.scrollTo({top:0, behavior:'smooth'}); }));
+  activate(hashMap[location.hash] || 'access');
+  window.addEventListener('hashchange', () => activate(hashMap[location.hash] || 'access'));
+})();
+</script>
 {% endblock %}

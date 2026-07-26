@@ -2,7 +2,17 @@
 set -Eeuo pipefail
 
 SCRIPT_VERSION="1.0"
-XRAY_VERSION="v26.5.9"
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+XRAY_VERSION_FILE="$SCRIPT_DIR/xray-version.env"
+if [[ -z "${XRAY_VERSION:-}" ]]; then
+  if [[ -r "$XRAY_VERSION_FILE" ]]; then
+    # shellcheck disable=SC1090
+    source "$XRAY_VERSION_FILE"
+  else
+    XRAY_VERSION="__SG_PANEL_XRAY_VERSION__"
+  fi
+fi
+[[ "${XRAY_VERSION:-}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "не удалось определить проверенную версию Xray" >&2; exit 1; }
 LOG_FILE="/var/log/sg-node-runtime-install.log"
 STATE_FILE="/etc/sg-node/runtime.env"
 GREEN=$'\033[0;32m'

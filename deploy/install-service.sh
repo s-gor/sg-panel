@@ -34,6 +34,8 @@ mkdir -p \
   "$PROJECT_DIR/data" \
   "$PROJECT_DIR/backups" \
   /usr/local/etc/xray \
+  /usr/local/share/xray \
+  /usr/share/xray \
   /etc/nginx \
   /var/www/sg-panel-placeholder \
   /var/lib/sg-panel-update
@@ -60,7 +62,7 @@ NoNewPrivileges=false
 PrivateTmp=true
 ProtectHome=true
 ProtectSystem=full
-ReadWritePaths=$PROJECT_DIR/data $PROJECT_DIR/backups /etc/xpanel-mvp /usr/local/etc/xray /etc/nginx /var/www/sg-panel-placeholder /var/lib/sg-panel-update
+ReadWritePaths=$PROJECT_DIR/data $PROJECT_DIR/backups /etc/xpanel-mvp /usr/local/etc/xray /usr/local/share/xray /usr/share/xray /etc/nginx /var/www/sg-panel-placeholder /var/lib/sg-panel-update
 
 [Install]
 WantedBy=multi-user.target
@@ -77,6 +79,16 @@ cd "$PROJECT_DIR"
 exec .venv/bin/python -m xpanel sync-hysteria-tls --restart
 EOF_HOOK
 chmod 0755 /etc/letsencrypt/renewal-hooks/deploy/sync-sg-panel-hysteria-tls.sh
+
+cat > /usr/local/bin/sg-panel <<'EOF_CLI'
+#!/usr/bin/env bash
+set -Eeuo pipefail
+PROJECT_DIR="/opt/xpanel-mvp"
+[[ -x "$PROJECT_DIR/.venv/bin/python" ]] || { echo "Ошибка: SG-Panel не установлен" >&2; exit 1; }
+cd "$PROJECT_DIR"
+exec .venv/bin/python -m xpanel.admin_cli "$@"
+EOF_CLI
+chmod 0755 /usr/local/bin/sg-panel
 
 systemctl daemon-reload
 systemctl enable xpanel-web >/dev/null

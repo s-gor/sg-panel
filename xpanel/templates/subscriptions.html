@@ -1,96 +1,40 @@
 {% extends "base.html" %}
 {% block title %}Подписки — SG-Panel{% endblock %}
 {% block section %}CLIENTS{% endblock %}
-{% block heading %}Clients{% endblock %}
-{% block subtitle %}Постоянные ссылки для автоматического обновления текущего Inbound-профиля и всех включённых Hysteria 2 Inbound{% endblock %}
+{% block heading %}Subscriptions{% endblock %}
+{% block subtitle %}Отдельная постоянная подписка для каждого доступа и устройства{% endblock %}
 {% block content %}
-<script>document.body.classList.add('ui-standard-page','subscriptions-page');</script>
+<script>document.body.classList.add('ui-standard-page','subscriptions-page','access-devices-fix35');</script>
 <div class="ui-page ui-page-wide">
-  {% if panel_access_global.mode != 'https' %}
-  <div class="ui-warning-note subscription-http-warning"><span>!</span><p><strong>Панель сейчас работает по HTTP.</strong> Токены подписок передаются без TLS. Для публичного сервера сначала включите HTTPS в разделе «Безопасность → Доступ к панели» либо используйте подписки только через доверенную локальную сеть или SSH-туннель.</p></div>
-  {% endif %}
+  {% if panel_access_global.mode != 'https' %}<div class="ui-warning-note subscription-http-warning"><span>!</span><p><strong>Панель сейчас работает по HTTP.</strong> Токены подписок передаются без TLS. Используйте HTTPS, доверенную сеть или SSH-туннель.</p></div>{% endif %}
   <section class="ui-top-grid subscriptions-top-grid">
     <article class="ui-card ui-card-form">
-      <header class="ui-card-heading">
-        <div>
-          <p class="panel-kicker">ПАРАМЕТРЫ</p>
-          <h2>Публичные подписки <a class="context-help-link" href="{{ url_for('help_page') }}#clients-links" title="Справка о ссылках и подписках" aria-label="Справка о ссылках и подписках">?</a></h2>
-          <p>Настройте название профиля и внешний адрес, который будет получать клиент.</p>
-        </div>
-      </header>
-
+      <header class="ui-card-heading"><div><p class="panel-kicker">ПАРАМЕТРЫ</p><h2>Публичные подписки</h2><p>Название профиля и внешний адрес, который получает SG Client или другой совместимый клиент.</p></div></header>
       <form method="post" action="{{ url_for('subscriptions_settings_save') }}" class="ui-form">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-
-        <label class="ui-toggle-row">
-          <span><strong>Разрешить публичные подписки</strong><small>Когда выключено, все адреса подписок отвечают кодом 404.</small></span>
-          <input type="checkbox" name="enabled" {% if settings.enabled %}checked{% endif %}>
-          <span class="switch" aria-hidden="true"></span>
-        </label>
-
-        <div class="ui-field-grid ui-field-grid-subscriptions">
-          <label><span>Название профиля</span><input type="text" name="profile_title" maxlength="80" value="{{ settings.profile_title }}" required></label>
-          <label class="ui-field-wide"><span>Публичный базовый URL</span><input type="url" name="base_url" value="{{ settings.base_url }}" placeholder="https://panel.example.com"></label>
-        </div>
-
-        <p class="ui-field-note">Если поле URL пустое, панель использует текущий адрес: <code>{{ fallback_base_url }}</code>. Для удалённых клиентов этот адрес должен быть доступен извне.</p>
-
-        <div class="ui-actions"><button class="button primary" type="submit">Сохранить настройки</button></div>
+        <label class="ui-toggle-row"><span><strong>Разрешить публичные подписки</strong><small>Когда выключено, все адреса отвечают 404.</small></span><input type="checkbox" name="enabled" {% if settings.enabled %}checked{% endif %}><span class="switch"></span></label>
+        <div class="ui-field-grid ui-field-grid-subscriptions"><label><span>Название профиля</span><input type="text" name="profile_title" maxlength="80" value="{{ settings.profile_title }}" required></label><label class="ui-field-wide"><span>Публичный базовый URL</span><input type="url" name="base_url" value="{{ settings.base_url }}" placeholder="https://panel.example.com"></label></div>
+        <p class="ui-field-note">Если URL пуст, используется текущий адрес: <code>{{ fallback_base_url }}</code>.</p><div class="ui-actions"><button class="button primary" type="submit">Сохранить настройки</button></div>
       </form>
-
-      <div class="ui-info-note"><span>i</span><p><strong>Применять конфигурацию Xray не требуется.</strong> Подписка формируется из актуальных данных SQLite при каждом запросе.</p></div>
+      <div class="ui-info-note"><span>i</span><p><strong>Xray перезапускать не требуется.</strong> Подписка формируется из актуальных данных SQLite при каждом запросе.</p></div>
     </article>
-
     <article class="ui-card subscriptions-formats-card">
-      <header class="ui-card-heading">
-        <div>
-          <p class="panel-kicker">ФОРМАТЫ</p>
-          <h2>Адреса выдачи</h2>
-          <p>Один токен можно использовать в нескольких форматах.</p>
-        </div>
-      </header>
-
-      <div class="ui-code-list">
-        <div><span>Base64</span><code>/sub/TOKEN</code><small>Основной вариант для совместимых клиентов; при Multi-Hysteria содержит все включённые ссылки.</small></div>
-        <div><span>Обычная ссылка</span><code>/sub/TOKEN?format=plain</code><small>Все актуальные прямые ссылки без кодирования, по одной в строке.</small></div>
-        <div><span>JSON</span><code>/sub/TOKEN?format=json</code><small>Структурированный ответ с основной ссылкой и массивом links для интеграций.</small></div>
-      </div>
-
-      <div class="ui-warning-note"><span>!</span><p><strong>Токен является секретом.</strong> После его перегенерации прежний адрес сразу перестаёт работать.</p></div>
+      <header class="ui-card-heading"><div><p class="panel-kicker">ФОРМАТЫ</p><h2>Один token — три формата</h2><p>Token принадлежит конкретному устройству, а не всему клиенту.</p></div></header>
+      <div class="ui-code-list"><div><span>Base64</span><code>/sub/TOKEN</code><small>Активные URI устройства.</small></div><div><span>Plain</span><code>/sub/TOKEN?format=plain</code><small>По одной ссылке в строке.</small></div><div><span>SG Client JSON v2</span><code>/sub/TOKEN?format=json</code><small>Управляемый профиль с deviceId и deviceUuid.</small></div></div>
+      <div class="ui-warning-note"><span>!</span><p><strong>Token является секретом.</strong> После перегенерации прежний URL сразу перестаёт работать.</p></div>
     </article>
   </section>
 
   <section class="ui-card ui-table-card subscription-users">
-    <header class="ui-card-heading ui-card-heading-row">
-      <div>
-        <p class="panel-kicker">ПОЛЬЗОВАТЕЛИ</p>
-        <h2>Персональные ссылки</h2>
-        <p>Отдельный адрес и состояние подписки для каждого пользователя.</p>
-      </div>
-      <span class="ui-counter">{{ users|length }} {{ 'пользователь' if users|length == 1 else 'пользователей' }}</span>
-    </header>
-
-    {% if users %}
-    <div class="table-wrap"><table><thead><tr><th>Пользователь</th><th>Состояние</th><th>URL подписки</th><th>Обращения</th><th>Действия</th></tr></thead><tbody>
-    {% for user in users %}
-      <tr>
-        <td><div class="user-cell"><span class="avatar">{{ user.name[:1]|upper }}</span><div><strong>{{ user.name }}</strong><small>#{{ user.id }}</small></div></div></td>
-        <td>
-          {% if not user.enabled or user_is_expired(user) %}<span class="pill disabled"><i></i>Недоступна</span>
-          {% elif user.subscription_enabled %}<span class="pill enabled"><i></i>Включена</span>
-          {% else %}<span class="pill disabled"><i></i>Выключена</span>{% endif %}
-        </td>
-        <td><div class="subscription-url-cell"><input id="sub-{{ user.id }}" type="text" readonly value="{{ subscription_urls[user.id] }}"><button class="button ghost small" type="button" onclick="copySubscription({{ user.id }}, this)">Копировать</button></div></td>
-        <td><div class="traffic-cell"><strong>{{ user.subscription_access_count }}</strong><small>{% if user.subscription_last_access_at %}{{ user.subscription_last_access_at[:16]|replace('T',' ') }} UTC{% else %}ещё не использовалась{% endif %}</small></div></td>
-        <td><div class="row-actions">
-          <a class="button ghost small" href="{{ url_for('user_link', user_id=user.id) }}">Ссылка / QR</a>
-          <form method="post" action="{{ url_for('user_subscription_toggle', user_id=user.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button secondary small" type="submit">{{ 'Отключить' if user.subscription_enabled else 'Включить' }}</button></form>
-          <form method="post" action="{{ url_for('user_subscription_regenerate', user_id=user.id) }}" onsubmit="return confirm('Старый URL пользователя {{ user.name }} перестанет работать. Продолжить?')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button danger small" type="submit">Новый токен</button></form>
-        </div></td>
-      </tr>
-    {% endfor %}
-    </tbody></table></div>
-    {% else %}<div class="empty-state"><span>SG</span><h3>Пользователей пока нет</h3><p>Сначала создайте пользователя.</p></div>{% endif %}
+    <header class="ui-card-heading ui-card-heading-row"><div><p class="panel-kicker">ДОСТУПЫ И УСТРОЙСТВА</p><h2>Персональные ссылки</h2><p>Каждый UUID имеет собственную подписку и независимое отключение. Выдача содержит активные соединения текущего Inbound-профиля.</p></div><span class="ui-counter">{{ subscription_entries|length }}</span></header>
+    {% if subscription_entries %}<div class="table-wrap"><table><thead><tr><th>Клиент / устройство</th><th>Состояние</th><th>URL подписки</th><th>Обращения</th><th>Действия</th></tr></thead><tbody>
+    {% for entry in subscription_entries %}{% set user=entry.user %}{% set device=entry.device %}<tr>
+      <td><div class="user-cell"><span class="avatar">{{ user.name[:1]|upper }}</span><div><strong>{{ user.name }}</strong><small>{{ device.name }}{% if device.is_primary %} · основной{% endif %}</small></div></div></td>
+      <td>{% if not device.effective_enabled or device.expired %}<span class="pill disabled"><i></i>Недоступна</span>{% elif device.subscription_enabled %}<span class="pill enabled"><i></i>Включена</span>{% else %}<span class="pill disabled"><i></i>Выключена</span>{% endif %}</td>
+      <td><div class="subscription-url-cell"><input id="sub-{{ device.id }}" type="text" readonly value="{{ entry.url }}"><button class="button ghost small" type="button" data-copy-subscription="sub-{{ device.id }}">Копировать</button></div><small class="subscription-device-uuid">UUID {{ device.uuid }}</small></td>
+      <td><div class="traffic-cell"><strong>{{ device.subscription_access_count }}</strong><small>{% if device.subscription_last_access_at %}{{ device.subscription_last_access_at[:16]|replace('T',' ') }} UTC{% else %}ещё не использовалась{% endif %}</small></div></td>
+      <td><div class="row-actions"><a class="button ghost small" href="{{ url_for('device_link', user_id=user.id, device_id=device.id) }}">Ссылки / QR</a><form method="post" action="{{ url_for('device_subscription_toggle', user_id=user.id, device_id=device.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button small {{ 'toggle-disable' if device.subscription_enabled else 'toggle-enable' }}" type="submit">{{ 'Отключить' if device.subscription_enabled else 'Включить' }}</button></form><form method="post" action="{{ url_for('device_subscription_regenerate', user_id=user.id, device_id=device.id) }}" data-confirm="Старый URL доступа «{{ device.name }}» клиента {{ user.name }} перестанет работать. Создать новый token?"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button danger small" type="submit">Новый token</button></form></div></td>
+    </tr>{% endfor %}</tbody></table></div>{% else %}<div class="empty-state"><span>SG</span><h3>Доступов пока нет</h3><p>Сначала создайте клиента. Основной доступ появится автоматически.</p><a class="button primary" href="{{ url_for('users_page', create=1) }}">Создать клиента</a></div>{% endif %}
   </section>
 </div>
 <script>
@@ -103,19 +47,19 @@ function showSubscriptionCopyFeedback(button, message) {
     button._copyResetTimer = null;
   }, 1800);
 }
-
-async function copySubscription(id, button) {
-  const field = document.getElementById('sub-' + id);
-  if (!field) return;
-  try {
-    if (navigator.clipboard && window.isSecureContext) await navigator.clipboard.writeText(field.value);
-    else { field.focus(); field.select(); document.execCommand('copy'); }
-    showSubscriptionCopyFeedback(button, 'Скопировано');
-  } catch (error) {
-    field.focus();
-    field.select();
-    showSubscriptionCopyFeedback(button, 'Ctrl+C');
-  }
-}
+(() => {
+  document.querySelectorAll('[data-copy-subscription]').forEach(button => button.addEventListener('click', async () => {
+    const field = document.getElementById(button.dataset.copySubscription);
+    if (!field) return;
+    try {
+      if (navigator.clipboard && window.isSecureContext) await navigator.clipboard.writeText(field.value);
+      else { field.focus(); field.select(); document.execCommand('copy'); }
+      showSubscriptionCopyFeedback(button, 'Скопировано');
+    } catch (_) {
+      field.focus(); field.select();
+      showSubscriptionCopyFeedback(button, 'Выделено — Ctrl+C');
+    }
+  }));
+})();
 </script>
 {% endblock %}

@@ -1,0 +1,133 @@
+/* SG-Panel Preview 9 · FIX40 · UI21
+   Restore the compact Cluster and SG-Node card without touching runtime logic. */
+
+.cluster-restore-ui21 .section-tabs { margin-bottom: 16px; }
+.cluster-restore-page { display: grid; gap: 18px; }
+.cluster-restore-page-actions { display: flex; gap: 9px; flex-wrap: wrap; }
+
+.cluster-restore-controller { margin: 0; }
+.cluster-restore-server-icon {
+  display: grid; place-items: center; width: 46px; height: 46px; flex: 0 0 46px;
+  border: 1px solid color-mix(in srgb, var(--accent) 42%, var(--line));
+  border-radius: 13px; background: color-mix(in srgb, var(--accent-soft) 62%, var(--panel-2));
+  color: var(--accent); font-weight: 900;
+}
+.cluster-restore-controller-facts { display: flex; align-items: center; justify-content: flex-end; gap: 14px; flex-wrap: wrap; }
+.cluster-restore-controller-facts > span:not(.node-state-pill) { color: var(--muted); font-size: 10px; white-space: nowrap; }
+.cluster-restore-controller-facts b { margin-left: 4px; color: var(--text); font-size: 12px; }
+.cluster-restore-count {
+  display: inline-flex; align-items: center; min-height: 32px; padding: 0 11px;
+  border: 1px solid var(--line); border-radius: 999px; background: var(--panel-2);
+  color: var(--muted); font-size: 10px; font-weight: 750; white-space: nowrap;
+}
+.compact-node-row { min-width: 0; }
+.compact-node-main { min-width: 0; }
+.compact-node-icon .country-flag-card { width: 29px; height: 21px; border-radius: 5px; object-fit: cover; }
+.compact-node-copy { min-width: 0; }
+.compact-node-copy strong, .compact-node-copy small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.compact-node-metrics { min-width: 0; }
+.compact-node-metrics span { white-space: nowrap; }
+.compact-node-actions { align-items: center; }
+.cluster-restore-empty {
+  display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 20px;
+}
+.cluster-restore-empty > div { display: grid; gap: 5px; }
+.cluster-restore-empty span { color: var(--muted); font-size: 11px; }
+
+.cluster-restore-onboarding { margin-top: 0; }
+.cluster-restore-onboarding-body {
+  display: grid; grid-template-columns: minmax(280px, .8fr) minmax(430px, 1.2fr);
+  gap: 22px; align-items: end; padding: 0 20px 20px;
+}
+.cluster-restore-onboarding-copy h2 { margin: 3px 0 7px; font-size: 21px; }
+.cluster-restore-onboarding-copy p:last-child { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.55; }
+.cluster-restore-node-form { padding: 0; grid-template-columns: minmax(220px, 1fr) auto; }
+.cluster-restore-onboarding[open] > summary em { font-size: 0; }
+.cluster-restore-onboarding[open] > summary em::after { content: "Скрыть"; font-size: 10px; }
+
+/* Server card: one compact status block, wide address and calm resource facts. */
+.node-restore-ui21 .section-tabs { margin-bottom: 16px; }
+.node-restore-shell { display: grid; gap: 16px; width: 100%; }
+.node-restore-status {
+  display: grid; grid-template-columns: minmax(340px, 1fr) minmax(520px, .95fr);
+  gap: 24px; align-items: center; padding: 22px 24px; overflow: hidden;
+}
+.node-restore-status-main { min-width: 0; }
+.node-restore-status-main h2 { margin: 4px 0 7px; font-size: 23px; }
+.node-restore-status-main p:last-child { max-width: 720px; margin: 0; color: var(--muted); font-size: 12px; line-height: 1.55; }
+.node-restore-facts {
+  display: grid; grid-template-columns: repeat(4, minmax(80px, 1fr)); gap: 8px; margin: 0;
+}
+.node-restore-facts > div {
+  min-width: 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 11px;
+  background: var(--panel-2);
+}
+.node-restore-facts > .wide { grid-column: 1 / -1; display: grid; grid-template-columns: auto minmax(0,1fr); align-items: center; gap: 12px; }
+.node-restore-facts dt { margin: 0 0 4px; color: var(--muted); font-size: 9px; text-transform: uppercase; letter-spacing: .06em; }
+.node-restore-facts .wide dt { margin: 0; }
+.node-restore-facts dd { margin: 0; color: var(--text); font-size: 13px; font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.node-restore-facts .wide dd { text-align: right; }
+
+.node-restore-connect { overflow: hidden; }
+.node-restore-connect > header {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 20px;
+  padding: 18px 22px 14px; border-bottom: 1px solid var(--line);
+}
+.node-restore-connect h2 { margin: 3px 0 5px; font-size: 21px; }
+.node-restore-connect header p:last-child { margin: 0; color: var(--muted); font-size: 11px; }
+.node-restore-connect-grid {
+  display: grid; grid-template-columns: minmax(300px, .72fr) minmax(0, 1.28fr);
+  gap: 18px; align-items: center; padding: 18px 22px 12px;
+}
+.node-restore-steps { display: grid; gap: 9px; margin: 0; padding: 0; list-style: none; }
+.node-restore-steps li { display: grid; grid-template-columns: 28px minmax(0,1fr); gap: 10px; align-items: center; color: var(--muted); font-size: 11px; }
+.node-restore-steps b { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 8px; background: var(--accent-soft); color: var(--accent); }
+.node-restore-steps strong { display: block; color: var(--text); font-size: 12px; }
+.node-restore-command-box {
+  display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 10px; align-items: center;
+  min-width: 0; padding: 10px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel-2);
+}
+.node-restore-command-box code {
+  min-width: 0; padding: 8px 10px; border: 0; background: transparent; color: var(--text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 11px;
+}
+.node-restore-command-box .button { white-space: nowrap; }
+.node-restore-command-full { margin: 0 22px 12px; border-top: 1px solid var(--line); }
+.node-restore-command-full summary { padding: 10px 0 2px; color: var(--muted); font-size: 10px; cursor: pointer; }
+.node-restore-command-full pre {
+  margin: 8px 0 0; padding: 12px; border: 1px solid var(--line); border-radius: 10px;
+  background: var(--panel-2); white-space: pre-wrap; overflow-wrap: anywhere; font-size: 10px; line-height: 1.5;
+}
+.node-restore-command-note { margin: 0; padding: 0 22px 18px; color: var(--muted); font-size: 10px; }
+.node-simple-jobs:empty { display: none; }
+
+/* Do not render the old duplicate navigation and gray metric towers. */
+.node-restore-ui21 .node-simple-nav { display: none !important; }
+.node-restore-ui21 .node-simple-status { display: none !important; }
+.node-restore-ui21 .node-simple-command { display: none !important; }
+
+html[data-resolved-theme="dark"] .node-restore-facts > div,
+html[data-resolved-theme="dark"] .node-restore-command-box,
+html[data-resolved-theme="dark"] .node-restore-command-full pre { background: #111923; }
+html[data-resolved-theme="light"] .node-restore-facts > div,
+html[data-resolved-theme="light"] .node-restore-command-box,
+html[data-resolved-theme="light"] .node-restore-command-full pre { background: #EEF3F5; }
+
+@media (max-width: 1120px) {
+  .node-restore-status, .node-restore-connect-grid, .cluster-restore-onboarding-body { grid-template-columns: 1fr; }
+  .cluster-restore-controller { align-items: flex-start; flex-direction: column; }
+  .cluster-restore-controller-facts { justify-content: flex-start; }
+}
+@media (max-width: 760px) {
+  .cluster-restore-page-actions, .cluster-restore-empty { align-items: stretch; flex-direction: column; }
+  .compact-node-main { grid-template-columns: 42px minmax(0,1fr); }
+  .compact-node-main .node-role-badge, .compact-node-main .node-state-pill { grid-column: 2; justify-self: start; }
+  .compact-node-metrics { padding-left: 16px; }
+  .compact-node-actions { padding-top: 0; }
+  .cluster-restore-node-form, .node-restore-command-box { grid-template-columns: 1fr; }
+  .node-restore-status, .node-restore-connect > header, .node-restore-connect-grid,
+  .node-restore-command-full, .node-restore-command-note { margin-left: 0; margin-right: 0; padding-left: 16px; padding-right: 16px; }
+  .node-restore-facts { grid-template-columns: repeat(2, minmax(0,1fr)); }
+  .node-restore-facts > .wide { grid-column: 1 / -1; grid-template-columns: 1fr; }
+  .node-restore-facts .wide dd { text-align: left; }
+}

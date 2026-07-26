@@ -1,0 +1,163 @@
+{% set staged = geofiles.staged_manifest or {} %}
+{% set missing_categories = staged.get('missing_categories', []) %}
+{% set staged_preset = staged.get('server_preset', 'none') %}
+{% set staged_final = staged.get('final_outbound_tag', 'direct') %}
+{% set staged_final_info = outbound_by_tag.get(staged_final) %}
+<div class="r096-geo r096-panel-embedded">
+  <section class="ui-card geofiles-overview-card">
+    <header class="ui-card-heading ui-card-heading-row">
+      <div>
+        <p class="panel-kicker">GEOFILES</p>
+        <h2>Установленная связанная пара <a class="context-help-link" href="{{ url_for('help_page') }}#routing-geofiles" title="Справка по GeoFiles" aria-label="Справка по GeoFiles">?</a></h2>
+        <p>Routing GeoIP и GeoSite меняются только вместе. База флагов стран <code>sg-country-geoip.dat</code> живёт отдельно.</p>
+      </div>
+      <span class="pill {{ 'enabled' if geofiles.geoip.installed and geofiles.geosite.installed and not geofiles.active_analysis.error else 'warning' }}"><i></i>{{ 'ГОТОВЫ' if geofiles.geoip.installed and geofiles.geosite.installed and not geofiles.active_analysis.error else 'ТРЕБУЕТСЯ ПРОВЕРКА' }}</span>
+    </header>
+    <div class="geofiles-active-grid">
+      <article><span>Текущий источник</span><strong>{{ geofiles.active_label }}</strong><small>Семейство: {{ geofiles.active_analysis.family }}</small><small>Generation: {{ geofiles.settings.active_generation or 'legacy / не создана' }}</small></article>
+      <article><span>geoip.dat</span><strong>{{ format_bytes(geofiles.geoip.size) if geofiles.geoip.installed else 'Не найден' }}</strong><code title="{{ geofiles.geoip.sha256 }}">{{ geofiles.geoip.sha256 or 'SHA-256 отсутствует' }}</code><small>{{ geofiles.geoip.path }}</small><small>Категорий: {{ geofiles.active_analysis.geoip_categories|length }}</small></article>
+      <article><span>geosite.dat</span><strong>{{ format_bytes(geofiles.geosite.size) if geofiles.geosite.installed else 'Не найден' }}</strong><code title="{{ geofiles.geosite.sha256 }}">{{ geofiles.geosite.sha256 or 'SHA-256 отсутствует' }}</code><small>{{ geofiles.geosite.path }}</small><small>Категорий: {{ geofiles.active_analysis.geosite_categories|length }}</small></article>
+      <article><span>Последняя проверка</span><strong>{{ 'Пройдена' if geofiles.settings.last_check_state == 'ok' else ('Применение заблокировано' if geofiles.settings.last_check_state == 'blocked' else ('Ошибка' if geofiles.settings.last_check_state == 'error' else 'Не выполнялась')) }}</strong><small>{{ geofiles.settings.last_check_message or 'Новый источник ещё не проверялся' }}</small><small>{{ geofiles.settings.last_checked_at or '' }}</small></article>
+    </div>
+    {% if geofiles.active_analysis.error %}<div class="ui-info-note danger"><span>!</span><p>{{ geofiles.active_analysis.error }}</p></div>{% endif %}
+    {% if geofiles.active_analysis.geoip_categories or geofiles.active_analysis.geosite_categories %}
+    <details class="expert-example"><summary>Показать реальные категории установленной пары</summary>
+      <p><strong>GeoIP ({{ geofiles.active_analysis.geoip_categories|length }}):</strong> {{ geofiles.active_analysis.geoip_categories|join(', ') }}</p>
+      <p><strong>GeoSite ({{ geofiles.active_analysis.geosite_categories|length }}):</strong> {{ geofiles.active_analysis.geosite_categories|join(', ') }}</p>
+    </details>
+    {% endif %}
+  </section>
+
+  <section class="ui-card geofiles-edit-control" data-geofiles-lock-card>
+    <div>
+      <p class="panel-kicker">STAGING / FAIL-CLOSED</p>
+      <h2>Сначала полный future-config, потом live-файлы</h2>
+      <p>SG-Panel читает protobuf-категории, проверяет все активные ссылки, собирает полный будущий Routing и полный Xray config и запускает Xray с <code>XRAY_LOCATION_ASSET=&lt;staging&gt;</code>. До успеха live-состояние не меняется.</p>
+      <p class="r096-geo-note">Категория <code>category-ads-all</code> не обязательна: проверка использует реальные категории выбранной пары и блокирует только действительно несовместимые активные правила.</p>
+    </div>
+    <div class="advanced-safety-actions">
+      <span class="expert-lock-state" data-geofiles-lock-state>Только чтение</span>
+      <button class="button secondary" type="button" data-geofiles-edit-toggle>Включить выбор источника</button>
+    </div>
+  </section>
+
+  <section class="ui-card geofiles-card">
+    <header class="ui-card-heading"><div><p class="panel-kicker">ИСТОЧНИК И ПЛАН</p><h2>Проверить связанную пару</h2><p>Выбор совместимости и финального Outbound входит в проверяемый candidate и не может быть изменён на шаге применения.</p></div></header>
+    <form method="post" enctype="multipart/form-data" action="{{ url_for('settings_geofiles_check') }}" class="ui-form geofiles-form is-readonly" id="geofiles-source-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <fieldset data-geofiles-edit-fieldset disabled>
+        <div class="geofiles-source-grid">
+          {% for key, item in geofiles.sources.items() %}
+          <label class="geofiles-source-card"><input type="radio" name="source" value="{{ key }}" {% if geofiles.selected_source == key %}checked{% endif %}><span><strong>{{ item.label }}</strong><small>{{ item.description }}</small></span></label>
+          {% endfor %}
+        </div>
+        <div class="ui-field-grid geofiles-custom-fields" data-geo-source="custom">
+          <label><span>GeoIP URL</span><input name="geoip_url" value="{{ geofiles.selection.geoip_url }}" placeholder="https://.../geoip.dat"></label>
+          <label><span>GeoSite URL</span><input name="geosite_url" value="{{ geofiles.selection.geosite_url }}" placeholder="https://.../geosite.dat"></label>
+        </div>
+        <div class="geofiles-local-fields" data-geo-source="local">
+          <div class="ui-field-grid">
+            <label><span>Загрузить geoip.dat</span><input type="file" name="geoip_file" accept=".dat,application/octet-stream"></label>
+            <label><span>Загрузить geosite.dat</span><input type="file" name="geosite_file" accept=".dat,application/octet-stream"></label>
+          </div>
+          <div class="ui-info-note"><span>i</span><p>Нужны оба файла. Оба файла всегда загружаются, проверяются и применяются вместе. Один файл отдельно принять или применить невозможно.</p></div>
+          <details class="expert-example"><summary>Или использовать файлы на сервере</summary>
+            <div class="ui-field-grid">
+              <label><span>Путь к geoip.dat</span><input name="geoip_local_path" value="{{ geofiles.selection.geoip_local_path }}" placeholder="/opt/geofiles/geoip.dat"></label>
+              <label><span>Путь к geosite.dat</span><input name="geosite_local_path" value="{{ geofiles.selection.geosite_local_path }}" placeholder="/opt/geofiles/geosite.dat"></label>
+            </div>
+          </details>
+        </div>
+
+        <div class="r096-roscom-plan" data-geo-source="roscomvpn">
+          <header><div><strong>RoscomVPN · отдельная совместимость</strong><small>Категории не переименовываются и не подгоняются под Loyalsoldier.</small></div></header>
+          <div class="geofiles-safe-choice is-required"><span><strong>Совместимая серверная основа обязательна</strong><small>Построить совместимую серверную основу — обязательная часть проверки. При выборе RoscomVPN она всегда входит в один candidate: Direct создаётся только из реально найденных private / whitelist / category-ru и других поддерживаемых категорий. Пользовательские правила не удаляются и не отключаются.</small></span></div>
+          <div class="ui-field-grid r096-roscom-plan-grid">
+            <label><span>Остальной трафик → реальный Outbound</span><select name="final_outbound_tag">{% for outbound in outbound_options %}{% if outbound.default_eligible %}<option value="{{ outbound.tag }}" {% if staged_final == outbound.tag or (not staged and settings.default_outbound_tag == outbound.tag) %}selected{% endif %}>{{ outbound.label }} · {{ outbound.type_label }}</option>{% endif %}{% endfor %}</select></label>
+            <label class="geofiles-safe-choice compact"><input type="checkbox" name="enable_block" {% if staged.get('block_enabled') %}checked{% endif %}><span><strong>необязательный Block</strong><small>Только category-ads, win-spy и torrent, если они реально присутствуют.</small></span></label>
+          </div>
+          <div class="ui-info-note warning"><span>!</span><p>Выбранный WARP, Cascade или Custom VLESS/JSON должен существовать и быть включён. Иначе проверка блокируется; скрытого перехода на Direct нет.</p></div>
+        </div>
+
+        <div class="ui-info-note"><span>i</span><p>Проверка: размеры и SHA-256 → реальные protobuf-категории → все активные geo-ссылки → полный future Routing/Xray config → <code>xray run -test</code>. Рабочие файлы не изменяются.</p></div>
+        <div class="ui-actions"><button class="button secondary" type="submit">Проверить полный candidate</button></div>
+      </fieldset>
+    </form>
+
+    {% if geofiles.settings.last_check_state %}
+    <div class="geofiles-check-result {{ 'is-success' if geofiles.settings.last_check_state == 'ok' else ('is-warning' if geofiles.settings.last_check_state == 'blocked' else 'is-error') }}">
+      <strong>{{ 'Проверка пройдена' if geofiles.settings.last_check_state == 'ok' else ('Применение заблокировано' if geofiles.settings.last_check_state == 'blocked' else 'Проверка не пройдена') }}</strong>
+      <span>{{ geofiles.settings.last_check_message }}</span><small>{{ geofiles.settings.last_checked_at or '' }}</small>
+      {% if staged %}<small>Семейство: {{ staged.get('family', 'Не определено') }} · GeoIP: {{ staged.get('geoip_categories', [])|length }} · GeoSite: {{ staged.get('geosite_categories', [])|length }} · Xray: {{ staged.get('candidate_xray_test', 'не запускался') }}</small>{% endif %}
+    </div>
+    {% endif %}
+
+    {% if missing_categories %}
+    <div class="geofiles-compatibility-panel is-blocked">
+      <strong>Применение заблокировано без удаления правил</strong>
+      <p>В полном будущем config отсутствуют категории:</p>
+      <ul>{% for item in missing_categories %}<li><code>{{ item }}</code></li>{% endfor %}</ul>
+      <p>Исправьте правило либо повторите проверку RoscomVPN с отдельной совместимой основой. Автоматического удаления отсутствующих ссылок и отключения правил нет.</p>
+    </div>
+    {% endif %}
+
+    {% if staged and geofiles.settings.last_check_state == 'ok' %}
+    <section class="r096-checked-plan">
+      <header><strong>Проверенный план применения</strong><span>Данные зафиксированы SHA-256 candidate</span></header>
+      <div>
+        <article><span>Источник</span><strong>{{ staged.get('source_label', staged.get('source', '')) }}</strong></article>
+        <article><span>Режим</span><strong>{{ 'RoscomVPN compatible' if staged_preset == 'roscomvpn' else 'Сохранить активный Routing' }}</strong></article>
+        <article><span>Остальной трафик</span><strong>{{ staged_final_info.label if staged_final_info else staged_final }}</strong></article>
+        <article><span>Block</span><strong>{{ 'Включён явно' if staged.get('block_enabled') else 'Не включён' }}</strong></article>
+      </div>
+      <code>{{ staged.get('candidate_config_sha256', '') }}</code>
+    </section>
+    {% endif %}
+
+    <form method="post" action="{{ url_for('settings_geofiles_apply') }}" class="geofiles-apply-form" data-sg-confirm="Применить именно проверенную пару GeoFiles, Routing и полный Xray config?" data-sg-confirm-title="Применить GeoFiles" data-sg-confirm-button="Применить">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="ui-actions geofiles-apply-actions">
+        <button class="button primary" type="submit" {% if geofiles.settings.last_check_state != 'ok' %}disabled{% endif %}>Применить проверенный план</button>
+        <small>При ошибке возвращаются оба .dat-файла, Routing, config.json и настройки. Rollback считается успешным только после повторного Xray test и подтверждения xray.service active.</small>
+      </div>
+    </form>
+  </section>
+</div>
+<script>
+(() => {
+  const form = document.getElementById('geofiles-source-form');
+  const fieldset = document.querySelector('[data-geofiles-edit-fieldset]');
+  const toggle = document.querySelector('[data-geofiles-edit-toggle]');
+  const state = document.querySelector('[data-geofiles-lock-state]');
+  const finalRoute = form?.querySelector('select[name="final_outbound_tag"]');
+  const block = form?.querySelector('input[name="enable_block"]');
+
+  const setEditing = (enabled) => {
+    if (!form || !fieldset || !toggle) return;
+    fieldset.disabled = !enabled;
+    form.classList.toggle('is-readonly', !enabled);
+    toggle.textContent = enabled ? 'Выключить выбор источника' : 'Включить выбор источника';
+    toggle.classList.toggle('danger', enabled);
+    if (state) state.textContent = enabled ? 'Редактирование включено' : 'Только чтение';
+  };
+
+  const syncSource = () => {
+    const source = form?.querySelector('input[name="source"]:checked')?.value || 'sgclient';
+    document.querySelectorAll('[data-geo-source]').forEach(node => {
+      node.hidden = node.dataset.geoSource !== source;
+    });
+    const roscom = source === 'roscomvpn';
+    const planEnabled = roscom;
+    if (finalRoute) finalRoute.disabled = !planEnabled;
+    if (block) {
+      block.disabled = !planEnabled;
+      if (!planEnabled) block.checked = false;
+    }
+  };
+
+  toggle?.addEventListener('click', () => setEditing(Boolean(fieldset?.disabled)));
+  form?.querySelectorAll('input[name="source"]').forEach(input => input.addEventListener('change', syncSource));
+  setEditing(false);
+  syncSource();
+})();
+</script>

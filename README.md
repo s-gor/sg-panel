@@ -5,371 +5,206 @@
 <h1 align="center">SG-Panel</h1>
 
 <p align="center">
-  Собственная веб-панель для установки, настройки и безопасного обслуживания Xray-сервера.
+  Веб-панель для установки, настройки и безопасного обслуживания собственного Xray-сервера.
 </p>
 
 <p align="center">
   <img alt="Version" src="https://img.shields.io/badge/version-v0.10.0--rc70-35d69a">
-  <img alt="Ubuntu" src="https://img.shields.io/badge/Ubuntu-24.04-E95420?logo=ubuntu&logoColor=white">
+  <img alt="Build" src="https://img.shields.io/badge/build-FIX40%20UI23-5b8def">
+  <img alt="Ubuntu" src="https://img.shields.io/badge/Ubuntu-22.04%2B-E95420?logo=ubuntu&logoColor=white">
   <img alt="Python" src="https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white">
-  <img alt="Xray" src="https://img.shields.io/badge/Xray-v26.5.9-5b8def">
-  <img alt="Tests" src="https://img.shields.io/badge/tests-545%20tests-35d69a">
+  <img alt="Xray" src="https://img.shields.io/badge/Xray-v26.6.27-5b8def">
 </p>
 
 <p align="center">
-  <img src="docs/assets/sg-panel-rc45-graphite.png" alt="SG-Panel v0.10.0 RC45 — тема Графит">
+  <img src="docs/assets/sg-panel-rc45-graphite.png" alt="SG-Panel — тема Графит">
 </p>
 
-> Текущая версия: **`v0.10.0-rc70`**. Основная тема — **Графит**. В панели оставлены ровно две темы: **Графит** и тёплая контрастная светлая **Латте**.
+> Текущая чистая GitHub-база: **`v0.10.0-rc70` · `Preview 9 · FIX40 · UI23`**.
+>
+> Ветка содержит Hysteria2 Salamander FinalMask, компактный Cluster, пошаговый Cascade, восстановленную карточку SG-Node и Worker `0.7.0`. Отвергнутый Routing UI25 и экспериментальные UI24-обёртки установщика в базу не входят.
 
-## Что такое SG-Panel
+## Что умеет SG-Panel
 
-SG-Panel разворачивает и обслуживает собственный Xray-сервер на Ubuntu Server 24.04. Панель управляет клиентами, входящими профилями, подписками, трафиком, маршрутами, Outbounds, DNS, Cloudflare WARP, HTTPS, резервными копиями и обновлениями. Multi-Node объединяет Cluster Controller и удалённые SG-Node. RC70 завершает аудит встроенной Help и документации: Cascade и SG-Node теперь описаны пошагово, с точными кнопками, проверками, возвратом, обслуживанием и типовыми ошибками. Сетевая логика и темы RC69 сохранены.
+SG-Panel управляет собственным Xray-сервером на Ubuntu 22.04 и новее:
 
-Проект не пытается быть универсальной панелью для любых схем. В интерфейсе доступны только те режимы, которые SG-Panel умеет полностью сформировать, проверить, применить и восстановить при ошибке.
+- VLESS REALITY;
+- VLESS XHTTP REALITY;
+- VLESS XHTTP TLS;
+- Hysteria2;
+- смешанный XHTTP TLS + Hysteria2;
+- Hysteria2 Salamander FinalMask;
+- клиенты, устройства, QR-коды и постоянные subscriptions;
+- Routing, пользовательские Outbounds, DNS и Cloudflare WARP;
+- GeoFiles с staging, `xray run -test`, backup и rollback;
+- Controller, SG-Node, центральная клиентская база и deployments;
+- Cascade через SG-Node или вторую самостоятельную SG-Panel;
+- HTTPS, резервные копии, диагностика и обновления.
+
+Проект показывает в обычном интерфейсе только те операции, которые может сформировать, проверить, применить и восстановить при ошибке.
+
+## Архитектура
 
 ```text
 Клиент
    |
    v
-SG-Panel / Xray Server
+Controller / SG-Panel
    |
-   +-- direct ------> Интернет через IP сервера
-   +-- warp --------> Интернет через Cloudflare WARP
-   +-- outbound ----> Другой Xray-сервер
+   +-- Direct -----------------> Интернет через Controller
+   +-- WARP -------------------> Интернет через Cloudflare WARP
+   +-- Outbound ---------------> Другой Xray-сервер
+   +-- Cascade через SG-Node --> Интернет через выбранную Node
 ```
 
-## Основные возможности
+Controller является источником истины для клиентов. Один клиент может иметь отдельные deployments на Controller и SG-Node без создания нового UUID/Auth.
 
-## Cluster: управление центральным сервером и SG-Node
+## Hysteria2 Salamander
 
-Раздел **Cluster** использует один понятный порядок из пяти шагов:
+Salamander хранится и применяется на уровне конкретного Hysteria2 Inbound. SG-Panel:
 
-1. **Подготовить чистую Ubuntu как SG-Node** — скопировать одну полную установочную команду без токена. Она сама устанавливает bootstrap-зависимости, Agent, Worker, Xray, Nginx, Certbot и переводит сервер в `ready_to_connect`.
-2. **Добавить подготовленную SG-Node** — создать карточку и новый одноразовый enrollment token.
-3. **Подключить установленную SG-Node** — скопировать отдельную однострочную команду с токеном. Она проверяет `ready_to_connect`, запускает Agent и Worker и подтверждает регистрацию heartbeat.
-4. **Проверить статус** — увидеть Agent, Worker, heartbeat, публичный адрес, версии компонентов и состояние «В сети».
-5. **Развернуть первый профиль** — VLESS REALITY RAW/TCP на порту `64441`, XTLS Vision, fingerprint Firefox.
+- генерирует отдельный криптографически стойкий пароль;
+- безопасно объединяет Salamander с существующим `finalmask`;
+- сохраняет `quicParams`, TCP-слои и другие UDP-слои;
+- проверяет минимальную версию Xray `v26.3.27`;
+- строит полный candidate и запускает `xray run -test`;
+- использует один URI builder для Copy, QR, downloads и subscriptions;
+- не выводит пароль в обычные журналы и diagnostic bundle;
+- сохраняет тот же пароль в backup/restore.
 
-На удалённой Ubuntu вторая SG-Panel не устанавливается. Xray и Nginx после подготовки остаются остановленными до развёртывания профиля. Публичный адрес определяется Agent или Controller; при нестандартной сети его можно указать вручную. Задания Node проходят SHA-256, `xray run -test`, backup, атомарное применение и rollback при ошибке. При недоступности Controller уже применённый клиентский трафик продолжает работать.
+Подробный контракт: [Hysteria2 Salamander FinalMask](docs/HYSTERIA2-SALAMANDER.md).
 
-Подробнее: [Cluster, Multi-Node и SG-Node Agent](docs/MULTI-NODE.md).
+**Граница приёмки:** код, миграция, candidate, URI, backup и rollback реализованы. Реальное внешнее подключение Hysteria2 + Salamander ещё должно быть подтверждено отдельным live-тестом.
 
-### Дополнительные параметры и GeoFiles
+## Cluster и SG-Node
 
-Расширенные параметры находятся в **Xray Server → Дополнительно**, а используемые базы маршрутизации — в **Routing → GeoFiles**.
+Cluster поддерживает:
 
-- XHTTP Mode и Server/Client Extra показывают безопасные значения `Auto` и `{}`;
-- FinalMask по умолчанию выключен и не попадает в конфигурацию или экспорт;
-- ECH и certificate pinning показывают применимость и не создают фиктивные криптографические значения;
-- GeoFiles показывают фактические пути, размеры, даты и SHA-256 установленного комплекта Xray.
+- компактный список Controller и SG-Node;
+- onboarding через `+ Добавить SG-Node`;
+- Agent и Worker;
+- централизованные клиентские deployments;
+- атомарные задания с локальным `xray run -test`, backup и rollback;
+- сохранение существующего Xray-конфига Node при служебных операциях Cascade.
 
-Оба раздела используют явное включение редактирования, обязательную проверку, `xray run -test`, backup и rollback.
-
-Подробнее: [Дополнительные параметры и GeoFiles](docs/EXPERT-TRANSPORT-GEOFILES.md).
-
-### Пять доступных входящих профилей
-
-SG-Panel поддерживает пять доступных входящих профилей, сгруппированных по типу внешней защиты.
-
-| Семья | Профиль | Публичная точка | Сертификат |
-|---|---|---|---|
-| **REALITY · без сертификата** | `VLESS REALITY` | TCP, обычно `443` | не нужен |
-| **REALITY · без сертификата** | `VLESS XHTTP-REALITY` | TCP/XHTTP, обычно `443` | не нужен |
-| **TLS · нужен сертификат** | `VLESS XHTTP-TLS` | TCP `443` через Nginx | нужен |
-| **TLS · нужен сертификат** | `Hysteria 2` | QUIC/UDP, основной порт `443` | нужен |
-| **TLS · нужен сертификат** | `XHTTP-TLS + Hysteria 2` | TCP и UDP одновременно | нужен |
-
-Для XHTTP доступны режимы `auto`, `packet-up`, `stream-up` и `stream-one`. Выбранный режим сохраняется и в серверной конфигурации, и в клиентской ссылке.
-
-### Multi-Inbound
-
-- до трёх `VLESS REALITY` точек: `Primary`, `Backup`, `Alt`;
-- до трёх `VLESS XHTTP-TLS` Inbound через один публичный `TCP/443`, разные Path и локальные порты `8443`, `8444`, `8445`;
-- до трёх `Hysteria 2` Inbound на отдельных UDP-портах;
-- смешанный профиль объединяет до трёх XHTTP и до трёх Hysteria 2 Inbound;
-- при Vision несколько публичных REALITY-точек обслуживаются одним общим Xray Inbound с отдельными Short ID;
-- сохранённые, но неактивные ссылки не исчезают со страницы клиента;
-- постоянная подписка содержит только реально активные соединения.
-
-### Clients & Traffic Studio
-
-- отдельный UUID или Hysteria auth для каждого клиента;
-- имя, комментарий, срок действия и включение/отключение;
-- прямая ссылка, QR-код и постоянная подписка;
-- последняя активность и online-состояние;
-- текущая скорость, сессия, день, месяц и общий трафик;
-- график за 14 дней;
-- персональный и общий сброс статистики без удаления профилей.
-
-### Routing
-
-- `Default Outbound`;
-- Traffic Rules с приоритетами;
-- пользовательские VLESS Outbounds;
-- Cloudflare WARP для всего трафика или отдельных направлений;
-- встроенный DNS Xray: UDP/TCP, DoH, DoQ Local и hosts-записи;
-- Sniffing и `Route only`.
-
-### Безопасное применение конфигурации
-
-Любое изменение Inbound, Clients, Routing или JSON проходит один обязательный цикл:
-
-1. Изменить параметры.
-2. Нажать **«Проверить конфигурацию»**.
-3. SG-Panel применит черновик только к временной копии SQLite.
-4. Панель сформирует полный кандидат `config.json` и выполнит `xray run -test`.
-5. Только после успешной проверки станет доступно **«Сохранить и применить»**.
-
-Если проверка не проходит, рабочая база и запущенный Xray не заменяются. Если после проверки изменить хотя бы одно поле, сохранение снова блокируется до новой проверки.
-
-### Доступ и защита панели
-
-- backend слушает только `127.0.0.1:8080`;
-- публичный доступ обслуживает Nginx на отдельном порту;
-- первая установка возможна по IP и HTTP;
-- HTTPS с Let's Encrypt включается позже из интерфейса;
-- смена пароля, управление сессиями и журнал входов;
-- IP allowlist отдельно для панели и подписок;
-- CSRF-защита форм.
-
-### Резервные копии и обновления
-
-- создание и проверка резервной копии;
-- скачивание SQLite и итогового `config.json`;
-- восстановление с повторной генерацией конфигурации;
-- автоматическая копия перед опасными операциями;
-- rollback при ошибке применения;
-- отдельная вкладка `Maintenance → Updates`;
-- проверка Xray Core по Stable и Pre-release каналам;
-- автоматический rollback при неудачном обновлении.
-
-### Встроенная справка
-
-Раздел **Help** объясняет профили, Inbound, публичные точки входа, XTLS Vision, активные и сохранённые ссылки, TLS/HTTPS, Traffic Rules, Outbounds, DNS, резервные копии, обновления и диагностику. Контекстные значки `?` открывают сразу нужный раздел.
-
-## Две темы
-
-<table>
-<tr>
-<td width="50%" valign="top">
-<strong>Графит</strong><br><br>
-Основная тема SG-Panel. Использует общую палитру SG Client / SG-Panel. Зелёный цвет применяется только к активным и успешным состояниям.
-<br><br>
-<img src="docs/assets/sg-panel-rc45-graphite.png" alt="Тема Графит">
-</td>
-<td width="50%" valign="top">
-<strong>Латте</strong><br><br>
-Тёплая светлая тема без белых пустых поверхностей. Фон, карточки, поля и боковая панель используют кофейно-графитовые уровни; зелёный остаётся цветом статуса, а основные кнопки — тёмно-кофейными.
-<br><br>
-Новая тема выбирается вручную и не зависит от системной темы ОС.
-</td>
-</tr>
-</table>
-
-Подробнее: [Темы SG-Panel](docs/THEMES.md).
-
-## Требования
-
-- Ubuntu Server 24.04 LTS;
-- архитектура `amd64`;
-- права `root` или `sudo`;
-- минимум 1 ГиБ RAM;
-- публичный или локальный IPv4 либо hostname;
-- отдельный TCP-порт панели, по умолчанию `61443`.
-
-Домен и сертификат не требуются для первой установки с `VLESS REALITY`. Они понадобятся для HTTPS панели и TLS-профилей.
-
-## Порты
-
-| Порт | Назначение | Открывать извне |
-|---:|---|---|
-| `22/tcp` | SSH | только административный IP |
-| `80/tcp` | SG-заглушка и HTTP-01 Let's Encrypt | да, для выпуска и продления сертификата |
-| `443/tcp` | VLESS и обычный HTTPS/fallback на локальный Nginx с SG-заглушкой | для клиентов |
-| `443/udp` | основной Hysteria 2 | для клиентов Hysteria 2 |
-| `8443/udp`, `9443/udp` | дополнительные Hysteria 2 | только если включены |
-| `61443/tcp` | HTTP/HTTPS панели | только административный IP или локальная сеть |
-| `8080/tcp` | backend SG-Panel | не открывать |
-| `8443/tcp`–`8445/tcp` | локальные XHTTP listener за Nginx | не открывать |
-
-TCP и UDP — разные транспортные протоколы. Например, `443/tcp` может обслуживать Nginx/XHTTP, а `443/udp` — Hysteria 2.
-
-## Чистая установка
-
-**Первоначальная установка больше не требует домена.** Панель сначала работает по HTTP, а HTTPS включается позже в `Безопасность → Доступ к панели`.
-
-### Проверка точного RC70 до публикации
-
-Загрузите на чистую Ubuntu 24.04 один самодостаточный файл:
+Версии runtime текущей базы:
 
 ```text
-070-INSTALL-SG-PANEL-RC70.run
+Agent  0.5.0
+Worker 0.7.0
 ```
 
-Запустите из каталога, куда загружен файл:
+Agent сообщает Controller реальную версию Worker `0.7.0`.
 
-```bash
-sudo bash ./070-INSTALL-SG-PANEL-RC70.run
-```
+Подробнее: [Cluster и SG-Node](docs/MULTI-NODE.md).
 
-В установщик уже встроен точный исходный комплект RC70. Отдельный ZIP, предварительный `apt update`, установка `unzip` и ручная распаковка не требуются.
+## Cascade
 
-### После публикации в GitHub
+Два режима:
+
+1. **SG-Node из Cluster** — выбрать online Node и включить Cascade одной кнопкой.
+2. **Другая SG-Panel** — создать служебную ссылку на сервере выхода и вставить её на сервере подключения клиентов.
+
+Controller не заменяет полный Xray config SG-Node. Worker объединяет только управляемый служебный доступ, проверяет candidate и выполняет rollback при ошибке.
+
+Подробнее: [Cascade](docs/CASCADE.md).
+
+## GeoFiles и Routing
+
+GeoFiles работают парой `geoip.dat` + `geosite.dat` и поддерживают:
+
+- встроенный комплект SG Client;
+- Loyalsoldier;
+- RunetFreedom;
+- RoscomVPN;
+- пользовательские HTTPS URL;
+- загрузку или выбор локальной пары.
+
+Полный будущий Routing и Xray config проверяются со staging до изменения live-файлов. Отсутствующие geo-категории не удаляются автоматически из пользовательских правил.
+
+Подробнее: [Routing](docs/ROUTING.md) и [GeoFiles](docs/EXPERT-TRANSPORT-GEOFILES.md).
+
+## Установка из GitHub
+
+На чистой Ubuntu 22.04 или новее:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/s-gor/sg-panel/main/install-from-github.sh -o /tmp/install-sg-panel.sh
 sudo bash /tmp/install-sg-panel.sh
 ```
 
-Не используйте `curl | bash`: интерактивный мастер должен читать ответы с клавиатуры.
+Не используйте `curl | bash`: мастер задаёт начальные вопросы в интерактивном терминале.
 
-Установщик с первой секунды показывает старую зелёную вертушку `| / - \`. Сначала он без вопросов подготавливает чистую Ubuntu, обновляет систему, устанавливает `curl`, `unzip`, Python, Nginx, Certbot и остальные обязательные компоненты, а затем определяет публичный адрес.
+Установщик:
 
-Только после готовности системы мастер один раз спрашивает пароль и его повтор, публичный порт панели, адрес Xray, **имя этого сервера в панели**, имя первого клиента, Reality target и Reality SNI. После подтверждения установка продолжается без дополнительного ввода. Имя можно позже изменить в `System → Status & Services`; оно постоянно показывается в шапке и помогает не перепутать несколько SG-Panel.
+1. ждёт завершения cloud-init и apt/dpkg;
+2. устанавливает системные зависимости;
+3. определяет публичный IPv4;
+4. один раз запрашивает пароль, порт, адрес, имя сервера и Reality-параметры;
+5. устанавливает SG-Panel, Xray и Nginx;
+6. создаёт первый профиль;
+7. проверяет службы и итоговый Xray config.
 
-Полный порядок из семи этапов:
-
-1. подготовка чистой Ubuntu;
-2. обновление Ubuntu;
-3. установка системных компонентов;
-4. определение публичного адреса;
-5. проверка и распаковка исходников;
-6. установка SG-Panel, Xray и Nginx;
-7. финальная проверка панели и служб.
-
-Вывод `apt`, `dpkg`, `curl`, Python, Xray, Nginx и `systemctl` записывается в журналы, а не заполняет терминал. При ошибке показываются проблемный этап, последние полезные строки и путь к полному журналу. При ошибке обновления предыдущая рабочая версия восстанавливается отдельным этапом Rollback с такой же вертушкой.
-
-Когда мастер показывает рекомендуемое значение, например:
-
-```text
-Публичный HTTP-порт панели [61443]:
-```
-
-для его принятия просто нажмите **Enter**.
-
-После завершения откройте адрес, показанный установщиком, например:
-
-```text
-http://SERVER_IP:61443
-```
-
-Первая клиентская ссылка сохраняется в:
-
-```bash
-sudo cat /root/sg-panel-first-user.txt
-```
+Начальная установка работает по HTTP и не требует домена или TLS-сертификата. HTTPS включается позднее из панели.
 
 Подробности: [Установка](docs/INSTALLATION.md).
 
-## Первый порядок проверки
+## Обновление из локального исходного дерева
 
-1. Открыть `System → Resources`.
-2. Убедиться, что SG-Panel, Xray и Nginx активны.
-3. Открыть `Clients` и проверить первого клиента.
-4. Импортировать прямую ссылку или подписку.
-5. Проверить реальное подключение.
-6. Только после этого менять Inbound, WARP, Traffic Rules или DNS.
+В корне проверенной версии:
 
-## Обновление
+```bash
+sudo bash install-or-upgrade.sh
+```
 
-1. Откройте `Maintenance → Updates`.
-2. Нажмите **«Проверить сейчас»**.
-3. Убедитесь, что показана ожидаемая версия.
-4. Нажмите **«Обновить до …»**.
-5. Следите за живым журналом до состояния **«Готово»** или **«Восстановлено»**.
-
-Перед изменением сервера updater создаёт страховочную копию приложения, SQLite, Xray, WARP, DNS, Traffic Rules, Outbounds, Nginx, systemd-файлов и сведений о сертификатах. Затем проверяются локальный `/health`, `xray run -test`, Xray, Nginx и таймеры. При ошибке выполняется автоматический rollback.
-
-Установленный более новый Xray не понижается обычным обновлением SG-Panel.
+Updater создаёт страховочную копию и при ошибке возвращает приложение, SQLite, Xray config, доступ панели и Node runtime.
 
 ## Полное удаление
 
-Обычный uninstall устроен безопасно по умолчанию: он удаляет панель и её службы, но не удаляет Xray, Nginx, сертификаты и резервные копии без явного выбора.
-
-Для полной очистки отдельного тестового сервера:
-
 ```bash
-sudo bash /opt/xpanel-mvp/FULL-UNINSTALL-SG-PANEL.sh --yes
+sudo bash FULL-UNINSTALL-SG-PANEL.sh
 ```
 
-Скрипт не изменяет SSH, сеть Ubuntu, пользовательские файлы в `/home` и Security Group провайдера.
+Подробности: [Удаление](docs/UNINSTALL.md).
+
+## Разработка и проверка
+
+```bash
+python -m pip install -r requirements.txt pytest
+python -m pytest -q
+python -m compileall -q xpanel tests
+find . -type f -name '*.sh' -print0 | xargs -0 -n1 bash -n
+```
+
+GitHub Actions запускает тесты на Python 3.12 и 3.13.
+
+## Структура
+
+```text
+xpanel/       приложение и веб-интерфейс
+node_agent/   SG-Node Agent и Worker
+deploy/       установка, обновление и обслуживание
+tests/        функциональные и регрессионные тесты
+docs/         пользовательская и техническая документация
+assets/       встроенные GeoFiles
+```
 
 ## Документация
 
-### Начало работы
-
-- [С чего начать](docs/START-HERE.md)
-- [Руководство пользователя](docs/USER-GUIDE.md)
+- [Начало работы](docs/START-HERE.md)
 - [Установка](docs/INSTALLATION.md)
-- [Интерфейс, Help и темы](docs/PANEL.md)
-- [Темы SG-Panel](docs/THEMES.md)
-- [Multi-Node и SG-Node Agent](docs/MULTI-NODE.md)
-
-### Клиенты и подключения
-
-- [Clients & Traffic Studio](docs/CLIENTS.md)
-- [Ссылки, QR-коды и подписки](docs/PROTECTED-LINKS.md)
-- [Xray Server и Inbound-профили](docs/SERVER.md)
-- [Схемы движения трафика](docs/TRAFFIC-FLOWS.md)
-
-### Routing
-
-- [Traffic Rules](docs/TRAFFIC-RULES.md)
+- [Пользовательское руководство](docs/USER-GUIDE.md)
+- [Clients](docs/CLIENTS.md)
+- [Routing](docs/ROUTING.md)
 - [Outbounds](docs/OUTBOUNDS.md)
-- [DNS](docs/DNS.md)
-- [Cloudflare WARP](docs/WARP.md)
-- [Дополнительные параметры и GeoFiles](docs/EXPERT-TRANSPORT-GEOFILES.md)
-- [Контракт SG-Panel → SG Client](docs/SG-CLIENT-MANAGED-PROFILE.md)
+- [Cluster и SG-Node](docs/MULTI-NODE.md)
+- [Cascade](docs/CASCADE.md)
+- [Hysteria2 Salamander](docs/HYSTERIA2-SALAMANDER.md)
+- [Backup](docs/BACKUPS.md)
+- [Diagnostics](docs/DIAGNOSTICS.md)
+- [Security](docs/SECURITY.md)
+- [Changelog](CHANGELOG.md)
 
-### Конфигурация, безопасность и обслуживание
+## Текущая линия
 
-- [JSON и Generated Config](docs/JSON-EDITOR.md)
-- [HTTPS и fallback](docs/HTTPS.md)
-- [Security и Panel exposure](docs/SECURITY.md)
-- [Резервные копии и обновления](docs/MAINTENANCE.md)
-- [Диагностика](docs/DIAGNOSTICS.md)
-- [Полное удаление](docs/UNINSTALL.md)
-
-## Что нового в RC70
-
-### Полная справка Cascade
-
-- создание служебного доступа на выходном сервере;
-- импорт и реальная проверка на входном сервере;
-- включение и выдача обычной клиентской ссылки;
-- повторная проверка и замена выхода;
-- временный возврат Direct и полное удаление;
-- взаимодействие с Traffic Rules и типовые ошибки.
-
-### Полная справка Cluster и SG-Node
-
-- все пять шагов от чистой Ubuntu до первого профиля;
-- точные названия кнопок и различие полной установки/подключения;
-- Agent, Worker, heartbeat, публичный адрес и штатные состояния;
-- первый VLESS REALITY на `64441/tcp` с Vision и Firefox;
-- повторное подключение, обновление, отключение, удаление и журналы.
-
-На страницах Cascade, Cluster и карточки Node добавлены контекстные переходы прямо в нужные разделы Help. Актуализированы пользовательские документы и удалены старые названия `Network` из текущей документации.
-
-Сетевая логика, темы «Графит» и «Латте», существующие Cascade/Node, клиенты, UUID, ключи, сертификаты, Routing и GeoFiles не изменялись.
-
-Полное описание: [Release Notes RC70](RELEASE-NOTES-RC70.md). Руководства: [Cascade](docs/CASCADE.md), [Cluster и SG-Node](docs/MULTI-NODE.md), [Установка](docs/INSTALLATION.md), [Cloudflare WARP](docs/WARP.md), [Контракт SG-Panel → SG Client](docs/SG-CLIENT-MANAGED-PROFILE.md). История проекта: [CHANGELOG](CHANGELOG.md).
-
-## Основные пути на сервере
-
-```text
-/opt/xpanel-mvp                         приложение
-/opt/xpanel-mvp/data/panel.db           SQLite
-/usr/local/etc/xray/config.json         активная конфигурация Xray
-/etc/xpanel-mvp/web.env                 параметры backend
-/etc/xpanel-mvp/panel-access.env        публичный режим панели
-/root/sg-panel-backups                  резервные копии
-/root/sg-panel-first-user.txt           первая клиентская ссылка
-```
-
-## Ответственность
-
-Используйте проект в соответствии с законодательством своей страны и правилами провайдера. Перед установкой на сервер с другими сервисами изучите installer, updater и полный uninstall.
-
-Проект: **Ser.Gor**.
+Эта публикация является чистой cumulative-базой UI23. Дальнейшие изменения должны идти от неё без возврата удалённых build-отчётов, временных архивов и отвергнутых UI24/UI25.

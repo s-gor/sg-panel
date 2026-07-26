@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-# SG-Panel unified installer for a clean Ubuntu 24.04 EC2.
+# SG-Panel unified installer for Ubuntu 22.04 and newer.
+# Any official Ubuntu release is accepted; the installer is not tied to a
+# particular release channel.
 # The same file is intended for both:
 #   a downloaded GitHub bootstrap;
 #   a local test with the exact source ZIP supplied through --source-zip.
@@ -15,7 +17,9 @@ DEFAULT_INSTANCE_NAME="SG-Panel"
 DEFAULT_REALITY_DEST="www.bing.com:443"
 DEFAULT_REALITY_SNI="www.bing.com"
 EXPECTED_VERSION="0.10.0-rc70"
-LOCAL_ARCHIVE_NAME="070-SG-Panel-RC70.zip"
+EXPECTED_BUILD="FIX40"
+EXPECTED_RELEASE_LABEL="Preview 9 · FIX40 · UI23"
+LOCAL_ARCHIVE_NAME="SG-PANEL-FIX40-FULL-UI23-SOURCE.zip"
 ARCHIVE_URL="${SG_PANEL_ARCHIVE_URL:-https://github.com/${OWNER}/${REPO}/archive/refs/heads/${BRANCH}.zip}"
 LOG_FILE="${SG_PANEL_INSTALLER_LOG:-/var/log/sg-panel-installer-$(date -u +%Y%m%d-%H%M%S).log}"
 CORE_LOG="${SG_PANEL_CORE_LOG:-/var/log/sg-panel-core-install-$(date -u +%Y%m%d-%H%M%S).log}"
@@ -90,13 +94,34 @@ startup_error(){
   exit 1
 }
 
+supported_ubuntu_version(){
+  local version="${1:-}"
+  [[ "$version" =~ ^[0-9]+([.][0-9]+)?$ ]] || return 1
+  command -v dpkg >/dev/null 2>&1 || return 1
+  dpkg --compare-versions "$version" ge "22.04"
+}
+
+check_supported_platform(){
+  [[ -r /etc/os-release ]] || startup_error "Не удалось определить операционную систему."
+  # shellcheck disable=SC1091
+  . /etc/os-release
+  [[ "${ID:-}" == "ubuntu" ]] || \
+    startup_error "Поддерживается Ubuntu 22.04 и новее. Обнаружена: ${PRETTY_NAME:-unknown}."
+  supported_ubuntu_version "${VERSION_ID:-}" || \
+    startup_error "Нужна Ubuntu 22.04 или новее. Обнаружена версия: ${VERSION_ID:-unknown}."
+  case "$(uname -m)" in
+    x86_64|amd64|aarch64|arm64) ;;
+    *) startup_error "Поддерживаются архитектуры amd64 и arm64. Обнаружена: $(uname -m)." ;;
+  esac
+}
+
 usage(){
   cat <<'USAGE'
 Использование:
-  sudo bash install.sh --source-zip ./070-SG-Panel-RC70.zip
+  sudo bash install.sh --source-zip ./SG-PANEL-FIX40-FULL-UI23-SOURCE.zip
   sudo bash install.sh
 
-Для теста точной версии передайте архив RC70 через --source-zip.
+Для установки точной версии передайте архив FIX40 UI23 через --source-zip.
 Сначала мастер с зелёной вертушкой подготавливает Ubuntu и устанавливает все системные компоненты.
 После этого один раз запрашиваются параметры панели, затем установка продолжается без дополнительного ввода.
 Весь технический вывод apt, dpkg, curl, Python, Xray, Nginx и systemd идёт только в журналы.
@@ -412,6 +437,7 @@ collect_inputs(){
   printf '%s\n' \
     "SG-Panel — параметры новой установки" \
     "Ubuntu и необходимые системные компоненты уже подготовлены." \
+    "Начальная установка работает по HTTP: домен и TLS-сертификат не требуются." \
     "Сейчас один раз задаются параметры панели; затем установка продолжится без дополнительного ввода." \
     "Чтобы принять значение в квадратных скобках, нажмите Enter." \
     ""
@@ -488,12 +514,11 @@ prepare_system(){
   wait_for_apt
 }
 
-apt_update_and_upgrade(){
+apt_update_indexes(){
   wait_for_apt
   export DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a APT_LISTCHANGES_FRONTEND=none
   dpkg --configure -a
   apt-get -o DPkg::Lock::Timeout=900 -o Dpkg::Use-Pty=0 update -qq
-  apt-get -o DPkg::Lock::Timeout=900 -o Dpkg::Use-Pty=0 dist-upgrade -y -qq
 }
 
 apt_install_dependencies(){
@@ -565,7 +590,28 @@ prepare_source(){
   source_root="$(find "$WORK_DIR/extracted" -maxdepth 5 -type f \
     -path '*/deploy/ec2-first-install.sh' -printf '%h\n' | sed 's#/deploy$##' | head -n 1)"
   [[ -n "$source_root" && -f "$source_root/xpanel/__init__.py" ]]
-  grep -q "__version__ = \"$EXPECTED_VERSION\"" "$source_root/xpanel/__init__.py"
+  grep -Fq "__version__ = \"$EXPECTED_VERSION\"" "$source_root/xpanel/__init__.py"
+  grep -Fq "__build__ = \"$EXPECTED_BUILD\"" "$source_root/xpanel/__init__.py"
+  grep -Fq "__release_label__ = \"$EXPECTED_RELEASE_LABEL\"" "$source_root/xpanel/__init__.py"
+  [[ -f "$source_root/xpanel/static/fix40-node-simple-hotfix18.css" ]]
+  [[ -f "$source_root/xpanel/static/fix40-cascade-steps-ui20.css" ]]
+  [[ -f "$source_root/xpanel/static/fix40-cluster-restore-ui21.css" ]]
+  [[ -f "$source_root/xpanel/static/fix40-node-detail-polish-ui22.css" ]]
+  grep -Fq 'WORKER_VERSION = "0.7.0"' "$source_root/node_agent/sg_node_worker.py"
+  grep -Fq 'def upsert_cascade_access' "$source_root/node_agent/sg_node_worker.py"
+  grep -Fq 'def finalize_cascade_cluster_job' "$source_root/xpanel/service.py"
+  grep -Fq 'fix40-cascade-steps-ui20.css' "$source_root/xpanel/templates/base.html"
+  grep -Fq 'fix40-cluster-restore-ui21.css' "$source_root/xpanel/templates/base.html"
+  grep -Fq 'fix40-node-detail-polish-ui22.css' "$source_root/xpanel/templates/base.html"
+  grep -Fq 'HYSTERIA_SALAMANDER_MIN_VERSION = (26, 3, 27)' "$source_root/xpanel/service.py"
+  grep -Fq 'def _apply_hysteria_salamander_to_inbound' "$source_root/xpanel/service.py"
+  grep -Fq 'obfs_mode TEXT NOT NULL DEFAULT' "$source_root/xpanel/db.py"
+  grep -Fq 'data-hysteria-salamander-card' "$source_root/xpanel/templates/settings.html"
+  grep -Fq 'build_hysteria2_uri' "$source_root/xpanel/service.py"
+  grep -Fq 'compact-node-row' "$source_root/xpanel/templates/nodes.html"
+  grep -Fq 'node-restore-status' "$source_root/xpanel/templates/node_detail.html"
+  ! grep -Fq 'class="node-simple-nav"' "$source_root/xpanel/templates/node_detail.html"
+  ! grep -Fq '<select' "$source_root/xpanel/templates/cascade.html"
   find "$source_root" -type f -name '*.sh' -exec chmod 0755 {} +
   printf '%s\n' "$source_root" >"$WORK_DIR/source-root"
 }
@@ -607,13 +653,103 @@ validate_result(){
   port="$(grep -E '^PANEL_PUBLIC_PORT=' "$marker" | tail -1 | cut -d= -f2-)"
   [[ -n "$mode" && -n "$host" && "$port" =~ ^[0-9]+$ ]]
 
+  local login_body=""
   if [[ "$mode" == "https" ]]; then
-    curl -kfsS --max-time 10 --resolve "$host:$port:127.0.0.1" \
-      "https://$host:$port/login" >/dev/null
+    login_body="$(curl -kfsS --max-time 10 --resolve "$host:$port:127.0.0.1" \
+      "https://$host:$port/login")"
   else
-    curl -fsS --max-time 10 -H "Host: $host" \
-      "http://127.0.0.1:$port/login" >/dev/null
+    login_body="$(curl -fsS --max-time 10 -H "Host: $host" \
+      "http://127.0.0.1:$port/login")"
   fi
+  grep -Fq "$EXPECTED_BUILD" <<<"$login_body" || {
+    echo "GUI не отдаёт маркер сборки $EXPECTED_BUILD" >&2
+    return 1
+  }
+  local clients_css
+  if [[ "$mode" == "https" ]]; then
+    clients_css="$(curl -kfsS --max-time 10 --resolve "$host:$port:127.0.0.1" \
+      "https://$host:$port/static/fix40-clients-layout-hotfix3.css?v=$EXPECTED_VERSION-$EXPECTED_BUILD-clients-layout-hotfix3")"
+  else
+    clients_css="$(curl -fsS --max-time 10 -H "Host: $host" \
+      "http://127.0.0.1:$port/static/fix40-clients-layout-hotfix3.css?v=$EXPECTED_VERSION-$EXPECTED_BUILD-clients-layout-hotfix3")"
+  fi
+  grep -Fq "Clients Layout Hotfix 3" <<<"$clients_css" || {
+    echo "GUI не отдаёт Clients Layout Hotfix 3" >&2
+    return 1
+  }
+  local global_css
+  if [[ "$mode" == "https" ]]; then
+    global_css="$(curl -kfsS --max-time 10 --resolve "$host:$port:127.0.0.1" \
+      "https://$host:$port/static/fix40-interface-cleanup-hotfix5.css?v=$EXPECTED_VERSION-$EXPECTED_BUILD-interface-cleanup-hotfix5")"
+  else
+    global_css="$(curl -fsS --max-time 10 -H "Host: $host" \
+      "http://127.0.0.1:$port/static/fix40-interface-cleanup-hotfix5.css?v=$EXPECTED_VERSION-$EXPECTED_BUILD-interface-cleanup-hotfix5")"
+  fi
+  grep -Fq "Interface Cleanup Hotfix 5" <<<"$global_css" || {
+    echo "GUI не отдаёт Interface Cleanup Hotfix 5" >&2
+    return 1
+  }
+  if [[ "$mode" == "https" ]]; then
+    global_css="$(curl -kfsS --max-time 10 --resolve "$host:$port:127.0.0.1" \
+      "https://$host:$port/static/fix40-ui-compact-hotfix6.css?v=$EXPECTED_VERSION-$EXPECTED_BUILD-ui-compact-hotfix6")"
+  else
+    global_css="$(curl -fsS --max-time 10 -H "Host: $host" \
+      "http://127.0.0.1:$port/static/fix40-ui-compact-hotfix6.css?v=$EXPECTED_VERSION-$EXPECTED_BUILD-ui-compact-hotfix6")"
+  fi
+  grep -Fq "UI Compact Hotfix 6" <<<"$global_css" || {
+    echo "GUI не отдаёт UI Compact Hotfix 6" >&2
+    return 1
+  }
+  local tabs_css
+  tabs_css="$(curl -fsS --max-time 10 "http://127.0.0.1:8080/static/fix40-global-tabs-dark-buttons-hotfix7.css")"
+  grep -Fq "Global Tabs and Dark Buttons Hotfix 7" <<<"$tabs_css" || {
+    echo "GUI не отдаёт Global Tabs and Dark Buttons Hotfix 7" >&2
+    return 1
+  }
+  local ui8_css
+  ui8_css="$(curl -fsS --max-time 10 "http://127.0.0.1:8080/static/fix40-interface-verification-hotfix8.css")"
+  grep -Fq "Interface Verification Hotfix 8" <<<"$ui8_css" || {
+    echo "GUI не отдаёт Interface Verification Hotfix 8" >&2
+    return 1
+  }
+  local ui9_css
+  ui9_css="$(curl -fsS --max-time 10 "http://127.0.0.1:8080/static/fix40-light-buttons-theme-icon-hotfix9.css")"
+  grep -Fq "Light Button Gradient and Theme Icon Hotfix 9" <<<"$ui9_css" || {
+    echo "GUI не отдаёт Light Button Gradient and Theme Icon Hotfix 9" >&2
+    return 1
+  }
+  local ui18_css
+  ui18_css="$(curl -fsS --max-time 10 "http://127.0.0.1:8080/static/fix40-node-simple-hotfix18.css")"
+  grep -Fq "Node card and safe card geometry" <<<"$ui18_css" || {
+    echo "GUI не отдаёт Node Simple Hotfix 18" >&2
+    return 1
+  }
+  local ui19_css
+  ui19_css="$(curl -fsS --max-time 10 "http://127.0.0.1:8080/static/fix40-cascade-steps-ui20.css")"
+  grep -Fq "guided three-step Cascade" <<<"$ui19_css" || {
+    echo "GUI не отдаёт Cascade Steps UI20" >&2
+    return 1
+  }
+  local ui21_css
+  ui21_css="$(curl -fsS --max-time 10 "http://127.0.0.1:8080/static/fix40-cluster-restore-ui21.css")"
+  grep -Fq "Restore the compact Cluster and SG-Node card" <<<"$ui21_css" || {
+    echo "GUI не отдаёт Cluster Restore UI21" >&2
+    return 1
+  }
+  local ui22_css
+  ui22_css="$(curl -fsS --max-time 10 "http://127.0.0.1:8080/static/fix40-node-detail-polish-ui22.css")"
+  grep -Fq "remove the inherited gray slabs" <<<"$ui22_css" || {
+    echo "GUI не отдаёт Node Detail Polish UI22" >&2
+    return 1
+  }
+  grep -Fq 'HYSTERIA_SALAMANDER_MIN_VERSION = (26, 3, 27)' "$TARGET/xpanel/service.py" || {
+    echo "установленный код не содержит Salamander UI23" >&2
+    return 1
+  }
+  grep -Fq 'data-hysteria-salamander-card' "$TARGET/xpanel/templates/settings.html" || {
+    echo "установленный GUI не содержит Salamander UI23" >&2
+    return 1
+  }
 }
 
 show_result(){
@@ -626,7 +762,7 @@ show_result(){
   cat <<EOF_RESULT
 
 ============================================================
- SG-Panel $EXPECTED_VERSION — установка завершена успешно
+ SG-Panel $EXPECTED_RELEASE_LABEL ($EXPECTED_BUILD; core $EXPECTED_VERSION) — установка завершена успешно
 ============================================================
 
 ПАНЕЛЬ
@@ -655,18 +791,20 @@ EOF_RESULT
 }
 
 main(){
-  startup_begin "Запуск мастера установки RC70"
+  startup_begin "Запуск мастера полной установки SG-Panel"
   [[ $EUID -eq 0 ]] || startup_error "Запустите установщик через sudo bash."
-  [[ -r /etc/os-release ]] || startup_error "Не удалось определить операционную систему."
-  # shellcheck disable=SC1091
-  . /etc/os-release
-  [[ "${ID:-}" == "ubuntu" && "${VERSION_ID:-}" == "24.04" ]] || \
-    startup_error "Поддерживается чистая Ubuntu Server 24.04 LTS."
+  if [[ -e /opt/xpanel-mvp || -e /etc/xpanel-mvp || -e /var/lib/xpanel-mvp || -e /var/log/xpanel-mvp ]]; then
+    startup_error "Этот файл предназначен только для новой EC2. Обнаружены следы установленной SG-Panel; ничего не удалено."
+  fi
+  if command -v systemctl >/dev/null 2>&1 && systemctl list-unit-files --no-legend 2>/dev/null | awk '{print $1}' | grep -Eq '^(xpanel-web|xray|nginx)\.service$'; then
+    startup_error "Этот файл предназначен только для новой EC2. Обнаружены уже установленные службы SG-Panel/Xray/Nginx; ничего не удалено."
+  fi
+  check_supported_platform
   [[ -r /dev/tty && -w /dev/tty ]] || \
     startup_error "Нужен интерактивный терминал для первоначальных вопросов."
 
   if [[ -n "$SOURCE_ZIP_ARG" && ! -f "$SOURCE_ZIP_ARG" ]]; then
-    startup_error "Не найден архив RC70: $SOURCE_ZIP_ARG"
+    startup_error "Не найден архив SG-Panel FIX40: $SOURCE_ZIP_ARG"
   fi
 
   install -d -m 0755 "$(dirname "$LOG_FILE")"
@@ -675,19 +813,19 @@ main(){
   : >"$CORE_LOG"
   chmod 0600 "$CORE_LOG"
   WORK_DIR="$(mktemp -d /tmp/sg-panel-install.XXXXXX)"
-  startup_ok "Мастер установки RC70 запущен"
+  startup_ok "Мастер полной установки SG-Panel запущен"
 
   # Надёжный bootstrap выполняется до вопросов. Пользователь с первой секунды
   # видит зелёную вертушку, а весь apt/dpkg-вывод остаётся в журнале.
   run_step "Этап 1/7 · Подготовка чистой Ubuntu" prepare_system
-  run_step "Этап 2/7 · Обновление Ubuntu" apt_update_and_upgrade
+  run_step "Этап 2/7 · Обновление индексов APT" apt_update_indexes
   run_step "Этап 3/7 · Установка системных компонентов" apt_install_dependencies
   run_step "Этап 4/7 · Определение публичного адреса" detect_public_address_stage
 
   PREDETECTED_PUBLIC_IPV4="$(cat "$WORK_DIR/public-ipv4" 2>/dev/null || true)"
   collect_inputs
 
-  run_step "Этап 5/7 · Проверка и распаковка SG-Panel RC70" prepare_source
+  run_step "Этап 5/7 · Проверка и распаковка SG-Panel FIX40" prepare_source
   run_step "Этап 6/7 · Установка SG-Panel, Xray и Nginx" install_panel
   unset ADMIN_PASSWORD
   run_step "Этап 7/7 · Финальная проверка панели и служб" validate_result

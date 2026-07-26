@@ -2,8 +2,14 @@
 set -Eeuo pipefail
 
 EXPECTED_VERSION="0.10.0-rc70"
+EXPECTED_BUILD="FIX40"
+EXPECTED_RELEASE_LABEL="Preview 9 · FIX40 · UI23"
 SOURCE_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
-XRAY_VERSION="v26.5.9"
+XRAY_VERSION_FILE="$SOURCE_DIR/deploy/xray-version.env"
+[[ -r "$XRAY_VERSION_FILE" ]] || { echo "не найден единый файл версии Xray: $XRAY_VERSION_FILE" >&2; exit 1; }
+# shellcheck disable=SC1090
+source "$XRAY_VERSION_FILE"
+[[ "${XRAY_VERSION:-}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "некорректная версия Xray в $XRAY_VERSION_FILE" >&2; exit 1; }
 DEFAULT_PANEL_PORT="61443"
 DEFAULT_BACKEND_PORT="8080"
 DEFAULT_REALITY_DEST="www.bing.com:443"
@@ -222,7 +228,31 @@ ensure_xray_version(){
     return 1
   fi
   systemctl enable xray >/dev/null 2>&1 || true
-  if [[ -s "$config" ]]; then
+
+  # На совершенно новой Ubuntu официальный Xray-install создаёт временный
+  # config.json со значением {}. Такой placeholder синтаксически корректен,
+  # но Xray может завершиться сразу, потому что рабочих inbound/outbound ещё нет.
+  # Настоящий конфиг SG-Panel создаётся на этапе 8/9; там же служба обязана
+  # запуститься и затем строго проверяется на этапе 9/9.
+  local bootstrap_placeholder=0
+  if [[ ! -d "$TARGET" && -s "$config" ]]; then
+    if python3 - "$config" <<'PY_XRAY_PLACEHOLDER'
+import json
+import sys
+
+try:
+    with open(sys.argv[1], "r", encoding="utf-8") as handle:
+        value = json.load(handle)
+except Exception:
+    raise SystemExit(1)
+raise SystemExit(0 if value == {} else 1)
+PY_XRAY_PLACEHOLDER
+    then
+      bootstrap_placeholder=1
+    fi
+  fi
+
+  if [[ -s "$config" && "$bootstrap_placeholder" -eq 0 ]]; then
     systemctl restart xray
     sleep 1
     systemctl is-active --quiet xray || {
@@ -230,6 +260,9 @@ ensure_xray_version(){
       rollback_xray
       return 1
     }
+  else
+    systemctl stop xray >/dev/null 2>&1 || true
+    log "Xray $XRAY_VERSION установлен; запуск отложен до создания рабочего конфига SG-Panel"
   fi
 }
 
@@ -261,7 +294,27 @@ done
 [[ $EUID -eq 0 ]] || fail "запустите скрипт от root"
 cd /
 [[ -f "$SOURCE_DIR/xpanel/__init__.py" ]] || fail "не найден каталог проекта"
-grep -q "__version__ = \"$EXPECTED_VERSION\"" "$SOURCE_DIR/xpanel/__init__.py" || fail "исходники не версии $EXPECTED_VERSION"
+grep -Fq "__version__ = \"$EXPECTED_VERSION\"" "$SOURCE_DIR/xpanel/__init__.py" || fail "исходники не версии ядра $EXPECTED_VERSION"
+grep -Fq "__build__ = \"$EXPECTED_BUILD\"" "$SOURCE_DIR/xpanel/__init__.py" || fail "исходники не сборки $EXPECTED_BUILD"
+grep -Fq "__release_label__ = \"$EXPECTED_RELEASE_LABEL\"" "$SOURCE_DIR/xpanel/__init__.py" || fail "исходники не релиза $EXPECTED_RELEASE_LABEL"
+[[ -f "$SOURCE_DIR/xpanel/static/fix40-cascade-steps-ui20.css" ]] || fail "в исходниках отсутствует Cascade Steps UI20"
+[[ -f "$SOURCE_DIR/xpanel/static/fix40-cluster-restore-ui21.css" ]] || fail "в исходниках отсутствует Cluster Restore UI21"
+grep -Fq "Restore the compact Cluster and SG-Node card" "$SOURCE_DIR/xpanel/static/fix40-cluster-restore-ui21.css" || fail "CSS Cluster Restore UI21 повреждён"
+grep -Fq 'fix40-cluster-restore-ui21.css' "$SOURCE_DIR/xpanel/templates/base.html" || fail "Cluster Restore UI21 не подключён"
+[[ -f "$SOURCE_DIR/xpanel/static/fix40-node-detail-polish-ui22.css" ]] || fail "в исходниках отсутствует Node Detail Polish UI22"
+grep -Fq 'remove the inherited gray slabs' "$SOURCE_DIR/xpanel/static/fix40-node-detail-polish-ui22.css" || fail "CSS Node Detail Polish UI22 повреждён"
+grep -Fq 'fix40-node-detail-polish-ui22.css' "$SOURCE_DIR/xpanel/templates/base.html" || fail "Node Detail Polish UI22 не подключён"
+grep -Fq 'HYSTERIA_SALAMANDER_MIN_VERSION = (26, 3, 27)' "$SOURCE_DIR/xpanel/service.py" || fail "в исходниках отсутствует контракт Salamander UI23"
+grep -Fq 'def _apply_hysteria_salamander_to_inbound' "$SOURCE_DIR/xpanel/service.py" || fail "в исходниках отсутствует безопасное слияние FinalMask UI23"
+grep -Fq 'obfs_mode TEXT NOT NULL DEFAULT' "$SOURCE_DIR/xpanel/db.py" || fail "в исходниках отсутствует миграция Salamander UI23"
+grep -Fq 'data-hysteria-salamander-card' "$SOURCE_DIR/xpanel/templates/settings.html" || fail "в интерфейсе отсутствует Salamander UI23"
+grep -Fq 'build_hysteria2_uri' "$SOURCE_DIR/xpanel/service.py" || fail "в исходниках отсутствует единый URI builder Salamander UI23"
+grep -Fq 'compact-node-row' "$SOURCE_DIR/xpanel/templates/nodes.html" || fail "компактный список Cluster не найден"
+grep -Fq 'node-restore-status' "$SOURCE_DIR/xpanel/templates/node_detail.html" || fail "компактная карточка SG-Node не найдена"
+! grep -Fq 'class="node-simple-nav"' "$SOURCE_DIR/xpanel/templates/node_detail.html" || fail "в карточке SG-Node осталась дублирующая навигация"
+grep -Fq 'WORKER_VERSION = "0.7.0"' "$SOURCE_DIR/node_agent/sg_node_worker.py" || fail "в исходниках отсутствует Worker UI19"
+grep -Fq 'def upsert_cascade_access' "$SOURCE_DIR/node_agent/sg_node_worker.py" || fail "в Worker отсутствует безопасная операция Cascade"
+! grep -Fq '<select' "$SOURCE_DIR/xpanel/templates/cascade.html" || fail "в Cascade остался системный select"
 install -d -m 0755 "$(dirname "$LOG_FILE")"
 touch "$LOG_FILE"
 chmod 0600 "$LOG_FILE"
@@ -538,15 +591,22 @@ if [[ $PRESERVE_PANEL_ACCESS -eq 0 ]]; then
   done
 fi
 
-ensure_swap(){
-  local mem_kib
+check_memory_and_disk(){
+  local mem_kib root_free_kib root_free_mib
   mem_kib="$(awk '/MemTotal:/ {print $2}' /proc/meminfo)"
-  if (( mem_kib < 1572864 )) && ! swapon --show=NAME --noheadings | grep -qx '/swapfile'; then
-    [[ -f /swapfile ]] || fallocate -l 2G /swapfile
-    chmod 600 /swapfile
-    blkid /swapfile 2>/dev/null | grep -q 'TYPE="swap"' || mkswap /swapfile >/dev/null
-    swapon /swapfile
-    grep -q '^/swapfile[[:space:]]' /etc/fstab || echo '/swapfile none swap sw 0 0' >> /etc/fstab
+  root_free_kib="$(df -Pk / | awk 'NR==2 {print $4}')"
+  root_free_mib=$(( root_free_kib / 1024 ))
+
+  # Не блокируем установку искусственным фиксированным порогом: реальную
+  # пригодность диска подтверждают apt/dpkg и запись каждого компонента.
+  log "Свободное место корневого раздела перед установкой: ${root_free_mib} MiB."
+
+  if (( mem_kib < 1572864 )); then
+    log "Оперативной памяти меньше 1.5 GiB. Swap автоматически не создаётся; существующий swap сохраняется без изменений."
+  fi
+
+  if [[ -f /swapfile ]]; then
+    log "Обнаружен существующий /swapfile. Установщик не изменяет и не удаляет его."
   fi
 }
 
@@ -567,7 +627,6 @@ install_system_packages(){
   wait_for_apt
   dpkg --configure -a
   apt-get -o DPkg::Lock::Timeout=900 -o Dpkg::Use-Pty=0 update -qq
-  apt-get -o DPkg::Lock::Timeout=900 -o Dpkg::Use-Pty=0 dist-upgrade -y
   apt-get -o DPkg::Lock::Timeout=900 -o Dpkg::Use-Pty=0 install -y \
     curl ca-certificates unzip rsync zstd psmisc \
     python3 python3-venv python3-pip \
@@ -656,7 +715,7 @@ configure_panel_access_stage(){
 
 validate_installation_stage(){
   cd "$TARGET"
-  local cli_version xray_version mode host port url
+  local cli_version xray_version mode host port url login_body
   cli_version="$(.venv/bin/python -m xpanel --version | awk '{print $2}')"
   [[ "$cli_version" == "$EXPECTED_VERSION" ]] || fail "неожиданная версия CLI: $cli_version"
   xray_version="v$(/usr/local/bin/xray version | awk 'NR==1 {print $2}' | sed 's/^v//')"
@@ -674,10 +733,46 @@ validate_installation_stage(){
   port="$PANEL_PUBLIC_PORT"
   if [[ "$mode" == "https" ]]; then
     url="https://$host:$port"
-    curl -kfsS --max-time 5 --resolve "$host:$port:127.0.0.1" "$url/login" >/dev/null
+    login_body="$(curl -kfsS --max-time 5 --resolve "$host:$port:127.0.0.1" "$url/login")"
   else
-    curl -fsS --max-time 5 -H "Host: $host" "http://127.0.0.1:$port/login" >/dev/null
+    login_body="$(curl -fsS --max-time 5 -H "Host: $host" "http://127.0.0.1:$port/login")"
   fi
+  grep -Fq "$EXPECTED_BUILD" <<<"$login_body" || fail "GUI не отдаёт маркер сборки $EXPECTED_BUILD"
+  local clients_css
+  if [[ "$mode" == "https" ]]; then
+    clients_css="$(curl -kfsS --max-time 5 --resolve "$host:$port:127.0.0.1" \
+      "$url/static/fix40-clients-layout-hotfix3.css?v=$EXPECTED_VERSION-$EXPECTED_BUILD-clients-layout-hotfix3")"
+  else
+    clients_css="$(curl -fsS --max-time 5 -H "Host: $host" \
+      "http://127.0.0.1:$port/static/fix40-clients-layout-hotfix3.css?v=$EXPECTED_VERSION-$EXPECTED_BUILD-clients-layout-hotfix3")"
+  fi
+  grep -Fq "Clients Layout Hotfix 3" <<<"$clients_css" || fail "GUI не отдаёт Clients Layout Hotfix 3"
+  local global_css
+  if [[ "$mode" == "https" ]]; then
+    global_css="$(curl -kfsS --max-time 5 --resolve "$host:$port:127.0.0.1" \
+      "$url/static/fix40-interface-cleanup-hotfix5.css?v=$EXPECTED_VERSION-$EXPECTED_BUILD-interface-cleanup-hotfix5")"
+  else
+    global_css="$(curl -fsS --max-time 5 -H "Host: $host" \
+      "http://127.0.0.1:$port/static/fix40-interface-cleanup-hotfix5.css?v=$EXPECTED_VERSION-$EXPECTED_BUILD-interface-cleanup-hotfix5")"
+  fi
+  grep -Fq "Interface Cleanup Hotfix 5" <<<"$global_css" || fail "GUI не отдаёт Interface Cleanup Hotfix 5"
+  if [[ "$mode" == "https" ]]; then
+    global_css="$(curl -kfsS --max-time 5 --resolve "$host:$port:127.0.0.1" \
+      "$url/static/fix40-ui-compact-hotfix6.css?v=$EXPECTED_VERSION-$EXPECTED_BUILD-ui-compact-hotfix6")"
+  else
+    global_css="$(curl -fsS --max-time 5 -H "Host: $host" \
+      "http://127.0.0.1:$port/static/fix40-ui-compact-hotfix6.css?v=$EXPECTED_VERSION-$EXPECTED_BUILD-ui-compact-hotfix6")"
+  fi
+  grep -Fq "UI Compact Hotfix 6" <<<"$global_css" || fail "GUI не отдаёт UI Compact Hotfix 6"
+  local tabs_css
+  tabs_css="$(curl -fsS --max-time 10 "http://127.0.0.1:8080/static/fix40-global-tabs-dark-buttons-hotfix7.css")"
+  grep -Fq "Global Tabs and Dark Buttons Hotfix 7" <<<"$tabs_css" || fail "GUI не отдаёт Global Tabs and Dark Buttons Hotfix 7"
+  local ui8_css
+  ui8_css="$(curl -fsS --max-time 10 "http://127.0.0.1:8080/static/fix40-interface-verification-hotfix8.css")"
+  grep -Fq "Interface Verification Hotfix 8" <<<"$ui8_css" || fail "GUI не отдаёт Interface Verification Hotfix 8"
+  local ui9_css
+  ui9_css="$(curl -fsS --max-time 10 "http://127.0.0.1:8080/static/fix40-light-buttons-theme-icon-hotfix9.css")"
+  grep -Fq "Light Button Gradient and Theme Icon Hotfix 9" <<<"$ui9_css" || fail "GUI не отдаёт Light Button Gradient and Theme Icon Hotfix 9"
   write_install_marker "$mode" "$host" "$port"
 }
 
@@ -692,7 +787,7 @@ check_panel_port_stage(){
 
 apply_and_publish_stage(){ apply_xray_stage; configure_panel_access_stage; }
 
-run_stage "Этап 1/9 · Подготовка памяти и swap" ensure_swap
+run_stage "Этап 1/9 · Проверка памяти и свободного места" check_memory_and_disk
 run_stage "Этап 2/9 · Обновление системы и установка пакетов" install_system_packages
 run_stage "Этап 3/9 · Проверка публичного порта панели" check_panel_port_stage
 run_stage "Этап 4/9 · Установка или проверка Xray" install_xray_stage
@@ -735,7 +830,7 @@ ACTIVE_XRAY_VERSION="v$(/usr/local/bin/xray version | awk 'NR==1 {print $2}' | s
 cat <<EOF_RESULT
 
 ============================================================
- SG-Panel $EXPECTED_VERSION — установка завершена успешно
+ SG-Panel $EXPECTED_RELEASE_LABEL ($EXPECTED_BUILD; core $EXPECTED_VERSION) — установка завершена успешно
 ============================================================
 
 ПАНЕЛЬ УПРАВЛЕНИЯ

@@ -6,6 +6,7 @@ import re
 import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Any
+from urllib.parse import quote, unquote, urlencode, urlsplit, urlunsplit
 
 from .db import connect
 
@@ -30,6 +31,14 @@ STATE_LABELS = {
     "offline": "Нет связи",
     "revoked": "Отозван",
 }
+
+DEPLOYMENT_SLOT_LABELS = {
+    "primary": "Основное",
+    "backup": "Резервное",
+    "alt": "Следующее",
+}
+DEPLOYMENT_SLOT_PRIORITY = {"primary": 10, "backup": 20, "alt": 100}
+
 
 
 def _now() -> datetime:
@@ -370,6 +379,10 @@ def _metadata_fields(payload: dict[str, Any]) -> dict[str, Any]:
         "nginx_version": _clean_text(payload.get("nginx_version"), max_length=120),
         "nginx_state": _safe_service_state(payload.get("nginx_state")),
         "inbound_profile": _clean_text(payload.get("inbound_profile"), max_length=60),
+        "geofiles_generation": _clean_text(payload.get("geofiles_generation"), max_length=128),
+        "geofiles_source": _clean_text(payload.get("geofiles_source"), max_length=80),
+        "geofiles_geoip_sha256": _clean_text(payload.get("geofiles_geoip_sha256"), max_length=64),
+        "geofiles_geosite_sha256": _clean_text(payload.get("geofiles_geosite_sha256"), max_length=64),
         "cpu_percent": _safe_number(payload.get("cpu_percent")),
         "memory_percent": _safe_number(payload.get("memory_percent")),
         "disk_percent": _safe_number(payload.get("disk_percent")),
@@ -431,7 +444,8 @@ def register_node(
                 architecture = ?, agent_version = ?, agent_state = ?,
                 worker_version = ?, worker_state = ?, xray_version = ?,
                 xray_state = ?, nginx_version = ?, nginx_state = ?,
-                inbound_profile = ?, cpu_percent = ?,
+                inbound_profile = ?, geofiles_generation = ?, geofiles_source = ?,
+                geofiles_geoip_sha256 = ?, geofiles_geosite_sha256 = ?, cpu_percent = ?,
                 memory_percent = ?, disk_percent = ?, load1 = ?, client_count = ?,
                 last_error = ?, last_seen_at = ?, registered_at = COALESCE(registered_at, ?),
                 updated_at = CURRENT_TIMESTAMP
@@ -453,6 +467,10 @@ def register_node(
                 fields["nginx_version"],
                 fields["nginx_state"],
                 fields["inbound_profile"],
+                fields["geofiles_generation"],
+                fields["geofiles_source"],
+                fields["geofiles_geoip_sha256"],
+                fields["geofiles_geosite_sha256"],
                 fields["cpu_percent"],
                 fields["memory_percent"],
                 fields["disk_percent"],
@@ -498,6 +516,11 @@ def _node_by_agent_token(agent_token: str) -> dict[str, Any]:
     return node
 
 
+def authenticate_node_token(agent_token: str) -> dict[str, Any]:
+    """Authenticate an SG-Node without changing heartbeat or runtime state."""
+    return _node_by_agent_token(agent_token)
+
+
 def heartbeat_node(agent_token: str, payload: dict[str, Any] | None = None) -> dict[str, Any]:
     node = _node_by_agent_token(agent_token)
     fields = _metadata_fields(payload or {})
@@ -510,8 +533,9 @@ def heartbeat_node(agent_token: str, payload: dict[str, Any] | None = None) -> d
                 platform_version = ?, architecture = ?, agent_version = ?,
                 agent_state = ?, worker_version = ?, worker_state = ?,
                 xray_version = ?, xray_state = ?, nginx_version = ?,
-                nginx_state = ?, inbound_profile = ?, cpu_percent = ?,
-                memory_percent = ?, disk_percent = ?, load1 = ?,
+                nginx_state = ?, inbound_profile = ?, geofiles_generation = ?,
+                geofiles_source = ?, geofiles_geoip_sha256 = ?, geofiles_geosite_sha256 = ?,
+                cpu_percent = ?, memory_percent = ?, disk_percent = ?, load1 = ?,
                 client_count = ?, last_error = ?, last_seen_at = ?,
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = ?
@@ -530,6 +554,10 @@ def heartbeat_node(agent_token: str, payload: dict[str, Any] | None = None) -> d
                 fields["nginx_version"],
                 fields["nginx_state"],
                 fields["inbound_profile"],
+                fields["geofiles_generation"],
+                fields["geofiles_source"],
+                fields["geofiles_geoip_sha256"],
+                fields["geofiles_geosite_sha256"],
                 fields["cpu_percent"],
                 fields["memory_percent"],
                 fields["disk_percent"],
@@ -619,6 +647,33 @@ JOB_STATUS_LABELS = {
 }
 
 
+def _visible_job_title(value: object) -> str:
+    """Hide legacy connection-role words from ordinary Cluster history."""
+    text = str(value or "").strip()
+    text = re.sub(r"(?i)\bПодготовить\s+Backup\b", "Развернуть подключения", text)
+    text = re.sub(r"(?i)\bСделать\s+Primary\b", "Изменить порядок подключения", text)
+    text = re.sub(r"(?i)(?:/|\s*[·:—-]\s*)?(?:Primary|Backup|Alt)\b", "", text)
+    text = re.sub(r"\s{2,}", " ", text).strip(" ·:—-/")
+    return text or "Задание SG-Node"
+
+
+def _visible_job_client_link(value: object) -> str:
+    """Keep a working legacy URI while removing role suffixes from its title."""
+    raw = str(value or "").strip()
+    if not raw:
+        return ""
+    try:
+        parts = urlsplit(raw)
+    except ValueError:
+        return raw
+    fragment = unquote(parts.fragment or "").strip()
+    if fragment:
+        fragment = re.sub(r"(?i)/(?:Primary|Backup|Alt)$", "", fragment).strip(" /")
+        if re.fullmatch(r"(?i)(?:Primary|Backup|Alt)", fragment):
+            fragment = "Профиль"
+    return urlunsplit((parts.scheme, parts.netloc, parts.path, parts.query, quote(fragment, safe="/")))
+
+
 def _job_dict(row: Any) -> dict[str, Any]:
     item = dict(row)
     for source, target in (("payload_json", "payload"), ("result_json", "result")):
@@ -629,6 +684,8 @@ def _job_dict(row: Any) -> dict[str, Any]:
         item[target] = parsed if isinstance(parsed, dict) else {}
     status = str(item.get("status") or "queued")
     item["status_label"] = JOB_STATUS_LABELS.get(status, status)
+    item["display_title"] = _visible_job_title(item.get("title"))
+    item["display_client_link"] = _visible_job_client_link(item.get("client_link"))
     return item
 
 
@@ -707,9 +764,10 @@ def _backfill_node_deployments() -> None:
                     if user_uuid:
                         found[user_uuid] = str(value.get("email") or value.get("name") or user_uuid)
             existing = con.execute(
-                "SELECT id, user_uuid, state FROM node_deployments WHERE node_id = ?",
+                "SELECT id, user_id, device_id, user_uuid, user_name, device_name, state FROM node_deployments WHERE node_id = ?",
                 (node_id,),
             ).fetchall()
+            existing_by_uuid = {str(row["user_uuid"]): row for row in existing}
             for row in existing:
                 if str(row["user_uuid"]) not in found and str(row["state"]) == "active":
                     con.execute(
@@ -717,33 +775,79 @@ def _backfill_node_deployments() -> None:
                         (int(row["id"]),),
                     )
             for user_uuid, fallback_name in found.items():
-                user = con.execute(
-                    "SELECT id, name FROM users WHERE uuid = ?", (user_uuid,)
+                device = con.execute(
+                    """
+                    SELECT d.id AS device_id, d.name AS device_name, d.user_id,
+                           u.name AS user_name
+                    FROM devices d JOIN users u ON u.id=d.user_id
+                    WHERE d.uuid=?
+                    """,
+                    (user_uuid,),
                 ).fetchone()
-                user_id = int(user["id"]) if user is not None else None
-                user_name = str(user["name"]) if user is not None else fallback_name
+                prior = existing_by_uuid.get(user_uuid)
+                user_id = int(device["user_id"]) if device is not None else None
+                device_id = int(device["device_id"]) if device is not None else None
+                user_name = str(device["user_name"]) if device is not None else fallback_name
+                device_name = str(device["device_name"]) if device is not None else ""
+                # UUID rotation intentionally leaves the previous credential on
+                # the Node until an explicit Agent redeployment removes it. Keep
+                # that stale row associated with its central client and keep its
+                # error state instead of turning it back into an active orphan
+                # merely because the old UUID still appears in the last config.
+                if device is None and prior is not None and prior["user_id"] is not None:
+                    linked = con.execute(
+                        "SELECT id, name FROM users WHERE id = ?", (int(prior["user_id"]),)
+                    ).fetchone()
+                    if linked is not None:
+                        user_id = int(linked["id"])
+                        user_name = str(linked["name"])
                 con.execute(
                     """
                     INSERT INTO node_deployments
-                        (node_id, user_id, user_uuid, user_name, profile, public_port,
+                        (node_id, user_id, device_id, user_uuid, device_uuid,
+                         user_name, device_name, profile, public_port,
                          client_link, state, last_job_id, last_message)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, 'active', ?, 'Восстановлено из последней конфигурации')
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, 'Восстановлено из последней конфигурации')
                     ON CONFLICT(node_id, user_uuid) DO UPDATE SET
-                        user_id=excluded.user_id,
-                        user_name=excluded.user_name,
+                        user_id=COALESCE(excluded.user_id, node_deployments.user_id),
+                        device_id=COALESCE(excluded.device_id, node_deployments.device_id),
+                        device_uuid=excluded.device_uuid,
+                        user_name=CASE
+                            WHEN excluded.user_id IS NOT NULL THEN excluded.user_name
+                            ELSE node_deployments.user_name
+                        END,
+                        device_name=CASE
+                            WHEN excluded.device_id IS NOT NULL THEN excluded.device_name
+                            ELSE node_deployments.device_name
+                        END,
                         profile=excluded.profile,
                         public_port=excluded.public_port,
                         client_link=CASE WHEN excluded.client_link != '' THEN excluded.client_link ELSE node_deployments.client_link END,
-                        state='active',
+                        state=CASE
+                            WHEN node_deployments.state='error'
+                                 AND node_deployments.user_id IS NOT NULL
+                                 AND excluded.user_id IS NOT NULL
+                            THEN 'error'
+                            ELSE 'active'
+                        END,
                         last_job_id=excluded.last_job_id,
-                        last_message='Восстановлено из последней конфигурации',
+                        last_message=CASE
+                            WHEN node_deployments.state='error'
+                                 AND node_deployments.user_id IS NOT NULL
+                                 AND excluded.user_id IS NOT NULL
+                            THEN node_deployments.last_message
+                            ELSE 'Восстановлено из последней конфигурации'
+                        END,
                         updated_at=CURRENT_TIMESTAMP
                     """,
                     (
                         node_id,
                         user_id,
+                        device_id,
+                        user_uuid,
                         user_uuid,
                         user_name[:80],
+                        device_name[:80],
                         str(payload.get("profile") or "")[:80],
                         public_port,
                         str(latest.get("client_link") or "")[:4096],
@@ -759,10 +863,22 @@ def list_node_deployments(node_id: int, *, include_removed: bool = False) -> lis
     params: list[Any] = [int(node_id)]
     if not include_removed:
         query += " AND state != 'removed'"
-    query += " ORDER BY user_name COLLATE NOCASE, id"
+    query += " ORDER BY CASE slot WHEN 'primary' THEN 10 WHEN 'backup' THEN 20 ELSE 100 END, priority, user_name COLLATE NOCASE, id"
     with connect() as con:
         rows = con.execute(query, params).fetchall()
-    return [dict(row) for row in rows]
+    return [_decorate_deployment(dict(row)) for row in rows]
+
+
+def _decorate_deployment(item: dict[str, Any]) -> dict[str, Any]:
+    slot = str(item.get("slot") or "alt")
+    if slot not in DEPLOYMENT_SLOT_LABELS:
+        slot = "alt"
+    item["slot"] = slot
+    item["slot_label"] = DEPLOYMENT_SLOT_LABELS[slot]
+    item["priority"] = int(item.get("priority") or DEPLOYMENT_SLOT_PRIORITY[slot])
+    item["subscription_enabled"] = bool(item.get("subscription_enabled"))
+    item["desired_state"] = str(item.get("desired_state") or "active")
+    return item
 
 
 def list_user_deployments(user_id: int, *, include_removed: bool = False) -> list[dict[str, Any]]:
@@ -770,7 +886,8 @@ def list_user_deployments(user_id: int, *, include_removed: bool = False) -> lis
     query = """
         SELECT d.*, n.name AS node_name, n.location AS node_location,
                n.state AS node_state, n.is_local AS node_is_local,
-               n.last_seen_at AS node_last_seen_at, n.registered_at AS node_registered_at
+               n.last_seen_at AS node_last_seen_at, n.registered_at AS node_registered_at,
+               n.public_address AS node_public_address, n.role AS node_role
         FROM node_deployments d
         JOIN nodes n ON n.id = d.node_id
         WHERE d.user_id = ?
@@ -778,12 +895,12 @@ def list_user_deployments(user_id: int, *, include_removed: bool = False) -> lis
     params: list[Any] = [int(user_id)]
     if not include_removed:
         query += " AND d.state != 'removed'"
-    query += " ORDER BY n.name COLLATE NOCASE, d.id"
+    query += " ORDER BY CASE d.slot WHEN 'primary' THEN 10 WHEN 'backup' THEN 20 ELSE 100 END, d.priority, n.name COLLATE NOCASE, d.id"
     with connect() as con:
         rows = con.execute(query, params).fetchall()
     items: list[dict[str, Any]] = []
     for row in rows:
-        item = dict(row)
+        item = _decorate_deployment(dict(row))
         if item.get("node_is_local"):
             item["node_effective_state"] = "local"
         else:
@@ -798,73 +915,532 @@ def list_user_deployments(user_id: int, *, include_removed: bool = False) -> lis
     return items
 
 
-def _deployment_metadata(job: dict[str, Any]) -> dict[str, Any]:
-    payload = job.get("payload") if isinstance(job.get("payload"), dict) else {}
-    metadata = payload.get("deployment") if isinstance(payload, dict) else {}
-    return metadata if isinstance(metadata, dict) else {}
-
-
-def _record_deployment_job(job: dict[str, Any]) -> None:
-    metadata = _deployment_metadata(job)
-    action = str(metadata.get("action") or "").strip()
-    if action not in {"upsert", "remove"}:
-        return
-    node_id = int(job["node_id"])
-    user_id = metadata.get("user_id")
-    user_id = int(user_id) if user_id not in (None, "") else None
-    user_uuid = _clean_text(metadata.get("user_uuid"), max_length=80)
-    if not user_uuid:
-        return
-    state = "pending" if action == "upsert" else "removing"
+def find_deployment(deployment_id: int) -> dict[str, Any]:
     with connect() as con:
-        con.execute(
+        row = con.execute(
             """
-            INSERT INTO node_deployments
-                (node_id, user_id, user_uuid, user_name, profile, public_host,
-                 public_port, client_link, state, last_job_id, last_message)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '')
-            ON CONFLICT(node_id, user_uuid) DO UPDATE SET
-                user_id = excluded.user_id,
-                user_name = excluded.user_name,
-                profile = CASE WHEN excluded.profile != '' THEN excluded.profile ELSE node_deployments.profile END,
-                public_host = CASE WHEN excluded.public_host != '' THEN excluded.public_host ELSE node_deployments.public_host END,
-                public_port = COALESCE(excluded.public_port, node_deployments.public_port),
-                client_link = CASE WHEN excluded.client_link != '' THEN excluded.client_link ELSE node_deployments.client_link END,
-                state = excluded.state,
-                last_job_id = excluded.last_job_id,
-                last_message = '',
-                updated_at = CURRENT_TIMESTAMP
+            SELECT d.*, n.name AS node_name, n.is_local AS node_is_local,
+                   n.public_address AS node_public_address
+            FROM node_deployments d
+            JOIN nodes n ON n.id=d.node_id
+            WHERE d.id=?
             """,
-            (
-                node_id,
-                user_id,
-                user_uuid,
-                _clean_text(metadata.get("user_name"), max_length=80),
-                _clean_text(metadata.get("profile"), max_length=80),
-                _clean_text(metadata.get("public_host"), max_length=255),
-                _safe_optional_int(metadata.get("public_port"), minimum=1, maximum=65535),
-                _clean_text(job.get("client_link"), max_length=4096),
-                state,
-                int(job["id"]),
-            ),
-        )
+            (int(deployment_id),),
+        ).fetchone()
+    if row is None:
+        raise ValueError("Развёртывание клиента не найдено")
+    return _decorate_deployment(dict(row))
 
 
-def _complete_deployment_job(job: dict[str, Any], *, ok: bool, message: str) -> None:
-    metadata = _deployment_metadata(job)
-    action = str(metadata.get("action") or "").strip()
-    user_uuid = _clean_text(metadata.get("user_uuid"), max_length=80)
-    if action not in {"upsert", "remove"} or not user_uuid:
-        return
-    state = ("active" if action == "upsert" else "removed") if ok else "error"
+def update_deployment_policy(
+    deployment_id: int,
+    *,
+    slot: str,
+    subscription_enabled: bool = True,
+    desired_state: str = "active",
+    priority: int | None = None,
+) -> dict[str, Any]:
+    deployment = find_deployment(deployment_id)
+    slot = str(slot or "").strip().lower()
+    if slot not in DEPLOYMENT_SLOT_LABELS:
+        raise ValueError("Выберите основное, резервное или следующее подключение")
+    desired_state = str(desired_state or "active").strip().lower()
+    if desired_state not in {"active", "standby", "removed"}:
+        raise ValueError("Неизвестное желаемое состояние развёртывания")
+    state = str(deployment.get("state") or "")
+    if slot == "primary" and state != "active":
+        raise ValueError("Основным можно назначить только проверенное активное подключение")
+    if desired_state != "active" or state != "active":
+        subscription_enabled = False
+    if slot == "primary":
+        desired_state = "active"
+        subscription_enabled = True
+    if priority is None:
+        priority_value = DEPLOYMENT_SLOT_PRIORITY[slot]
+    else:
+        priority_value = int(priority)
+        if priority_value < 1 or priority_value > 9999:
+            raise ValueError("Порядок переключения должен быть от 1 до 9999")
+    user_id = deployment.get("user_id")
+    device_id = deployment.get("device_id")
     with connect() as con:
+        if slot == "primary":
+            if device_id is not None:
+                con.execute(
+                    """
+                    UPDATE node_deployments
+                    SET slot=CASE WHEN slot='primary' THEN 'backup' ELSE slot END,
+                        priority=CASE WHEN slot='primary' THEN 20 ELSE priority END,
+                        updated_at=CURRENT_TIMESTAMP
+                    WHERE device_id=? AND id!=? AND state!='removed'
+                    """,
+                    (int(device_id), int(deployment_id)),
+                )
+            elif user_id is not None:
+                con.execute(
+                    """
+                    UPDATE node_deployments
+                    SET slot=CASE WHEN slot='primary' THEN 'backup' ELSE slot END,
+                        priority=CASE WHEN slot='primary' THEN 20 ELSE priority END,
+                        updated_at=CURRENT_TIMESTAMP
+                    WHERE user_id=? AND device_id IS NULL AND id!=? AND state!='removed'
+                    """,
+                    (int(user_id), int(deployment_id)),
+                )
         con.execute(
             """
             UPDATE node_deployments
-            SET state = ?, last_message = ?, last_job_id = ?, updated_at = CURRENT_TIMESTAMP
-            WHERE node_id = ? AND user_uuid = ?
+            SET slot=?, priority=?, subscription_enabled=?, desired_state=?,
+                updated_at=CURRENT_TIMESTAMP
+            WHERE id=?
             """,
-            (state, message, int(job["id"]), int(job["node_id"]), user_uuid),
+            (slot, priority_value, 1 if subscription_enabled else 0, desired_state, int(deployment_id)),
+        )
+        if device_id is not None or user_id is not None:
+            if device_id is not None:
+                visible = con.execute(
+                    """
+                    SELECT COUNT(*)
+                    FROM node_deployments
+                    WHERE device_id=? AND state='active' AND desired_state='active'
+                      AND subscription_enabled=1
+                    """,
+                    (int(device_id),),
+                ).fetchone()[0]
+            else:
+                visible = con.execute(
+                    """
+                    SELECT COUNT(*)
+                    FROM node_deployments
+                    WHERE user_id=? AND device_id IS NULL
+                      AND state='active' AND desired_state='active'
+                      AND subscription_enabled=1
+                    """,
+                    (int(user_id),),
+                ).fetchone()[0]
+            if int(visible or 0) == 0:
+                raise ValueError(
+                    "Нельзя скрыть последний активный endpoint: стабильная подписка останется пустой"
+                )
+    return find_deployment(deployment_id)
+
+
+def _build_deployment_vless_link(metadata: dict[str, Any], client_encryption: str) -> str:
+    profile = str(metadata.get("profile") or "").strip().lower()
+    user_uuid = _clean_text(metadata.get("user_uuid"), max_length=80)
+    public_host = _clean_text(metadata.get("public_host"), max_length=255)
+    public_port = _safe_optional_int(metadata.get("public_port"), minimum=1, maximum=65535)
+    if not user_uuid or not public_host or public_port is None:
+        raise ValueError("Deployment не содержит UUID, адрес или порт")
+    label = quote(
+        f"{_clean_text(metadata.get('user_name'), max_length=80, default=user_uuid)}/"
+        f"{_clean_text(metadata.get('node_name'), max_length=80, default='SG-Node')}",
+        safe="",
+    )
+    if profile in {"vless xhttp reality", "xhttp_reality", "vless xhttp + reality"}:
+        if not client_encryption:
+            raise ValueError("SG-Node не вернула Client Encryption")
+        public_key = _clean_text(metadata.get("reality_public_key"), max_length=255)
+        short_id = _clean_text(metadata.get("reality_short_id"), max_length=64)
+        server_name = _clean_text(metadata.get("reality_server_name"), max_length=255)
+        path = str(metadata.get("xhttp_path") or "/sg-xhttp-reality").strip()
+        if not public_key or not short_id or not server_name or not path.startswith("/"):
+            raise ValueError("Deployment не содержит публичные параметры XHTTP REALITY")
+        query = urlencode({
+            "type": "xhttp",
+            "security": "reality",
+            "flow": "xtls-rprx-vision",
+            "encryption": client_encryption,
+            "fp": "firefox",
+            "sni": server_name,
+            "pbk": public_key,
+            "sid": short_id,
+            "path": path,
+            "mode": str(metadata.get("xhttp_client_mode") or "stream-one"),
+        })
+        return f"vless://{user_uuid}@{public_host}:{public_port}?{query}#{label}"
+    link = str(metadata.get("client_link") or "").strip()
+    if not link:
+        raise ValueError("Deployment не содержит клиентскую ссылку")
+    return link
+
+
+def _deployment_metadata_items(job: dict[str, Any]) -> list[dict[str, Any]]:
+    payload = job.get("payload") if isinstance(job.get("payload"), dict) else {}
+    if isinstance(payload.get("deployments"), list):
+        return [item for item in payload["deployments"] if isinstance(item, dict)]
+    metadata = payload.get("deployment") if isinstance(payload, dict) else {}
+    return [metadata] if isinstance(metadata, dict) and metadata else []
+
+
+def _record_deployment_job(job: dict[str, Any]) -> None:
+    items = _deployment_metadata_items(job)
+    if not items:
+        return
+    node_id = int(job["node_id"])
+    with connect() as con:
+        for metadata in items:
+            action = str(metadata.get("action") or "").strip()
+            if action not in {"upsert", "remove"}:
+                continue
+            user_id = metadata.get("user_id")
+            user_id = int(user_id) if user_id not in (None, "") else None
+            device_id = metadata.get("device_id")
+            device_id = int(device_id) if device_id not in (None, "") else None
+            user_uuid = _clean_text(metadata.get("user_uuid") or metadata.get("device_uuid"), max_length=80)
+            if not user_uuid:
+                continue
+            slot = str(metadata.get("slot") or "alt").strip().lower()
+            if slot not in DEPLOYMENT_SLOT_LABELS:
+                slot = "alt"
+            desired_state = str(metadata.get("desired_state") or "active").strip().lower()
+            if desired_state not in {"active", "standby", "removed"}:
+                desired_state = "active"
+            state = "pending" if action == "upsert" else "removing"
+            profile = _clean_text(metadata.get("profile"), max_length=80)
+            is_xhttp = profile.lower() in {"vless xhttp reality", "xhttp_reality", "vless xhttp + reality"}
+            con.execute(
+                """
+                INSERT INTO node_deployments
+                    (node_id, user_id, device_id, user_uuid, device_uuid,
+                     user_name, device_name, profile, public_host, public_port,
+                     client_link, state, last_job_id, last_message, slot, priority,
+                     subscription_enabled, desired_state, client_encryption,
+                     reality_public_key, reality_short_id, reality_server_name,
+                     xhttp_path, xhttp_server_mode, xhttp_client_mode,
+                     encryption_generation, export_ready)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', ?, ?, ?, ?,
+                        '', ?, ?, ?, ?, ?, ?, '', ?)
+                ON CONFLICT(node_id, user_uuid) DO UPDATE SET
+                    user_id=excluded.user_id,
+                    device_id=COALESCE(excluded.device_id,node_deployments.device_id),
+                    device_uuid=excluded.device_uuid,
+                    user_name=excluded.user_name,
+                    device_name=excluded.device_name,
+                    profile=CASE WHEN node_deployments.state='active' AND node_deployments.export_ready=1 THEN node_deployments.profile ELSE excluded.profile END,
+                    public_host=CASE WHEN node_deployments.state='active' AND node_deployments.export_ready=1 THEN node_deployments.public_host ELSE excluded.public_host END,
+                    public_port=CASE WHEN node_deployments.state='active' AND node_deployments.export_ready=1 THEN node_deployments.public_port ELSE excluded.public_port END,
+                    client_link=CASE WHEN node_deployments.state='active' AND node_deployments.export_ready=1 THEN node_deployments.client_link WHEN excluded.client_link!='' THEN excluded.client_link ELSE node_deployments.client_link END,
+                    state=CASE WHEN node_deployments.state='active' AND node_deployments.export_ready=1 THEN 'active' ELSE excluded.state END,
+                    last_job_id=excluded.last_job_id,
+                    last_message=CASE WHEN node_deployments.state='active' AND node_deployments.export_ready=1 THEN 'Проверяется новая конфигурация; прежний endpoint остаётся активным' ELSE '' END,
+                    slot=CASE WHEN node_deployments.state='active' AND node_deployments.export_ready=1 THEN node_deployments.slot ELSE excluded.slot END,
+                    priority=CASE WHEN node_deployments.state='active' AND node_deployments.export_ready=1 THEN node_deployments.priority ELSE excluded.priority END,
+                    subscription_enabled=CASE WHEN node_deployments.state='active' AND node_deployments.export_ready=1 THEN node_deployments.subscription_enabled ELSE excluded.subscription_enabled END,
+                    desired_state=CASE WHEN node_deployments.state='active' AND node_deployments.export_ready=1 THEN node_deployments.desired_state ELSE excluded.desired_state END,
+                    reality_public_key=CASE WHEN excluded.reality_public_key!='' THEN excluded.reality_public_key ELSE node_deployments.reality_public_key END,
+                    reality_short_id=CASE WHEN excluded.reality_short_id!='' THEN excluded.reality_short_id ELSE node_deployments.reality_short_id END,
+                    reality_server_name=CASE WHEN excluded.reality_server_name!='' THEN excluded.reality_server_name ELSE node_deployments.reality_server_name END,
+                    xhttp_path=CASE WHEN excluded.xhttp_path!='' THEN excluded.xhttp_path ELSE node_deployments.xhttp_path END,
+                    xhttp_server_mode=excluded.xhttp_server_mode,
+                    xhttp_client_mode=excluded.xhttp_client_mode,
+                    export_ready=CASE WHEN node_deployments.state='active' AND node_deployments.export_ready=1 THEN 1 ELSE excluded.export_ready END,
+                    updated_at=CURRENT_TIMESTAMP
+                """,
+                (
+                    node_id, user_id, device_id, user_uuid, user_uuid,
+                    _clean_text(metadata.get("user_name"), max_length=80),
+                    _clean_text(metadata.get("device_name"), max_length=80),
+                    profile,
+                    _clean_text(metadata.get("public_host"), max_length=255),
+                    _safe_optional_int(metadata.get("public_port"), minimum=1, maximum=65535),
+                    _clean_text(metadata.get("client_link") or job.get("client_link"), max_length=65535),
+                    state, int(job["id"]), slot,
+                    _safe_optional_int(metadata.get("priority"), minimum=1, maximum=9999) or DEPLOYMENT_SLOT_PRIORITY[slot],
+                    1 if metadata.get("subscription_enabled", True) else 0,
+                    desired_state,
+                    _clean_text(metadata.get("reality_public_key"), max_length=255),
+                    _clean_text(metadata.get("reality_short_id"), max_length=64),
+                    _clean_text(metadata.get("reality_server_name"), max_length=255),
+                    _clean_text(metadata.get("xhttp_path"), max_length=1024),
+                    _clean_text(metadata.get("xhttp_server_mode"), max_length=32, default="auto"),
+                    _clean_text(metadata.get("xhttp_client_mode"), max_length=32, default="stream-one"),
+                    0 if is_xhttp else (1 if metadata.get("client_link") else 0),
+                ),
+            )
+
+
+def _complete_deployment_job(job: dict[str, Any], *, ok: bool, message: str) -> None:
+    items = _deployment_metadata_items(job)
+    if not items:
+        return
+    result = job.get("result") if isinstance(job.get("result"), dict) else {}
+    node_id = int(job["node_id"])
+    client_encryption = _clean_text(result.get("client_encryption"), max_length=65535)
+    generation = _clean_text(result.get("encryption_generation"), max_length=160)
+    checked_at = _clean_text(result.get("encryption_checked_at"), max_length=80)
+    with connect() as con:
+        if ok and client_encryption:
+            con.execute(
+                """UPDATE nodes SET xray_encryption_state='ready',
+                   xray_encryption_generation=?,xray_encryption_checked_at=?,
+                   xray_minimum_supported=?,updated_at=CURRENT_TIMESTAMP WHERE id=?""",
+                (generation, checked_at or _iso(),
+                 _clean_text(result.get("xray_minimum_supported"), max_length=40, default="v26.6.27"), node_id),
+            )
+        elif not ok:
+            con.execute(
+                """UPDATE nodes SET xray_encryption_state=CASE WHEN xray_encryption_state='ready' THEN xray_encryption_state ELSE 'error' END,
+                   updated_at=CURRENT_TIMESTAMP WHERE id=?""", (node_id,),
+            )
+        node_row=con.execute("SELECT name FROM nodes WHERE id=?",(node_id,)).fetchone()
+        node_name=str(node_row["name"] if node_row else "SG-Node")
+        for metadata in items:
+            action=str(metadata.get("action") or "").strip()
+            user_uuid=_clean_text(metadata.get("user_uuid") or metadata.get("device_uuid"),max_length=80)
+            if action not in {"upsert","remove"} or not user_uuid:
+                continue
+            deployment=con.execute(
+                "SELECT id,profile,state,export_ready FROM node_deployments WHERE node_id=? AND user_uuid=?",
+                (node_id,user_uuid),
+            ).fetchone()
+            if deployment is None:
+                continue
+            deployment_id=int(deployment["id"])
+            previous_active=str(deployment["state"] or "")=="active" and bool(deployment["export_ready"])
+            state=("active" if action=="upsert" else "removed") if ok else ("active" if previous_active else "error")
+            profile=str(metadata.get("profile") or deployment["profile"] or "").lower()
+            is_xhttp=profile in {"vless xhttp reality","xhttp_reality","vless xhttp + reality"}
+            link=""
+            export_ready=int(deployment["export_ready"] or 0) if (not ok and previous_active) else 0
+            final_message=message
+            if ok and action=="upsert":
+                try:
+                    enriched=dict(metadata); enriched["node_name"]=node_name
+                    link=_build_deployment_vless_link(enriched,client_encryption)
+                    export_ready=1
+                except ValueError as exc:
+                    state="error"; final_message=str(exc)
+            con.execute(
+                """
+                UPDATE node_deployments SET state=?,last_message=?,last_job_id=?,
+                    profile=CASE WHEN ? THEN ? ELSE profile END,
+                    public_host=CASE WHEN ? THEN ? ELSE public_host END,
+                    public_port=CASE WHEN ? THEN ? ELSE public_port END,
+                    client_link=CASE WHEN ?!='' THEN ? ELSE client_link END,
+                    client_encryption=CASE WHEN ?!='' THEN ? ELSE client_encryption END,
+                    reality_public_key=CASE WHEN ? THEN ? ELSE reality_public_key END,
+                    reality_short_id=CASE WHEN ? THEN ? ELSE reality_short_id END,
+                    reality_server_name=CASE WHEN ? THEN ? ELSE reality_server_name END,
+                    xhttp_path=CASE WHEN ? THEN ? ELSE xhttp_path END,
+                    encryption_generation=CASE WHEN ?!='' THEN ? ELSE encryption_generation END,
+                    xhttp_server_mode=CASE WHEN ?!='' THEN ? ELSE xhttp_server_mode END,
+                    xhttp_client_mode=CASE WHEN ?!='' THEN ? ELSE xhttp_client_mode END,
+                    export_ready=?,last_verified_at=CASE WHEN ? THEN CURRENT_TIMESTAMP ELSE last_verified_at END,
+                    updated_at=CURRENT_TIMESTAMP WHERE id=?
+                """,
+                (
+                    state,final_message,int(job["id"]),
+                    1 if ok and action=="upsert" else 0,_clean_text(metadata.get("profile"),max_length=80),
+                    1 if ok and action=="upsert" else 0,_clean_text(metadata.get("public_host"),max_length=255),
+                    1 if ok and action=="upsert" else 0,_safe_optional_int(metadata.get("public_port"),minimum=1,maximum=65535),
+                    link,link,client_encryption if is_xhttp else "",client_encryption if is_xhttp else "",
+                    1 if ok and action=="upsert" else 0,_clean_text(metadata.get("reality_public_key"),max_length=255),
+                    1 if ok and action=="upsert" else 0,_clean_text(metadata.get("reality_short_id"),max_length=64),
+                    1 if ok and action=="upsert" else 0,_clean_text(metadata.get("reality_server_name"),max_length=255),
+                    1 if ok and action=="upsert" else 0,_clean_text(metadata.get("xhttp_path"),max_length=1024),
+                    generation if is_xhttp else "",generation if is_xhttp else "",
+                    _clean_text(result.get("xhttp_server_mode"),max_length=32),_clean_text(result.get("xhttp_server_mode"),max_length=32),
+                    _clean_text(result.get("xhttp_client_mode"),max_length=32),_clean_text(result.get("xhttp_client_mode"),max_length=32),
+                    export_ready,1 if state=="active" and ok else 0,deployment_id,
+                ),
+            )
+            slot=str(metadata.get("slot") or "alt").strip().lower()
+            device_id=metadata.get("device_id")
+            user_id=metadata.get("user_id")
+            if state=="active" and action=="upsert" and slot=="primary":
+                if device_id not in (None,""):
+                    con.execute(
+                        "UPDATE node_deployments SET slot='backup',priority=20,updated_at=CURRENT_TIMESTAMP WHERE device_id=? AND id!=? AND state!='removed' AND slot='primary'",
+                        (int(device_id),deployment_id),
+                    )
+                elif user_id not in (None,""):
+                    con.execute(
+                        "UPDATE node_deployments SET slot='backup',priority=20,updated_at=CURRENT_TIMESTAMP WHERE user_id=? AND device_id IS NULL AND id!=? AND state!='removed' AND slot='primary'",
+                        (int(user_id),deployment_id),
+                    )
+                con.execute("UPDATE node_deployments SET slot='primary',priority=10 WHERE id=?",(deployment_id,))
+
+
+def create_failover_batch(
+    *,
+    target_node_id: int,
+    user_ids: list[int],
+    mode: str,
+    source_node_id: int | None = None,
+    summary: str = "",
+    details: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    if mode not in {"prepare_backup", "make_primary", "copy"}:
+        raise ValueError("Неизвестный режим массового развёртывания")
+    find_node(target_node_id)
+    unique_ids = sorted({int(value) for value in user_ids if int(value) > 0})
+    if not unique_ids:
+        raise ValueError("Не выбраны клиенты")
+    with connect() as con:
+        existing = {int(row["id"]) for row in con.execute(
+            f"SELECT id FROM users WHERE id IN ({','.join('?' for _ in unique_ids)})", unique_ids
+        ).fetchall()}
+        missing = [value for value in unique_ids if value not in existing]
+        if missing:
+            raise ValueError("Часть клиентов больше не существует")
+        cursor = con.execute(
+            """
+            INSERT INTO client_failover_batches
+                (source_node_id, target_node_id, mode, status, total_clients, summary, details_json)
+            VALUES (?, ?, ?, 'planned', ?, ?, ?)
+            """,
+            (
+                source_node_id, int(target_node_id), mode, len(unique_ids),
+                _clean_text(summary, max_length=500),
+                json.dumps(details if isinstance(details, dict) else {}, ensure_ascii=False, sort_keys=True),
+            ),
+        )
+        batch_id = int(cursor.lastrowid)
+        con.executemany(
+            "INSERT INTO client_failover_targets (batch_id, user_id) VALUES (?, ?)",
+            [(batch_id, user_id) for user_id in unique_ids],
+        )
+    return find_failover_batch(batch_id)
+
+
+def find_failover_batch(batch_id: int) -> dict[str, Any]:
+    with connect() as con:
+        row = con.execute(
+            """
+            SELECT b.*, n.name AS target_node_name
+            FROM client_failover_batches b
+            JOIN nodes n ON n.id=b.target_node_id
+            WHERE b.id=?
+            """,
+            (int(batch_id),),
+        ).fetchone()
+        targets = con.execute(
+            """
+            SELECT t.*, u.name AS user_name, u.uuid AS user_uuid
+            FROM client_failover_targets t
+            JOIN users u ON u.id=t.user_id
+            WHERE t.batch_id=? ORDER BY u.name COLLATE NOCASE
+            """,
+            (int(batch_id),),
+        ).fetchall()
+    if row is None:
+        raise ValueError("Операция развёртывания не найдена")
+    item = dict(row)
+    try:
+        item["details"] = json.loads(item.pop("details_json") or "{}")
+    except json.JSONDecodeError:
+        item["details"] = {}
+    item["targets"] = [dict(target) for target in targets]
+    return item
+
+
+def list_failover_batches(*, limit: int = 20) -> list[dict[str, Any]]:
+    with connect() as con:
+        rows = con.execute(
+            """
+            SELECT b.*, n.name AS target_node_name
+            FROM client_failover_batches b
+            JOIN nodes n ON n.id=b.target_node_id
+            ORDER BY b.id DESC LIMIT ?
+            """,
+            (max(1, min(int(limit), 100)),),
+        ).fetchall()
+    items: list[dict[str, Any]] = []
+    for row in rows:
+        item = dict(row)
+        try:
+            item["details"] = json.loads(item.pop("details_json") or "{}")
+        except json.JSONDecodeError:
+            item["details"] = {}
+        items.append(item)
+    return items
+
+
+def attach_failover_job(batch_id: int, job_id: int) -> dict[str, Any]:
+    with connect() as con:
+        con.execute(
+            """
+            UPDATE client_failover_batches
+            SET node_job_id=?, status='queued', updated_at=CURRENT_TIMESTAMP
+            WHERE id=?
+            """,
+            (int(job_id), int(batch_id)),
+        )
+        con.execute(
+            "UPDATE client_failover_targets SET status='queued', updated_at=CURRENT_TIMESTAMP WHERE batch_id=?",
+            (int(batch_id),),
+        )
+    return find_failover_batch(batch_id)
+
+
+def fail_failover_batch(batch_id: int, message: str) -> dict[str, Any]:
+    """Close a planned/queued batch when no Agent job could be created."""
+    with connect() as con:
+        row = con.execute(
+            "SELECT total_clients, status FROM client_failover_batches WHERE id=?",
+            (int(batch_id),),
+        ).fetchone()
+        if row is None:
+            raise ValueError("Операция развёртывания не найдена")
+        if str(row["status"]) in {"succeeded", "failed", "cancelled"}:
+            return find_failover_batch(batch_id)
+        text = _clean_text(message, max_length=500, default="Операция не создана")
+        con.execute(
+            """
+            UPDATE client_failover_batches
+            SET status='failed', succeeded_clients=0, failed_clients=total_clients,
+                summary=?, completed_at=CURRENT_TIMESTAMP, updated_at=CURRENT_TIMESTAMP
+            WHERE id=?
+            """,
+            (text, int(batch_id)),
+        )
+        con.execute(
+            """
+            UPDATE client_failover_targets
+            SET status='failed', message=?, updated_at=CURRENT_TIMESTAMP
+            WHERE batch_id=?
+            """,
+            (text, int(batch_id)),
+        )
+    return find_failover_batch(batch_id)
+
+
+def _complete_failover_batch(job: dict[str, Any], *, ok: bool, message: str) -> None:
+    with connect() as con:
+        row = con.execute(
+            "SELECT id FROM client_failover_batches WHERE node_job_id=?",
+            (int(job["id"]),),
+        ).fetchone()
+        if row is None:
+            return
+        batch_id = int(row["id"])
+        status = "succeeded" if ok else "failed"
+        target_status = "succeeded" if ok else "failed"
+        count = con.execute(
+            "SELECT COUNT(*) FROM client_failover_targets WHERE batch_id=?", (batch_id,)
+        ).fetchone()[0]
+        con.execute(
+            """
+            UPDATE client_failover_batches
+            SET status=?, succeeded_clients=?, failed_clients=?, summary=?,
+                completed_at=CURRENT_TIMESTAMP, updated_at=CURRENT_TIMESTAMP
+            WHERE id=?
+            """,
+            (status, int(count) if ok else 0, 0 if ok else int(count), message, batch_id),
+        )
+        con.execute(
+            """
+            UPDATE client_failover_targets
+            SET status=?, message=?,
+                deployment_id=(SELECT d.id FROM node_deployments d
+                               WHERE d.node_id=(SELECT target_node_id FROM client_failover_batches WHERE id=?)
+                                 AND d.user_id=client_failover_targets.user_id
+                               ORDER BY d.id DESC LIMIT 1),
+                updated_at=CURRENT_TIMESTAMP
+            WHERE batch_id=?
+            """,
+            (target_status, message, batch_id, batch_id),
         )
 
 
@@ -1025,28 +1601,22 @@ def create_node_job(
     client_link: str = "",
 ) -> dict[str, Any]:
     node = find_node(node_id)
-    if node.get("is_local"):
+    if node["is_local"]:
         raise ValueError("Локальный сервер не использует задания SG-Node")
     if node.get("effective_state") != "online":
         raise ValueError("Сервер должен быть в сети")
-    if job_type != "apply_xray_config":
+    allowed_job_types = {
+        "apply_xray_config", "stage_geofiles", "validate_geofiles",
+        "apply_geofiles", "rollback_geofiles", "get_geofiles_manifest",
+    }
+    if job_type not in allowed_job_types:
         raise ValueError("Неизвестный тип задания")
     if not isinstance(payload, dict):
         raise ValueError("Задание должно содержать JSON-объект")
-    encoded = json.dumps(payload, ensure_ascii=False, sort_keys=True)
-    if len(encoded.encode("utf-8")) > 1_000_000:
-        raise ValueError("Задание слишком большое")
+    encoded = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+    if len(encoded.encode("utf-8")) > 2_000_000:
+        raise ValueError("Задание превышает допустимый размер")
     with connect() as con:
-        active = con.execute(
-            """
-            SELECT id FROM node_jobs
-            WHERE node_id = ? AND status IN ('queued', 'running')
-            LIMIT 1
-            """,
-            (int(node_id),),
-        ).fetchone()
-        if active is not None:
-            raise ValueError("На сервере уже выполняется другое задание")
         cursor = con.execute(
             """
             INSERT INTO node_jobs
@@ -1054,23 +1624,19 @@ def create_node_job(
             VALUES (?, ?, 'queued', ?, ?, ?)
             """,
             (
-                int(node_id),
-                job_type,
+                int(node_id), job_type,
                 _clean_text(title, max_length=160, default="Задание SG-Node"),
-                encoded,
-                _clean_text(client_link, max_length=4096),
+                encoded, _clean_text(client_link, max_length=65535),
             ),
         )
         job_id = int(cursor.lastrowid)
-    record_node_event(
-        node_id,
-        "job_queued",
-        f"Подготовлено задание: {title}",
-        details={"job_id": job_id, "job_type": job_type},
-    )
+        con.execute(
+            "INSERT INTO node_events(node_id, level, event_type, message) VALUES (?, 'info', 'job_queued', ?)",
+            (int(node_id), f"Поставлено задание #{job_id}: {title}"),
+        )
     job = find_node_job(job_id)
     _record_deployment_job(job)
-    return job
+    return find_node_job(job_id)
 
 
 def claim_node_job(agent_token: str) -> dict[str, Any] | None:
@@ -1113,6 +1679,14 @@ def claim_node_job(agent_token: str) -> dict[str, Any] | None:
             UPDATE user_deletion_targets
             SET status = 'running', updated_at = CURRENT_TIMESTAMP
             WHERE job_id = ?
+            """,
+            (int(job["id"]),),
+        )
+        con.execute(
+            """
+            UPDATE client_failover_batches
+            SET status='running', updated_at=CURRENT_TIMESTAMP
+            WHERE node_job_id=? AND status='queued'
             """,
             (int(job["id"]),),
         )
@@ -1159,6 +1733,7 @@ def complete_node_job(
     message = _clean_text(result.get("message"), max_length=400)
     completed_job = find_node_job(job_id)
     _complete_deployment_job(completed_job, ok=ok, message=message)
+    _complete_failover_batch(completed_job, ok=ok, message=message)
     deletion_request = update_deletion_target(completed_job, ok=ok, message=message)
     if deletion_request is not None:
         completed_job["deletion_request"] = deletion_request

@@ -1,0 +1,135 @@
+/* SG-Panel Preview 9 · FIX40 · Interface Verification Hotfix 8
+   Confirmed on fresh EC2 review:
+   - section-tab labels must stay visible and white in every theme;
+   - dark primary actions use SG blue-gray;
+   - Routing has no duplicate inner navigation and keeps the English title;
+   - Network Controller uses a compact semantic status, not a giant metric word. */
+
+/* Keep every tab label visible even when older theme rules use text fill or opacity. */
+body.preview-9-rc6-typography .section-tabs a,
+body.preview-9-rc6-typography .section-tabs a:link,
+body.preview-9-rc6-typography .section-tabs a:visited,
+body.preview-9-rc6-typography .section-tabs a:hover,
+body.preview-9-rc6-typography .section-tabs a:active,
+body.preview-9-rc6-typography .section-tabs a.active,
+body.preview-9-rc6-typography .section-tabs .section-tab-label {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  filter: none !important;
+  mix-blend-mode: normal !important;
+  text-shadow: 0 1px 1px rgba(0,0,0,.18) !important;
+}
+
+body.preview-9-rc6-typography .section-tabs .section-tab-label {
+  display: block !important;
+  width: 100% !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  text-align: center !important;
+  font: inherit !important;
+  letter-spacing: inherit !important;
+}
+
+/* Remove any old underline/rail regardless of section-specific rules. */
+body.preview-9-rc6-typography .section-tabs,
+body.preview-9-rc6-typography .section-tabs::before,
+body.preview-9-rc6-typography .section-tabs::after {
+  border-bottom: 0 !important;
+  background-image: none !important;
+}
+body.preview-9-rc6-typography .section-tabs::before,
+body.preview-9-rc6-typography .section-tabs::after {
+  content: none !important;
+  display: none !important;
+}
+body.preview-9-rc6-typography .section-tabs a,
+body.preview-9-rc6-typography .section-tabs a.active {
+  background-image: none !important;
+}
+
+/* Dark-theme actions: SG blue-gray, white label. Green remains only for statuses. */
+html[data-resolved-theme="dark"] body.preview-9-rc6-typography :is(
+  .button.primary,
+  button.button.primary,
+  a.button.primary,
+  .client-action.primary,
+  .login-submit
+) {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+  border-color: #587087 !important;
+  background: #41586f !important;
+  background-image: none !important;
+  opacity: 1 !important;
+}
+html[data-resolved-theme="dark"] body.preview-9-rc6-typography :is(
+  .button.primary,
+  button.button.primary,
+  a.button.primary,
+  .client-action.primary,
+  .login-submit
+):hover {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+  border-color: #6b859d !important;
+  background: #4c6881 !important;
+  background-image: none !important;
+}
+
+/* Routing title uses the same scale as the rest of SG-Panel. */
+body.page-routing .topbar-heading h1 {
+  font-size: 31px !important;
+  line-height: 1.05 !important;
+  letter-spacing: -.035em !important;
+}
+
+/* Compact semantic state in the fourth Clients metric. */
+body.awg-clients-page .clients-awg-metrics article.network-controller-metric > .network-controller-state {
+  align-self: flex-start !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 7px !important;
+  width: auto !important;
+  max-width: 100% !important;
+  min-height: 28px !important;
+  margin-top: 12px !important;
+  padding: 5px 10px !important;
+  border: 1px solid color-mix(in srgb, var(--success, #4f8e75) 58%, transparent) !important;
+  border-radius: 999px !important;
+  background: color-mix(in srgb, var(--success, #4f8e75) 14%, transparent) !important;
+  color: var(--success, #4f8e75) !important;
+  -webkit-text-fill-color: currentColor !important;
+  font-size: 12px !important;
+  font-weight: 800 !important;
+  line-height: 1 !important;
+  letter-spacing: 0 !important;
+  box-shadow: none !important;
+}
+body.awg-clients-page .clients-awg-metrics article.network-controller-metric > .network-controller-state.warning {
+  border-color: color-mix(in srgb, var(--warning, #b28138) 58%, transparent) !important;
+  background: color-mix(in srgb, var(--warning, #b28138) 14%, transparent) !important;
+  color: var(--warning, #b28138) !important;
+}
+body.awg-clients-page .clients-awg-metrics article.network-controller-metric > .network-controller-state > i {
+  display: block !important;
+  width: 7px !important;
+  height: 7px !important;
+  flex: 0 0 7px !important;
+  border-radius: 50% !important;
+  background: currentColor !important;
+  box-shadow: 0 0 0 4px color-mix(in srgb, currentColor 14%, transparent) !important;
+}
+
+html[data-resolved-theme="dark"] body.awg-clients-page .clients-awg-metrics article.network-controller-metric > .network-controller-state {
+  color: #6fd3a6 !important;
+  border-color: rgba(111,211,166,.42) !important;
+  background: rgba(111,211,166,.10) !important;
+}
+html[data-resolved-theme="dark"] body.awg-clients-page .clients-awg-metrics article.network-controller-metric > .network-controller-state.warning {
+  color: #e4b86d !important;
+  border-color: rgba(228,184,109,.42) !important;
+  background: rgba(228,184,109,.10) !important;
+}

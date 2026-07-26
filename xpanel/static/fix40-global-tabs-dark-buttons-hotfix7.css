@@ -1,0 +1,124 @@
+/* SG-Panel Preview 9 · FIX40 · Global Tabs and Dark Buttons Hotfix 7
+   Global correction agreed during fresh-EC2 visual review.
+   - All section tabs are equal real buttons without an underline.
+   - Light theme uses calm jade with white text.
+   - Dark theme uses SG blue-gray with white text.
+   - Green remains reserved for statuses, not primary actions. */
+
+/* One shared component for System, Security, Maintenance and every other section. */
+body.preview-9-rc6-typography .section-tabs {
+  display: grid !important;
+  grid-auto-flow: column !important;
+  grid-auto-columns: 180px !important;
+  justify-content: start !important;
+  align-items: stretch !important;
+  gap: 10px !important;
+  width: max-content !important;
+  max-width: 100% !important;
+  margin: -4px 0 24px !important;
+  padding: 0 !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  border: 0 !important;
+  border-bottom: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  scrollbar-width: thin;
+}
+
+body.preview-9-rc6-typography .section-tabs a {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-sizing: border-box !important;
+  width: 180px !important;
+  min-width: 180px !important;
+  min-height: 42px !important;
+  padding: 9px 12px !important;
+  color: #fff !important;
+  border: 1px solid color-mix(in srgb, var(--sg-jade, #4d806b) 78%, #29463a) !important;
+  border-bottom: 1px solid color-mix(in srgb, var(--sg-jade, #4d806b) 78%, #29463a) !important;
+  border-radius: 10px !important;
+  background: color-mix(in srgb, var(--sg-jade, #4d806b) 84%, #789286) !important;
+  box-shadow: 0 5px 14px rgba(38, 66, 54, .14) !important;
+  font-size: 12px !important;
+  font-weight: 800 !important;
+  line-height: 1.2 !important;
+  text-align: center !important;
+  text-decoration: none !important;
+  white-space: nowrap !important;
+}
+
+body.preview-9-rc6-typography .section-tabs a:hover {
+  color: #fff !important;
+  border-color: color-mix(in srgb, var(--sg-jade-strong, #3f715d) 82%, #29463a) !important;
+  background: color-mix(in srgb, var(--sg-jade-strong, #3f715d) 90%, #789286) !important;
+}
+
+body.preview-9-rc6-typography .section-tabs a.active {
+  color: #fff !important;
+  border-color: color-mix(in srgb, var(--sg-jade-strong, #3f715d) 86%, #21382f) !important;
+  border-bottom-color: color-mix(in srgb, var(--sg-jade-strong, #3f715d) 86%, #21382f) !important;
+  background: var(--sg-jade-strong, #3f715d) !important;
+  box-shadow: 0 6px 16px rgba(38, 66, 54, .20) !important;
+}
+
+/* Dark SG palette: blue-gray actions, green only for semantic statuses. */
+html[data-resolved-theme="dark"] body.preview-9-rc6-typography .section-tabs a {
+  color: #fff !important;
+  border-color: #587087 !important;
+  border-bottom-color: #587087 !important;
+  background: #41586f !important;
+  box-shadow: 0 5px 14px rgba(5, 12, 20, .24) !important;
+}
+
+html[data-resolved-theme="dark"] body.preview-9-rc6-typography .section-tabs a:hover {
+  color: #fff !important;
+  border-color: #688198 !important;
+  background: #4b6680 !important;
+}
+
+html[data-resolved-theme="dark"] body.preview-9-rc6-typography .section-tabs a.active {
+  color: #fff !important;
+  border-color: #7892aa !important;
+  border-bottom-color: #7892aa !important;
+  background: #58738d !important;
+  box-shadow: 0 6px 16px rgba(5, 12, 20, .30) !important;
+}
+
+html[data-resolved-theme="dark"] body.preview-9-rc6-typography .button.primary,
+html[data-resolved-theme="dark"] body.preview-9-rc6-typography .login-submit {
+  color: #fff !important;
+  border-color: #587087 !important;
+  background: #41586f !important;
+  box-shadow: 0 8px 20px rgba(5, 12, 20, .26) !important;
+}
+
+html[data-resolved-theme="dark"] body.preview-9-rc6-typography .button.primary:hover,
+html[data-resolved-theme="dark"] body.preview-9-rc6-typography .login-submit:hover {
+  color: #fff !important;
+  border-color: #688198 !important;
+  background: #4b6680 !important;
+  box-shadow: 0 10px 24px rgba(5, 12, 20, .32) !important;
+}
+
+html[data-resolved-theme="dark"] body.preview-9-rc6-typography .button.primary:active,
+html[data-resolved-theme="dark"] body.preview-9-rc6-typography .login-submit:active {
+  color: #fff !important;
+  border-color: #7892aa !important;
+  background: #58738d !important;
+}
+
+@media (max-width: 760px) {
+  body.preview-9-rc6-typography .section-tabs {
+    grid-auto-flow: row !important;
+    grid-auto-columns: minmax(0, 1fr) !important;
+    grid-template-columns: 1fr !important;
+    width: 100% !important;
+    overflow: visible !important;
+  }
+  body.preview-9-rc6-typography .section-tabs a {
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+}

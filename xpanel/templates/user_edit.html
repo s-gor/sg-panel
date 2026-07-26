@@ -30,14 +30,13 @@
   <section class="ui-card user-cluster-deployments">
     <header class="ui-card-heading"><div><p class="panel-kicker">CLUSTER</p><h2>Где работает пользователь</h2><p>Центральный сервер управляется напрямую. Удалённые ноды очищаются отдельными проверяемыми заданиями.</p></div></header>
     <div class="user-deployment-list">
-      <div class="user-deployment-row is-local"><div><strong>Центральный сервер</strong><span>Локальная SG-Panel</span></div><b>{{ 'Активен' if user.enabled else 'Отключён' }}</b></div>
       {% for deployment in node_deployments %}
-      <div class="user-deployment-row state-{{ deployment.state }}">
-        <div><strong>{{ deployment.node_name }}</strong><span>{{ deployment.profile or 'Профиль не указан' }}{% if deployment.public_host %} · {{ deployment.public_host }}{% if deployment.public_port %}:{{ deployment.public_port }}{% endif %}{% endif %}</span></div>
+      <div class="user-deployment-row state-{{ deployment.state }} {{ 'is-local' if deployment.node_is_local else '' }}">
+        <div><strong>{{ 'Центральный сервер' if deployment.node_is_local else deployment.node_name }}</strong><span>{{ deployment.profile or 'Профиль не указан' }}{% if deployment.public_host %} · {{ deployment.public_host }}{% if deployment.public_port %}:{{ deployment.public_port }}{% endif %}{% endif %}</span></div>
         <b>{{ {'pending':'Ожидает применения','active':'Активен','removing':'Удаляется','removed':'Удалён','error':'Ошибка'}.get(deployment.state, deployment.state) }}</b>
       </div>
       {% else %}
-      <div class="user-deployment-empty">На удалённых нодах пользователь пока не развёрнут.</div>
+      <div class="user-deployment-empty">Развёртывания ещё не созданы.</div>
       {% endfor %}
     </div>
   </section>
@@ -52,7 +51,7 @@
 
   <section class="ui-card user-identity-rotation">
     <header class="ui-card-heading"><div><p class="panel-kicker">IDENTITY</p><h2>Сменить UUID</h2><p>Старая прямая ссылка перестанет работать. Развёртывания на удалённых нодах автоматически не меняются.</p></div></header>
-    <form method="post" action="{{ url_for('user_regenerate_uuid', user_id=user.id) }}" onsubmit="return confirm('Создать новый UUID для {{ user.name }}?')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button danger" type="submit">Создать новый UUID</button></form>
+    <form method="post" action="{{ url_for('user_regenerate_uuid', user_id=user.id) }}" data-confirm="Создать новый UUID для {{ user.name }}?"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button danger" type="submit">Создать новый UUID</button></form>
   </section>
 
 </div>

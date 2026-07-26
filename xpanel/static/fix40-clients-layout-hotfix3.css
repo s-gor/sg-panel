@@ -1,0 +1,140 @@
+/* SG-Panel Preview 9 FIX40 · Clients Layout Hotfix 3
+ * Scope: restore the original table action, remove the primary-card accent,
+ * and make client management balanced and symmetric.
+ */
+
+/* The table returns to the proven compact action: primary link + details. */
+body.clients-layout-hotfix3 .clients-awg-table th:nth-child(6) {
+  width: 18% !important;
+  min-width: 178px !important;
+}
+body.clients-layout-hotfix3 .clients-row-actions {
+  display: grid !important;
+  grid-template-columns: minmax(122px, 1fr) 42px !important;
+  align-items: stretch !important;
+  justify-content: end !important;
+  gap: 7px !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 230px !important;
+  margin-left: auto !important;
+}
+body.clients-layout-hotfix3 .clients-row-actions .client-action {
+  min-width: 0 !important;
+  min-height: 36px !important;
+  margin: 0 !important;
+  padding: 8px 10px !important;
+  border-radius: 9px !important;
+  font-size: 9px !important;
+  line-height: 1.15 !important;
+  white-space: nowrap !important;
+}
+body.clients-layout-hotfix3 .clients-row-actions .client-action.more {
+  width: 42px !important;
+  min-width: 42px !important;
+  padding-inline: 0 !important;
+}
+
+/* Primary is a normal access card; no green/blue inset stripe. */
+body.clients-layout-hotfix3 .client-device-card.is-primary {
+  border-color: var(--line-soft) !important;
+  box-shadow: none !important;
+}
+
+/* Balanced management: two equal actions, one full-width destructive action. */
+body.clients-layout-hotfix3 .client-management-panel {
+  display: grid !important;
+  gap: 12px !important;
+  margin-top: 14px !important;
+  padding-top: 14px !important;
+  border-top: 1px solid var(--line) !important;
+  background: transparent !important;
+}
+body.clients-layout-hotfix3 .client-management-panel h3 {
+  margin: 0 !important;
+  color: var(--text) !important;
+  font-size: 12px !important;
+  font-weight: 800 !important;
+}
+body.clients-layout-hotfix3 .client-management-actions {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 10px !important;
+  width: 100% !important;
+  min-width: 0 !important;
+}
+body.clients-layout-hotfix3 .client-management-actions > form {
+  width: 100% !important;
+  min-width: 0 !important;
+  margin: 0 !important;
+}
+body.clients-layout-hotfix3 .client-management-actions > form.client-management-delete {
+  grid-column: 1 / -1 !important;
+  padding-top: 11px !important;
+  border-top: 1px solid var(--line) !important;
+}
+body.clients-layout-hotfix3 .client-management-actions .button {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  min-height: 44px !important;
+  margin: 0 !important;
+  padding: 10px 12px !important;
+  border-radius: 10px !important;
+  font-size: 10.5px !important;
+  line-height: 1.2 !important;
+  text-align: center !important;
+  white-space: normal !important;
+}
+body.clients-layout-hotfix3 .client-management-delete .danger-outline {
+  color: var(--danger, #b34b55) !important;
+  border: 1px solid color-mix(in srgb, var(--danger, #b34b55) 58%, var(--line)) !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+body.clients-layout-hotfix3 .client-management-delete .danger-outline:hover {
+  color: #fff !important;
+  border-color: var(--danger, #b34b55) !important;
+  background: var(--danger, #b34b55) !important;
+}
+
+html[data-theme="light"] body.clients-layout-hotfix3 .client-management-reset,
+html[data-resolved-theme="light"] body.clients-layout-hotfix3 .client-management-reset {
+  color: #34423a !important;
+  border-color: #aaa99b !important;
+  background: linear-gradient(180deg, #f7f2e9 0%, #e7ddd0 100%) !important;
+}
+html[data-theme="light"] body.clients-layout-hotfix3 .client-management-toggle.warning,
+html[data-resolved-theme="light"] body.clients-layout-hotfix3 .client-management-toggle.warning {
+  color: #6a4b12 !important;
+  border-color: #c8a75c !important;
+  background: #f1e4c7 !important;
+}
+html[data-theme="light"] body.clients-layout-hotfix3 .client-management-delete .danger-outline,
+html[data-resolved-theme="light"] body.clients-layout-hotfix3 .client-management-delete .danger-outline {
+  color: #a74750 !important;
+  border-color: #c9848b !important;
+  background: #fffaf8 !important;
+}
+
+@media (max-width: 760px) {
+  body.clients-layout-hotfix3 .client-management-actions {
+    grid-template-columns: 1fr !important;
+  }
+  body.clients-layout-hotfix3 .client-management-actions > form.client-management-delete {
+    grid-column: auto !important;
+  }
+}
+
+/* Luxury Jade previously replaced the primary label through an empty pseudo-element. */
+html[data-theme="light"] body.awg-clients-page.preview-9-rc6-typography.clients-layout-hotfix3 .clients-row-actions .client-action.primary,
+html[data-resolved-theme="light"] body.awg-clients-page.preview-9-rc6-typography.clients-layout-hotfix3 .clients-row-actions .client-action.primary {
+  font-size: 9px !important;
+}
+html[data-theme="light"] body.awg-clients-page.preview-9-rc6-typography.clients-layout-hotfix3 .clients-row-actions .client-action.primary::after,
+html[data-resolved-theme="light"] body.awg-clients-page.preview-9-rc6-typography.clients-layout-hotfix3 .clients-row-actions .client-action.primary::after {
+  content: none !important;
+  display: none !important;
+}

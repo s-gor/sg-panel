@@ -1,188 +1,180 @@
 {% extends "base.html" %}
-{% block title %}Дополнительно — SG-Panel{% endblock %}
-{% block section %}XRAY SERVER{% endblock %}
-{% block heading %}Xray Server{% endblock %}
-{% block subtitle %}Дополнительные параметры транспорта и управляемого профиля SG Client{% endblock %}
+{% block title %}Expert — SG-Panel{% endblock %}
+{% block section %}EXPERT{% endblock %}
+{% block heading %}Expert{% endblock %}
+{% block subtitle %}Расширенные параметры и диагностика текущей схемы{% endblock %}
 {% block content %}
 <script>document.body.classList.add('ui-standard-page','advanced-settings-page');</script>
 {% set s = expert.settings %}
-{% set st = expert.statuses %}
 {% set eff = expert.effective %}
 {% set ctx = expert.context %}
-{% set profile_labels = {'raw_reality':'VLESS REALITY','xhttp_tls':'VLESS XHTTP-TLS','xhttp_reality':'VLESS XHTTP-REALITY','grpc_tls':'VLESS gRPC-TLS','hysteria2_tls':'Hysteria 2','xhttp_hysteria_tls':'XHTTP-TLS + Hysteria 2'} %}
 <div class="ui-page ui-page-wide advanced-page">
-  <section class="ui-card advanced-overview-card" id="transport">
-    <header class="ui-card-heading ui-card-heading-row">
-      <div>
-        <p class="panel-kicker">ДОПОЛНИТЕЛЬНО</p>
-        <h2>Эффективные параметры текущей схемы <a class="context-help-link" href="{{ url_for('help_page') }}#advanced-transport" title="Справка по дополнительным параметрам" aria-label="Справка по дополнительным параметрам">?</a></h2>
-        <p>SG-Panel передаёт серверно-зависимые значения в управляемый профиль. Обычному пользователю не нужно искать ECH, fingerprint, PEM или Flow самостоятельно.</p>
-      </div>
-      <span class="pill enabled"><i></i>{{ profile_labels.get(expert.profile, expert.profile) }}</span>
-    </header>
-    <div class="advanced-overview-grid">
-      {% if ctx.xhttp_applicable %}
-      <article><span>XHTTP</span><strong>{{ eff.xhttp_mode_label }}</strong><small>Server Extra: {{ eff.xhttp_server_extra }} · Client Extra: {{ eff.xhttp_client_extra }}</small></article>
-      {% endif %}
-      <article><span>FinalMask</span><strong>{{ st.finalmask.label }}</strong><small>{{ 'Серверная и клиентская части передаются согласованно' if eff.finalmask_enabled else 'Не добавляется в config.json и клиентский экспорт' }}</small></article>
-      {% if expert.profile == 'raw_reality' %}
-      <article><span>XTLS Flow</span><strong>{{ 'Vision включён' if server.flow == 'xtls-rprx-vision' else 'Без Vision' }}</strong><small>Flow записывается серверу и в ссылку одновременно</small></article>
-      <article><span>TLS certificate extras</span><strong>Не применимо</strong><small>ECH, SHA-256 сертификата и CA PEM не экспортируются для REALITY</small></article>
-      {% elif ctx.tls_applicable %}
-      <article><span>Проверка сертификата</span><strong>{{ st.tls_verification.label }}</strong><small>{{ eff.tls_verify_name_effective or server.server_name }}{% if eff.client_ca_enabled %} · CA SHA-256 {{ eff.client_ca_sha256[:12] }}…{% endif %}</small></article>
-      {% if ctx.ech_applicable %}
-      <article><span>ECH</span><strong>{{ st.ech.label }}</strong><small>Клиент получает только ECHConfig; серверный ключ не экспортируется</small></article>
-      {% else %}
-      <article><span>ECH</span><strong>Не применяется в Xray</strong><small>TLS этой схемы завершается в Nginx</small></article>
-      {% endif %}
-      {% endif %}
-    </div>
-  </section>
 
-  <section class="ui-card advanced-safety-card" data-expert-lock-card>
-    <div>
-      <p class="panel-kicker">SERVER AUTHORITY</p>
-      <h2>Панель — источник параметров для клиента</h2>
-      <p>Редактирование выключено по умолчанию. После изменения SG-Panel проверяет формат, создаёт итоговую конфигурацию, выполняет <code>xray run -test</code> и только затем разрешает применение с rollback при ошибке.</p>
-    </div>
-    <div class="advanced-safety-actions">
-      <span class="expert-lock-state" data-expert-lock-state>Только чтение</span>
-      <button class="button secondary" type="button" data-expert-edit-toggle>Включить редактирование</button>
-    </div>
-  </section>
-
-  {% if expert.profile == 'raw_reality' %}
-  <section class="ui-card advanced-vision-card">
-    <div>
-      <p class="panel-kicker">XTLS FLOW</p>
-      <h2>Vision настраивается в Inbound</h2>
-      <p><strong>{{ 'XTLS Vision включён' if server.flow == 'xtls-rprx-vision' else 'Стандартный VLESS без Vision' }}</strong>. SG-Panel записывает Flow одновременно серверному пользователю и в клиентскую ссылку. SG Client должен считать его управляемым полем и не включать отдельно.</p>
-    </div>
-    <a class="button ghost" href="{{ url_for('settings_page') }}#server-profile-form">Открыть Inbound</a>
-  </section>
-  {% endif %}
-
-  <form method="post" action="{{ url_for('settings_advanced_save') }}" class="ui-form expert-main-form is-readonly" id="expert-transport-form" data-validated-form>
+  <form method="post" action="{{ url_for('settings_advanced_save') }}" class="ui-form expert-main-form" id="expert-transport-form">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-    <fieldset class="expert-edit-fieldset" data-expert-edit-fieldset disabled>
 
+    <section class="ui-card expert-card" id="transport">
+      <header class="ui-card-heading">
+        <div>
+          <p class="panel-kicker">РАСШИРЕННЫЕ ПАРАМЕТРЫ</p>
+          <h2>Подключения текущей схемы</h2>
+          <p>Обычные значения уже настроены в Xray Server. Меняйте этот блок только при понятной технической необходимости.</p>
+        </div>
+      </header>
+
+      <div class="expert-card-body">
       {% if ctx.xhttp_applicable %}
-      <section class="ui-card expert-card" id="xhttp-extra">
-        <header class="ui-card-heading ui-card-heading-row"><div><p class="panel-kicker">XHTTP</p><h2>Mode и Extra</h2><p>Серверная и клиентская части хранятся раздельно и передаются SG Client из профиля.</p></div><span class="expert-status {{ st.xhttp_extra.state }}">{{ st.xhttp_extra.label }}</span></header>
-        <div class="expert-help-grid">
-          <div><strong>Нейтральное значение</strong><p><code>Auto</code> и <code>{}</code> оставляют стандартное поведение Xray.</p></div>
-          <div><strong>Источник</strong><p>SG-Panel формирует серверную конфигурацию и управляемый клиентский экспорт.</p></div>
-          <div><strong>Совместимость</strong><p>Server Extra и Client Extra могут отличаться, но должны поддерживаться обеими сторонами.</p></div>
-          <div><strong>Проверка</strong><p>JSON проверяется как объект и затем тестируется итоговый <code>config.json</code>.</p></div>
-        </div>
-        <div class="ui-field-grid expert-mode-grid">
-          <label><span>XHTTP Mode</span><select name="xhttp_mode">
-            {% for value, label in [('auto','Auto — рекомендуется'),('packet-up','Packet Up'),('stream-up','Stream Up'),('stream-one','Stream One')] %}
-            <option value="{{ value }}" {% if server.xhttp_mode == value %}selected{% endif %}>{{ label }}</option>
-            {% endfor %}
-          </select><small>Auto оставляет выбор режима Xray.</small></label>
-          <div class="expert-format-card"><strong>Допустимые значения</strong><code>auto · packet-up · stream-up · stream-one</code><p>Ручной режим нужен только для известной совместимой схемы.</p></div>
-        </div>
+      <div class="ui-field-grid expert-mode-grid">
+        <label><span>XMUX</span><select name="xmux_mode">
+          <option value="auto" {% if s.xmux_mode == 'auto' %}selected{% endif %}>Автоматически — Xray-core</option>
+          <option value="reduced" {% if s.xmux_mode == 'reduced' %}selected{% endif %}>Сниженное число соединений</option>
+          <option value="expert" {% if s.xmux_mode == 'expert' %}selected{% endif %}>Ручной JSON</option>
+        </select></label>
+        <label><span>XHTTP mode</span><select name="xhttp_mode">
+          {% for value, label in [('auto','Автоматически — Xray-core'),('packet-up','Packet Up'),('stream-up','Stream Up'),('stream-one','Stream One')] %}
+          <option value="{{ value }}" {% if server.xhttp_mode == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select></label>
+      </div>
+      <details class="expert-example">
+        <summary>Ручной JSON XHTTP и XMUX</summary>
         <div class="expert-json-grid">
-          <label><span>Server Extra · JSON</span><textarea name="xhttp_extra_server_json" rows="10" spellcheck="false">{{ s.xhttp_extra_server_json }}</textarea><small>Попадает в <code>streamSettings.xhttpSettings.extra</code>.</small></label>
-          <label><span>Client Extra · JSON</span><textarea name="xhttp_extra_client_json" rows="10" spellcheck="false">{{ s.xhttp_extra_client_json }}</textarea><small>Попадает в управляемый экспорт и параметр <code>extra</code>.</small></label>
+          <label><span>Server Extra · JSON</span><textarea name="xhttp_extra_server_json" rows="9" spellcheck="false">{{ s.xhttp_extra_server_json }}</textarea></label>
+          <label><span>Client Extra · JSON</span><textarea name="xhttp_extra_client_json" rows="9" spellcheck="false">{{ s.xhttp_extra_client_json }}</textarea></label>
         </div>
-        <details class="expert-example"><summary>Показать пример XHTTP Extra</summary><div class="expert-example-grid"><pre>{{ expert.xhttp_server_example }}</pre><pre>{{ expert.xhttp_client_example }}</pre></div><p>Пример только для просмотра и не записывается автоматически.</p></details>
-      </section>
+        <div class="ui-warning-note"><span>!</span><p><code>maxConnections</code> и <code>maxConcurrency</code> нельзя задавать одновременно.</p></div>
+        <details class="expert-example"><summary>Пресет «Сниженное число соединений»</summary><pre>{{ expert.xmux_reduced_preset }}</pre></details>
+      </details>
+      {% else %}
+      <div class="ui-info-note"><span>i</span><p>Текущая схема не использует XHTTP. Поэтому XHTTP mode, XMUX и Extra здесь не показываются и не дублируют Xray Server.</p></div>
       {% endif %}
+      </div>
+    </section>
 
-      <section class="ui-card expert-card" id="finalmask">
+    <details class="ui-card expert-card" id="finalmask">
+      <summary><span><b>FinalMask</b><small>Необязательный заключительный слой маскировки</small></span><em>{{ 'Включён' if s.finalmask_enabled else 'Выключен' }}</em></summary>
+      <div class="expert-client-body">
         <input type="hidden" name="finalmask_present" value="1">
-        <header class="ui-card-heading ui-card-heading-row"><div><p class="panel-kicker">FINALMASK</p><h2>Заключительный слой маскировки</h2><p>Единственный параметр этого экрана, для которого допустим осознанный экспертный override. Серверная и клиентская части всё равно должны оставаться совместимыми.</p></div><span class="expert-status {{ st.finalmask.state }}">{{ st.finalmask.label }}</span></header>
-        <div class="expert-help-grid">
-          <div><strong>Для обычного пользователя</strong><p>Значение приходит из SG-Panel или профиля и не требует ручной настройки.</p></div>
-          <div><strong>Для эксперта</strong><p>Можно применить проверенный пресет или JSON администратора.</p></div>
-          <div><strong>Риск</strong><p>Случайный пример из форума может нарушить соединение.</p></div>
-          <div><strong>Нейтральное значение</strong><p><code>{}</code> хранится для отображения, но при выключенном состоянии не применяется.</p></div>
-        </div>
-        <label class="switch-row expert-master-switch"><input type="checkbox" name="finalmask_enabled" value="1" {% if s.finalmask_enabled %}checked{% endif %}><span class="switch" aria-hidden="true"></span><div><strong>Включить FinalMask</strong><small>После включения оба JSON обязательны и проходят полную проверку.</small></div></label>
+        <label class="switch-row expert-master-switch"><input type="checkbox" name="finalmask_enabled" value="1" {% if s.finalmask_enabled %}checked{% endif %}><span class="switch" aria-hidden="true"></span><div><strong>Использовать FinalMask</strong><small>Оставьте выключенным без заранее проверенной серверно-клиентской схемы.</small></div></label>
         <div class="expert-json-grid">
-          <label><span>FinalMask Server · JSON</span><textarea name="finalmask_server_json" rows="10" spellcheck="false">{{ s.finalmask_server_json }}</textarea><small>Серверная часть <code>streamSettings.finalmask</code>.</small></label>
-          <label><span>FinalMask Client · JSON</span><textarea name="finalmask_client_json" rows="10" spellcheck="false">{{ s.finalmask_client_json }}</textarea><small>Клиентская часть управляемого экспорта и параметр <code>fm</code>.</small></label>
+          <label><span>Server JSON</span><textarea name="finalmask_server_json" rows="8" spellcheck="false">{{ s.finalmask_server_json }}</textarea></label>
+          <label><span>Client JSON</span><textarea name="finalmask_client_json" rows="8" spellcheck="false">{{ s.finalmask_client_json }}</textarea></label>
         </div>
-        <details class="expert-example"><summary>Показать пример FinalMask</summary><pre>{{ expert.finalmask_example }}</pre><p>Пример не записывается автоматически.</p></details>
-      </section>
+      </div>
+    </details>
 
-      {% if ctx.tls_applicable %}
-      <section class="ui-card expert-card" id="tls-expert">
+    {% if ctx.tls_applicable %}
+    <details class="ui-card expert-card" id="tls-expert">
+      <summary><span><b>TLS, сертификат клиента и ECH</b><small>Только дополнительные проверки поверх выбранной TLS-схемы</small></span><em>Открыть</em></summary>
+      <div class="expert-client-body">
         <input type="hidden" name="tls_present" value="1">
-        <header class="ui-card-heading ui-card-heading-row"><div><p class="panel-kicker">TLS CERTIFICATE</p><h2>Проверка сертификата клиента</h2><p>По умолчанию используется системное хранилище доверия и имя из Server Name/SNI. Дополнительные значения нужны только для специальной серверной схемы.</p></div><span class="expert-status {{ st.tls_verification.state }}">{{ st.tls_verification.label }}</span></header>
-        <div class="expert-help-grid">
-          <div><strong>Обычный публичный сертификат</strong><p>Оставьте System CA. Пользовательский PEM не требуется.</p></div>
-          <div><strong>Имя сертификата</strong><p>Автоматически берётся из Server Name; ручной override нужен редко.</p></div>
-          <div><strong>SHA-256</strong><p>Получается из конкретного сертификата и передаётся администратором.</p></div>
-          <div><strong>Частная CA</strong><p>Импортируйте полную PEM-цепочку без закрытого ключа.</p></div>
-        </div>
-
         <div class="ui-field-grid expert-tls-grid">
-          <label><span>Проверка сертификата по имени</span><select name="tls_verify_name_mode" id="expert-verify-name-mode"><option value="auto" {% if s.tls_verify_name_mode == 'auto' %}selected{% endif %}>Автоматически из Server Name — рекомендуется</option><option value="manual" {% if s.tls_verify_name_mode == 'manual' %}selected{% endif %}>Указать вручную</option></select><small>Эффективное имя: <code>{{ eff.tls_verify_name_effective or server.server_name }}</code></small></label>
-          <label id="expert-verify-name-field"><span>verifyPeerCertByName</span><input name="tls_verify_name" id="expert-verify-name" value="{{ s.tls_verify_name }}" placeholder="tls.example.com"><small>Несколько допустимых имён — через запятую.</small></label>
+          <label><span>Проверка имени сертификата</span><select name="tls_verify_name_mode" id="expert-verify-name-mode"><option value="auto" {% if s.tls_verify_name_mode == 'auto' %}selected{% endif %}>Автоматически из Server Name</option><option value="manual" {% if s.tls_verify_name_mode == 'manual' %}selected{% endif %}>Указать вручную</option></select></label>
+          <label id="expert-verify-name-field"><span>verifyPeerCertByName</span><input name="tls_verify_name" id="expert-verify-name" value="{{ s.tls_verify_name }}" placeholder="tls.example.com"></label>
         </div>
 
-        <div class="expert-divider"></div>
-        <label class="switch-row expert-master-switch"><input type="checkbox" name="certificate_pinning_enabled" value="1" {% if s.certificate_pinning_enabled %}checked{% endif %}><span class="switch" aria-hidden="true"></span><div><strong>Certificate pinning: закрепить SHA-256 в управляемом профиле</strong><small>Не используйте «получить и сразу доверять»: сначала сравните отпечаток с данными администратора или профиля.</small></div></label>
+        <label class="switch-row expert-master-switch"><input type="checkbox" name="certificate_pinning_enabled" value="1" {% if s.certificate_pinning_enabled %}checked{% endif %}><span class="switch" aria-hidden="true"></span><div><strong>Certificate pinning</strong><small>Закрепить проверенный SHA-256 сертификата в управляемом профиле.</small></div></label>
         <div class="ui-field-grid expert-pin-grid">
-          <label class="ui-field-wide"><span>pinnedPeerCertSha256</span><input class="mono" name="certificate_pinning_sha256" id="expert-cert-pin" value="{{ s.certificate_pinning_sha256 }}" placeholder="64 HEX; несколько значений через запятую"></label>
-          <label><span>Источник подтверждения</span><input name="certificate_pinning_source" id="expert-cert-pin-source" value="{{ s.certificate_pinning_source }}" placeholder="SG-Panel / administrator / certificate file"></label>
-          <label><span>Путь к проверенному сертификату</span><input id="expert-cert-path" value="{{ server.tls_cert_path }}" placeholder="/etc/letsencrypt/live/domain/fullchain.pem"></label>
+          <label class="ui-field-wide"><span>SHA-256</span><input class="mono" name="certificate_pinning_sha256" id="expert-cert-pin" value="{{ s.certificate_pinning_sha256 }}" placeholder="64 HEX"></label>
+          <label><span>Источник</span><input name="certificate_pinning_source" id="expert-cert-pin-source" value="{{ s.certificate_pinning_source }}"></label>
+          <label><span>Файл сертификата</span><input id="expert-cert-path" value="{{ server.tls_cert_path }}" placeholder="/etc/letsencrypt/live/domain/fullchain.pem"></label>
         </div>
-        <div class="ui-actions expert-inline-actions"><button class="button secondary" type="button" id="expert-calc-pin">Рассчитать SHA-256 из файла</button><span id="expert-pin-result" class="expert-inline-result" role="status"></span></div>
+        <div class="ui-actions expert-inline-actions"><button class="button secondary" type="button" id="expert-calc-pin">Рассчитать SHA-256</button><span id="expert-pin-result" class="expert-inline-result" role="status"></span></div>
 
         <div class="expert-divider"></div>
         <div class="ui-field-grid expert-pin-grid">
-          <label><span>Источник пользовательской CA</span><input name="client_ca_source" id="expert-ca-source" value="{{ s.client_ca_source }}" placeholder="SG-Panel / private CA / путь к файлу"></label>
-          <label><span>Импортировать PEM с Controller</span><input id="expert-ca-path" placeholder="/etc/sg-panel/private-ca-chain.pem"><small>Файл читается только после нажатия кнопки.</small></label>
-          <div class="expert-format-card"><strong>Текущий статус</strong><code>{{ 'SHA-256 ' ~ eff.client_ca_sha256 if eff.client_ca_enabled else 'Не настроено — System CA' }}</code><p>Закрытые ключи импортировать запрещено.</p></div>
+          <label><span>Источник пользовательской CA</span><input name="client_ca_source" id="expert-ca-source" value="{{ s.client_ca_source }}"></label>
+          <label><span>Файл PEM на Controller</span><input id="expert-ca-path" placeholder="/etc/sg-panel/private-ca-chain.pem"></label>
         </div>
-        <div class="ui-actions expert-inline-actions"><button class="button secondary" type="button" id="expert-import-ca">Импортировать и проверить PEM</button><span id="expert-ca-result" class="expert-inline-result" role="status"></span></div>
-        <label><span>CA PEM / полная цепочка</span><textarea name="client_ca_pem" id="expert-ca-pem" rows="9" spellcheck="false" placeholder="-----BEGIN CERTIFICATE-----">{{ s.client_ca_pem }}</textarea><small>Передаётся только в управляемом профиле SG Client. Системные корневые сертификаты остаются включены.</small></label>
+        <div class="ui-actions expert-inline-actions"><button class="button secondary" type="button" id="expert-import-ca">Импортировать PEM</button><span id="expert-ca-result" class="expert-inline-result" role="status"></span></div>
+        <label><span>CA PEM</span><textarea name="client_ca_pem" id="expert-ca-pem" rows="8" spellcheck="false">{{ s.client_ca_pem }}</textarea></label>
 
         {% if ctx.ech_applicable %}
         <div class="expert-divider"></div>
         <input type="hidden" name="ech_present" value="1">
-        <header class="ui-card-heading"><div><p class="panel-kicker">ECH</p><h2>Encrypted ClientHello</h2><p>SG-Panel хранит серверный ключ только на Controller, а клиенту передаёт связанную ECHConfig или проверенный DNS/DoH-источник.</p></div></header>
-        <div class="ui-warning-note"><span>!</span><p>Пользователь не может придумать рабочую ECH-конфигурацию для чужого сервера. <code>echServerKeys</code> никогда не включается в клиентский экспорт.</p></div>
+        <h3>Encrypted ClientHello</h3>
         <div class="ui-field-grid expert-tls-grid">
-          <label><span>ECH mode</span><select name="ech_mode" id="expert-ech-mode"><option value="off" {% if s.ech_mode == 'off' %}selected{% endif %}>Off — стандартный TLS</option><option value="generated" {% if s.ech_mode == 'generated' %}selected{% endif %}>Generated pair</option><option value="existing" {% if s.ech_mode == 'existing' %}selected{% endif %}>Existing pair</option><option value="dns" {% if s.ech_mode == 'dns' %}selected{% endif %}>DNS / DoH echConfigList</option></select></label>
-          <label><span>Outer Server Name</span><input name="ech_public_name" id="expert-ech-public-name" value="{{ s.ech_public_name }}" placeholder="public.example.com"><small>Внешнее имя до расшифровки ECH.</small></label>
+          <label><span>ECH mode</span><select name="ech_mode" id="expert-ech-mode"><option value="off" {% if s.ech_mode == 'off' %}selected{% endif %}>Off</option><option value="generated" {% if s.ech_mode == 'generated' %}selected{% endif %}>Generated pair</option><option value="existing" {% if s.ech_mode == 'existing' %}selected{% endif %}>Existing pair</option><option value="dns" {% if s.ech_mode == 'dns' %}selected{% endif %}>DNS / DoH</option></select></label>
+          <label><span>Outer Server Name</span><input name="ech_public_name" id="expert-ech-public-name" value="{{ s.ech_public_name }}" placeholder="public.example.com"></label>
         </div>
         <div class="expert-json-grid expert-secret-grid">
-          <label><span>echServerKeys · server secret</span><textarea name="ech_server_keys" id="expert-ech-server-keys" rows="6" spellcheck="false">{{ s.ech_server_keys }}</textarea><small>Хранится только на сервере и никогда не экспортируется клиенту.</small></label>
-          <label><span>echConfigList · client value</span><textarea name="ech_config_list" id="expert-ech-config-list" rows="6" spellcheck="false">{{ s.ech_config_list }}</textarea><small>Связанный клиентский ECHConfig или DNS/DoH источник.</small></label>
+          <label><span>echServerKeys</span><textarea name="ech_server_keys" id="expert-ech-server-keys" rows="6" spellcheck="false">{{ s.ech_server_keys }}</textarea></label>
+          <label><span>echConfigList</span><textarea name="ech_config_list" id="expert-ech-config-list" rows="6" spellcheck="false">{{ s.ech_config_list }}</textarea></label>
         </div>
-        <div class="ui-actions expert-inline-actions"><button class="button secondary" type="button" id="expert-generate-ech">Сгенерировать связанную ECH-пару</button><span id="expert-ech-result" class="expert-inline-result" role="status"></span></div>
-        {% else %}
-        <div class="ui-warning-note"><span>i</span><p><strong>ECH Xray для этой схемы не настраивается.</strong> TLS завершается в Nginx. SG-Panel не экспортирует фиктивную ECHConfig.</p></div>
+        <div class="ui-actions expert-inline-actions"><button class="button secondary" type="button" id="expert-generate-ech">Сгенерировать ECH-пару</button><span id="expert-ech-result" class="expert-inline-result" role="status"></span></div>
         {% endif %}
-      </section>
-      {% endif %}
+      </div>
+    </details>
+    {% endif %}
 
-      <div class="ui-actions expert-save-actions"><button class="button primary" type="submit">Сохранить и применить</button></div>
-    </fieldset>
+    <div class="ui-actions expert-save-actions"><button class="button primary" type="submit">Проверить и применить параметры</button></div>
   </form>
+
+  <details class="ui-card expert-card" id="configurations">
+    <summary><span><b>Итоговые конфигурации</b><small>То, что реально получает Xray, Nginx и выбранный клиент</small></span><em>Открыть</em></summary>
+    <div class="expert-client-body">
+      {% if users %}
+      <form method="get" action="{{ url_for('settings_advanced_page') }}#configurations" class="deployment-policy-form">
+        <label><span>Клиент</span><select name="client">{% for user in users %}<option value="{{ user.id }}" {% if selected_user and user.id == selected_user.id %}selected{% endif %}>{{ user.name }}</option>{% endfor %}</select></label>
+        <button class="button secondary small" type="submit">Показать</button>
+      </form>
+      {% endif %}
+      <details class="expert-example"><summary>JSON сервера Xray</summary><pre>{{ documents.server_json }}</pre></details>
+      <details class="expert-example"><summary>Nginx текущей схемы</summary><pre>{{ documents.nginx }}</pre></details>
+      {% if selected_user %}
+      <details class="expert-example"><summary>JSON клиента · {{ selected_user.name }}</summary><pre>{{ documents.client_json }}</pre></details>
+      <details class="expert-example"><summary>Ссылки и подписка · {{ selected_user.name }}</summary><p><strong>Подписка:</strong> <code>{{ documents.subscription_url }}</code></p><pre>{{ documents.links or 'Ссылки ещё не сформированы' }}</pre></details>
+      {% else %}
+      <div class="ui-info-note"><span>i</span><p>Создайте клиента, чтобы увидеть итоговый клиентский JSON, ссылки и подписку.</p></div>
+      {% endif %}
+    </div>
+  </details>
+
+  <section class="ui-card expert-card" id="diagnostics">
+    <header class="ui-card-heading ui-card-heading-row">
+      <div>
+        <p class="panel-kicker">ДИАГНОСТИКА</p>
+        <h2>Проверка текущей схемы</h2>
+        <p>Проверяются итоговый Xray JSON, локальные службы, Nginx и цепочка нескольких транспортов. Внешнюю доступность подтверждает клиент.</p>
+      </div>
+      <form method="post" action="{{ url_for('settings_advanced_diagnostics') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        {% if selected_user %}<input type="hidden" name="client" value="{{ selected_user.id }}">{% endif %}
+        <button class="button primary" type="submit">Проверить текущую схему</button>
+      </form>
+    </header>
+    {% if scheme_diagnostics.ran %}
+    <div class="expert-help-grid">
+      {% for check in scheme_diagnostics.checks %}<div><strong>{{ '✓' if check.ok else '!' }} {{ check.label }}</strong><p>{{ check.detail }}</p></div>{% endfor %}
+    </div>
+    <div class="ui-{{ 'info' if scheme_diagnostics.overall_ok else 'warning' }}-note"><span>{{ '✓' if scheme_diagnostics.overall_ok else '!' }}</span><p>{{ 'Локальная проверка пройдена.' if scheme_diagnostics.overall_ok else 'Есть ошибки, которые нужно исправить до применения.' }} {{ scheme_diagnostics.note }}</p></div>
+    {% else %}
+    <div class="ui-info-note"><span>i</span><p>Проверка запускается только по кнопке и не меняет настройки.</p></div>
+    {% endif %}
+  </section>
+
+  <details class="ui-card expert-card" id="connections">
+    <summary><span><b>Подключения клиента{% if selected_user %} · {{ selected_user.name }}{% endif %}</b><small>{{ 'Несколько реальных транспортов в одной управляемой подписке' if documents.connections|length >= 2 else 'Автоматический режим без лишних ручных настроек' }}</small></span><em>{{ documents.connections|length }} вариантов</em></summary>
+    <div class="expert-client-body">
+      {% if documents.connections|length >= 2 %}
+      <div class="expert-help-grid">
+        {% for connection in documents.connections %}
+        <div><strong>{{ loop.index }}. {{ connection.name or connection.label or connection.id or 'Подключение' }}</strong><p>{{ connection.transport or connection.network or 'автоматический выбор' }} · {{ connection.security or 'без отдельной защиты' }}</p></div>
+        {% endfor %}
+      </div>
+      <div class="ui-info-note"><span>i</span><p>Управление подключениями клиентов выполняется автоматически: SG Client выбирает рабочий транспорт и адаптивно переподключается. Ручные настройки здесь не дублируют Xray Server.</p></div>
+      {% elif selected_user %}
+      <div class="ui-info-note"><span>i</span><p>Сейчас доступен один вариант подключения. Порядок переключения не требуется.</p></div>
+      {% else %}
+      <div class="ui-info-note"><span>i</span><p>Создайте клиента, чтобы увидеть доступные варианты подключения.</p></div>
+      {% endif %}
+    </div>
+  </details>
+
+
 </div>
 <script>
 (() => {
-  const form = document.getElementById('expert-transport-form');
-  const fieldset = document.querySelector('[data-expert-edit-fieldset]');
-  const toggle = document.querySelector('[data-expert-edit-toggle]');
-  const lockState = document.querySelector('[data-expert-lock-state]');
-  const setEditing = (enabled) => {
-    if (!fieldset || !toggle || !form) return;
-    fieldset.disabled = !enabled;
-    form.classList.toggle('is-readonly', !enabled);
-    toggle.textContent = enabled ? 'Выключить редактирование' : 'Включить редактирование';
-    toggle.classList.toggle('danger', enabled);
-    if (lockState) lockState.textContent = enabled ? 'Редактирование включено' : 'Только чтение';
-  };
-  toggle?.addEventListener('click', () => setEditing(fieldset?.disabled));
-  setEditing(false);
-
   const csrf = {{ csrf_token()|tojson }};
   const showResult = (node, text, ok) => {
     if (!node) return;
@@ -210,8 +202,7 @@
       document.getElementById('expert-ech-server-keys').value = body.server_keys;
       document.getElementById('expert-ech-config-list').value = body.config_list;
       document.getElementById('expert-ech-mode').value = 'generated';
-      for (const id of ['expert-ech-server-keys','expert-ech-config-list','expert-ech-mode']) document.getElementById(id).dispatchEvent(new Event('input',{bubbles:true}));
-      showResult(target, 'Связанная ECH-пара создана. Выполните общую проверку.', true);
+      showResult(target, 'ECH-пара создана.', true);
     } catch (error) { showResult(target, error.message || String(error), false); }
     finally { button.disabled = false; }
   });
@@ -226,8 +217,7 @@
       const body = await response.json(); if (!response.ok || !body.ok) throw new Error(body.message || 'Ошибка расчёта');
       document.getElementById('expert-cert-pin').value = body.sha256;
       document.getElementById('expert-cert-pin-source').value = body.source;
-      document.getElementById('expert-cert-pin').dispatchEvent(new Event('input',{bubbles:true}));
-      showResult(target, 'SHA-256 рассчитан. Сравните его с доверенным источником и выполните общую проверку.', true);
+      showResult(target, 'SHA-256 рассчитан.', true);
     } catch (error) { showResult(target, error.message || String(error), false); }
     finally { button.disabled = false; }
   });
@@ -235,15 +225,14 @@
   document.getElementById('expert-import-ca')?.addEventListener('click', async (event) => {
     const button = event.currentTarget;
     const target = document.getElementById('expert-ca-result');
-    button.disabled = true; showResult(target, 'Чтение и проверка…', true);
+    button.disabled = true; showResult(target, 'Проверяю…', true);
     try {
       const data = new FormData(); data.set('csrf_token', csrf); data.set('ca_path', document.getElementById('expert-ca-path').value);
       const response = await fetch({{ url_for('settings_advanced_import_ca')|tojson }}, {method:'POST', body:data, credentials:'same-origin'});
       const body = await response.json(); if (!response.ok || !body.ok) throw new Error(body.message || 'Ошибка импорта');
       document.getElementById('expert-ca-pem').value = body.pem;
       document.getElementById('expert-ca-source').value = body.source;
-      document.getElementById('expert-ca-pem').dispatchEvent(new Event('input',{bubbles:true}));
-      showResult(target, 'PEM проверен. SHA-256: ' + body.sha256 + '. Выполните общую проверку.', true);
+      showResult(target, 'PEM проверен.', true);
     } catch (error) { showResult(target, error.message || String(error), false); }
     finally { button.disabled = false; }
   });

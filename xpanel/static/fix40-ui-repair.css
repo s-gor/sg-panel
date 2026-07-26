@@ -1,0 +1,346 @@
+/* SG-Panel Preview 9 FIX40 — confirmed UI repairs only.
+   Scope: collapsed sidebar, Clients inspector containment, DNS cleanup. */
+
+/* --------------------------------------------------------------------------
+   Collapsed sidebar: fixed 72 px rail, fixed-height buttons, no nested scroll.
+   -------------------------------------------------------------------------- */
+body.preview-9-rc6-typography .shell.sidebar-collapsed {
+  grid-template-columns: 72px minmax(0, 1fr) !important;
+}
+body.preview-9-rc6-typography .shell.sidebar-collapsed > .sidebar {
+  width: 72px !important;
+  min-width: 72px !important;
+  height: 100vh !important;
+  padding: 0 8px !important;
+  overflow: hidden !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+body.preview-9-rc6-typography .shell.sidebar-collapsed .brand {
+  flex: 0 0 72px !important;
+  min-height: 72px !important;
+  height: 72px !important;
+  padding: 12px 0 !important;
+  justify-content: center !important;
+}
+body.preview-9-rc6-typography .shell.sidebar-collapsed .brand-mark {
+  width: 36px !important;
+  height: 40px !important;
+  flex: 0 0 36px !important;
+}
+body.preview-9-rc6-typography .shell.sidebar-collapsed :is(.brand-copy,.sidebar-system,.sidebar-collapse b,.logout-button span) {
+  display: none !important;
+}
+body.preview-9-rc6-typography .shell.sidebar-collapsed .grouped-main-nav,
+body.preview-9-rc6-typography .shell.sidebar-collapsed .main-nav {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-content: initial !important;
+  justify-content: flex-start !important;
+  gap: 4px !important;
+  padding: 8px 0 !important;
+  overflow: hidden !important;
+  scrollbar-width: none !important;
+}
+body.preview-9-rc6-typography .shell.sidebar-collapsed :is(.grouped-main-nav,.main-nav)::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+body.preview-9-rc6-typography .shell.sidebar-collapsed :is(.grouped-main-nav,.main-nav) a {
+  flex: 0 0 48px !important;
+  width: 56px !important;
+  min-width: 56px !important;
+  max-width: 56px !important;
+  min-height: 48px !important;
+  height: 48px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  gap: 0 !important;
+  justify-content: center !important;
+  border-radius: 10px !important;
+  transform: none !important;
+}
+body.preview-9-rc6-typography .shell.sidebar-collapsed :is(.grouped-main-nav,.main-nav) a span {
+  display: none !important;
+}
+body.preview-9-rc6-typography .shell.sidebar-collapsed :is(.grouped-main-nav,.main-nav) a svg {
+  width: 23px !important;
+  height: 23px !important;
+  flex: 0 0 23px !important;
+}
+body.preview-9-rc6-typography .shell.sidebar-collapsed :is(.grouped-main-nav,.main-nav) a.active {
+  min-height: 48px !important;
+  height: 48px !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 5px 14px rgba(15,45,36,.16) !important;
+}
+body.preview-9-rc6-typography .shell.sidebar-collapsed .sidebar-spacer {
+  display: none !important;
+}
+body.preview-9-rc6-typography .shell.sidebar-collapsed :is(.sidebar-collapse,.logout-button) {
+  flex: 0 0 44px !important;
+  width: 56px !important;
+  min-width: 56px !important;
+  min-height: 44px !important;
+  height: 44px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  justify-content: center !important;
+  border-radius: 0 !important;
+}
+body.preview-9-rc6-typography .shell.sidebar-collapsed .logout-form {
+  flex: 0 0 44px !important;
+  margin: 0 !important;
+}
+
+/* --------------------------------------------------------------------------
+   Clients: inspector must fit the viewport and contain every control.
+   -------------------------------------------------------------------------- */
+body.clients-fix40 .clients-page-shell,
+body.clients-fix40 .clients-awg-page,
+body.clients-fix40 .clients-awg-master-detail,
+body.clients-fix40 .clients-awg-table-card,
+body.clients-fix40 .clients-awg-inspector,
+body.clients-fix40 .client-devices-section,
+body.clients-fix40 .client-device-card {
+  min-width: 0 !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+}
+body.clients-fix40 .clients-awg-master-detail {
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 390px) !important;
+  gap: 14px !important;
+}
+body.clients-fix40 .clients-awg-table-card {
+  overflow: hidden !important;
+}
+body.clients-fix40 .clients-awg-table-card .table-wrap {
+  min-width: 0 !important;
+  max-width: 100% !important;
+  overflow-x: auto !important;
+}
+body.clients-fix40 .clients-awg-inspector {
+  width: 100% !important;
+  overflow: hidden !important;
+  padding: 16px !important;
+}
+body.clients-fix40 .clients-awg-inspector > header {
+  min-width: 0 !important;
+  flex-wrap: wrap !important;
+}
+body.clients-fix40 .clients-awg-inspector .client-detail-name {
+  flex: 1 1 190px !important;
+  min-width: 0 !important;
+}
+body.clients-fix40 .clients-awg-inspector .client-detail-name h2 {
+  min-width: 0 !important;
+  max-width: 100% !important;
+  white-space: normal !important;
+  overflow-wrap: anywhere !important;
+}
+body.clients-fix40 .client-devices-section {
+  padding: 12px !important;
+  overflow: hidden !important;
+}
+body.clients-fix40 .client-devices-section > header {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) !important;
+  align-items: start !important;
+  gap: 10px !important;
+}
+body.clients-fix40 .client-devices-section > header > div {
+  min-width: 0 !important;
+  display: grid !important;
+  grid-template-columns: auto auto !important;
+  justify-content: start !important;
+  align-items: baseline !important;
+  gap: 6px 9px !important;
+}
+body.clients-fix40 .client-devices-section > header > div small {
+  grid-column: 1 / -1 !important;
+  min-width: 0 !important;
+  white-space: normal !important;
+  overflow-wrap: anywhere !important;
+}
+body.clients-fix40 .client-devices-section > header > .button {
+  justify-self: start !important;
+  max-width: 100% !important;
+  white-space: normal !important;
+}
+body.clients-fix40 .client-device-title {
+  min-width: 0 !important;
+  flex-wrap: wrap !important;
+}
+body.clients-fix40 .client-device-title > div {
+  flex: 1 1 180px !important;
+  min-width: 0 !important;
+}
+body.clients-fix40 .client-device-title small {
+  white-space: normal !important;
+  overflow-wrap: anywhere !important;
+}
+body.clients-fix40 .client-device-title > .client-status-badge {
+  flex: 0 0 auto !important;
+}
+body.clients-fix40 .client-device-uuid {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  align-items: center !important;
+  gap: 8px !important;
+}
+body.clients-fix40 .client-device-uuid code {
+  display: block !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+body.clients-fix40 .client-device-uuid button {
+  min-width: max-content !important;
+  padding: 4px 0 !important;
+}
+body.clients-fix40 .client-device-meta {
+  min-width: 0 !important;
+  overflow-wrap: anywhere !important;
+}
+body.clients-fix40 .client-device-actions {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 7px !important;
+  min-width: 0 !important;
+}
+body.clients-fix40 .client-device-actions > *,
+body.clients-fix40 .client-device-actions form,
+body.clients-fix40 .client-device-actions :is(a,button) {
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  margin: 0 !important;
+  white-space: normal !important;
+  overflow-wrap: anywhere !important;
+}
+body.clients-fix40 .clients-awg-facts-compact {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  min-width: 0 !important;
+}
+body.clients-fix40 .clients-awg-facts-compact > div {
+  min-width: 0 !important;
+}
+body.clients-fix40 .clients-awg-facts-compact dd,
+body.clients-fix40 .client-fact-traffic {
+  min-width: 0 !important;
+  overflow-wrap: anywhere !important;
+}
+body.clients-fix40 .client-fact-traffic {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 4px 10px !important;
+}
+body.clients-fix40 .clients-awg-inspector-actions {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  min-width: 0 !important;
+}
+body.clients-fix40 .clients-awg-inspector-actions .button {
+  min-width: 0 !important;
+  white-space: normal !important;
+}
+@media (max-width: 1280px) {
+  body.clients-fix40 .clients-awg-master-detail {
+    grid-template-columns: minmax(0, 1fr) minmax(300px, 350px) !important;
+  }
+}
+@media (max-width: 1080px) {
+  body.clients-fix40 .clients-awg-master-detail {
+    grid-template-columns: 1fr !important;
+  }
+  body.clients-fix40 .clients-awg-inspector {
+    position: static !important;
+    order: -1 !important;
+  }
+}
+@media (max-width: 520px) {
+  body.clients-fix40 .client-device-actions,
+  body.clients-fix40 .clients-awg-facts-compact,
+  body.clients-fix40 .clients-awg-inspector-actions {
+    grid-template-columns: 1fr !important;
+  }
+  body.clients-fix40 .client-device-uuid {
+    grid-template-columns: 1fr !important;
+  }
+  body.clients-fix40 .client-device-uuid button {
+    justify-self: start !important;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   DNS: no dashboard metrics, no detached priority column, compact server rows.
+   -------------------------------------------------------------------------- */
+body.dns-page .ui-page-toolbar {
+  margin-top: 0 !important;
+}
+body.preview-9-rc6-typography.dns-page .ui-table-card .dns-server-table {
+  min-width: 900px !important;
+  table-layout: fixed !important;
+}
+body.dns-page .dns-server-table th:nth-child(1) { width: 34% !important; }
+body.dns-page .dns-server-table th:nth-child(2) { width: 27% !important; }
+body.dns-page .dns-server-table th:nth-child(3) { width: 13% !important; }
+body.dns-page .dns-server-table th:nth-child(4) { width: 26% !important; min-width: 260px !important; }
+body.dns-page .dns-server-table :is(th,td) {
+  padding-top: 14px !important;
+  padding-bottom: 14px !important;
+}
+body.dns-page .dns-server-identity {
+  min-width: 0 !important;
+  display: flex !important;
+  align-items: flex-start !important;
+  justify-content: space-between !important;
+  gap: 10px !important;
+}
+body.dns-page .dns-server-identity > div {
+  min-width: 0 !important;
+}
+body.dns-page .dns-server-identity strong,
+body.dns-page .dns-server-identity small {
+  display: block !important;
+  min-width: 0 !important;
+  overflow-wrap: anywhere !important;
+}
+body.dns-page .dns-priority-note {
+  flex: 0 0 auto !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  min-height: 24px !important;
+  padding: 3px 7px !important;
+  border: 1px solid var(--line-soft) !important;
+  border-radius: 999px !important;
+  color: var(--muted) !important;
+  background: var(--panel-soft) !important;
+  font-size: 9px !important;
+  font-weight: 700 !important;
+  white-space: nowrap !important;
+}
+body.dns-page .dns-server-table .conditions {
+  min-width: 0 !important;
+}
+body.dns-page .dns-server-table .row-actions {
+  flex-wrap: wrap !important;
+  min-width: 0 !important;
+  gap: 7px !important;
+}
+body.dns-page .dns-server-table .row-actions > form,
+body.dns-page .dns-server-table .row-actions :is(a,button) {
+  min-width: 0 !important;
+  white-space: normal !important;
+}
+@media (max-width: 760px) {
+  body.dns-page .dns-server-identity {
+    display: grid !important;
+  }
+  body.dns-page .dns-priority-note {
+    justify-self: start !important;
+  }
+}

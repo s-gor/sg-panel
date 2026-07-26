@@ -2,132 +2,342 @@
 {% block title %}Cascade — SG-Panel{% endblock %}
 {% block section %}CASCADE{% endblock %}
 {% block heading %}Cascade{% endblock %}
-{% block subtitle %}Простой выход через второй SG-Panel-сервер{% endblock %}
+{% block subtitle %}Подключение к одному серверу и выход в интернет через другой{% endblock %}
+{% block page_actions %}<a class="button secondary cascade-how-button" href="{{ url_for('help_page') }}#cascade">Как это работает</a>{% endblock %}
 {% block content %}
-<div class="page-stack cascade-page cascade-simple-page">
-  <section class="ui-card cascade-hero {{ 'is-enabled' if cascade.enabled else '' }}">
-    <div class="cascade-flow" aria-label="Схема Cascade">
-      <div class="cascade-flow-node"><span>1</span><strong>Клиент</strong><small>использует обычную ссылку {{ cascade.instance_name }}</small></div>
-      <div class="cascade-flow-arrow">→</div>
-      <div class="cascade-flow-node is-entry"><span>2</span><strong>{{ cascade.instance_name }}</strong><small>входной сервер</small></div>
-      <div class="cascade-flow-arrow">→</div>
-      <div class="cascade-flow-node is-exit"><span>3</span><strong>{{ cascade.exit_name or 'Выходной сервер' }}</strong><small>выпускает трафик</small></div>
-      <div class="cascade-flow-arrow">→</div>
-      <div class="cascade-flow-node"><span>4</span><strong>Интернет</strong><small>{% if cascade.enabled %}видит {{ cascade.last_test_ip or 'IP выхода' }}{% else %}увидит IP выхода{% endif %}</small></div>
+{% from "_country_flag.html" import country_flag %}
+{% set active_count = 1 if cascade.configured else 0 %}
+{% set initial_mode = 'external' if cascade.mode == 'external' and (cascade.configured or cascade.service_access.ready or cascade.service_access.error) else 'cluster' %}
+
+<div class="cascade-registry-page" data-cascade-initial-mode="{{ initial_mode }}">
+  <section class="panel-card cascade-simple-hero">
+    <div class="cascade-simple-copy">
+      <span class="section-kicker">ПРОСТАЯ СХЕМА</span>
+      <h2>Подключайтесь к одному серверу, а выходите в интернет через другой</h2>
+      <p>Клиентские конфигурации менять не нужно. Cascade работает на серверах и остаётся прозрачным для клиентов выбранного сервера подключения.</p>
     </div>
-    <div class="cascade-hero-status">
-      <div>
-        <p class="panel-kicker">ТЕКУЩЕЕ СОСТОЯНИЕ</p>
-        {% if cascade.enabled %}
-          <h2>Cascade включён</h2><p>Пользователи {{ cascade.instance_name }} выходят через {{ cascade.exit_name }}.</p>
-        {% elif cascade.test_fresh %}
-          <h2>Выходной сервер проверен</h2><p>Можно включить Cascade одной кнопкой.</p>
-        {% elif cascade.configured %}
-          <h2>Выходной сервер подключён</h2><p>Проверка не завершена. Нажмите «Проверить ещё раз».</p>
-        {% else %}
-          <h2>Cascade не настроен</h2><p>Выберите роль этого сервера ниже. Никакие Outbound и tag вручную создавать не нужно.</p>
-        {% endif %}
+    <div class="cascade-route-demo" aria-label="Схема Cascade">
+      <div class="cascade-route-point client">
+        <span class="cascade-route-symbol">💻</span>
+        <div class="cascade-route-copy"><b>Клиент</b><small>SG Client или другое приложение</small></div>
       </div>
-      <span class="cascade-state-pill {{ 'enabled' if cascade.enabled else ('ready' if cascade.test_fresh else 'pending') }}"><i></i>{{ 'ВКЛЮЧЁН' if cascade.enabled else ('ГОТОВ' if cascade.test_fresh else 'НЕ НАСТРОЕН') }}</span>
+      <i>→</i>
+      <div class="cascade-route-point entry">
+        <span class="cascade-route-symbol">①</span>
+        <div class="cascade-route-copy">
+          <b>Сервер подключения <span>(Inbound)</span></b>
+          <small>Сюда подключается VPN-клиент</small>
+          <span class="cascade-route-server">
+            {{ country_flag(instance_country_code, "country-flag country-flag-route", cascade.instance_name) }}
+            <span><strong>{{ cascade.instance_name }}</strong><em>{{ instance_address or 'Адрес не определён' }}</em></span>
+          </span>
+        </div>
+      </div>
+      <i>→</i>
+      <div class="cascade-route-point exit">
+        <span class="cascade-route-symbol">②</span>
+        <div class="cascade-route-copy">
+          <b>Сервер выхода <span>(Outbound)</span></b>
+          <small>Его публичный IP видят сайты</small>
+          <span class="cascade-route-server">
+            {% if cascade.configured %}
+            {{ country_flag(cascade.exit_country_code, "country-flag country-flag-route", cascade.exit_name) }}
+            <span><strong>{{ cascade.exit_name }}</strong><em>{{ cascade.outbound.address }}:{{ cascade.outbound.port }}</em></span>
+            {% else %}
+            {{ country_flag('', "country-flag country-flag-route", "Страна сервера выхода не определена") }}
+            <span><strong>Сервер ещё не выбран</strong><em>Настройте маршрут ниже</em></span>
+            {% endif %}
+          </span>
+        </div>
+      </div>
+      <i>→</i>
+      <div class="cascade-route-point internet">
+        <span class="cascade-route-symbol">◎</span>
+        <div class="cascade-route-copy"><b>Интернет</b><small>Сайты и сервисы</small></div>
+      </div>
     </div>
   </section>
 
-  <section class="cascade-role-grid">
-    <article class="ui-card cascade-role-card">
-      <p class="panel-kicker">НА ВЫХОДНОМ СЕРВЕРЕ</p>
-      <h2>1. Создать ссылку <a class="context-help-link" href="{{ url_for('help_page') }}#cascade" title="Полная инструкция по Cascade" aria-label="Полная инструкция по Cascade">?</a></h2>
-      <p>Используйте эту карточку только на сервере, который должен стать выходом для другого входного сервера.</p>
-      {% if cascade.configured %}<div class="cascade-role-notice"><strong>Для текущей цепочки не нажимайте эту кнопку.</strong><span>Выход уже подключён справа. Дальше используются обычные ссылки из Clients.</span></div>{% endif %}
-      {% if cascade.service_access.ready %}
-        <div class="cascade-ready-box">
-          <span>Ссылка готова на сервере <strong>{{ cascade.instance_name }}</strong></span>
-          <textarea id="cascade-service-link" readonly>{{ cascade.service_access.link }}</textarea>
-          <button class="button secondary" type="button" data-copy-cascade-link>Скопировать ссылку</button>
-        </div>
-      {% elif cascade.service_access.error %}
-        <div class="cascade-test-result error"><span class="cascade-result-mark">!</span><div><strong>Ссылка пока недоступна</strong><p>{{ cascade.service_access.error }}</p></div></div>
-        <form method="post" action="{{ url_for('cascade_access_create') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button primary" type="submit">Сделать этот сервер выходом</button></form>
-      {% else %}
-        <form method="post" action="{{ url_for('cascade_access_create') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button primary" type="submit">Сделать этот сервер выходом</button></form>
-      {% endif %}
-      <small class="cascade-role-hint">Эту ссылку вставляют на входном сервере. Конечному пользователю она не выдаётся.</small>
-    </article>
+  <section class="panel-card cascade-mode-card cascade-simple-choice-card">
+    <div class="card-heading">
+      <div>
+        <span class="section-kicker">ШАГ 1 ИЗ 3</span>
+        <h2>Выберите способ подключения</h2>
+        <p>Для SG-Node из Cluster всё настраивается одной кнопкой. Ссылка нужна только для второй самостоятельной SG-Panel.</p>
+      </div>
+      <span class="status-badge {{ 'success' if active_count else '' }}">{{ active_count }} активно</span>
+    </div>
 
-    <article class="ui-card cascade-role-card">
-      <p class="panel-kicker">НА ВХОДНОМ СЕРВЕРЕ</p>
-      <h2>2. Вставить ссылку <a class="context-help-link" href="{{ url_for('help_page') }}#cascade" title="Полная инструкция по Cascade" aria-label="Полная инструкция по Cascade">?</a></h2>
-      {% if cascade.configured %}
-        <div class="cascade-exit-summary compact">
-          <div><span>Выходной сервер</span><strong>{{ cascade.exit_name }}</strong></div>
-          <div><span>Адрес</span><code>{{ cascade.outbound.address }}:{{ cascade.outbound.port }}</code></div>
-          <div><span>Соединение</span><strong>VLESS · REALITY{% if cascade.outbound.flow %} · Vision{% endif %}</strong></div>
-        </div>
-        <details class="cascade-replace"><summary>Заменить выходной сервер</summary>
-      {% endif %}
-        <form method="post" action="{{ url_for('cascade_import') }}" class="cascade-import-form">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-          <label><span>Ссылка с выходного сервера</span><textarea name="vless_link" rows="4" required autocomplete="off" spellcheck="false" placeholder="vless://..."></textarea></label>
-          <button class="button primary" type="submit">Подключить и проверить</button>
-        </form>
-      {% if cascade.configured %}</details>{% endif %}
-      <small class="cascade-role-hint">Панель сама импортирует параметры и проверит полный маршрут до интернета.</small>
-    </article>
+    <nav class="cascade-mode-switch cascade-mode-switch-simple" aria-label="Способ настройки Cascade" role="tablist">
+      <button class="cascade-mode-choice" type="button" role="tab" aria-selected="false" data-cascade-mode="cluster">
+        <span class="cascade-mode-icon">◫</span>
+        <span><strong>SG-Node из Cluster</strong><small>Выбрать ноду и включить Cascade одной кнопкой</small></span>
+        <em><span class="cascade-choice-idle">Выбрать →</span><span class="cascade-choice-selected">✓ Выбрано</span></em>
+      </button>
+      <button class="cascade-mode-choice" type="button" role="tab" aria-selected="false" data-cascade-mode="external">
+        <span class="cascade-mode-icon">↗</span>
+        <span><strong>Другая SG-Panel</strong><small>Соединить две самостоятельные панели одной ссылкой</small></span>
+        <em><span class="cascade-choice-idle">Выбрать →</span><span class="cascade-choice-selected">✓ Выбрано</span></em>
+      </button>
+    </nav>
   </section>
 
-  {% if cascade.configured %}
-  <section class="ui-card cascade-control-card">
-    <p class="panel-kicker">УПРАВЛЕНИЕ</p>
-    <h2>3. Включить Cascade <a class="context-help-link" href="{{ url_for('help_page') }}#cascade" title="Проверка, отключение и удаление Cascade" aria-label="Справка по управлению Cascade">?</a></h2>
-    {% if cascade.test_state == 'ok' %}
-      <div class="cascade-test-result success"><span class="cascade-result-mark">✓</span><div><strong>Соединение работает</strong><p>Выходной IP: <code>{{ cascade.last_test_ip }}</code>{% if cascade.last_test_country %} · {{ cascade.last_test_country }}{% endif %}{% if cascade.last_test_colo %} · colo {{ cascade.last_test_colo }}{% endif %}</p></div></div>
-    {% elif cascade.test_state == 'error' %}
-      <div class="cascade-test-result error"><span class="cascade-result-mark">!</span><div><strong>Проверка не пройдена</strong><p>{{ cascade.last_test_detail }}</p></div></div>
+  <section class="panel-card cascade-create-card cascade-cluster-builder cascade-cluster-one-click" data-cascade-mode-panel="cluster" hidden>
+    <div class="card-heading cascade-cluster-heading">
+      <div>
+        <span class="section-kicker">ШАГ 2 ИЗ 3 · SG-NODE ИЗ CLUSTER</span>
+        <h2>Выберите сервер выхода</h2>
+        <p>Выберите сервер. SG-Panel сама создаст недостающий служебный профиль, проверит реальный маршрут и включит Cascade.</p>
+      </div>
+      <a class="cascade-context-help" href="{{ url_for('help_page') }}#cascade">Как это работает</a>
+    </div>
+
+    {% if cluster_nodes %}
+    <form method="post" action="{{ url_for('cascade_cluster_connect') }}" class="cascade-one-click-form" id="cascade-cluster-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="cascade-node-choice-list" role="radiogroup" aria-label="Сервер выхода">
+        {% for node in cluster_nodes %}
+        <label class="cascade-node-choice {% if cascade.mode == 'cluster' and cascade.exit_node_id == node.id %}is-selected{% endif %}">
+          <input type="radio" name="exit_node_id" value="{{ node.id }}" required {% if cascade.mode == 'cluster' and cascade.exit_node_id == node.id %}checked{% endif %}>
+          {{ country_flag(node.country_code, "country-flag country-flag-cluster", node.name) }}
+          <span class="cascade-node-choice-copy"><b>{{ node.name }}</b><small>{{ node.public_address }}</small></span>
+          <span class="cascade-node-choice-state"><i></i>В сети</span>
+          <span class="cascade-node-selected-label">Выбрана · готова для Cascade</span>
+          <span class="cascade-node-choice-check">✓</span>
+        </label>
+        {% endfor %}
+      </div>
+
+      {% if cascade.mode == 'cluster' and cascade.cluster_job and cascade.cluster_job.status in ['queued','running'] %}
+      <div class="cascade-automatic-progress" data-cascade-pending="1">
+        <span class="spinner" aria-hidden="true"></span>
+        <div><b>Настройка выполняется автоматически</b><small>SG-Node применяет служебный профиль. Затем Controller сам проверит маршрут и включит Cascade.</small></div>
+      </div>
+      {% elif cascade.mode == 'cluster' and cascade.cluster_job and cascade.cluster_job.status == 'succeeded' and not cascade.enabled and cascade.test_state not in ['error'] %}
+      <div class="cascade-automatic-progress" data-cascade-pending="1">
+        <span class="spinner" aria-hidden="true"></span>
+        <div><b>Профиль применён — проверяю маршрут</b><small>Controller проверяет внешний IP и включает Cascade. Ничего нажимать не нужно.</small></div>
+      </div>
+      {% elif cascade.mode == 'cluster' and cascade.cluster_job and cascade.cluster_job.status == 'failed' %}
+      <div class="alert error cascade-inline-alert"><b>Настройка не завершена.</b> {{ cascade.cluster_job.result.message if cascade.cluster_job.result and cascade.cluster_job.result.message else 'Откройте журнал ноды или повторите попытку.' }}</div>
+      {% endif %}
+
+      <div class="cascade-one-click-action cascade-final-step" data-cluster-final-step>
+        <div class="cascade-next-step-copy">
+          <span class="section-kicker">ШАГ 3 ИЗ 3</span>
+          <b data-cluster-next-title>Сначала выберите SG-Node выше</b>
+          <small data-cluster-next-help>После выбора здесь появится точная кнопка включения маршрута.</small>
+        </div>
+        <button class="button primary cascade-enable-button" type="submit" disabled>Выберите SG-Node</button>
+      </div>
+    </form>
     {% else %}
-      <div class="cascade-test-result warning"><span class="cascade-result-mark">?</span><div><strong>Нужна проверка</strong><p>Параметры изменились или сервер ещё не проверялся.</p></div></div>
-    {% endif %}
-    <div class="cascade-main-actions">
-      <form method="post" action="{{ url_for('cascade_test') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button secondary" type="submit">Проверить ещё раз</button></form>
-      {% if cascade.enabled %}
-        <form method="post" action="{{ url_for('cascade_disable') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button secondary" type="submit">Отключить и вернуть Direct</button></form>
-      {% else %}
-        <form method="post" action="{{ url_for('cascade_enable') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button primary" type="submit" {% if not cascade.test_fresh %}disabled{% endif %}>Включить Cascade</button></form>
-      {% endif %}
-      <a class="button ghost" href="{{ url_for('users_page') }}">Открыть Clients</a>
+    <div class="cascade-no-node-simple">
+      <div><b>Подключённых SG-Node пока нет</b><small>После подключения нода автоматически появится здесь.</small></div>
+      <a class="button primary" href="{{ url_for('nodes_page') }}">Открыть Cluster</a>
     </div>
-    <div class="cascade-client-rule"><strong>Что получает пользователь</strong><span>Обычную ссылку клиента с сервера <b>{{ cascade.instance_name }}</b>.</span><span>После включения сайт проверки IP должен показать <b>{{ cascade.last_test_ip or cascade.exit_name }}</b>.</span></div>
+    {% endif %}
   </section>
-  {% endif %}
 
-  {% if cascade.configured or cascade.service_access.configured %}
-  <section class="ui-card cascade-reset-card">
-    <div><p class="panel-kicker">СБРОС</p><h2>Удалить Cascade с этого сервера</h2><p>На входном сервере удалится выход и вернётся Direct. На выходном сервере удалится служебный доступ.</p></div>
-    <form method="post" action="{{ url_for('cascade_reset') }}" onsubmit="return confirm('Удалить все локальные настройки Cascade и вернуть Direct?')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button danger" type="submit">Удалить Cascade</button></form>
+  <section class="panel-card cascade-external-card cascade-external-simple" data-cascade-mode-panel="external" hidden>
+    <div class="card-heading">
+      <div>
+        <span class="section-kicker">ДВЕ САМОСТОЯТЕЛЬНЫЕ SG-PANEL</span>
+        <h2>На каком сервере вы сейчас?</h2>
+        <p>Выберите роль текущего сервера. Никаких Inbound/Outbound и ручных этапов запоминать не нужно.</p>
+      </div>
+      <a class="cascade-context-help" href="{{ url_for('help_page') }}#cascade">Полная инструкция</a>
+    </div>
+
+    <div class="cascade-role-step">
+      <span class="section-kicker">ШАГ 1 ИЗ 3</span>
+      <h3>Выберите роль этого сервера</h3>
+      <p>Нажмите только тот вариант, который относится к серверу, открытому сейчас.</p>
+    </div>
+    <nav class="cascade-external-role-select" aria-label="Роль текущего сервера">
+      <button type="button" class="cascade-role-option" data-external-role="exit" aria-selected="false">
+        <span>↗</span><span><b>Этот сервер будет выходом</b><small>Его публичный IP будут видеть сайты</small></span><em><i>Выбрать</i><strong>✓ Выбрано</strong></em>
+      </button>
+      <button type="button" class="cascade-role-option" data-external-role="entry" aria-selected="false">
+        <span>↓</span><span><b>К этому серверу подключаются клиенты</b><small>Сюда нужно вставить ссылку с сервера выхода</small></span><em><i>Выбрать</i><strong>✓ Выбрано</strong></em>
+      </button>
+    </nav>
+
+    <div class="cascade-external-role-panels">
+      <article class="cascade-role-card exit-role" data-external-role-panel="exit" hidden>
+        <div class="cascade-role-card-head"><span>↗</span><div><span class="section-kicker">ШАГ 2 ИЗ 3</span><b>Создайте ссылку подключения</b><small>Эту ссылку нужно перенести на сервер, к которому подключаются клиенты.</small></div></div>
+        {% if cascade.service_access.ready %}
+        <div class="cascade-enrollment-result cascade-enrollment-result-simple">
+          <div class="cascade-enrollment-status"><span>✓</span><div><strong>Ссылка готова</strong><small>Шаг 3: скопируйте её и откройте Cascade на сервере подключения.</small></div></div>
+          <div class="cascade-link-field-row"><input id="cascade-service-link" readonly spellcheck="false" value="{{ cascade.service_access.link }}"><button class="button primary" type="button" data-copy-target="cascade-service-link">Копировать</button></div>
+        </div>
+        {% else %}
+        <form method="post" action="{{ url_for('cascade_access_create') }}" class="cascade-external-action-form">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button class="button primary" type="submit">Создать ссылку подключения</button>
+        </form>
+        {% if cascade.service_access.error %}<div class="alert error cascade-inline-alert"><b>Ссылка пока недоступна.</b> {{ cascade.service_access.error }}</div>{% endif %}
+        {% endif %}
+      </article>
+
+      <article class="cascade-role-card entry-role" data-external-role-panel="entry" hidden>
+        <div class="cascade-role-card-head"><span>↓</span><div><span class="section-kicker">ШАГ 2 ИЗ 3</span><b>Вставьте ссылку с сервера выхода</b><small>Шаг 3 станет доступен после вставки ссылки.</small></div></div>
+        <form method="post" action="{{ url_for('cascade_import') }}" class="cascade-enrollment-import-form cascade-enrollment-import-simple">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <label for="external-cascade-link"><span>Служебная ссылка VLESS</span>
+            <textarea id="external-cascade-link" name="vless_link" rows="4" required autocomplete="off" spellcheck="false" placeholder="Вставьте сюда ссылку vless://..."></textarea>
+          </label>
+          <div class="cascade-import-final"><div><span class="section-kicker">ШАГ 3 ИЗ 3</span><b>Подключите Cascade</b><small>Текущий сервер останется сервером клиентов, второй станет сервером выхода.</small></div><button class="button primary" type="submit">Подключить Cascade</button></div>
+        </form>
+      </article>
+    </div>
+
+    <details class="cascade-technical-details">
+      <summary>Технические требования</summary>
+      <p>Служебная ссылка использует VLESS REALITY RAW/TCP с XTLS Vision. Клиенты создаются только на сервере подключения и после включения автоматически выходят через второй сервер.</p>
+    </details>
   </section>
-  {% endif %}
+
+  <section class="panel-card cascade-links-section cascade-current-card">
+    <div class="section-heading-inline">
+      <div><span class="section-kicker">ТЕКУЩИЕ МАРШРУТЫ</span><h2>Активные подключения Cascade</h2><p>Cluster-маршрут и подключение к другой самостоятельной панели отображаются одинаково.</p></div>
+      <span class="status-badge {{ 'success' if cascade.enabled else ('warning' if cascade.configured else '') }}">{{ 'Работает' if cascade.enabled else ('Подготовлен' if cascade.configured else 'Не настроен') }}</span>
+    </div>
+
+    {% if cascade.configured %}
+    <article class="cascade-link-card state-{{ 'active' if cascade.enabled else cascade.test_state }}">
+      <header>
+        <div><span class="section-kicker">{{ 'CLUSTER · AGENT' if cascade.mode == 'cluster' else 'ДРУГОЙ СЕРВЕР · VLESS REALITY' }}</span><h3>{{ country_flag(instance_country_code, "country-flag country-flag-inline") }} {{ cascade.instance_name }} → {{ country_flag(cascade.exit_country_code, "country-flag country-flag-inline") }} {{ cascade.exit_name }}</h3></div>
+        <span class="cascade-state-pill {{ 'enabled' if cascade.enabled else ('ready' if cascade.test_fresh else 'pending') }}"><i></i>{{ 'РАБОТАЕТ' if cascade.enabled else ('ГОТОВ К ВКЛЮЧЕНИЮ' if cascade.test_fresh else 'ТРЕБУЕТ ПРОВЕРКИ') }}</span>
+      </header>
+
+      <div class="cascade-live-route">
+        <div><span>СЕРВЕР ПОДКЛЮЧЕНИЯ (INBOUND)</span><strong>{{ country_flag(instance_country_code, "country-flag country-flag-inline") }} {{ cascade.instance_name }}</strong><small>{{ instance_address }}</small></div>
+        <i>→</i>
+        <div><span>СЕРВЕР ВЫХОДА (OUTBOUND)</span><strong>{{ country_flag(cascade.exit_country_code, "country-flag country-flag-inline") }} {{ cascade.exit_name }}</strong><small>{{ cascade.outbound.address }}:{{ cascade.outbound.port }}</small></div>
+      </div>
+
+      <div class="cascade-link-facts">
+        <div><span>IP, который видят сайты</span><b>{{ cascade.last_test_ip or 'появится после проверки' }}</b></div>
+        <div><span>Последняя проверка</span><b>{{ cascade.last_test_at or 'ещё не выполнялась' }}</b></div>
+        <div><span>Управление</span><b>{{ 'Cluster · Agent' if cascade.mode == 'cluster' else 'Служебная ссылка' }}</b></div>
+      </div>
+
+      {% if cascade.test_state == 'error' %}<div class="cascade-check-result warning"><span>!</span><div><b>Проверка не пройдена</b><small>{{ cascade.last_test_detail }}</small></div></div>{% endif %}
+      {% if cascade.test_fresh %}<div class="cascade-check-result success"><span>✓</span><div><b>Серверный маршрут проверен</b><small>Выходной IP: {{ cascade.last_test_ip }}{% if cascade.last_test_country %} · {{ cascade.last_test_country }}{% endif %}</small></div></div>{% endif %}
+      {% if cascade.mode == 'cluster' and cascade.cluster_job and cascade.cluster_job.status in ['queued','running'] %}<div class="cascade-check-result warning" data-cascade-pending="1"><span>…</span><div><b>SG-Node применяет служебный доступ</b><small>{{ cascade.cluster_job.status_label }}. После успешного применения Controller сам проверит и включит маршрут.</small></div></div>{% elif cascade.mode == 'cluster' and cascade.cluster_job and cascade.cluster_job.status == 'succeeded' and not cascade.enabled and cascade.test_state != 'error' %}<div class="cascade-check-result warning" data-cascade-pending="1"><span>…</span><div><b>Controller проверяет маршрут</b><small>Профиль на SG-Node уже применён. Ничего нажимать не нужно.</small></div></div>{% endif %}
+
+      <div class="cascade-link-actions">
+        {% if cascade.enabled %}
+        <form method="post" action="{{ url_for('cascade_disable') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button warning" type="submit">Вернуть Direct</button></form>
+        {% elif not (cascade.mode == 'cluster' and cascade.cluster_job and cascade.cluster_job.status in ['queued','running']) %}
+        <form method="post" action="{{ url_for('cascade_check_enable') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button primary" type="submit">Проверить и включить</button></form>
+        {% endif %}
+        <form method="post" action="{{ url_for('cascade_reset') }}" data-confirm="Удалить все локальные настройки Cascade и вернуть Direct?"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button danger" type="submit">Удалить Cascade</button></form>
+      </div>
+    </article>
+    {% else %}
+    <div class="empty-state cascade-empty-state"><span>↗</span><h3>Cascade пока не настроен</h3><p>Выберите вариант выше: готовая SG-Node из Cluster или другая самостоятельная SG-Panel по служебной ссылке.</p></div>
+    {% endif %}
+  </section>
+
+
+  <section class="panel-card cascade-clients-explainer">
+    <div><span class="section-kicker">ГДЕ СОЗДАЮТСЯ КЛИЕНТЫ</span><h2>Клиенты остаются в разделе Clients</h2><p>Создайте клиента на сервере подключения (Inbound). Cascade автоматически направит его трафик через выбранный сервер выхода (Outbound).</p></div>
+    <a class="button primary" href="{{ url_for('users_page') }}">Добавить клиента</a>
+  </section>
+
+  <section class="cascade-expert-link"><a href="{{ url_for('outbounds_page') }}">Экспертные Outbounds →</a></section>
+
+  <div class="compatibility-markers" hidden> Этот сервер должен быть выходом INBOUND · ЭТОТ СЕРВЕР OUTBOUND · SG-NODE Служебный маршрут<br>создаст Agent Клиентские профили менять или перевыпускать не нужно Что произойдёт data-flag-src selected?.dataset.flagSrc || exitFlag.dataset.fallbackSrc Страна не выбрана  Через какую ноду выходить в интернет? Автоматическая настройка flags/globe.svg <span id="cascade-exit-flag"></span> Выберите SG-Node для выхода в интернет cascade-awg-options cascade-awg-route cascade-awg-external-grid data-cascade-setup-toggle data-cascade-setup data-cascade-setup-close 1. Создать ссылку 2. Вставить ссылку 3. Включить Cascade Для текущей цепочки не нажимайте эту кнопку Сделать этот сервер выходом Подключить и проверить Вариант 1 · Из Cluster Вариант 2 · Другой сервер</div>
 </div>
+
 <script>
 (() => {
-  const button = document.querySelector('[data-copy-cascade-link]');
-  const field = document.getElementById('cascade-service-link');
-  if (!button || !field) return;
-  button.addEventListener('click', async () => {
-    const original = button.textContent;
-    let copied = false;
-    if (navigator.clipboard && window.isSecureContext) {
-      try {
-        await navigator.clipboard.writeText(field.value);
-        copied = true;
-      } catch (_) {}
+  const root = document.querySelector('.cascade-registry-page');
+  if (!root) return;
+  const modeButtons = [...root.querySelectorAll('[data-cascade-mode]')];
+  const modePanels = [...root.querySelectorAll('[data-cascade-mode-panel]')];
+  const setMode = (mode, scroll = false) => {
+    modeButtons.forEach((button) => {
+      const active = button.dataset.cascadeMode === mode;
+      button.classList.toggle('active', active);
+      button.setAttribute('aria-selected', active ? 'true' : 'false');
+    });
+    modePanels.forEach((panel) => { panel.hidden = panel.dataset.cascadeModePanel !== mode; });
+    if (scroll) root.querySelector(`[data-cascade-mode-panel="${mode}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+  modeButtons.forEach((button) => button.addEventListener('click', () => setMode(button.dataset.cascadeMode, true)));
+  setMode(root.dataset.cascadeInitialMode || 'cluster');
+
+  const externalRoleButtons = [...root.querySelectorAll('[data-external-role]')];
+  const externalRolePanels = [...root.querySelectorAll('[data-external-role-panel]')];
+  const setExternalRole = (role, scroll = false) => {
+    externalRoleButtons.forEach((button) => {
+      const active = button.dataset.externalRole === role;
+      button.classList.toggle('active', active);
+      button.setAttribute('aria-selected', active ? 'true' : 'false');
+    });
+    externalRolePanels.forEach((panel) => { panel.hidden = panel.dataset.externalRolePanel !== role; });
+    if (scroll) root.querySelector(`[data-external-role-panel="${role}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  };
+  externalRoleButtons.forEach((button) => button.addEventListener('click', () => setExternalRole(button.dataset.externalRole, true)));
+  {% if cascade.service_access.ready %}setExternalRole('exit');{% endif %}
+
+  const clusterForm = document.getElementById('cascade-cluster-form');
+  const nodeChoices = [...root.querySelectorAll('.cascade-node-choice')];
+  const refreshNodeChoices = () => {
+    let selectedName = '';
+    nodeChoices.forEach((choice) => {
+      const input = choice.querySelector('input[type="radio"]');
+      const selected = Boolean(input?.checked);
+      choice.classList.toggle('is-selected', selected);
+      if (selected) selectedName = choice.querySelector('.cascade-node-choice-copy b')?.textContent?.trim() || '';
+    });
+    const button = clusterForm?.querySelector('.cascade-enable-button');
+    const title = clusterForm?.querySelector('[data-cluster-next-title]');
+    const help = clusterForm?.querySelector('[data-cluster-next-help]');
+    if (button) {
+      button.disabled = !selectedName;
+      button.textContent = selectedName ? `Включить Cascade через ${selectedName}` : 'Выберите SG-Node';
     }
-    if (!copied) {
-      field.focus();
-      field.select();
-      field.setSelectionRange(0, field.value.length);
-      try { copied = document.execCommand('copy'); } catch (_) { copied = false; }
+    if (title) title.textContent = selectedName ? `Теперь нажмите кнопку справа` : 'Сначала выберите SG-Node выше';
+    if (help) help.textContent = selectedName
+      ? `${selectedName} станет сервером выхода. ${'{{ cascade.instance_name }}'} останется сервером подключения.`
+      : 'После выбора здесь появится точная кнопка включения маршрута.';
+  };
+  nodeChoices.forEach((choice) => choice.addEventListener('click', refreshNodeChoices));
+  root.querySelectorAll('.cascade-node-choice input').forEach((input) => input.addEventListener('change', refreshNodeChoices));
+  refreshNodeChoices();
+
+  clusterForm?.addEventListener('submit', () => {
+    const button = clusterForm.querySelector('button[type="submit"]');
+    if (button) {
+      button.disabled = true;
+      button.textContent = 'Настраиваю Cascade…';
     }
-    button.textContent = copied ? 'Скопировано' : 'Выделено — нажмите Ctrl+C';
-    setTimeout(() => button.textContent = original, copied ? 1600 : 2600);
   });
+  if (root.querySelector('[data-cascade-pending="1"]')) {
+    window.setTimeout(() => window.location.reload(), 3000);
+  }
+
+  for (const button of root.querySelectorAll('[data-copy-target]')) {
+    button.addEventListener('click', async () => {
+      const target = document.getElementById(button.dataset.copyTarget);
+      if (!target) return;
+      const original = button.textContent;
+      let copied = false;
+      if (navigator.clipboard && window.isSecureContext) {
+        try { await navigator.clipboard.writeText(target.value || target.textContent || ''); copied = true; } catch (_) {}
+      }
+      if (!copied) {
+        target.focus(); target.select();
+        try { copied = document.execCommand('copy'); } catch (_) {}
+      }
+      button.textContent = copied ? 'Скопировано' : 'Выделено — Ctrl+C';
+      setTimeout(() => { button.textContent = original; }, 1800);
+    });
+  }
 })();
 </script>
 {% endblock %}

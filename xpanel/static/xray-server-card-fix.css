@@ -1,0 +1,443 @@
+/* SG-Panel Preview 9 FIX23 — Xray Server profile-card alignment and Russia-kit centering. */
+.server-settings-page .inbound-settings-form > .inbound-core-settings,
+.server-settings-page .inbound-settings-form > .ui-form-section.profile-section[data-profile-section="russia_kit"] {
+  margin: 14px 0;
+  padding: 18px;
+  overflow: hidden;
+  border: 1px solid var(--line) !important;
+  border-radius: 16px;
+  background: var(--panel) !important;
+  box-shadow: var(--shadow);
+}
+
+.server-settings-page .inbound-settings-form > .inbound-core-settings {
+  gap: 16px;
+}
+
+.server-settings-page .inbound-core-settings > .inbound-field-groups {
+  gap: 14px;
+}
+
+.server-settings-page .inbound-core-settings > .inbound-field-groups > .inbound-field-group {
+  margin: 0;
+  padding: 0;
+  border: 0 !important;
+  border-radius: 0;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.server-settings-page .inbound-settings-form > .inbound-expert-panel {
+  margin: 14px 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--panel);
+  box-shadow: var(--shadow);
+}
+
+.server-settings-page .inbound-settings-form > .inbound-expert-panel > summary {
+  min-height: 72px;
+  padding: 16px 20px;
+}
+
+.server-settings-page .inbound-settings-form > .inbound-expert-panel > .inbound-field-group-server {
+  margin: 0 18px 18px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: var(--panel-2);
+  box-shadow: none;
+}
+
+.server-settings-page .inbound-settings-form > .ui-form-section.profile-section[data-profile-section="russia_kit"] {
+  gap: 16px;
+}
+
+.server-settings-page .inbound-settings-form > .ui-form-section.profile-section[data-profile-section="russia_kit"].is-last-visible-profile-section {
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--line) !important;
+}
+
+.server-settings-page .inbound-settings-form > .ui-form-section.profile-section[data-profile-section="russia_kit"] > :last-child {
+  margin-bottom: 0;
+}
+
+/* The Xray Server has no sibling tab: do not reserve a separate tab row.
+   Step 1 belongs directly to the rounded "Основное подключение" card,
+   so its top-level section must not draw another rectangular surface. */
+.server-settings-page .inbound-main-card > .inbound-settings-form {
+  background: transparent !important;
+}
+
+.server-settings-page .inbound-settings-form > .inbound-profile-section {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+@media (max-width: 760px) {
+  .server-settings-page .inbound-settings-form > .inbound-core-settings,
+  .server-settings-page .inbound-settings-form > .ui-form-section.profile-section[data-profile-section="russia_kit"] {
+    padding: 15px;
+    border-radius: 14px;
+  }
+  .server-settings-page .inbound-settings-form > .inbound-expert-panel > summary {
+    min-height: 64px;
+    padding: 14px 15px;
+  }
+  .server-settings-page .inbound-settings-form > .inbound-expert-panel > .inbound-field-group-server {
+    margin: 0 15px 15px;
+    padding: 14px;
+  }
+}
+
+
+/* FIX23 — remove the remaining side “ears”, equalise profile cards and
+   give the Russia-kit summary a centred, deliberate composition. */
+.server-settings-page .inbound-settings-form > .inbound-profile-section {
+  margin-right: -20px;
+  margin-left: -20px;
+  padding: 18px 20px 20px;
+  border: 0 !important;
+  border-radius: 0;
+  background: var(--panel-2) !important;
+  box-shadow: none !important;
+}
+
+html[data-theme="light"] body.preview-9-rc6-typography .server-settings-page .inbound-settings-form > .inbound-profile-section,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .server-settings-page .inbound-settings-form > .inbound-profile-section {
+  background: var(--lux-surface-mid) !important;
+}
+
+.server-settings-page .inbound-profile-family {
+  display: flex;
+  flex-direction: column;
+}
+
+.server-settings-page .inbound-profile-family > .profile-family-grid {
+  flex: 1 1 auto;
+  align-items: stretch;
+}
+
+.server-settings-page .profile-family-grid > .inbound-profile-card,
+.server-settings-page .profile-family-grid > .inbound-profile-card > .profile-card-body {
+  height: 100%;
+}
+
+@media (min-width: 1101px) {
+  .server-settings-page .inbound-profile-family-tls .profile-family-grid-4 {
+    grid-template-columns:
+      minmax(0, 1fr)
+      minmax(0, .94fr)
+      minmax(210px, 1.18fr)
+      minmax(224px, 1.28fr);
+  }
+}
+
+.server-settings-page .inbound-profile-card input[value="xhttp_hysteria_tls"] + .profile-card-body .profile-card-top strong,
+.server-settings-page .inbound-profile-card input[value="russia_kit"] + .profile-card-body .profile-card-top strong {
+  font-size: 13px;
+  line-height: 1.28;
+  white-space: nowrap;
+  overflow-wrap: normal;
+}
+
+.server-settings-page .inbound-active-banner.is-russia-kit {
+  grid-template-columns: minmax(0, 1fr);
+  justify-items: center;
+  gap: 13px;
+  padding: 20px 22px 18px;
+  text-align: center;
+}
+
+.server-settings-page .inbound-active-banner.is-russia-kit .inbound-active-banner-main,
+.server-settings-page .inbound-active-banner.is-russia-kit .inbound-active-banner-side {
+  min-width: 0;
+  width: min(100%, 860px);
+  text-align: center;
+}
+
+.server-settings-page .inbound-active-banner.is-russia-kit .inbound-active-banner-main strong {
+  font-size: 20px;
+  line-height: 1.25;
+}
+
+.server-settings-page .inbound-active-banner.is-russia-kit .inbound-active-banner-main small,
+.server-settings-page .inbound-active-banner.is-russia-kit .inbound-active-banner-side small {
+  margin-right: auto;
+  margin-left: auto;
+  max-width: 760px;
+}
+
+.server-settings-page .inbound-active-banner.is-russia-kit .inbound-selection-state {
+  margin-right: auto;
+  margin-left: auto;
+  padding: 6px 11px;
+  font-size: 10px;
+}
+
+.server-settings-page .inbound-active-banner.is-russia-kit .inbound-active-banner-side b {
+  margin-top: 7px;
+  font-size: 12.5px;
+  line-height: 1.3;
+}
+
+.server-settings-page .inbound-active-banner.is-russia-kit .inbound-mode-route {
+  width: 100%;
+  padding-top: 15px;
+}
+
+.server-settings-page .inbound-active-banner.is-russia-kit .inbound-mode-route > div {
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  min-height: 66px;
+  text-align: center;
+}
+
+html[data-theme="light"] body.preview-9-rc6-typography .server-settings-page .inbound-active-banner.is-russia-kit .inbound-selection-state.is-active,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .server-settings-page .inbound-active-banner.is-russia-kit .inbound-selection-state.is-active {
+  color: #315f50 !important;
+  border-color: #9fb9aa !important;
+  background: linear-gradient(180deg, #e4ede7 0%, #d4e2d9 100%) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.72), 0 2px 8px rgba(48,72,59,.10) !important;
+}
+
+@media (max-width: 1100px) {
+  .server-settings-page .inbound-profile-family-tls .profile-family-grid-4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 680px) {
+  .server-settings-page .inbound-settings-form > .inbound-profile-section {
+    margin-right: -20px;
+    margin-left: -20px;
+    padding: 15px;
+  }
+  .server-settings-page .inbound-profile-family-tls .profile-family-grid-4 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .server-settings-page .inbound-profile-card input[value="xhttp_hysteria_tls"] + .profile-card-body .profile-card-top strong,
+  .server-settings-page .inbound-profile-card input[value="russia_kit"] + .profile-card-body .profile-card-top strong {
+    white-space: normal;
+  }
+  .server-settings-page .inbound-active-banner.is-russia-kit {
+    padding: 17px 15px;
+  }
+}
+
+/* FIX25 — equal adaptive profile selector cards without fixed-width overflow.
+   At wide desktop widths the family columns use a 1:2 ratio. With 7px
+   horizontal family padding, 1px borders and 16px card gaps, every one of
+   the six cards resolves to the same width. Card content uses fixed rows so
+   protocol, title and description sit on the same visual levels. */
+.server-settings-page .profile-family-grid > .inbound-profile-card {
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+  height: 188px;
+  min-height: 188px;
+  max-height: 188px;
+}
+
+.server-settings-page .profile-family-grid > .inbound-profile-card > .profile-card-body {
+  box-sizing: border-box;
+  display: grid;
+  grid-template-rows: 28px 20px 42px minmax(0, 1fr);
+  align-items: center;
+  justify-items: center;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  gap: 4px;
+  padding: 13px 12px 14px;
+  text-align: center;
+}
+
+.server-settings-page .profile-family-grid .profile-card-status-row {
+  min-height: 28px;
+  align-self: center;
+  justify-content: center;
+  width: 100%;
+}
+
+.server-settings-page .profile-family-grid .profile-card-active-state,
+.server-settings-page .profile-family-grid .profile-card-draft-state {
+  margin: 0 auto;
+  text-align: center;
+}
+
+.server-settings-page .profile-family-grid .profile-card-protocol {
+  align-self: center;
+  max-width: 100%;
+  font-size: 8.5px;
+  line-height: 1.2;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.server-settings-page .profile-family-grid .profile-card-top {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  min-height: 42px;
+  gap: 0;
+  text-align: center;
+}
+
+.server-settings-page .profile-family-grid .profile-card-top strong,
+.server-settings-page .inbound-profile-card input[value="xhttp_hysteria_tls"] + .profile-card-body .profile-card-top strong,
+.server-settings-page .inbound-profile-card input[value="russia_kit"] + .profile-card-body .profile-card-top strong {
+  max-width: 100%;
+  font-size: 13px;
+  line-height: 1.28;
+  text-align: center;
+  white-space: normal;
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
+.server-settings-page .profile-family-grid .profile-card-body > small {
+  align-self: center;
+  margin: 0;
+  max-width: 100%;
+  font-size: 11px;
+  line-height: 1.42;
+  text-align: center;
+}
+
+@media (min-width: 1481px) {
+  .server-settings-page .inbound-profile-families {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+    gap: 14px;
+  }
+
+  .server-settings-page .inbound-profile-family {
+    padding: 12px 7px 7px;
+  }
+
+  .server-settings-page .profile-family-heading {
+    margin-right: 7px;
+    margin-left: 7px;
+  }
+
+  .server-settings-page .profile-family-grid {
+    gap: 16px;
+  }
+
+  .server-settings-page .inbound-profile-family-reality .profile-family-grid-2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .server-settings-page .inbound-profile-family-tls .profile-family-grid-4 {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 681px) and (max-width: 1480px) {
+  .server-settings-page .inbound-profile-families {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .server-settings-page .inbound-profile-family {
+    padding: 13px;
+  }
+
+  .server-settings-page .profile-family-grid {
+    gap: 10px;
+  }
+
+  .server-settings-page .inbound-profile-family-reality .profile-family-grid-2,
+  .server-settings-page .inbound-profile-family-tls .profile-family-grid-4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 680px) {
+  .server-settings-page .profile-family-grid > .inbound-profile-card {
+    height: auto;
+    min-height: 168px;
+    max-height: none;
+  }
+
+  .server-settings-page .profile-family-grid > .inbound-profile-card > .profile-card-body {
+    grid-template-rows: 26px 18px auto minmax(54px, 1fr);
+    min-height: 168px;
+  }
+
+  .server-settings-page .profile-family-grid .profile-card-protocol {
+    white-space: normal;
+  }
+}
+
+
+/* FIX27 — the active-profile summary was removed from the Xray Server.
+   Keep a defensive rule so an older cached/alternate template cannot render it. */
+.server-settings-page .inbound-active-banner,
+.advanced-settings-page .inbound-active-banner {
+  display: none !important;
+}
+
+/* FIX28 — uniform spacing inside and around the REALITY/TLS profile groups.
+   Keep the grouped composition in both themes, but use one 14px rhythm for
+   group-to-group, frame-to-card and card-to-card spacing. The desktop column
+   formula preserves equal card widths across the 2-card and 4-card families. */
+.server-settings-page .inbound-profile-families {
+  --profile-spacing: 14px;
+  gap: var(--profile-spacing);
+}
+
+.server-settings-page .inbound-profile-family {
+  padding: var(--profile-spacing);
+}
+
+.server-settings-page .profile-family-heading {
+  margin: 0 0 var(--profile-spacing);
+}
+
+.server-settings-page .profile-family-grid {
+  gap: var(--profile-spacing);
+}
+
+@media (min-width: 1481px) {
+  .server-settings-page .inbound-profile-families {
+    grid-template-columns:
+      minmax(0, calc(33.333333% + .666667px))
+      minmax(0, calc(66.666667% - 14.666667px));
+  }
+
+  .server-settings-page .inbound-profile-family {
+    padding: var(--profile-spacing);
+  }
+
+  .server-settings-page .profile-family-heading {
+    margin: 0 0 var(--profile-spacing);
+  }
+
+  .server-settings-page .profile-family-grid {
+    gap: var(--profile-spacing);
+  }
+}
+
+@media (min-width: 681px) and (max-width: 1480px) {
+  .server-settings-page .inbound-profile-families,
+  .server-settings-page .profile-family-grid {
+    gap: var(--profile-spacing);
+  }
+
+  .server-settings-page .inbound-profile-family {
+    padding: var(--profile-spacing);
+  }
+}
+
+@media (max-width: 680px) {
+  .server-settings-page .inbound-profile-families,
+  .server-settings-page .profile-family-grid {
+    gap: var(--profile-spacing);
+  }
+
+  .server-settings-page .inbound-profile-family {
+    padding: var(--profile-spacing);
+  }
+}

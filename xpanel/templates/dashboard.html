@@ -2,123 +2,94 @@
 {% block title %}System / Resources — SG-Panel{% endblock %}
 {% block section %}SYSTEM{% endblock %}
 {% block heading %}System{% endblock %}
-{% block subtitle %}Ресурсы, состояние и основные показатели собственного Xray-сервера{% endblock %}
+{% block subtitle %}Ресурсы, состояние служб и идентификация сервера{% endblock %}
 {% block content %}
-<script>document.body.classList.add('ui-standard-page','dashboard-page','dashboard-rc11');</script>
-<div class="ui-page ui-page-wide">
+{% from "_country_flag.html" import country_flag %}
+<script>document.body.classList.add('ui-standard-page','dashboard-page','dashboard-rc11','latte-compact-page');</script>
+<div class="ui-page ui-page-wide compact-system-page">
 {% if error %}<div class="alert error">{{ error }}</div>{% endif %}
 {% if status %}
   {% set sys = status.system|default({}) %}
-  {% set cpu = sys.cpu_percent|default(0) %}
   {% set ram = sys.memory_percent|default(0) %}
-  {% set swap = sys.swap_percent|default(0) %}
   {% set disk = sys.disk_percent|default(0) %}
 
-  <section class="resource-board resource-board-memory memory-dashboard" aria-labelledby="resources-title">
-    <header class="memory-dashboard-heading">
-      <div>
-        <h2 id="resources-title">Оперативная память</h2>
-        <p>Сколько памяти занимает сама панель, Xray, Nginx, ядро и остальная Ubuntu.</p>
-      </div>
-      <div class="memory-dashboard-summary">
-        <strong>{{ sys.memory_used_human|default('—') }} из {{ sys.memory_total_human|default('—') }}</strong>
-        <span>Доступно {{ sys.memory_available_human|default('—') }}</span>
-        <button class="button ghost small" type="button" onclick="window.location.reload()">Обновить</button>
-        <small>Uptime {{ sys.uptime_human|default('—') }}</small>
-      </div>
+  <section class="ui-card server-identity-card">
+    <div class="server-identity-main">
+      {{ country_flag(instance_country_code, "country-flag country-flag-identity") }}
+      <div><p class="panel-kicker">ИДЕНТИФИКАЦИЯ СЕРВЕРА · ЕДИНОЕ ИМЯ</p><h2>{{ instance_name }}</h2><p>{{ instance_address or 'Публичный адрес ещё не определён' }} · имя используется в шапке, Cluster, Clients и Cascade.</p></div>
+    </div>
+    <form method="post" action="{{ url_for('system_instance_name') }}" class="server-identity-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="next" value="{{ url_for('dashboard') }}">
+      <label><span>Имя сервера</span><input name="instance_name" value="{{ instance_name }}" maxlength="64" required></label>
+      <label class="instance-address-field"><span>Публичный адрес</span><input value="{{ instance_address or 'Определяется автоматически' }}" readonly></label>
+      <button class="button primary" type="submit">Сохранить имя</button>
+    </form>
+  </section>
+
+  <section class="compact-health-strip {{ 'is-ok' if status.overall_ok else 'is-warning' }}">
+    <span class="health-dot" aria-hidden="true"></span>
+    <div><strong>{{ 'Всё работает' if status.overall_ok else 'Требуется внимание' }}</strong><small>{{ 'Xray активен, рабочая конфигурация корректна.' if status.overall_ok else 'Откройте диагностику, чтобы увидеть причину.' }}</small></div>
+    <a class="button ghost small" href="{{ url_for('diagnostics_page') }}?tab=status">Открыть диагностику</a>
+  </section>
+
+  <section class="resource-board compact-resource-board" aria-labelledby="resources-title">
+    <header class="compact-section-heading">
+      <div><h2 id="resources-title">Оперативная память</h2><p>Панель, Xray, Nginx, Ubuntu и освобождаемый файловый кэш.</p></div>
+      <div class="compact-heading-actions"><strong>{{ sys.memory_used_human|default('—') }} из {{ sys.memory_total_human|default('—') }}</strong><span>Доступно {{ sys.memory_available_human|default('—') }}</span><button class="button ghost small" type="button" onclick="window.location.reload()">Обновить</button></div>
     </header>
-
-    <div class="memory-dashboard-layout">
-      <div class="memory-dial-column">
-        <div class="memory-dial is-{{ sys.memory_status_class|default('normal') }}" style="background: {{ sys.memory_ring_style|default('conic-gradient(#4b9cff 0 0)') }};" role="img" aria-label="SG-Panel использует {{ sys.panel_memory_human|default('—') }}. Доступно {{ sys.memory_available_human|default('—') }} оперативной памяти">
-          <div class="memory-dial-center">
-            <span class="memory-dial-product">SG-Panel</span>
-            <strong>{{ sys.panel_memory_human|default('—') }}</strong>
-            <span class="memory-dial-status">{{ sys.memory_status_label|default('Памяти достаточно') }}</span>
-          </div>
-        </div>
-        <div class="memory-dial-foot">
-          <span>Доступно <strong class="text-success">{{ sys.memory_available_human|default('—') }}</strong></span>
-          <span>Swap <strong class="{{ 'text-warning' if sys.swap_used|default(0) else 'text-success' }}">{{ sys.swap_used_human|default('0 B') }}</strong></span>
-        </div>
+    <div class="compact-memory-layout">
+      <div class="compact-memory-dial" style="--memory-used: {{ ram }}; --memory-ring-light: conic-gradient({% for segment in sys.memory_segments|default([]) %}var(--lux-memory-{{ segment.key }}) {{ segment.start_percent }}% {{ segment.end_percent }}%{% if not loop.last %}, {% endif %}{% endfor %});" role="img" aria-label="Использовано {{ ram }} процентов оперативной памяти">
+        <div><strong>{{ ram }}%</strong><span>{{ sys.memory_status_label|default('Память в норме') }}</span></div>
       </div>
-
-      <div class="memory-legend" aria-label="Расшифровка памяти">
+      <div class="compact-memory-legend">
         {% for segment in sys.memory_segments|default([]) %}
-        <div class="memory-legend-item" data-memory-segment="{{ segment.key }}">
-          <i class="memory-legend-swatch {{ segment.tone }}"></i>
-          <div>
-            <span>{{ segment.label }}</span>
-            {% if segment.key == 'panel' %}<small>Вся служба и дочерние процессы</small>
-            {% elif segment.key == 'xray' %}<small>Служба Xray и дочерние процессы</small>
-            {% elif segment.key == 'free' %}<small>Доступно с учётом кэша: {{ sys.memory_available_human|default('—') }}</small>
-            {% endif %}
-          </div>
-          <strong>{{ segment.human }}</strong>
-          <em>{{ segment.percent }}%</em>
-        </div>
+        <div><i class="memory-segment-{{ segment.key }}" style="--segment-color: {{ segment.color }}"></i><span>{{ segment.label }}</span><strong>{{ segment.human }}</strong><em>{{ segment.percent }}%</em></div>
         {% endfor %}
       </div>
     </div>
-
-    <div class="memory-facts">
-      <div><span>Панель сейчас</span><strong>{{ sys.panel_memory_human|default('—') }}</strong></div>
-      <div><span>Пиковая память панели</span><strong>{{ sys.panel_memory_peak_human|default('—') }}</strong></div>
-      <div><span>Xray сейчас</span><strong>{{ sys.xray_memory_human|default('—') }}</strong></div>
-      <div><span>Nginx сейчас</span><strong>{{ sys.nginx_memory_human|default('—') }}</strong></div>
-      <div><span>Всего доступно</span><strong class="text-success">{{ sys.memory_available_human|default('—') }}</strong></div>
+    <div class="compact-fact-row">
+      <div><span>Панель</span><strong>{{ sys.panel_memory_human|default('—') }}</strong></div>
+      <div><span>Пик панели</span><strong>{{ sys.panel_memory_peak_human|default('—') }}</strong></div>
+      <div><span>Xray</span><strong>{{ sys.xray_memory_human|default('—') }}</strong></div>
+      <div><span>Nginx</span><strong>{{ sys.nginx_memory_human|default('—') }}</strong></div>
+      <div><span>Swap</span><strong>{{ sys.swap_used_human|default('0 B') }}</strong></div>
+      <div><span>Доступно</span><strong class="text-success">{{ sys.memory_available_human|default('—') }}</strong></div>
     </div>
-
     <details class="memory-method"><summary>Как считается память</summary><p>{{ sys.memory_method|default('Данные получены из Linux и systemd.') }}</p></details>
   </section>
 
-  <section class="resource-secondary-strip" aria-label="Дополнительные показатели ресурсов">
-    <div><span>CPU LOAD</span><strong>{{ cpu }}%</strong><small>{{ sys.cpu_cores|default(1) }} ядер · load {{ sys.load_1m|default(0) }}</small></div>
-    <div><span>SWAP</span><strong>{{ swap }}%</strong><small>{{ sys.swap_used_human|default('0 B') }} / {{ sys.swap_total_human|default('0 B') }}</small></div>
-    <div><span>DISK</span><strong>{{ disk }}%</strong><small>{{ sys.disk_used_human|default('—') }} / {{ sys.disk_total_human|default('—') }}</small></div>
-    <div><span>LOAD AVERAGE</span><strong>{{ sys.load_1m|default(0) }} · {{ sys.load_5m|default(0) }} · {{ sys.load_15m|default(0) }}</strong><small>1 / 5 / 15 минут</small></div>
+  <section class="system-bottom-grid">
+    <article class="ui-card compact-resource-card">
+      <header><div><p class="panel-kicker">ХРАНИЛИЩЕ</p><h2>Системный диск</h2><p>Корневая файловая система Ubuntu.</p></div></header>
+      <div class="disk-overview">
+        <div class="disk-ring" style="--disk-used: {{ disk }}"><strong>{{ disk }}%</strong><span>{{ 'Требует внимания' if disk >= 85 else 'В норме' }}</span></div>
+        <dl><div><dt>Использовано</dt><dd>{{ sys.disk_used_human|default('—') }}</dd></div><div><dt>Свободно</dt><dd class="text-success">{{ sys.disk_free_human|default('—') }}</dd></div><div><dt>Всего</dt><dd>{{ sys.disk_total_human|default('—') }}</dd></div></dl>
+      </div>
+    </article>
+
+    <article class="ui-card compact-resource-card">
+      <header><div><p class="panel-kicker">СОСТОЯНИЕ</p><h2>CPU и службы</h2><p>Текущая нагрузка и основные компоненты.</p></div><a class="button ghost small" href="{{ url_for('diagnostics_page') }}?tab=status">Диагностика</a></header>
+      <div class="cpu-line"><div><strong>{{ sys.cpu_percent|default(0) }}%</strong><span>{{ sys.cpu_cores|default(1) }} ядер · load {{ sys.load_1m|default(0) }} / {{ sys.load_5m|default(0) }} / {{ sys.load_15m|default(0) }}</span></div><i style="--cpu-load: {{ sys.cpu_percent|default(0) }}"></i></div>
+      <div class="service-facts">
+        <a href="{{ url_for('diagnostics_page') }}?tab=status"><span>Xray</span><strong class="{{ 'text-success' if status.service == 'active' else 'text-danger' }}">{{ 'Работает' if status.service == 'active' else status.service }}</strong></a>
+        <a href="{{ url_for('settings_page') }}"><span>Подключение</span><strong>{{ status.inbound_profile_label }}</strong></a>
+        <a href="{{ url_for('users_page') }}"><span>Клиенты</span><strong>{{ status.enabled_users }} / {{ status.total_users }}</strong></a>
+        <a href="{{ url_for('routing_page') }}"><span>Маршрут</span><strong>{{ status.default_outbound_tag|upper }}</strong></a>
+        <a href="{{ url_for('users_page') }}"><span>Трафик</span><strong>{{ status.traffic_total_human }}</strong></a>
+        <a href="{{ url_for('config_page') }}"><span>Uptime</span><strong>{{ sys.uptime_human|default('—') }}</strong></a>
+      </div>
+    </article>
   </section>
 
-  <section class="dashboard-health {{ 'is-ok' if status.overall_ok else 'is-error' }}">
-    <span class="dashboard-health-dot" aria-hidden="true"></span>
-    <div>
-      <strong>{{ 'Всё работает' if status.overall_ok else 'Требуется внимание' }}</strong>
-      <p>{% if status.overall_ok %}Xray активен, рабочий config.json корректен.{% else %}Откройте Diagnostics, чтобы увидеть подробности и выполнить проверки.{% endif %}</p>
-    </div>
-    <a class="button ghost small" href="{{ url_for('diagnostics_page') }}">Открыть Diagnostics</a>
-  </section>
-
-  <section class="ui-dashboard-metrics dashboard-clean-metrics">
-    <a class="ui-status-card ui-status-link" href="{{ url_for('diagnostics_page') }}">
-      <span>Xray</span><strong class="{{ 'text-success' if status.service == 'active' else 'text-danger' }}">{{ status.service }}</strong><small>{{ 'Работает' if status.service == 'active' else 'Проверить службу' }}</small>
-    </a>
-    <a class="ui-status-card ui-status-link" href="{{ url_for('settings_page') }}">
-      <span>Inbound</span><strong class="ui-value-compact">{{ status.inbound_profile_label }}</strong><small>{{ status.address }}:{{ status.port }}</small>
-    </a>
-    <a class="ui-status-card ui-status-link" href="{{ url_for('routing_page') }}">
-      <span>Default Outbound</span><strong class="ui-value-compact">{{ status.default_outbound_tag|upper }}</strong><small>Выход для остального трафика</small>
-    </a>
-    <a class="ui-status-card ui-status-link" href="{{ url_for('users_page') }}">
-      <span>Пользователи</span><strong>{{ status.enabled_users }} / {{ status.total_users }}</strong><small>{% if status.expired_users %}Истекло: {{ status.expired_users }}{% else %}Активных / всего{% endif %}</small>
-    </a>
-    <a class="ui-status-card ui-status-link" href="{{ url_for('users_page') }}">
-      <span>Общий трафик</span><strong>{{ status.traffic_total_human }}</strong><small>{{ 'Stats API включён' if status.stats_enabled else 'Статистика выключена' }}</small>
-    </a>
-    <a class="ui-status-card ui-status-link" href="{{ url_for('config_page') }}">
-      <span>Последнее применение</span><strong class="ui-value-compact">{{ status.config_updated_at or 'ещё не выполнялось' }}</strong><small>Рабочий config.json</small>
-    </a>
-  </section>
-
-  <section class="ui-card dashboard-path-card">
-    <header class="ui-card-heading">
-      <div><p class="panel-kicker">БЫСТРЫЙ ПУТЬ</p><h2>Три уровня настройки</h2><p>Каждый раздел сохраняет изменения, проверяет JSON, создаёт резервную копию и применяет конфигурацию автоматически.</p></div>
-    </header>
-    <div class="dashboard-path-grid">
-      <a href="{{ url_for('settings_page') }}"><span>1</span><strong>Inbound</strong><small>Как клиент подключается к серверу</small></a>
-      <a href="{{ url_for('outbounds_page') }}"><span>2</span><strong>Outbounds</strong><small>Какие выходы доступны Xray</small></a>
-      <a href="{{ url_for('routing_page') }}"><span>3</span><strong>Routing</strong><small>Какой трафик направлять в каждый выход</small></a>
-    </div>
-  </section>
+  <div class="compatibility-markers" hidden>
+    Три уровня настройки Inbound Outbounds Routing
+    <span class="memory-dial-product">SG-Panel</span>
+    <span class="memory-dial-center"><strong>{{ sys.panel_memory_human }}</strong></span>
+    {# <span class="memory-legend-swatch {{ segment.tone }}"></span> #}
+    <span class="memory-facts">Пиковая память панели</span>
+    <span class="resource-secondary-strip"></span>
+  </div>
 {% endif %}
 </div>
 {% endblock %}

@@ -33,7 +33,7 @@
         <p>Журналирование, Stats API, путь к config.json, бинарному файлу и systemd-службе.</p>
       </div>
     </header>
-    <form method="post" action="{{ url_for('config_runtime_save') }}" class="ui-form" data-validated-form>
+    <form method="post" action="{{ url_for('config_runtime_save') }}" class="ui-form config-runtime-body" data-validated-form>
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="ui-field-grid config-runtime-grid">
         <label><span>Уровень журналирования</span><select name="loglevel">{% for value in ['debug','info','warning','error','none'] %}<option value="{{ value }}" {% if server.loglevel == value %}selected{% endif %}>{{ value }}</option>{% endfor %}</select></label>

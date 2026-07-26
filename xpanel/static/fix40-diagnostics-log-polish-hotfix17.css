@@ -1,0 +1,41 @@
+/* Preview 9 · FIX40 · Hotfix 17
+   Logs & Diagnostics: no dark strip above Xray and equal inner spacing. */
+body.diagnostics-page .diagnostics-log-console {
+  overflow: hidden !important;
+}
+
+body.diagnostics-page .diagnostics-log-accordion .ui-card-heading {
+  margin-bottom: 0 !important;
+}
+
+body.diagnostics-page .diagnostic-log-accordion-list {
+  box-sizing: border-box !important;
+  padding: 10px 12px 12px !important;
+  gap: 10px !important;
+  background: var(--panel) !important;
+}
+
+body.diagnostics-page .diagnostic-log-panel > summary {
+  box-sizing: border-box !important;
+  padding: 13px 18px !important;
+}
+
+body.diagnostics-page .diagnostic-log-panel > summary > strong {
+  margin-left: 18px !important;
+  flex: 0 0 auto !important;
+}
+
+html[data-theme="light"] body.diagnostics-page .diagnostic-log-accordion-list,
+html[data-resolved-theme="light"] body.diagnostics-page .diagnostic-log-accordion-list {
+  background: var(--lux-surface-hi, #f7f3eb) !important;
+}
+
+@media (max-width: 760px) {
+  body.diagnostics-page .diagnostic-log-accordion-list {
+    padding: 8px !important;
+    gap: 8px !important;
+  }
+  body.diagnostics-page .diagnostic-log-panel > summary {
+    padding: 12px 14px !important;
+  }
+}

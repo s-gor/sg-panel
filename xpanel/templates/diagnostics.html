@@ -8,13 +8,6 @@
 <script>document.body.classList.add('ui-standard-page','diagnostics-page','diagnostics-rc15');</script>
 <div class="ui-page ui-page-wide">
 {% if diagnostics_tab != 'logs' %}
-  <section class="ui-diagnostics-summary diagnostics-core-grid">
-    <article class="ui-status-card"><span>Xray</span><strong class="{{ 'text-success' if diagnostics.xray_service == 'active' else 'text-danger' }}">{{ diagnostics.xray_service or 'unknown' }}</strong><small>{{ diagnostics.xray_version }}</small></article>
-    <article class="ui-status-card"><span>Nginx</span><strong class="{{ 'text-success' if diagnostics.nginx_service == 'active' else 'text-danger' }}">{{ diagnostics.nginx_service or 'unknown' }}</strong><small>Публичный доступ панели</small></article>
-    <article class="ui-status-card"><span>SG-Panel</span><strong class="{{ 'text-success' if diagnostics.panel_service == 'active' else 'text-danger' }}">{{ diagnostics.panel_service or 'unknown' }}</strong><small>Backend 127.0.0.1</small></article>
-    <article class="ui-status-card"><span>config.json</span><strong class="{{ 'text-success' if diagnostics.config_validation.ok else 'text-danger' }}">{{ 'OK' if diagnostics.config_validation.ok else 'ERROR' }}</strong><small>{{ diagnostics.config_validation.users }} активных пользователей</small></article>
-  </section>
-
   <section class="ui-card instance-settings-card">
     <header class="ui-card-heading"><div><p class="panel-kicker">ИМЯ СЕРВЕРА</p><h2>Как отличать эту SG-Panel</h2><p>Имя показывается в шапке и на всех страницах. Например: CC1 · Frankfurt или CC2 · Virginia.</p></div></header>
     <form method="post" action="{{ url_for('system_instance_name') }}" class="instance-name-form">
@@ -28,23 +21,15 @@
 
   <section class="ui-card diagnostics-controls-card">
     <header class="ui-card-heading ui-card-heading-row"><div><p class="panel-kicker">ОСНОВНЫЕ СЛУЖБЫ</p><h2>Управляемые компоненты <a class="context-help-link" href="{{ url_for('help_page') }}#diagnostics" title="Справка по диагностике" aria-label="Справка по диагностике">?</a></h2><p>Перезапуск нужен только при диагностике. Обычные изменения применяются на своих страницах.</p></div><a class="button ghost" href="{{ url_for('diagnostics_page') }}?tab=status">Обновить данные</a></header>
-    <div class="service-list awg-service-list">
-      <div><span><i class="status-dot {{ 'is-off' if diagnostics.xray_service != 'active' }}"></i><b>Xray</b><small>Основной {{ 'XHTTP / TCP + Hysteria 2 / UDP' if diagnostics.inbound_profile == 'xhttp_hysteria_tls' else ('Hysteria 2 / UDP' if diagnostics.inbound_profile == 'hysteria2_tls' else 'VLESS / TCP') }}</small></span><strong class="{{ 'text-success' if diagnostics.xray_service == 'active' else 'text-danger' }}">{{ diagnostics.xray_service }}</strong><form method="post" action="{{ url_for('diagnostics_restart_service', service_name='xray') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button ghost small" type="submit">Перезапустить Xray</button></form></div>
-      <div><span><i class="status-dot {{ 'is-off' if diagnostics.nginx_service != 'active' }}"></i><b>Nginx</b><small>HTTP/HTTPS панели</small></span><strong class="{{ 'text-success' if diagnostics.nginx_service == 'active' else 'text-danger' }}">{{ diagnostics.nginx_service }}</strong><form method="post" action="{{ url_for('diagnostics_restart_service', service_name='nginx') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button ghost small" type="submit">Перезапустить Nginx</button></form></div>
-      <div><span><i class="status-dot {{ 'is-off' if diagnostics.panel_service != 'active' }}"></i><b>SG-Panel</b><small>Административный backend</small></span><strong class="{{ 'text-success' if diagnostics.panel_service == 'active' else 'text-danger' }}">{{ diagnostics.panel_service }}</strong><form method="post" action="{{ url_for('diagnostics_restart_service', service_name='panel') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button ghost small" type="submit">Перезапустить SG-Panel</button></form></div>
+    <div class="diagnostics-controls-body">
+      <div class="service-list awg-service-list diagnostics-service-list">
+      <div><span><i class="status-dot {{ 'is-off' if diagnostics.xray_service != 'active' }}"></i><b>Xray</b><small>Основной {{ 'XHTTP / TCP + Hysteria 2 / UDP' if diagnostics.inbound_profile == 'xhttp_hysteria_tls' else ('Hysteria 2 / UDP' if diagnostics.inbound_profile == 'hysteria2_tls' else 'VLESS / TCP') }}</small></span><strong class="service-state-label {{ 'text-success' if diagnostics.xray_service == 'active' else 'text-danger' }}">{{ diagnostics.xray_service }}</strong><form class="service-restart-form" method="post" action="{{ url_for('diagnostics_restart_service', service_name='xray') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button ghost small service-restart-button" type="submit">Перезапустить Xray</button></form></div>
+      <div><span><i class="status-dot {{ 'is-off' if diagnostics.nginx_service != 'active' }}"></i><b>Nginx</b><small>HTTP/HTTPS панели</small></span><strong class="service-state-label {{ 'text-success' if diagnostics.nginx_service == 'active' else 'text-danger' }}">{{ diagnostics.nginx_service }}</strong><form class="service-restart-form" method="post" action="{{ url_for('diagnostics_restart_service', service_name='nginx') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button ghost small service-restart-button" type="submit">Перезапустить Nginx</button></form></div>
+      <div><span><i class="status-dot {{ 'is-off' if diagnostics.panel_service != 'active' }}"></i><b>SG-Panel</b><small>Административный backend</small></span><strong class="service-state-label {{ 'text-success' if diagnostics.panel_service == 'active' else 'text-danger' }}">{{ diagnostics.panel_service }}</strong><form class="service-restart-form" method="post" action="{{ url_for('diagnostics_restart_service', service_name='panel') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button ghost small service-restart-button" type="submit">Перезапустить SG-Panel</button></form></div>
+    </div>
     </div>
   </section>
 
-  <section class="ui-card diagnostics-facts-card">
-    <header class="ui-card-heading"><div><p class="panel-kicker">РАБОЧАЯ СХЕМА</p><h2>Сервер и конфигурация</h2><p>Только значения, нужные для повседневной проверки.</p></div></header>
-    <dl class="ui-details-list diagnostics-facts-list">
-      <div><dt>Публичная точка Xray</dt><dd><code>{{ diagnostics.transport_protocol }} {{ diagnostics.server_address }}:{{ diagnostics.server_port }}</code></dd></div>
-      <div><dt>Default Outbound</dt><dd><code>{{ diagnostics.default_outbound_tag }}</code></dd></div>
-      <div><dt>Системный DNS</dt><dd class="{{ 'text-success' if diagnostics.dns_test.ok else 'text-danger' }}">{% if diagnostics.dns_test.ok %}OK, {{ diagnostics.dns_test.latency_ms }} мс{% else %}{{ diagnostics.dns_test.detail }}{% endif %}</dd></div>
-      <div><dt>Ресурсы</dt><dd>{{ diagnostics.memory_used_percent }}% RAM · {{ diagnostics.memory_available }} доступно</dd></div>
-    </dl>
-    <details class="advanced technical-details"><summary>Все технические сведения</summary><dl class="ui-details-list diagnostics-facts-list"><div><dt>WARP</dt><dd>{{ 'не настроен' if not diagnostics.warp.configured else ('отключён' if not diagnostics.warp.enabled else diagnostics.warp.last_test_state) }}</dd></div><div><dt>WARP endpoint</dt><dd><code>{{ diagnostics.warp_endpoint or 'не настроен' }}</code></dd></div><div><dt>Операционная система</dt><dd>{{ diagnostics.os }}</dd></div><div><dt>Kernel / Python</dt><dd><code>{{ diagnostics.kernel }} / {{ diagnostics.python }}</code></dd></div></dl></details>
-  </section>
 {% else %}
   <section class="diagnostic-result-card diagnostics-log-summary {{ 'is-ok' if diagnostics.config_validation.ok else 'is-error' }}">
     <div class="diagnostic-result-head"><span class="status-dot {{ 'is-off' if not diagnostics.config_validation.ok }}"></span><div><p class="panel-kicker">ИТОГ ПРОВЕРКИ</p><h2>{{ 'Система работает нормально' if diagnostics.config_validation.ok else 'Конфигурация требует внимания' }}</h2><p>Откройте только нужный журнал. Все разделы закрыты по умолчанию и не занимают страницу.</p></div></div>

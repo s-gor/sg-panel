@@ -21,6 +21,6 @@
   </section>
 </div>
 <script>
-(() => { const editor=document.getElementById('json_config'); document.querySelector('[data-format-json]')?.addEventListener('click',()=>{try{editor.value=JSON.stringify(JSON.parse(editor.value),null,2)+'\n';editor.dispatchEvent(new Event('input',{bubbles:true}));}catch(error){alert('JSON содержит ошибку: '+error.message);}}); document.querySelector('[data-sync-json]')?.addEventListener('click',()=>{if(confirm('Заменить несохранённый текст актуальным JSON из панели?'))location.reload();}); })();
+(() => { const editor=document.getElementById('json_config'); document.querySelector('[data-format-json]')?.addEventListener('click',()=>{try{editor.value=JSON.stringify(JSON.parse(editor.value),null,2)+'\n';editor.dispatchEvent(new Event('input',{bubbles:true}));}catch(error){window.sgDialogAlert('JSON содержит ошибку: '+error.message);}}); document.querySelector('[data-sync-json]')?.addEventListener('click',()=>{window.sgDialogConfirm('Заменить несохранённый текст актуальным JSON из панели?').then(ok=>{if(ok)location.reload();});}); })();
 </script>
 {% endblock %}

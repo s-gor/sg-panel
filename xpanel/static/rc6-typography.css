@@ -1,0 +1,1270 @@
+/* SG-Panel Preview 9 — RC6 typography normalization.
+   This layer changes only type scale, weight, line-height and text brightness.
+   Layout, page structure and backend behaviour remain untouched. */
+
+body.preview-9-rc6-typography {
+  --rc6-text-main: #edf3fb;
+  --rc6-text-strong: #f5f8fc;
+  --rc6-text-secondary: #9eacbd;
+  --rc6-text-tertiary: #8392a6;
+  --rc6-text-disabled: #69788d;
+  color: var(--rc6-text-main);
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* Shell and sidebar: exact RC6 hierarchy instead of the older compact 13/9 px layer. */
+body.preview-9-rc6-typography .brand-copy strong {
+  color: var(--rc6-text-strong);
+  font-size: 18px;
+  font-weight: 750;
+  line-height: 1.1;
+}
+body.preview-9-rc6-typography .brand-copy small {
+  margin-top: 4px;
+  color: var(--rc6-text-secondary);
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: 0;
+  text-transform: none;
+}
+body.preview-9-rc6-typography .main-nav a,
+body.preview-9-rc6-typography .grouped-main-nav a {
+  color: #dce5f0;
+  font-size: 14.5px;
+  font-weight: 600;
+}
+body.preview-9-rc6-typography .main-nav a b,
+body.preview-9-rc6-typography .grouped-main-nav a b {
+  color: inherit;
+  font-size: 14.5px;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -.01em;
+}
+body.preview-9-rc6-typography .main-nav a small,
+body.preview-9-rc6-typography .grouped-main-nav a small {
+  margin-top: 4px;
+  color: #91a0b3;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.3;
+}
+body.preview-9-rc6-typography .main-nav a.active small,
+body.preview-9-rc6-typography .grouped-main-nav a.active small { color: #bdccdc; }
+
+body.preview-9-rc6-typography .sidebar-system .system-row {
+  color: #dce9e5;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.25;
+}
+body.preview-9-rc6-typography .system-server-name strong {
+  color: #edf4fa;
+  font-size: 12.5px;
+  font-weight: 750;
+  line-height: 1.25;
+}
+body.preview-9-rc6-typography .system-server-version {
+  color: #91c4f7;
+  font-size: 9.5px;
+  font-weight: 750;
+}
+body.preview-9-rc6-typography .system-server-subline {
+  color: #8393a6;
+  font-size: 9px;
+  font-weight: 500;
+  line-height: 1.3;
+}
+body.preview-9-rc6-typography .sidebar-collapse,
+body.preview-9-rc6-typography .logout-button {
+  color: #9eacbd;
+  font-size: 13px;
+  font-weight: 500;
+}
+body.preview-9-rc6-typography .sidebar-collapse b { font-size: 13px; font-weight: 600; }
+
+/* Page heading and global controls. */
+body.preview-9-rc6-typography .topbar-heading h1 {
+  color: var(--rc6-text-strong);
+  font-size: 32px;
+  font-weight: 750;
+  line-height: 1.08;
+  letter-spacing: -.035em;
+}
+body.preview-9-rc6-typography .eyebrow,
+body.preview-9-rc6-typography .panel-kicker,
+body.preview-9-rc6-typography .section-kicker {
+  color: #8dbaf0;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.3;
+}
+body.preview-9-rc6-typography .page-subtitle,
+body.preview-9-rc6-typography .topbar-heading > p:not(.eyebrow) {
+  color: var(--rc6-text-secondary);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.5;
+}
+body.preview-9-rc6-typography .instance-badge small {
+  color: #8fa0b4;
+  font-size: 8px;
+  font-weight: 850;
+}
+body.preview-9-rc6-typography .instance-badge b {
+  color: #eef5fb;
+  font-size: 12px;
+  font-weight: 750;
+}
+body.preview-9-rc6-typography .instance-badge em {
+  color: #9aa9ba;
+  font-size: 10px;
+  font-weight: 500;
+}
+body.preview-9-rc6-typography .topbar-version {
+  color: #8e9caf;
+  font-size: 10.5px;
+  font-weight: 750;
+}
+body.preview-9-rc6-typography .system-pill {
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+}
+body.preview-9-rc6-typography .account-button,
+body.preview-9-rc6-typography .icon-button { font-size: 13px; font-weight: 600; }
+
+/* Shared text: remove the patchwork of hard-coded dim greys. */
+body.preview-9-rc6-typography .muted,
+body.preview-9-rc6-typography .hint,
+body.preview-9-rc6-typography .empty,
+body.preview-9-rc6-typography .table-note,
+body.preview-9-rc6-typography .field-note,
+body.preview-9-rc6-typography .inline-note {
+  color: var(--rc6-text-secondary);
+  font-size: 13px;
+  line-height: 1.55;
+}
+body.preview-9-rc6-typography .button {
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+body.preview-9-rc6-typography .button.small { font-size: 11px; }
+body.preview-9-rc6-typography input,
+body.preview-9-rc6-typography select,
+body.preview-9-rc6-typography textarea { font-size: 13px; }
+
+/* Clients: raise the whole table/inspector to the visible RC6 scale. */
+body.preview-9-rc6-typography.awg-clients-page .clients-awg-metrics article > span {
+  color: #dce5ef;
+  font-size: 15px;
+  font-weight: 700;
+}
+body.preview-9-rc6-typography.awg-clients-page .clients-awg-metrics article > strong {
+  color: var(--rc6-text-strong);
+  font-weight: 750;
+}
+body.preview-9-rc6-typography.awg-clients-page .clients-awg-metrics article > small {
+  color: var(--rc6-text-secondary);
+  font-size: 12px;
+}
+body.preview-9-rc6-typography.awg-clients-page .clients-awg-metrics article > a {
+  color: #71b7ff;
+  font-size: 11.5px;
+  font-weight: 700;
+}
+body.preview-9-rc6-typography.awg-clients-page .clients-filter-field > span {
+  color: #93a3b6;
+  font-size: 10px;
+  font-weight: 800;
+}
+body.preview-9-rc6-typography.awg-clients-page .clients-awg-filter-panel footer,
+body.preview-9-rc6-typography.awg-clients-page .clients-table-footer {
+  color: #9aa9ba;
+  font-size: 11px;
+  font-weight: 500;
+}
+body.preview-9-rc6-typography.awg-clients-page .clients-awg-table th {
+  color: #8d9caf;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+body.preview-9-rc6-typography.awg-clients-page .clients-awg-table td {
+  color: #dce5ef;
+  font-size: 13px;
+  line-height: 1.4;
+}
+body.preview-9-rc6-typography.awg-clients-page .clients-awg-table .client-identity-cell strong {
+  color: #f0f5fa;
+  font-size: 13.5px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+body.preview-9-rc6-typography.awg-clients-page .clients-awg-table .client-identity-cell small,
+body.preview-9-rc6-typography.awg-clients-page .clients-awg-table .client-server-chip small {
+  color: #9aa8ba;
+  font-size: 10.5px;
+  font-weight: 500;
+  line-height: 1.35;
+}
+body.preview-9-rc6-typography.awg-clients-page .clients-awg-table .client-server-chip b {
+  color: #e7eef6;
+  font-size: 12px;
+  font-weight: 700;
+}
+body.preview-9-rc6-typography.awg-clients-page .clients-awg-table .client-traffic-pair strong,
+body.preview-9-rc6-typography.awg-clients-page .clients-awg-table .client-traffic-pair small {
+  color: #dfe8f1;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+body.preview-9-rc6-typography.awg-clients-page .client-status-badge,
+body.preview-9-rc6-typography.awg-clients-page .route-badge { font-size: 10px; font-weight: 800; }
+body.preview-9-rc6-typography.awg-clients-page .client-action { font-size: 11px; font-weight: 750; }
+body.preview-9-rc6-typography.awg-clients-page .clients-awg-inspector .client-detail-name h2 {
+  color: var(--rc6-text-strong);
+  font-size: 27px;
+  font-weight: 750;
+}
+body.preview-9-rc6-typography.awg-clients-page .clients-awg-server-card strong {
+  color: #edf3fa;
+  font-size: 15.5px;
+  font-weight: 700;
+}
+body.preview-9-rc6-typography.awg-clients-page .clients-awg-server-card small {
+  color: #9eacbd;
+  font-size: 11.5px;
+}
+body.preview-9-rc6-typography.awg-clients-page .clients-awg-facts dt {
+  color: #91a0b3;
+  font-size: 10.5px;
+  font-weight: 600;
+}
+body.preview-9-rc6-typography.awg-clients-page .clients-awg-facts dd {
+  color: #f0f5fa;
+  font-size: 13.5px;
+  font-weight: 700;
+}
+body.preview-9-rc6-typography.awg-clients-page .clients-awg-inspector .client-technical-details > summary,
+body.preview-9-rc6-typography.awg-clients-page .clients-awg-inspector .client-danger-zone > summary {
+  color: #a5b2c2;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+/* Cascade: preserve the new RC6 component frame, only normalize its type. */
+body.preview-9-rc6-typography.sg-awg-cascade-rc6 .card-heading h2 {
+  color: var(--rc6-text-strong);
+  font-size: 21px;
+  font-weight: 750;
+}
+body.preview-9-rc6-typography.sg-awg-cascade-rc6 .card-heading p,
+body.preview-9-rc6-typography.sg-awg-cascade-rc6 .section-heading-inline p,
+body.preview-9-rc6-typography.sg-awg-cascade-rc6 .cascade-exit-service-card p,
+body.preview-9-rc6-typography.sg-awg-cascade-rc6 .cascade-clients-explainer p {
+  color: var(--rc6-text-secondary);
+  font-size: 13px;
+  line-height: 1.55;
+}
+body.preview-9-rc6-typography.sg-awg-cascade-rc6 .cascade-simple-copy h2 {
+  color: var(--rc6-text-strong);
+  font-size: 25px;
+  font-weight: 750;
+}
+body.preview-9-rc6-typography.sg-awg-cascade-rc6 .cascade-simple-copy p {
+  color: var(--rc6-text-secondary);
+  font-size: 14px;
+}
+body.preview-9-rc6-typography.sg-awg-cascade-rc6 .cascade-route-point b {
+  color: #edf3fa;
+  font-size: 14px;
+  font-weight: 700;
+}
+body.preview-9-rc6-typography.sg-awg-cascade-rc6 .cascade-route-point small {
+  color: #9ba9ba;
+  font-size: 11px;
+}
+body.preview-9-rc6-typography.sg-awg-cascade-rc6 .cascade-mode-choice strong {
+  color: #f0f5fa;
+  font-size: 16px;
+  font-weight: 700;
+}
+body.preview-9-rc6-typography.sg-awg-cascade-rc6 .cascade-mode-choice small {
+  color: #9eacbd;
+  font-size: 12px;
+}
+body.preview-9-rc6-typography.sg-awg-cascade-rc6 .cascade-mode-choice em,
+body.preview-9-rc6-typography.sg-awg-cascade-rc6 .cascade-context-help,
+body.preview-9-rc6-typography.sg-awg-cascade-rc6 .cascade-expert-link a { font-size: 11px; }
+body.preview-9-rc6-typography.sg-awg-cascade-rc6 .status-badge,
+body.preview-9-rc6-typography.sg-awg-cascade-rc6 .cascade-state-pill { font-size: 10px; }
+
+/* Latte keeps the same size/weight hierarchy with its own contrast. */
+html[data-theme="light"] body.preview-9-rc6-typography {
+  --rc6-text-main: #192530;
+  --rc6-text-strong: #111d27;
+  --rc6-text-secondary: #556672;
+  --rc6-text-tertiary: #667985;
+  --rc6-text-disabled: #81919b;
+  color: var(--rc6-text-main);
+}
+html[data-theme="light"] body.preview-9-rc6-typography .main-nav a,
+html[data-theme="light"] body.preview-9-rc6-typography .grouped-main-nav a { color: #314553; }
+html[data-theme="light"] body.preview-9-rc6-typography .main-nav a small,
+html[data-theme="light"] body.preview-9-rc6-typography .grouped-main-nav a small { color: #617480; }
+html[data-theme="light"] body.preview-9-rc6-typography .main-nav a.active,
+html[data-theme="light"] body.preview-9-rc6-typography .grouped-main-nav a.active { color: #fff; }
+html[data-theme="light"] body.preview-9-rc6-typography .main-nav a.active small,
+html[data-theme="light"] body.preview-9-rc6-typography .grouped-main-nav a.active small { color: #e1ebf2; }
+html[data-theme="light"] body.preview-9-rc6-typography .eyebrow,
+html[data-theme="light"] body.preview-9-rc6-typography .panel-kicker,
+html[data-theme="light"] body.preview-9-rc6-typography .section-kicker { color: #31536f; }
+html[data-theme="light"] body.preview-9-rc6-typography .clients-awg-table td,
+html[data-theme="light"] body.preview-9-rc6-typography .clients-awg-table .client-server-chip b,
+html[data-theme="light"] body.preview-9-rc6-typography .clients-awg-server-card strong { color: #192530; }
+
+/* The Preview 3 sidebar selectors carry an extra class level; repeat the
+   RC6 typography at the same specificity so the old compact 13/9 px values
+   cannot win through the cascade. */
+body.preview-9-rc6-typography.preview-3-sidebar-polish.rc20-awg-shell .brand-copy strong {
+  font-size: 18px;
+  font-weight: 750;
+  line-height: 1.1;
+}
+body.preview-9-rc6-typography.preview-3-sidebar-polish.rc20-awg-shell .brand-copy small {
+  margin-top: 4px;
+  color: var(--rc6-text-secondary);
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+body.preview-9-rc6-typography.preview-3-sidebar-polish.rc20-awg-shell .main-nav a b,
+body.preview-9-rc6-typography.preview-3-sidebar-polish.rc20-awg-shell .grouped-main-nav a b {
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+body.preview-9-rc6-typography.preview-3-sidebar-polish.rc20-awg-shell .main-nav a small,
+body.preview-9-rc6-typography.preview-3-sidebar-polish.rc20-awg-shell .grouped-main-nav a small {
+  margin-top: 4px;
+  color: #91a0b3;
+  font-size: 10.5px;
+  font-weight: 500;
+  line-height: 1.28;
+}
+body.preview-9-rc6-typography.preview-3-sidebar-polish.rc20-awg-shell .main-nav a.active small,
+body.preview-9-rc6-typography.preview-3-sidebar-polish.rc20-awg-shell .grouped-main-nav a.active small { color: #bdccdc; }
+body.preview-9-rc6-typography.preview-3-sidebar-polish .sidebar-system .system-row { font-size: 10px; }
+body.preview-9-rc6-typography.preview-3-sidebar-polish .system-server-subline { font-size: 9.5px; color: #8797aa; }
+
+/* Final Preview 9 shell pass — reworks the existing RC6 typography layer.
+   The application structure and page-specific cards remain in app.css. */
+body.preview-9-rc6-typography {
+  --final-shell-bg: #0d151f;
+  --final-sidebar-bg: #121d2a;
+  --final-sidebar-border: #263447;
+  --final-topbar-bg: rgba(12, 20, 30, .92);
+  --final-line: #29384b;
+  --final-panel: #1a2635;
+}
+body.preview-9-rc6-typography .shell { grid-template-columns: 260px minmax(0, 1fr); }
+body.preview-9-rc6-typography .workspace { min-width: 0; width: 100%; }
+body.preview-9-rc6-typography .sidebar {
+  width: 260px;
+  border-right: 1px solid var(--final-sidebar-border);
+  background: linear-gradient(180deg, #14202e, #101a26);
+}
+body.preview-9-rc6-typography .brand { min-height: 84px; gap: 13px; padding: 20px 18px 18px; }
+body.preview-9-rc6-typography .brand-mark { width: 40px; height: 44px; }
+body.preview-9-rc6-typography .brand-copy strong { font-size: 18px; line-height: 1.15; }
+body.preview-9-rc6-typography .brand-copy small { margin-top: 5px; color: #9eadbd; font-size: 11px; font-weight: 650; line-height: 1.2; }
+body.preview-9-rc6-typography .main-nav,
+body.preview-9-rc6-typography .grouped-main-nav { gap: 4px; padding: 13px 10px 10px; }
+body.preview-9-rc6-typography .main-nav a,
+body.preview-9-rc6-typography .grouped-main-nav a { min-height: 60px; gap: 13px; padding: 10px 12px; border-radius: 10px; }
+body.preview-9-rc6-typography .main-nav a svg,
+body.preview-9-rc6-typography .grouped-main-nav a svg { width: 22px; height: 22px; }
+body.preview-9-rc6-typography .main-nav a b,
+body.preview-9-rc6-typography .grouped-main-nav a b,
+body.preview-9-rc6-typography.preview-3-sidebar-polish.rc20-awg-shell .main-nav a b,
+body.preview-9-rc6-typography.preview-3-sidebar-polish.rc20-awg-shell .grouped-main-nav a b { font-size: 15px; font-weight: 730; line-height: 1.22; }
+body.preview-9-rc6-typography .main-nav a small,
+body.preview-9-rc6-typography .grouped-main-nav a small,
+body.preview-9-rc6-typography.preview-3-sidebar-polish.rc20-awg-shell .main-nav a small,
+body.preview-9-rc6-typography.preview-3-sidebar-polish.rc20-awg-shell .grouped-main-nav a small { margin-top: 4px; color: #94a3b5; font-size: 11.25px; font-weight: 500; line-height: 1.28; }
+body.preview-9-rc6-typography .main-nav a.active small,
+body.preview-9-rc6-typography .grouped-main-nav a.active small { color: #c3d1df; }
+body.preview-9-rc6-typography .sidebar-system { margin: 14px 10px 10px; padding: 13px 14px; border-radius: 12px; }
+body.preview-9-rc6-typography .sidebar-system .system-row,
+body.preview-9-rc6-typography.preview-3-sidebar-polish .sidebar-system .system-row { font-size: 10px; line-height: 1.25; }
+body.preview-9-rc6-typography .system-server-name strong { font-size: 13px; }
+body.preview-9-rc6-typography .system-server-version { font-size: 9.5px; }
+body.preview-9-rc6-typography .system-server-subline,
+body.preview-9-rc6-typography.preview-3-sidebar-polish .system-server-subline { color: #8999aa; font-size: 9.5px; }
+body.preview-9-rc6-typography .sidebar-collapse,
+body.preview-9-rc6-typography .logout-button { min-height: 43px; font-size: 13px; }
+
+body.preview-9-rc6-typography .global-topbar {
+  position: relative;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  min-height: 62px;
+  padding: 0 24px;
+  border-bottom: 1px solid var(--final-line);
+  background: var(--final-topbar-bg);
+  backdrop-filter: blur(12px);
+}
+body.preview-9-rc6-typography .global-topbar-spacer { flex: 1 1 auto; min-width: 12px; }
+body.preview-9-rc6-typography .global-topbar .topbar-actions { display: flex; align-items: center; justify-content: flex-end; gap: 10px; min-width: 0; }
+body.preview-9-rc6-typography .instance-badge {
+  display: grid;
+  grid-template-columns: minmax(0, auto) auto;
+  grid-template-rows: auto auto;
+  align-items: center;
+  column-gap: 9px;
+  min-width: 232px;
+  min-height: 46px;
+  padding: 7px 12px;
+  border: 1px solid rgba(64, 199, 143, .30);
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(34, 112, 82, .28), rgba(24, 69, 56, .24));
+}
+body.preview-9-rc6-typography .instance-badge small { grid-column: 1 / -1; color: #7fd8ad; font-size: 8px; font-weight: 850; line-height: 1; letter-spacing: .055em; }
+body.preview-9-rc6-typography .instance-badge b { min-width: 0; overflow: hidden; color: #eef7f3; font-size: 12px; font-weight: 760; line-height: 1.2; text-overflow: ellipsis; white-space: nowrap; }
+body.preview-9-rc6-typography .instance-badge em { color: #9eafba; font-size: 9.5px; font-style: normal; white-space: nowrap; }
+body.preview-9-rc6-typography .country-flag-topbar { width: 20px; height: 14px; margin-right: 7px; vertical-align: -2px; }
+body.preview-9-rc6-typography .topbar-version { color: #8998aa; font-size: 10px; font-weight: 760; white-space: nowrap; }
+body.preview-9-rc6-typography .system-pill { min-height: 38px; padding: 0 14px; border-radius: 999px; font-size: 10.5px; font-weight: 820; }
+body.preview-9-rc6-typography .theme-chip,
+body.preview-9-rc6-typography .account-button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 38px; padding: 0 13px; border: 1px solid #2b3a4d; border-radius: 10px; color: #d5dee8; background: #111b27; font-size: 11px; font-weight: 650; cursor: pointer; }
+body.preview-9-rc6-typography .theme-chip:hover,
+body.preview-9-rc6-typography .account-button:hover { border-color: #405673; color: #f4f8fc; background: #182536; }
+body.preview-9-rc6-typography .theme-chip > span:first-child { color: #83baf1; font-size: 10px; }
+body.preview-9-rc6-typography .theme-chip b { font-size: 11px; font-weight: 650; }
+body.preview-9-rc6-typography .account-button { min-width: 74px; }
+
+body.preview-9-rc6-typography .content { width: 100%; max-width: none; margin: 0; padding: 25px 30px 32px; }
+body.preview-9-rc6-typography .topbar.page-header,
+body.preview-9-rc6-typography.sg-awg-cascade-rc6 .topbar.page-header,
+body.preview-9-rc6-typography.preview-7-awg-exact.awg-cascade-page .topbar,
+body.preview-9-rc6-typography.preview-7-awg-exact.awg-cluster-page .topbar,
+body.preview-9-rc6-typography.preview-7-awg-exact.awg-clients-page .topbar {
+  position: relative;
+  display: flex !important;
+  align-items: flex-end !important;
+  justify-content: space-between;
+  grid-template-columns: none !important;
+  grid-template-rows: none !important;
+  gap: 24px;
+  width: min(1540px, 100%) !important;
+  max-width: 1540px !important;
+  min-height: 0 !important;
+  margin: 0 auto 18px !important;
+  padding: 0 0 4px !important;
+  border: 0 !important;
+}
+body.preview-9-rc6-typography .topbar.page-header::before,
+body.preview-9-rc6-typography.sg-awg-cascade-rc6 .topbar.page-header::before,
+body.preview-9-rc6-typography.preview-7-awg-exact.awg-cascade-page .topbar::before,
+body.preview-9-rc6-typography.preview-7-awg-exact.awg-cluster-page .topbar::before,
+body.preview-9-rc6-typography.preview-7-awg-exact.awg-clients-page .topbar::before { display: none !important; }
+body.preview-9-rc6-typography .topbar-heading,
+body.preview-9-rc6-typography.sg-awg-cascade-rc6 .topbar-heading { grid-column: auto !important; grid-row: auto !important; align-self: auto !important; min-width: 0; padding: 0 !important; }
+body.preview-9-rc6-typography .topbar-heading h1 { margin: 5px 0 7px; font-size: 31px; font-weight: 760; line-height: 1.06; letter-spacing: -.035em; }
+body.preview-9-rc6-typography .eyebrow { color: #89b8ea; font-size: 10px; font-weight: 820; line-height: 1.2; letter-spacing: .14em; }
+body.preview-9-rc6-typography .page-subtitle,
+body.preview-9-rc6-typography .topbar-heading > p:not(.eyebrow) { color: #9eacbd; font-size: 14px; line-height: 1.5; }
+body.preview-9-rc6-typography .topbar-page-actions,
+body.preview-9-rc6-typography.sg-awg-cascade-rc6 .topbar-page-actions { grid-column: auto !important; grid-row: auto !important; align-self: flex-end !important; display: flex !important; padding: 0 0 2px !important; }
+body.preview-9-rc6-typography .section-tabs { width: min(1540px, 100%); max-width: 1540px; gap: 6px; margin: 0 auto 26px; border-bottom-color: var(--final-line); }
+body.preview-9-rc6-typography .section-tabs a { padding: 12px 15px; color: #9ba9ba; font-size: 13px; font-weight: 690; }
+body.preview-9-rc6-typography .section-tabs a.active { color: #edf4fb; }
+
+body.preview-9-rc6-typography.preview-7-awg-exact.awg-cascade-page .content,
+body.preview-9-rc6-typography.preview-7-awg-exact.awg-cluster-page .content,
+body.preview-9-rc6-typography.preview-7-awg-exact.awg-clients-page .content { padding: 25px 24px 34px !important; }
+body.preview-9-rc6-typography.preview-7-awg-exact.awg-cascade-page .topbar,
+body.preview-9-rc6-typography.preview-7-awg-exact.awg-cluster-page .topbar,
+body.preview-9-rc6-typography.preview-7-awg-exact.awg-clients-page .topbar,
+body.preview-9-rc6-typography.preview-7-awg-exact.awg-cascade-page .ui-page,
+body.preview-9-rc6-typography.preview-7-awg-exact.awg-cluster-page .ui-page,
+body.preview-9-rc6-typography.preview-7-awg-exact.awg-clients-page .ui-page { width: 100% !important; max-width: none !important; }
+
+html[data-theme="light"] body.preview-9-rc6-typography { --final-shell-bg: #E3E9EE; --final-sidebar-bg: #D7E0E5; --final-sidebar-border: #AEBCC7; --final-topbar-bg: rgba(227, 233, 238, .94); --final-line: #AEBCC7; }
+html[data-theme="light"] body.preview-9-rc6-typography .sidebar { border-right-color: #AEBCC7; background: linear-gradient(180deg, #DCE4E9, #D3DDE3); }
+html[data-theme="light"] body.preview-9-rc6-typography .global-topbar { border-bottom-color: #AEBCC7; background: var(--final-topbar-bg); }
+html[data-theme="light"] body.preview-9-rc6-typography .instance-badge { border-color: rgba(47,128,90,.32); background: rgba(47,128,90,.09); }
+html[data-theme="light"] body.preview-9-rc6-typography .instance-badge small { color: #2F805A; }
+html[data-theme="light"] body.preview-9-rc6-typography .instance-badge b { color: #192530; }
+html[data-theme="light"] body.preview-9-rc6-typography .instance-badge em { color: #556672; }
+html[data-theme="light"] body.preview-9-rc6-typography .theme-chip,
+html[data-theme="light"] body.preview-9-rc6-typography .account-button { border-color: #AEBCC7; color: #263744; background: #EAF0F3; }
+html[data-theme="light"] body.preview-9-rc6-typography .topbar-heading h1 { color: #192530; }
+html[data-theme="light"] body.preview-9-rc6-typography .page-subtitle { color: #556672; }
+
+@media(max-width:1180px){
+  body.preview-9-rc6-typography .instance-badge{min-width:190px}
+  body.preview-9-rc6-typography .system-pill span:last-child{display:none}
+  body.preview-9-rc6-typography .system-pill{width:38px;padding:0;justify-content:center}
+}
+@media(max-width:980px){
+  body.preview-9-rc6-typography .shell{grid-template-columns:1fr}
+  body.preview-9-rc6-typography .global-topbar{padding-inline:14px}
+  body.preview-9-rc6-typography .instance-badge{display:none}
+}
+
+/* Match the specificity of the historical Preview 3 shell so the final
+   values replace it rather than stacking beside it. */
+body.preview-9-rc6-typography.preview-3-sidebar-polish.rc20-awg-shell .shell { grid-template-columns: 250px minmax(0,1fr); }
+body.preview-9-rc6-typography.preview-3-sidebar-polish.rc20-awg-shell .sidebar { width:250px; padding:0; }
+body.preview-9-rc6-typography.preview-3-sidebar-polish.rc20-awg-shell .brand { min-height:84px; gap:13px; padding:20px 18px 18px; }
+body.preview-9-rc6-typography.preview-3-sidebar-polish.rc20-awg-shell .brand-mark { width:40px; height:44px; flex-basis:40px; }
+body.preview-9-rc6-typography.preview-3-sidebar-polish.rc20-awg-shell .brand-copy strong { font-size:18px; line-height:1.15; }
+body.preview-9-rc6-typography.preview-3-sidebar-polish.rc20-awg-shell .brand-copy small { margin-top:5px; font-size:11px; line-height:1.2; color:#9eadbd; }
+body.preview-9-rc6-typography.preview-3-sidebar-polish.rc20-awg-shell .main-nav,
+body.preview-9-rc6-typography.preview-3-sidebar-polish.rc20-awg-shell .grouped-main-nav { gap:4px; padding:13px 10px 10px; }
+body.preview-9-rc6-typography.preview-3-sidebar-polish.rc20-awg-shell .main-nav a,
+body.preview-9-rc6-typography.preview-3-sidebar-polish.rc20-awg-shell .grouped-main-nav a { min-height:60px; gap:13px; padding:10px 12px; border-radius:10px; }
+body.preview-9-rc6-typography.preview-3-sidebar-polish.rc20-awg-shell .main-nav a svg,
+body.preview-9-rc6-typography.preview-3-sidebar-polish.rc20-awg-shell .grouped-main-nav a svg { width:22px; height:22px; }
+
+/* SG-Panel Preview 9 follow-up — stronger light theme typography.
+   Keep the RC6 scale, but raise contrast and use the same blue accent family as graphite. */
+html[data-resolved-theme="light"] body.preview-9-rc6-typography {
+  --rc6-text-main: #192530;
+  --rc6-text-strong: #14202a;
+  --rc6-text-secondary: #4d6172;
+  --rc6-text-tertiary: #6c8092;
+  --rc6-text-disabled: #7a8d9f;
+  color: var(--rc6-text-main);
+}
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .brand-copy strong,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .topbar-heading h1,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .instance-badge b,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .system-server-name strong {
+  color: var(--rc6-text-strong);
+}
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .brand-copy small,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .system-server-subline,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .page-subtitle,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .topbar-heading > p:not(.eyebrow),
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .muted,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .hint,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .empty,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .table-note,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .field-note,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .inline-note {
+  color: var(--rc6-text-secondary);
+}
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .main-nav a,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .grouped-main-nav a {
+  color: #304153;
+}
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .main-nav a small,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .grouped-main-nav a small,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .instance-badge em,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .topbar-version,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .sidebar-collapse,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .logout-button {
+  color: #627487;
+}
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .main-nav a.active,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .grouped-main-nav a.active,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .main-nav a.active small,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .grouped-main-nav a.active small {
+  color: #153a63;
+}
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .eyebrow,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .panel-kicker,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .section-kicker,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .system-server-version {
+  color: #2f7de7;
+}
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .sidebar-system .system-row {
+  color: #3a536b;
+}
+
+/* Light-theme page details: override the older graphite-only text literals. */
+html[data-resolved-theme="light"] body.preview-9-rc6-typography.awg-clients-page .clients-awg-metrics article > span,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography.awg-clients-page .clients-awg-table td,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography.awg-clients-page .clients-awg-table .client-identity-cell strong,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography.awg-clients-page .clients-awg-table .client-server-chip b,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography.awg-clients-page .clients-awg-table .client-traffic-pair strong,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography.awg-clients-page .clients-awg-table .client-traffic-pair small,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography.awg-clients-page .clients-awg-server-card strong,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography.awg-clients-page .clients-awg-facts dd,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography.sg-awg-cascade-rc6 .cascade-route-point b,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography.sg-awg-cascade-rc6 .cascade-mode-choice strong {
+  color: #192530;
+}
+html[data-resolved-theme="light"] body.preview-9-rc6-typography.awg-clients-page .clients-filter-field > span,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography.awg-clients-page .clients-awg-filter-panel footer,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography.awg-clients-page .clients-table-footer,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography.awg-clients-page .clients-awg-table th,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography.awg-clients-page .clients-awg-table .client-identity-cell small,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography.awg-clients-page .clients-awg-table .client-server-chip small,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography.awg-clients-page .clients-awg-server-card small,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography.awg-clients-page .clients-awg-facts dt,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography.awg-clients-page .clients-awg-inspector .client-technical-details > summary,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography.awg-clients-page .clients-awg-inspector .client-danger-zone > summary,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography.sg-awg-cascade-rc6 .cascade-route-point small,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography.sg-awg-cascade-rc6 .cascade-mode-choice small {
+  color: #556b7c;
+}
+html[data-resolved-theme="light"] body.preview-9-rc6-typography.awg-clients-page .clients-awg-metrics article > a {
+  color: #2f7de7;
+}
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .theme-chip,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .account-button {
+  border-color: #aebcc7;
+  color: #263744;
+  background: #eaf0f3;
+}
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .theme-chip:hover,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .account-button:hover {
+  border-color: #5da2f7;
+  color: #163a62;
+  background: #e0ebf4;
+}
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .theme-chip > span:first-child {
+  color: #2f7de7;
+}
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .section-tabs a {
+  color: #526779;
+}
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .section-tabs a.active {
+  color: #173d66;
+}
+
+/* ========================================================================== 
+   SG-Panel Latte Graphite — exact shared palette from SG-Gateway
+   Palette-only normalization. Typography scale is intentionally untouched.
+   ========================================================================== */
+html[data-theme="light"] body.preview-9-rc6-typography,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography {
+  color-scheme: light;
+
+  --page-bg: #D6DEE3;
+  --sidebar-bg: #C8D2D9;
+  --topbar-bg: #DFE6EA;
+  --card-bg: #E9EEF1;
+  --nested-bg: #DCE5E9;
+  --row-bg: #E4EAED;
+  --field-bg: #F7F9FA;
+  --border: #9EAFB9;
+  --border-soft: #BAC6CD;
+  --text-primary: #172531;
+  --text-secondary: #4E6371;
+  --text-muted: #687A85;
+  --blue: #315D82;
+  --blue-hover: #37698E;
+  --blue-pressed: #284F70;
+  --success: #19785B;
+  --success-bg: #CFE2D8;
+  --success-border: #7EAA96;
+  --warning: #95681C;
+  --warning-bg: #E8DFCA;
+  --warning-border: #B28F50;
+  --error: #A3464F;
+  --error-bg: #EAD7D9;
+  --error-border: #BD858B;
+
+  /* Bind every historical SG-Panel token to the exact shared palette. */
+  --bg: var(--page-bg);
+  --bg-soft: var(--page-bg);
+  --sidebar: var(--sidebar-bg);
+  --panel: var(--card-bg);
+  --panel-2: var(--nested-bg);
+  --panel-3: var(--field-bg);
+  --text: var(--text-primary);
+  --muted: var(--text-secondary);
+  --muted-2: var(--text-muted);
+  --line: var(--border);
+  --line-soft: var(--border-soft);
+  --accent: var(--blue);
+  --accent-2: var(--blue-pressed);
+  --accent-soft: rgba(49, 93, 130, .10);
+  --success-soft: var(--success-bg);
+  --danger: var(--error);
+  --danger-soft: var(--error-bg);
+  --final-shell-bg: var(--page-bg);
+  --final-sidebar-bg: var(--sidebar-bg);
+  --final-sidebar-border: var(--border);
+  --final-topbar-bg: var(--topbar-bg);
+  --final-line: var(--border);
+  --rc6-text-main: var(--text-primary);
+  --rc6-text-strong: var(--text-primary);
+  --rc6-text-secondary: var(--text-secondary);
+  --rc6-text-tertiary: var(--text-muted);
+  --rc6-text-disabled: var(--text-muted);
+
+  color: var(--text-primary);
+  background: var(--page-bg);
+}
+
+html[data-theme="light"] body.preview-9-rc6-typography,
+html[data-theme="light"] body.preview-9-rc6-typography.app-body,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography.app-body {
+  background: var(--page-bg) !important;
+  color: var(--text-primary) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .app-grid,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .app-grid {
+  opacity: 0 !important;
+  background: none !important;
+}
+
+/* Shell */
+html[data-theme="light"] body.preview-9-rc6-typography .sidebar,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .sidebar {
+  background: var(--sidebar-bg) !important;
+  border-right-color: var(--border) !important;
+  box-shadow: none !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .brand,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .brand {
+  border-bottom-color: var(--border-soft) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .brand-copy strong,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .brand-copy strong {
+  color: var(--text-primary) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .brand-copy small,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .brand-copy small {
+  color: var(--text-secondary) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .brand-mark path,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .brand-mark path {
+  fill: rgba(49, 93, 130, .04) !important;
+  stroke: var(--blue) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .brand-mark text,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .brand-mark text {
+  fill: var(--blue-pressed) !important;
+}
+
+html[data-theme="light"] body.preview-9-rc6-typography .main-nav a,
+html[data-theme="light"] body.preview-9-rc6-typography .grouped-main-nav a,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .main-nav a,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .grouped-main-nav a {
+  color: var(--text-primary) !important;
+  border-color: transparent !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .main-nav a small,
+html[data-theme="light"] body.preview-9-rc6-typography .grouped-main-nav a small,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .main-nav a small,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .grouped-main-nav a small {
+  color: var(--text-secondary) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .main-nav a:hover,
+html[data-theme="light"] body.preview-9-rc6-typography .grouped-main-nav a:hover,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .main-nav a:hover,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .grouped-main-nav a:hover {
+  color: var(--text-primary) !important;
+  background: rgba(49, 93, 130, .08) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .main-nav a.active,
+html[data-theme="light"] body.preview-9-rc6-typography .grouped-main-nav a.active,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .main-nav a.active,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .grouped-main-nav a.active {
+  color: #FFFFFF !important;
+  border-color: #315D82 !important;
+  background: linear-gradient(135deg, #356789 0%, #2C5777 100%) !important;
+  box-shadow: none !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .main-nav a.active small,
+html[data-theme="light"] body.preview-9-rc6-typography .grouped-main-nav a.active small,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .main-nav a.active small,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .grouped-main-nav a.active small {
+  color: #FFFFFF !important;
+  opacity: .82;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .main-nav a::before,
+html[data-theme="light"] body.preview-9-rc6-typography .grouped-main-nav a::before,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .main-nav a::before,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .grouped-main-nav a::before {
+  display: none !important;
+}
+
+/* Own server card in sidebar */
+html[data-theme="light"] body.preview-9-rc6-typography .sidebar-system,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .sidebar-system {
+  background: #C9DFD5 !important;
+  border-color: #74A88F !important;
+  box-shadow: none !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .sidebar-system .system-row,
+html[data-theme="light"] body.preview-9-rc6-typography .sidebar-system .system-server-name strong,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .sidebar-system .system-row,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .sidebar-system .system-server-name strong {
+  color: #173D32 !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .sidebar-system .system-server-subline,
+html[data-theme="light"] body.preview-9-rc6-typography .sidebar-system .system-server-version,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .sidebar-system .system-server-subline,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .sidebar-system .system-server-version {
+  color: #42685B !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .system-dot,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .system-dot {
+  background: var(--success) !important;
+  box-shadow: 0 0 0 4px rgba(25, 120, 91, .10) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .sidebar-collapse,
+html[data-theme="light"] body.preview-9-rc6-typography .logout-button,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .sidebar-collapse,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .logout-button {
+  color: var(--text-secondary) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .sidebar-collapse:hover,
+html[data-theme="light"] body.preview-9-rc6-typography .logout-button:hover,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .sidebar-collapse:hover,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .logout-button:hover {
+  color: var(--text-primary) !important;
+  border-color: var(--border) !important;
+  background: var(--nested-bg) !important;
+}
+
+/* Top bar */
+html[data-theme="light"] body.preview-9-rc6-typography .global-topbar,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .global-topbar {
+  background: var(--topbar-bg) !important;
+  border-bottom-color: var(--border) !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .instance-badge,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .instance-badge {
+  background: linear-gradient(145deg, #D7E9DF 0%, #CDE1D6 100%) !important;
+  border-color: #7AA78F !important;
+  box-shadow: none !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .instance-badge small,
+html[data-theme="light"] body.preview-9-rc6-typography .instance-badge b,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .instance-badge small,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .instance-badge b {
+  color: #173D32 !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .instance-badge em,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .instance-badge em {
+  color: #42685B !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .topbar-version,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .topbar-version {
+  color: var(--text-secondary) !important;
+}
+
+/* Page typography: color only, no font-size changes */
+html[data-theme="light"] body.preview-9-rc6-typography h1,
+html[data-theme="light"] body.preview-9-rc6-typography h2,
+html[data-theme="light"] body.preview-9-rc6-typography h3,
+html[data-theme="light"] body.preview-9-rc6-typography h4,
+html[data-theme="light"] body.preview-9-rc6-typography strong,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography h1,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography h2,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography h3,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography h4,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography strong {
+  color: var(--text-primary);
+}
+html[data-theme="light"] body.preview-9-rc6-typography .page-subtitle,
+html[data-theme="light"] body.preview-9-rc6-typography p,
+html[data-theme="light"] body.preview-9-rc6-typography small,
+html[data-theme="light"] body.preview-9-rc6-typography .muted,
+html[data-theme="light"] body.preview-9-rc6-typography .hint,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .page-subtitle,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography p,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography small,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .muted,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .hint {
+  color: var(--text-secondary);
+}
+html[data-theme="light"] body.preview-9-rc6-typography .eyebrow,
+html[data-theme="light"] body.preview-9-rc6-typography .panel-kicker,
+html[data-theme="light"] body.preview-9-rc6-typography .section-kicker,
+html[data-theme="light"] body.preview-9-rc6-typography .cluster-stage4-kicker,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .eyebrow,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .panel-kicker,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .section-kicker,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .cluster-stage4-kicker {
+  color: var(--blue) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .section-tabs,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .section-tabs {
+  border-bottom-color: var(--border) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .section-tabs a,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .section-tabs a {
+  color: var(--text-secondary) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .section-tabs a.active,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .section-tabs a.active {
+  color: var(--text-primary) !important;
+  border-bottom-color: var(--blue) !important;
+}
+
+/* Main surface hierarchy */
+html[data-theme="light"] body.preview-9-rc6-typography .ui-card,
+html[data-theme="light"] body.preview-9-rc6-typography .panel-card,
+html[data-theme="light"] body.preview-9-rc6-typography .metric-card,
+html[data-theme="light"] body.preview-9-rc6-typography .ui-status-card,
+html[data-theme="light"] body.preview-9-rc6-typography .resource-board,
+html[data-theme="light"] body.preview-9-rc6-typography .gauge-card,
+html[data-theme="light"] body.preview-9-rc6-typography .dashboard-health,
+html[data-theme="light"] body.preview-9-rc6-typography .users-summary-card,
+html[data-theme="light"] body.preview-9-rc6-typography .memory-dashboard,
+html[data-theme="light"] body.preview-9-rc6-typography .memory-panel,
+html[data-theme="light"] body.preview-9-rc6-typography .backup-history-card,
+html[data-theme="light"] body.preview-9-rc6-typography .security-settings-card,
+html[data-theme="light"] body.preview-9-rc6-typography .security-history-card,
+html[data-theme="light"] body.preview-9-rc6-typography .help-section,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .ui-card,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .panel-card,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .metric-card,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .ui-status-card,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .resource-board,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .gauge-card,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .dashboard-health,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .users-summary-card,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .memory-dashboard,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .memory-panel,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .backup-history-card,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .security-settings-card,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .security-history-card,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .help-section {
+  background: var(--card-bg) !important;
+  border-color: var(--border) !important;
+  box-shadow: none !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .ui-card::before,
+html[data-theme="light"] body.preview-9-rc6-typography .panel-card::before,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .ui-card::before,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .panel-card::before {
+  display: none !important;
+}
+
+/* Nested cards and controls */
+html[data-theme="light"] body.preview-9-rc6-typography :is(
+  .info-cards > div, .ui-code-list > div, .resource-process-strip > div,
+  .service-list > div, .ui-details-list > div, .switch-row, .protocol-box,
+  .info-strip, .json-info-grid > div, .memory-legend-item, .memory-facts > div,
+  .resource-secondary-strip > div, .security-check, .security-status-card,
+  .backup-policy-strip, .backup-restore-flow > div, .help-note,
+  .cluster-stage4-server-card, .cluster-stage4-step, .cluster-stage4-client-facts > article,
+  .cascade-route-point, .cascade-mode-choice, .cascade-create-card,
+  .clients-awg-filter-panel, .clients-awg-inspector, .clients-awg-server-card
+),
+html[data-resolved-theme="light"] body.preview-9-rc6-typography :is(
+  .info-cards > div, .ui-code-list > div, .resource-process-strip > div,
+  .service-list > div, .ui-details-list > div, .switch-row, .protocol-box,
+  .info-strip, .json-info-grid > div, .memory-legend-item, .memory-facts > div,
+  .resource-secondary-strip > div, .security-check, .security-status-card,
+  .backup-policy-strip, .backup-restore-flow > div, .help-note,
+  .cluster-stage4-server-card, .cluster-stage4-step, .cluster-stage4-client-facts > article,
+  .cascade-route-point, .cascade-mode-choice, .cascade-create-card,
+  .clients-awg-filter-panel, .clients-awg-inspector, .clients-awg-server-card
+) {
+  background: var(--nested-bg) !important;
+  border-color: var(--border-soft) !important;
+  box-shadow: none !important;
+}
+
+/* Tables and row-level surfaces */
+html[data-theme="light"] body.preview-9-rc6-typography table,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography table {
+  color: var(--text-primary) !important;
+  border-color: var(--border) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography th,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography th {
+  color: var(--text-primary) !important;
+  background: #C7D3DA !important;
+  border-color: var(--border) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography td,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography td {
+  color: var(--text-primary) !important;
+  background: var(--row-bg) !important;
+  border-color: var(--border-soft) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography tbody tr:hover td,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography tbody tr:hover td {
+  background: #D9E3E8 !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .table-wrap,
+html[data-theme="light"] body.preview-9-rc6-typography .routing-table-shell,
+html[data-theme="light"] body.preview-9-rc6-typography .security-history-table-shell,
+html[data-theme="light"] body.preview-9-rc6-typography .clients-awg-table-card,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .table-wrap,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .routing-table-shell,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .security-history-table-shell,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .clients-awg-table-card {
+  background: var(--card-bg) !important;
+  border-color: var(--border) !important;
+  box-shadow: none !important;
+}
+
+/* Inputs */
+html[data-theme="light"] body.preview-9-rc6-typography input,
+html[data-theme="light"] body.preview-9-rc6-typography textarea,
+html[data-theme="light"] body.preview-9-rc6-typography select,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography input,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography textarea,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography select {
+  color: #172531 !important;
+  background: #F7F9FA !important;
+  border-color: #93A6B2 !important;
+  box-shadow: none !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography input::placeholder,
+html[data-theme="light"] body.preview-9-rc6-typography textarea::placeholder,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography input::placeholder,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography textarea::placeholder {
+  color: var(--text-muted) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography input:focus,
+html[data-theme="light"] body.preview-9-rc6-typography textarea:focus,
+html[data-theme="light"] body.preview-9-rc6-typography select:focus,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography input:focus,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography textarea:focus,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography select:focus {
+  border-color: var(--blue) !important;
+  box-shadow: 0 0 0 3px rgba(49, 93, 130, .12) !important;
+}
+
+/* Buttons */
+html[data-theme="light"] body.preview-9-rc6-typography .button.primary,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .button.primary {
+  color: #FFFFFF !important;
+  border-color: #315D82 !important;
+  background: linear-gradient(180deg, #3D7096 0%, #315D82 100%) !important;
+  box-shadow: none !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .button.primary:hover,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .button.primary:hover {
+  border-color: #37698E !important;
+  background: linear-gradient(180deg, #467AA0 0%, #37698E 100%) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .button.primary:active,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .button.primary:active {
+  border-color: #284F70 !important;
+  background: #284F70 !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .button:not(.primary):not(.danger):not(.warning),
+html[data-theme="light"] body.preview-9-rc6-typography .theme-chip,
+html[data-theme="light"] body.preview-9-rc6-typography .account-button,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .button:not(.primary):not(.danger):not(.warning),
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .theme-chip,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .account-button {
+  color: #1E3543 !important;
+  border-color: #8FA4B2 !important;
+  background: linear-gradient(180deg, #EDF1F3 0%, #D8E1E6 100%) !important;
+  box-shadow: none !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .button:not(.primary):not(.danger):not(.warning):hover,
+html[data-theme="light"] body.preview-9-rc6-typography .theme-chip:hover,
+html[data-theme="light"] body.preview-9-rc6-typography .account-button:hover,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .button:not(.primary):not(.danger):not(.warning):hover,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .theme-chip:hover,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .account-button:hover {
+  color: #172531 !important;
+  border-color: #7E95A4 !important;
+  background: linear-gradient(180deg, #F5F7F8 0%, #E1E8EC 100%) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .button.warning,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .button.warning {
+  color: var(--warning) !important;
+  border-color: var(--warning-border) !important;
+  background: var(--warning-bg) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .button.danger,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .button.danger {
+  color: var(--error) !important;
+  border-color: var(--error-border) !important;
+  background: var(--error-bg) !important;
+}
+
+/* Status language */
+html[data-theme="light"] body.preview-9-rc6-typography :is(.status.ok, .status-badge.ok, .system-pill.ok, .cluster-stage4-state.online, .is-success),
+html[data-resolved-theme="light"] body.preview-9-rc6-typography :is(.status.ok, .status-badge.ok, .system-pill.ok, .cluster-stage4-state.online, .is-success) {
+  color: var(--success) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography :is(.system-pill.ok, .cluster-stage4-state.online, .status-badge.ok),
+html[data-resolved-theme="light"] body.preview-9-rc6-typography :is(.system-pill.ok, .cluster-stage4-state.online, .status-badge.ok) {
+  background: var(--success-bg) !important;
+  border-color: var(--success-border) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography :is(.is-warning, .warning, .system-pill.attention),
+html[data-resolved-theme="light"] body.preview-9-rc6-typography :is(.is-warning, .warning, .system-pill.attention) {
+  color: var(--warning) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography :is(.system-pill.attention, .status-badge.warning),
+html[data-resolved-theme="light"] body.preview-9-rc6-typography :is(.system-pill.attention, .status-badge.warning) {
+  background: var(--warning-bg) !important;
+  border-color: var(--warning-border) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography :is(.status.bad, .is-danger, .danger, .cluster-stage4-state.offline),
+html[data-resolved-theme="light"] body.preview-9-rc6-typography :is(.status.bad, .is-danger, .danger, .cluster-stage4-state.offline) {
+  color: var(--error) !important;
+}
+
+/* Cluster */
+html[data-theme="light"] body.preview-9-rc6-typography .cluster-stage4-controller,
+html[data-theme="light"] body.preview-9-rc6-typography .cluster-stage4-servers,
+html[data-theme="light"] body.preview-9-rc6-typography .cluster-stage4-clients,
+html[data-theme="light"] body.preview-9-rc6-typography .cluster-stage4-onboarding,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .cluster-stage4-controller,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .cluster-stage4-servers,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .cluster-stage4-clients,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .cluster-stage4-onboarding {
+  background: var(--card-bg) !important;
+  border-color: var(--border) !important;
+  box-shadow: none !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .cluster-stage4-summary article,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .cluster-stage4-summary article {
+  background: var(--nested-bg) !important;
+  border-color: var(--border-soft) !important;
+  box-shadow: none !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .cluster-stage4-server-card,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .cluster-stage4-server-card {
+  background: var(--row-bg) !important;
+  border-color: var(--border) !important;
+  box-shadow: none !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .cluster-stage4-server-card::before,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .cluster-stage4-server-card::before {
+  display: none !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .cluster-stage4-server-card :is(.cluster-stage4-address, dl > div, .cluster-stage4-profile),
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .cluster-stage4-server-card :is(.cluster-stage4-address, dl > div, .cluster-stage4-profile) {
+  background: var(--field-bg) !important;
+  border-color: var(--border-soft) !important;
+}
+
+/* Cascade */
+html[data-theme="light"] body.preview-9-rc6-typography.sg-awg-cascade-rc6 .cascade-simple-hero,
+html[data-theme="light"] body.preview-9-rc6-typography.sg-awg-cascade-rc6 .cascade-mode-card,
+html[data-theme="light"] body.preview-9-rc6-typography.sg-awg-cascade-rc6 .cascade-cluster-builder,
+html[data-theme="light"] body.preview-9-rc6-typography.sg-awg-cascade-rc6 .cascade-external-card,
+html[data-theme="light"] body.preview-9-rc6-typography.sg-awg-cascade-rc6 .cascade-links-section,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography.sg-awg-cascade-rc6 .cascade-simple-hero,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography.sg-awg-cascade-rc6 .cascade-mode-card,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography.sg-awg-cascade-rc6 .cascade-cluster-builder,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography.sg-awg-cascade-rc6 .cascade-external-card,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography.sg-awg-cascade-rc6 .cascade-links-section {
+  background: var(--card-bg) !important;
+  border-color: var(--border) !important;
+  box-shadow: none !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography.sg-awg-cascade-rc6 .cascade-route-point,
+html[data-theme="light"] body.preview-9-rc6-typography.sg-awg-cascade-rc6 .cascade-mode-choice,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography.sg-awg-cascade-rc6 .cascade-route-point,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography.sg-awg-cascade-rc6 .cascade-mode-choice {
+  background: var(--nested-bg) !important;
+  border-color: var(--border-soft) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography.sg-awg-cascade-rc6 .cascade-mode-choice.is-selected,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography.sg-awg-cascade-rc6 .cascade-mode-choice.is-selected {
+  background: #D6E2EA !important;
+  border-color: var(--blue) !important;
+}
+
+/* Clients */
+html[data-theme="light"] body.preview-9-rc6-typography.awg-clients-page .clients-awg-metrics article,
+html[data-theme="light"] body.preview-9-rc6-typography.awg-clients-page .clients-awg-table-card,
+html[data-theme="light"] body.preview-9-rc6-typography.awg-clients-page .clients-awg-inspector,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography.awg-clients-page .clients-awg-metrics article,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography.awg-clients-page .clients-awg-table-card,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography.awg-clients-page .clients-awg-inspector {
+  background: var(--card-bg) !important;
+  border-color: var(--border) !important;
+  box-shadow: none !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography.awg-clients-page .clients-awg-table tbody tr,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography.awg-clients-page .clients-awg-table tbody tr {
+  background: var(--row-bg) !important;
+}
+
+/* Popovers / menus */
+html[data-theme="light"] body.preview-9-rc6-typography .theme-menu,
+html[data-theme="light"] body.preview-9-rc6-typography .account-menu,
+html[data-theme="light"] body.preview-9-rc6-typography .table-action-menu,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .theme-menu,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .account-menu,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .table-action-menu {
+  color: var(--text-primary) !important;
+  background: var(--field-bg) !important;
+  border-color: var(--border) !important;
+  box-shadow: 0 12px 26px rgba(23, 37, 49, .12) !important;
+}
+
+/* Code/log surfaces remain intentionally dark for readability. */
+html[data-theme="light"] body.preview-9-rc6-typography :is(.terminal-box, .log-view, .json-editor-form .json-editor),
+html[data-resolved-theme="light"] body.preview-9-rc6-typography :is(.terminal-box, .log-view, .json-editor-form .json-editor) {
+  color: #E7EEF3 !important;
+  background: #172531 !important;
+  border-color: #4E6371 !important;
+}
+
+/* Final exact-palette cleanup: the historical Preview 3 brand header had a
+   hard-coded graphite fill, and some text links kept their old pale blue. */
+html[data-theme="light"] body.preview-9-rc6-typography.preview-3-sidebar-polish.rc20-awg-shell .brand,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography.preview-3-sidebar-polish.rc20-awg-shell .brand {
+  background: var(--sidebar-bg) !important;
+  border-bottom-color: var(--border-soft) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .content a:not(.button):not(.system-pill),
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .content a:not(.button):not(.system-pill) {
+  color: var(--blue);
+}
+
+/* SG-Panel Latte Graphite — GeoFiles status indicators in light theme.
+   These are status badges, not action buttons. */
+html[data-theme="light"] body.preview-9-rc6-typography .geodata-file,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .geodata-file {
+  color: var(--warning) !important;
+  border-color: var(--warning-border) !important;
+  background: var(--warning-bg) !important;
+  box-shadow: none !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .geodata-file.is-ready,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .geodata-file.is-ready {
+  color: var(--success) !important;
+  border-color: var(--success-border) !important;
+  background: var(--success-bg) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .geodata-file.is-missing,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .geodata-file.is-missing {
+  color: var(--warning) !important;
+  border-color: var(--warning-border) !important;
+  background: var(--warning-bg) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .geodata-file strong,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .geodata-file strong {
+  color: currentColor !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .geodata-file i,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .geodata-file i {
+  background: var(--warning) !important;
+  box-shadow: none !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .geodata-file.is-ready i,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .geodata-file.is-ready i {
+  background: var(--success) !important;
+  box-shadow: none !important;
+}

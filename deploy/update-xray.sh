@@ -174,6 +174,26 @@ esac
 CURRENT_VERSION="$(xray_version "$XRAY_BIN")"
 [[ "$CURRENT_VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || fail "не удалось определить установленную версию Xray"
 [[ "$CURRENT_VERSION" != "$TARGET_VERSION" ]] || fail "Xray $TARGET_VERSION уже установлен"
+python3 - "$CURRENT_VERSION" "$TARGET_VERSION" <<'PYVERSION'
+import re
+import sys
+
+def version(value: str) -> tuple[int, int, int]:
+    match = re.fullmatch(r"v(\d+)\.(\d+)\.(\d+)", value.strip())
+    if not match:
+        raise SystemExit(2)
+    return tuple(int(item) for item in match.groups())
+
+current = version(sys.argv[1])
+target = version(sys.argv[2])
+minimum = (26, 6, 27)
+if target < minimum:
+    print("Целевая версия ниже обязательного минимума v26.6.27", file=sys.stderr)
+    raise SystemExit(3)
+if target < current:
+    print("Понижение версии Xray запрещено", file=sys.stderr)
+    raise SystemExit(4)
+PYVERSION
 
 DOWNLOAD_URL="https://github.com/XTLS/Xray-core/releases/download/${TARGET_VERSION}/${ASSET}"
 

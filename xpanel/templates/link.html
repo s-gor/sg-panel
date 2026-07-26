@@ -1,13 +1,14 @@
 {% extends "base.html" %}
-{% block title %}{{ user.name }} — SG-Panel{% endblock %}
+{% block title %}{{ device.display_name }} — SG-Panel{% endblock %}
 {% block section %}USERS / ACCESS{% endblock %}
 {% block heading %}Клиентский доступ{% endblock %}
-{% block subtitle %}Активные соединения и сохранённые профили пользователя {{ user.name }}{% endblock %}
+{% block subtitle %}Отдельный доступ «{{ device.name }}» клиента {{ user.name }} · собственный UUID и подписка{% endblock %}
 {% block content %}
 
 <nav class="client-link-page-actions" aria-label="Действия с клиентом">
   <a class="button secondary" href="{{ url_for('users_page', client=user.id) }}">← К списку клиентов</a>
-  <a class="button primary" href="{{ url_for('users_page', create=1) }}">＋ Создать ещё клиента</a>
+  <button class="button primary" type="button" onclick="window.location='{{ url_for('users_page', client=user.id) }}'">Устройства клиента</button>
+  <a class="button ghost" href="{{ url_for('users_page', create=1) }}">Создать ещё клиента</a>
 </nav>
 
 {% macro render_connection(item) %}
@@ -20,7 +21,7 @@
       </div>
       <span class="pill {{ 'enabled' if item.active else 'saved' }}"><i></i>{{ 'Активен' if item.active else 'Неактивен' }}</span>
     </div>
-    <div class="qr-frame"><img src="data:image/png;base64,{{ item.qr_data }}" alt="QR {{ item.client_title }} для {{ user.name }}"></div>
+    {% if item.qr_data %}<div class="qr-frame"><img src="data:image/png;base64,{{ item.qr_data }}" alt="QR {{ item.client_title }} для {{ device.display_name }}"></div>{% else %}<div class="qr-overflow-note"><strong>QR не создан</strong><p>{{ item.qr_error }}</p></div>{% endif %}
     <p class="hint center">
       {% if item.active %}Сервер сейчас обслуживает это соединение.
       {% else %}Параметры сохранены, но выбранный профиль сервера сейчас не обслуживает это соединение.
@@ -32,16 +33,20 @@
       <div><p class="panel-kicker">{{ item.profile_label }}</p><h2>{{ item.client_title }}</h2></div>
       <span class="panel-index">{{ item.tag }}</span>
     </div>
+    {% set endpoint_host = item.deployment_public_host or server.address %}
     {% if item.kind == 'hysteria' %}
-    <div class="hysteria-link-endpoint"><span>Публичная точка</span><strong>{{ server.address }}:{{ item.port }}/UDP</strong></div>
+    <div class="hysteria-link-endpoint"><span>Публичная точка</span><strong>{{ endpoint_host }}:{{ item.port }}/UDP</strong></div>
     {% elif item.kind == 'xhttp' %}
-    <div class="hysteria-link-endpoint"><span>Публичная точка</span><strong>{{ server.address }}:{{ item.port }}/TCP · {{ item.path }}</strong></div>
+    <div class="hysteria-link-endpoint"><span>Публичная точка</span><strong>{{ endpoint_host }}:{{ item.port }}/TCP · {{ item.path }}</strong></div>
+    <div class="hysteria-link-endpoint"><span>Локальный Xray</span><strong>{{ item.listen }}:{{ item.local_port }}</strong></div>
+    {% elif item.kind == 'ws' %}
+    <div class="hysteria-link-endpoint"><span>Публичная точка</span><strong>{{ endpoint_host }}:{{ item.port }}/TCP · {{ item.path }}</strong></div>
     <div class="hysteria-link-endpoint"><span>Локальный Xray</span><strong>{{ item.listen }}:{{ item.local_port }}</strong></div>
     {% elif item.kind == 'reality' %}
-    <div class="hysteria-link-endpoint"><span>Публичная точка</span><strong>{{ server.address }}:{{ item.port }}/TCP</strong></div>
+    <div class="hysteria-link-endpoint"><span>Публичная точка</span><strong>{{ endpoint_host }}:{{ item.port }}/TCP</strong></div>
     <div class="hysteria-link-endpoint"><span>Short ID</span><strong>{{ item.short_id }}</strong></div>
     {% else %}
-    <div class="hysteria-link-endpoint"><span>Публичная точка</span><strong>{{ server.address }}:{{ item.port }}/TCP</strong></div>
+    <div class="hysteria-link-endpoint"><span>Публичная точка</span><strong>{{ endpoint_host }}:{{ item.port }}/TCP</strong></div>
     {% endif %}
     <label class="link-label" for="link-{{ item.key }}">Connection URI</label>
     <textarea id="link-{{ item.key }}" class="link-box" readonly>{{ item.link }}</textarea>
@@ -51,7 +56,7 @@
     {% if not item.active %}
     <div class="ui-warning-note saved-link-warning"><span>!</span><p><strong>Сейчас не работает.</strong> Для подключения сначала активируйте профиль {{ item.profile_label }} и примените конфигурацию.</p></div>
     {% endif %}
-    <div class="secure-note"><span>◆</span><p><strong>{{ 'Отдельный персональный Hysteria auth' if item.kind == 'hysteria' else 'Персональный UUID' }}</strong><small>Не публикуйте эту ссылку в открытом доступе.</small></p></div>
+    <div class="secure-note"><span>◆</span><p><strong>{{ 'Отдельный персональный Hysteria auth' if item.kind == 'hysteria' else 'UUID этого устройства' }}</strong><small>Один UUID используется во всех профилях только этого устройства. Не публикуйте ссылку открыто.</small></p></div>
   </article>
 </section>
 {% endmacro %}
@@ -77,8 +82,8 @@
 
 <section class="link-grid subscription-link-grid">
   <article class="panel-card qr-panel">
-    <div class="panel-heading"><div><p class="panel-kicker">SUBSCRIPTION QR</p><h2>Постоянный URL</h2></div><span class="pill {{ 'enabled' if user.subscription_enabled else 'disabled' }}"><i></i>{{ 'enabled' if user.subscription_enabled else 'disabled' }}</span></div>
-    <div class="qr-frame"><img src="data:image/png;base64,{{ subscription_qr_data }}" alt="QR подписки для {{ user.name }}"></div>
+    <div class="panel-heading"><div><p class="panel-kicker">SUBSCRIPTION QR</p><h2>{{ device.name }}</h2></div><span class="pill {{ 'enabled' if device.subscription_enabled else 'disabled' }}"><i></i>{{ 'enabled' if device.subscription_enabled else 'disabled' }}</span></div>
+    {% if subscription_qr_data %}<div class="qr-frame"><img src="data:image/png;base64,{{ subscription_qr_data }}" alt="QR подписки для {{ device.display_name }}"></div>{% else %}<div class="qr-overflow-note"><strong>QR подписки не создан</strong><p>{{ subscription_qr_error }}</p></div>{% endif %}
     <p class="hint center">Подписка выдаёт только соединения, которые реально активны на сервере сейчас.</p>
   </article>
   <article class="panel-card link-panel">
@@ -94,7 +99,7 @@
     <p class="hint">Этот адрес передаёт Flow, REALITY, XHTTP Extra, FinalMask и применимые TLS-параметры с указанием источника. SG Client должен считать серверно-зависимые поля управляемыми и не включать их локально.</p>
     {% if not subscription_json_enabled %}<div class="alert error">JSON-выдача сейчас отключена в Security. Включите её только для доверенного SG Client; token предоставляет доступ к профилю.</div>{% endif %}
     {% if not subscription_settings.enabled %}<div class="alert error">Глобальная выдача подписок выключена. URL начнёт работать после включения на странице «Подписки».</div>{% endif %}
-    {% if not user.subscription_enabled %}<div class="alert error">Подписка этого пользователя отключена.</div>{% endif %}
+    {% if not device.subscription_enabled %}<div class="alert error">Подписка этого устройства отключена.</div>{% endif %}
     <div class="secure-note"><span>◆</span><p><strong>Стабильный token</strong><small>Адрес не меняется при переключении профиля. Стандартная подписка содержит активные URI, а управляемый JSON дополнительно описывает применимость и источник параметров.</small></p></div>
   </article>
 </section>

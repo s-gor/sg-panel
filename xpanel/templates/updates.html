@@ -64,6 +64,7 @@
       <span class="pill {{ xray_update_state_class }}">{{ xray_update_state_label }}</span>
     </header>
 
+    <div class="xray-update-body">
     <div class="xray-channel-grid">
       <article class="xray-channel-card {{ 'is-selected' if request.args.get('xray_channel', 'stable') == 'stable' else '' }}">
         <div class="xray-channel-heading">
@@ -149,6 +150,7 @@
       <span>Контроль всех активных Inbound</span>
       <span>Автоматический откат</span>
     </div>
+    </div>
   </section>
 
   <section class="ui-card update-progress-card" data-update-progress data-update-endpoint="{{ url_for('xray_updates_status') }}" data-update-kind="xray">
@@ -160,14 +162,16 @@
       </div>
       <span class="pill {{ xray_update_state_class }}" data-update-badge>{{ xray_update_state_label }}</span>
     </header>
-    <div class="update-live-line {{ 'is-running' if xray_update_running else '' }}" data-update-live-line>
-      <span class="update-spinner" aria-hidden="true"></span>
-      <strong data-update-live-message>{{ xray_update_status.message or 'Ожидание операции' }}</strong>
-      <small data-update-elapsed></small>
-    </div>
-    <pre class="update-log" data-update-log>{{ xray_update_status.log or '[Xray Update] Журнал появится после запуска обновления.' }}</pre>
-    <div class="ui-actions update-result-actions" data-update-result-actions hidden>
-      <a class="button primary" href="{{ url_for('updates_page') }}">Обновить данные страницы</a>
+    <div class="update-progress-body">
+      <div class="update-live-line {{ 'is-running' if xray_update_running else '' }}" data-update-live-line>
+        <span class="update-spinner" aria-hidden="true"></span>
+        <strong data-update-live-message>{{ xray_update_status.message or 'Ожидание операции' }}</strong>
+        <small data-update-elapsed></small>
+      </div>
+      <pre class="update-log" data-update-log>{{ xray_update_status.log or '[Xray Update] Журнал появится после запуска обновления.' }}</pre>
+      <div class="ui-actions update-result-actions" data-update-result-actions hidden>
+        <a class="button primary" href="{{ url_for('updates_page') }}">Обновить данные страницы</a>
+      </div>
     </div>
   </section>
 
@@ -197,19 +201,21 @@
       </div>
       <span class="pill {{ update_state_class }}" data-update-badge>{{ update_state_label }}</span>
     </header>
-    <div class="update-live-line {{ 'is-running' if update_running else '' }}" data-update-live-line>
-      <span class="update-spinner" aria-hidden="true"></span>
-      <strong data-update-live-message>{{ update_status.message or 'Ожидание операции' }}</strong>
-      <small data-update-elapsed></small>
-    </div>
-    <pre class="update-log" data-update-log>{{ update_status.log or '[SG-Panel Update] Журнал появится после запуска обновления.' }}</pre>
-    <div class="ui-actions update-result-actions" data-update-result-actions hidden>
-      <a class="button primary" href="{{ url_for('updates_page') }}">Обновить данные страницы</a>
+    <div class="update-progress-body">
+      <div class="update-live-line {{ 'is-running' if update_running else '' }}" data-update-live-line>
+        <span class="update-spinner" aria-hidden="true"></span>
+        <strong data-update-live-message>{{ update_status.message or 'Ожидание операции' }}</strong>
+        <small data-update-elapsed></small>
+      </div>
+      <pre class="update-log" data-update-log>{{ update_status.log or '[SG-Panel Update] Журнал появится после запуска обновления.' }}</pre>
+      <div class="ui-actions update-result-actions" data-update-result-actions hidden>
+        <a class="button primary" href="{{ url_for('updates_page') }}">Обновить данные страницы</a>
+      </div>
     </div>
   </section>
 
   <details class="ui-card advanced update-manual-card">
-    <summary>Запасной ручной способ обновления SG-Panel</summary>
+    <summary><span><b>Запасной ручной способ обновления SG-Panel</b><small>Команда на случай недоступного веб-интерфейса</small></span><em>Открыть</em></summary>
     <div class="advanced-body">
       <p>Если веб-интерфейс недоступен, распакуйте новый проверенный ZIP и запустите updater из корня нового исходного кода:</p>
       <pre><code>cd /home/ubuntu/sg-panel-main

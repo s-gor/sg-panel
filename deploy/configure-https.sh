@@ -170,14 +170,26 @@ server {
         default_type text/plain;
     }
 
-    location / {
+    location = / {
         root $PLACEHOLDER_ROOT;
-        index index.html;
-        try_files \$uri \$uri/ /index.html;
+        try_files /index.html =404;
         add_header Cache-Control "no-cache" always;
         add_header X-Content-Type-Options nosniff always;
         add_header X-Frame-Options DENY always;
         add_header Referrer-Policy no-referrer always;
+    }
+
+    location = /index.html {
+        root $PLACEHOLDER_ROOT;
+        try_files /index.html =404;
+        add_header Cache-Control "no-cache" always;
+        add_header X-Content-Type-Options nosniff always;
+        add_header X-Frame-Options DENY always;
+        add_header Referrer-Policy no-referrer always;
+    }
+
+    location / {
+        return 404;
     }
 }
 

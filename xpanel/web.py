@@ -13,11 +13,14 @@ import shutil
 import sqlite3
 import subprocess
 import tempfile
+import threading
+import time
 import uuid as uuidlib
 from datetime import datetime, timedelta, timezone
 from functools import wraps
 from pathlib import Path
-from urllib.parse import quote, urlencode
+from urllib.parse import parse_qs, quote, urlencode
+from urllib.request import Request, urlopen
 
 from flask import (
     Flask,
@@ -36,7 +39,7 @@ from flask import (
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from . import __version__
+from . import __build__, __release_label__, __version__
 from .db import connect, db_path, init_db, use_db_path
 from .update_manager import (
     check_for_updates,
@@ -58,11 +61,18 @@ from .node_manager import (
     delete_node,
     find_node,
     heartbeat_node,
+    authenticate_node_token,
     has_active_enrollment,
     list_node_events,
     list_node_jobs,
     list_node_deployments,
     list_user_deployments,
+    find_deployment,
+    update_deployment_policy,
+    create_failover_batch,
+    fail_failover_batch,
+    attach_failover_job,
+    list_failover_batches,
     latest_node_config,
     create_user_deletion_request,
     user_deletion_request,
@@ -94,6 +104,207 @@ from .security import (
     validate_admin_session,
     write_audit,
 )
+
+_COUNTRY_CACHE: dict[str, dict[str, object]] = {}
+_GEOIP_ASSET_CACHE: dict[str, object] = {}
+
+
+def _country_flag(country_code: str) -> str:
+    code = str(country_code or "").strip().upper()
+    if len(code) != 2 or not code.isalpha():
+        return "🌐"
+    return "".join(chr(0x1F1E6 + ord(char) - ord("A")) for char in code)
+
+
+def _geoip_read_varint(data: memoryview, offset: int, limit: int) -> tuple[int | None, int]:
+    value = 0
+    shift = 0
+    while offset < limit and shift <= 63:
+        current = int(data[offset])
+        offset += 1
+        value |= (current & 0x7F) << shift
+        if current & 0x80 == 0:
+            return value, offset
+        shift += 7
+    return None, offset
+
+
+def _geoip_skip_field(data: memoryview, offset: int, limit: int, wire: int) -> int | None:
+    if wire == 0:
+        value, offset = _geoip_read_varint(data, offset, limit)
+        return offset if value is not None else None
+    if wire == 1:
+        offset += 8
+    elif wire == 2:
+        length, offset = _geoip_read_varint(data, offset, limit)
+        if length is None:
+            return None
+        offset += int(length)
+    elif wire == 5:
+        offset += 4
+    else:
+        return None
+    return offset if offset <= limit else None
+
+
+def _geoip_cidr_matches(
+    data: memoryview, start: int, length: int, target: ipaddress._BaseAddress
+) -> bool:
+    end = start + length
+    offset = start
+    network_bytes = b""
+    prefix = None
+    while offset < end:
+        key, offset = _geoip_read_varint(data, offset, end)
+        if key is None:
+            break
+        field = int(key >> 3)
+        wire = int(key & 7)
+        if field == 1 and wire == 2:
+            value_length, value_start = _geoip_read_varint(data, offset, end)
+            if value_length is None or value_start + int(value_length) > end:
+                break
+            network_bytes = bytes(data[value_start : value_start + int(value_length)])
+            offset = value_start + int(value_length)
+            continue
+        if field == 2 and wire == 0:
+            prefix, offset = _geoip_read_varint(data, offset, end)
+            continue
+        next_offset = _geoip_skip_field(data, offset, end, wire)
+        if next_offset is None:
+            break
+        offset = next_offset
+    if not network_bytes or prefix is None or len(network_bytes) != len(target.packed):
+        return False
+    bits = 32 if target.version == 4 else 128
+    prefix_value = int(prefix)
+    if prefix_value < 0 or prefix_value > bits:
+        return False
+    shift = bits - prefix_value
+    return (int.from_bytes(network_bytes, "big") >> shift) == (int(target) >> shift)
+
+
+def _geoip_entry_country(
+    data: memoryview, start: int, length: int, target: ipaddress._BaseAddress
+) -> str:
+    end = start + length
+    offset = start
+    code = ""
+    while offset < end:
+        key, offset = _geoip_read_varint(data, offset, end)
+        if key is None:
+            break
+        field = int(key >> 3)
+        wire = int(key & 7)
+        if field == 1 and wire == 2:
+            value_length, value_start = _geoip_read_varint(data, offset, end)
+            if value_length is None or value_start + int(value_length) > end:
+                break
+            code = bytes(data[value_start : value_start + int(value_length)]).decode(
+                "utf-8", "replace"
+            ).strip().upper()
+            offset = value_start + int(value_length)
+            continue
+        if field == 2 and wire == 2:
+            value_length, value_start = _geoip_read_varint(data, offset, end)
+            if value_length is None or value_start + int(value_length) > end:
+                break
+            if (
+                len(code) == 2
+                and code.isalpha()
+                and _geoip_cidr_matches(data, value_start, int(value_length), target)
+            ):
+                return code
+            offset = value_start + int(value_length)
+            continue
+        next_offset = _geoip_skip_field(data, offset, end, wire)
+        if next_offset is None:
+            break
+        offset = next_offset
+    return ""
+
+
+def _bundled_geoip_country(address: str) -> str:
+    try:
+        target = ipaddress.ip_address(str(address or "").strip())
+    except ValueError:
+        return ""
+    if not target.is_global:
+        return ""
+    root = Path(__file__).resolve().parent.parent
+    source = root / "assets" / "geoip" / "sg-country-geoip.dat"
+    if not source.is_file():
+        return ""
+    try:
+        stat = source.stat()
+        cache_key = (str(source.resolve()), stat.st_size, stat.st_mtime_ns)
+        if _GEOIP_ASSET_CACHE.get("key") != cache_key:
+            _GEOIP_ASSET_CACHE.clear()
+            _GEOIP_ASSET_CACHE.update({"key": cache_key, "data": source.read_bytes()})
+        raw = _GEOIP_ASSET_CACHE.get("data")
+        if not isinstance(raw, bytes):
+            return ""
+        data = memoryview(raw)
+        offset = 0
+        limit = len(data)
+        while offset < limit:
+            key, offset = _geoip_read_varint(data, offset, limit)
+            if key is None:
+                break
+            field = int(key >> 3)
+            wire = int(key & 7)
+            if field == 1 and wire == 2:
+                length, start = _geoip_read_varint(data, offset, limit)
+                if length is None or start + int(length) > limit:
+                    break
+                code = _geoip_entry_country(data, start, int(length), target)
+                if code:
+                    return code
+                offset = start + int(length)
+                continue
+            next_offset = _geoip_skip_field(data, offset, limit, wire)
+            if next_offset is None:
+                break
+            offset = next_offset
+    except (OSError, ValueError):
+        return ""
+    return ""
+
+
+def _instance_country(address: str, *, allow_network: bool = True) -> tuple[str, str]:
+    """Resolve server country locally first and use a short network fallback.
+
+    The dedicated SG country GeoIP database makes flags deterministic even when the
+    systemd service cannot reach a public geolocation API. Results are cached per
+    public address for six hours. XPANEL_COUNTRY_CODE remains an explicit override.
+    """
+    override = os.environ.get("XPANEL_COUNTRY_CODE", "").strip().upper()
+    if len(override) == 2 and override.isalpha():
+        return override, _country_flag(override)
+    value = str(address or "").strip()
+    now = time.monotonic()
+    cached = _COUNTRY_CACHE.get(value)
+    if cached is not None and now - float(cached.get("checked_at") or 0.0) < 21600:
+        code = str(cached.get("code") or "")
+        return code, _country_flag(code)
+    code = _bundled_geoip_country(value)
+    if not code and allow_network and value:
+        try:
+            request_obj = Request(
+                f"https://ipwho.is/{quote(value, safe='')}",
+                headers={"User-Agent": "SG-Panel/identity"},
+            )
+            with urlopen(request_obj, timeout=1.25) as response:
+                payload = json.loads(response.read(32768).decode("utf-8", "replace"))
+            candidate = str(payload.get("country_code") or "").strip().upper()
+            if payload.get("success") is not False and len(candidate) == 2 and candidate.isalpha():
+                code = candidate
+        except Exception:
+            code = ""
+    _COUNTRY_CACHE[value] = {"code": code, "checked_at": now}
+    return code, _country_flag(code)
+
+
 from .service import (
     XPanelError,
     add_routing_rule,
@@ -104,9 +315,11 @@ from .service import (
     add_vless_outbound,
     add_vless_outbound_json,
     add_user,
+    add_device,
     apply_config,
     apply_geofiles_source,
     config_json_document,
+    controller_xray_encryption_status,
     dns_json_document,
     inbound_json_document,
     backup_file,
@@ -127,20 +340,30 @@ from .service import (
     find_dns_server,
     find_outbound,
     find_user,
+    find_device,
+    find_subscription_access,
     find_subscription_user,
     format_bytes,
     generate_reality_keys,
+    generate_hysteria_obfs_password,
     generate_ech_pair,
     get_diagnostics,
     get_geodata_status,
     get_geofiles_overview,
     get_dns_settings,
     get_routing_settings,
+    get_russia_kit_overview,
+    get_russia_kit_diagnostics,
     get_server,
     get_inbound_recommendations,
     get_hysteria_studio_overview,
     get_hysteria_diagnostics,
+    hysteria_salamander_support_status,
+    get_xray_channels_overview,
     get_transport_expert_overview,
+    get_expert_core_overview,
+    get_expert_scheme_diagnostics,
+    nginx_transport_document,
     get_status,
     get_subscription_settings,
     get_user_stats,
@@ -152,6 +375,9 @@ from .service import (
     get_instance_identity,
     update_instance_name,
     ensure_cascade_service_access,
+    enable_russia_kit,
+    connect_cascade_cluster_node,
+    finalize_cascade_cluster_job,
     remove_cascade,
     import_cascade_link,
     select_cascade_outbound,
@@ -164,6 +390,11 @@ from .service import (
     list_outbound_tags,
     list_balancer_tags,
     list_routing_rules,
+    list_user_devices,
+    list_devices,
+    routing_outbound_options,
+    routing_outbound_map,
+    routing_rules_overview,
     list_users,
     list_hysteria_inbounds,
     list_xhttp_inbounds,
@@ -174,6 +405,9 @@ from .service import (
     managed_client_export_v2,
     make_links,
     make_saved_links,
+    make_cluster_links,
+    make_cluster_saved_links,
+    qr_png_base64,
     outbound_json_document,
     parse_vless_share_link,
     make_subscription_url,
@@ -182,13 +416,17 @@ from .service import (
     routing_json_document,
     rule_json_document,
     regenerate_user_uuid,
+    regenerate_device_uuid,
     regenerate_subscription_token,
+    regenerate_device_subscription_token,
     reset_stats,
     record_subscription_access,
     restart_xray,
     restore_backup,
     verify_backup,
     set_routing_rule_enabled,
+    set_device_enabled,
+    set_device_subscription_enabled,
     set_dns_host_enabled,
     set_dns_server_enabled,
     set_outbound_enabled,
@@ -209,8 +447,14 @@ from .service import (
     update_warp_json_document,
     update_routing_settings,
     update_server_settings,
+    update_hysteria_inbounds,
+    update_hysteria_obfuscation,
+    update_xray_channels_settings,
     update_transport_expert_settings,
     update_user,
+    update_device,
+    delete_device,
+    update_user_connection_order_mode,
     update_users_json_document,
     update_subscription_settings,
     user_is_expired,
@@ -219,6 +463,10 @@ from .service import (
     subscription_is_available,
     validate_generated_config,
     validate_geofiles_source,
+    validate_uploaded_geofiles,
+    queue_node_geofiles_apply,
+    queue_node_geofiles_validate,
+    get_node_geofiles_rollout_status,
     test_dns_resolution,
     test_outbound_tcp,
     test_warp,
@@ -244,10 +492,29 @@ NODE_RUNTIME_INSTALLER = Path(__file__).resolve().parent.parent / "deploy" / "in
 NODE_AGENT_SOURCE = Path(__file__).resolve().parent.parent / "node_agent" / "sg_node_agent.py"
 NODE_WORKER_SOURCE = Path(__file__).resolve().parent.parent / "node_agent" / "sg_node_worker.py"
 NODE_AGENT_UNINSTALLER = Path(__file__).resolve().parent.parent / "deploy" / "uninstall-node-agent.sh"
+XRAY_VERSION_POLICY = Path(__file__).resolve().parent.parent / "deploy" / "xray-version.env"
 
 CLOUDFLARE_HTTPS_PORTS = {443, 2053, 2083, 2087, 2096, 8443}
 PANEL_CLOUDFLARE_PORTS = CLOUDFLARE_HTTPS_PORTS - {443}
 
+
+
+def _validated_xray_policy_version() -> str:
+    try:
+        for raw in XRAY_VERSION_POLICY.read_text(encoding="utf-8").splitlines():
+            line = raw.strip()
+            if line.startswith("XRAY_VERSION="):
+                value = line.split("=", 1)[1].strip().strip('"').strip("'")
+                if re.fullmatch(r"v\d+\.\d+\.\d+", value):
+                    return value
+    except OSError as exc:
+        raise RuntimeError(f"не удалось прочитать политику версии Xray: {exc}") from exc
+    raise RuntimeError("в политике SG-Panel не указана корректная версия Xray")
+
+
+def _standalone_node_installer(path: Path) -> str:
+    source = path.read_text(encoding="utf-8")
+    return source.replace("__SG_PANEL_XRAY_VERSION__", _validated_xray_policy_version())
 
 
 def _friendly_geodata_error(detail: str) -> str:
@@ -510,12 +777,12 @@ def _activity_text(value: str | None, *, online: bool | None = None) -> str:
 
 
 INBOUND_PROFILE_LABELS = {
-    "raw_reality": "VLESS REALITY",
-    "xhttp_tls": "VLESS XHTTP-TLS",
-    "xhttp_reality": "VLESS XHTTP-REALITY",
-    "grpc_tls": "VLESS gRPC + TLS",
+    "raw_reality": "VLESS REALITY TCP + Vision",
+    "xhttp_tls": "VLESS XHTTP-TLS + Encryption + Vision",
+    "xhttp_reality": "VLESS XHTTP + Encryption + Vision",
+    "grpc_tls": "VLESS gRPC-TLS + Encryption + Vision",
     "hysteria2_tls": "Hysteria 2",
-    "xhttp_hysteria_tls": "XHTTP-TLS + Hysteria 2",
+    "xhttp_hysteria_tls": "XHTTP-TLS + Vision + Hysteria 2",
 }
 
 
@@ -604,8 +871,13 @@ def create_app(test_config: dict | None = None) -> Flask:
             panel_instance_name = "SG-Panel"
             panel_instance_address = ""
             panel_instance_identity = panel_instance_name
+        country_code, instance_flag = _instance_country(
+            panel_instance_address, allow_network=not bool(app.config.get("TESTING"))
+        )
         return {
             "xpanel_version": __version__,
+            "xpanel_build": __build__,
+            "xpanel_release_label": __release_label__,
             "format_bytes": format_bytes,
             "user_is_expired": user_is_expired,
             "expiry_for_form": _expiry_for_form,
@@ -614,6 +886,8 @@ def create_app(test_config: dict | None = None) -> Flask:
             "instance_name": panel_instance_name,
             "instance_address": panel_instance_address,
             "instance_identity": panel_instance_identity,
+            "instance_country_code": country_code,
+            "instance_flag": instance_flag,
         }
 
     def client_ip() -> str:
@@ -708,6 +982,18 @@ def create_app(test_config: dict | None = None) -> Flask:
         ).encode("utf-8")
         return hashlib.sha256(encoded).hexdigest()
 
+    def _redact_request_secrets(value: object) -> str:
+        text = str(value or "")
+        sensitive_markers = ("password", "private_key", "secret", "token")
+        for key, values in request.form.lists():
+            if not any(marker in key.lower() for marker in sensitive_markers):
+                continue
+            for candidate in values:
+                secret = str(candidate or "")
+                if len(secret) >= 6:
+                    text = text.replace(secret, "[REDACTED]")
+        return text
+
     def _config_revision() -> str:
         init_db()
         queries = {
@@ -722,6 +1008,7 @@ def create_app(test_config: dict | None = None) -> Flask:
                 "FROM users ORDER BY id"
             ),
             "config_settings": "SELECT * FROM config_settings ORDER BY id",
+            "xray_channels": "SELECT * FROM xray_channels ORDER BY id",
             "routing_settings": "SELECT * FROM routing_settings ORDER BY id",
             "routing_rules": "SELECT * FROM routing_rules ORDER BY id",
             "dns_settings": "SELECT * FROM dns_settings ORDER BY id",
@@ -761,6 +1048,22 @@ def create_app(test_config: dict | None = None) -> Flask:
         finally:
             destination.close()
             source.close()
+
+    def _restore_database(snapshot: Path) -> None:
+        """Restore an SQLite snapshot without copying a possibly live WAL file."""
+        if not snapshot.is_file():
+            raise XPanelError("страховочная копия базы не найдена")
+        source = sqlite3.connect(snapshot)
+        destination = sqlite3.connect(db_path())
+        try:
+            source.backup(destination)
+            destination.commit()
+        except sqlite3.Error as exc:
+            raise XPanelError(f"не удалось восстановить базу: {exc}") from exc
+        finally:
+            destination.close()
+            source.close()
+
 
     def _validate_candidate_change(mutator) -> dict[str, object]:
         with tempfile.TemporaryDirectory(prefix="sg-panel-validate-") as tmpdir:
@@ -849,7 +1152,7 @@ def create_app(test_config: dict | None = None) -> Flask:
             ValueError, XPanelError, PermissionError, FileNotFoundError, OSError,
             sqlite3.Error,
         ) as exc:
-            body = {"ok": False, "message": str(exc)}
+            body = {"ok": False, "message": _redact_request_secrets(exc)}
             status = 400
         return Response(
             json.dumps(body, ensure_ascii=False),
@@ -1078,6 +1381,50 @@ def create_app(test_config: dict | None = None) -> Flask:
         query = request.args.get("q", "").strip().casefold()
         status_filter = request.args.get("status", "all").strip().lower()
         sort_mode = request.args.get("sort", "created").strip().lower()
+        server_filter = request.args.get("server", "all").strip().lower()
+
+        cluster_nodes = _local_node_overlay(list_nodes())
+        node_summary = network_summary(cluster_nodes)
+        local_address = str(get_instance_address() or server.get("address") or "").strip()
+        local_code, local_flag = _instance_country(
+            local_address, allow_network=bool(local_address and not app.config.get("TESTING"))
+        )
+        local_node = next((item for item in cluster_nodes if bool(item.get("is_local"))), None)
+        local_node_id = int(local_node.get("id") or 0) if local_node else 0
+        local_server = {
+            "value": "local",
+            "node_id": local_node_id,
+            "name": get_instance_name(),
+            "label": f"Controller · {get_instance_name()}",
+            "address": local_address,
+            "country_code": local_code,
+            "flag": local_flag,
+            "role": "Controller",
+        }
+        client_servers = [local_server]
+        server_by_node_id: dict[int, dict[str, object]] = ({local_node_id: local_server} if local_node_id else {})
+        country_lookup_budget = 4
+        for node_item in cluster_nodes:
+            if bool(node_item.get("is_local")):
+                continue
+            node_id = int(node_item.get("id") or 0)
+            address = str(node_item.get("public_address") or "").strip()
+            allow_lookup = bool(address and country_lookup_budget > 0 and not app.config.get("TESTING"))
+            code, flag = _instance_country(address, allow_network=allow_lookup)
+            if allow_lookup:
+                country_lookup_budget -= 1
+            node_server = {
+                "value": f"node:{node_id}",
+                "name": str(node_item.get("name") or f"SG-Node {node_id}"),
+                "label": f"SG-Node · {node_item.get('name') or node_id}",
+                "address": address,
+                "country_code": code,
+                "flag": flag,
+                "role": "SG-Node",
+                "state": str(node_item.get("effective_state") or "pending"),
+            }
+            client_servers.append(node_server)
+            server_by_node_id[node_id] = node_server
 
         enriched: list[dict[str, object]] = []
         for user in all_users:
@@ -1086,6 +1433,32 @@ def create_app(test_config: dict | None = None) -> Flask:
             expired = user_is_expired(user)
             expiring = user_expiring_soon(user)
             online = item_stats.get("online") is True
+            deployments = list_user_deployments(int(user["id"]))
+            devices = list_user_devices(int(user["id"]))
+            deployment_ids = {int(item.get("node_id") or 0) for item in deployments}
+            primary_deployment = next(
+                (item for item in deployments
+                 if str(item.get("slot") or "") == "primary"
+                 and str(item.get("state") or "") == "active"
+                 and str(item.get("desired_state") or "active") == "active"),
+                next(
+                    (item for item in deployments
+                     if str(item.get("state") or "") == "active"
+                     and str(item.get("desired_state") or "active") == "active"),
+                    deployments[0] if deployments else None,
+                ),
+            )
+            primary_node_id = int(primary_deployment.get("node_id") or 0) if primary_deployment else local_node_id
+            display_server = server_by_node_id.get(primary_node_id, local_server)
+            if server_filter == "local" and local_node_id in deployment_ids:
+                display_server = local_server
+            elif server_filter.startswith("node:"):
+                try:
+                    requested_node_id = int(server_filter.split(":", 1)[1])
+                except (TypeError, ValueError):
+                    requested_node_id = 0
+                if requested_node_id in deployment_ids and requested_node_id in server_by_node_id:
+                    display_server = server_by_node_id[requested_node_id]
             row.update(
                 {
                     "stats": item_stats,
@@ -1097,6 +1470,14 @@ def create_app(test_config: dict | None = None) -> Flask:
                         str(item_stats.get("last_seen_at") or ""),
                         online=item_stats.get("online") if isinstance(item_stats, dict) else None,
                     ),
+                    "deployments": deployments,
+                    "devices": devices,
+                    "device_count": len(devices),
+                    "active_device_count": sum(1 for item in devices if bool(item.get("effective_enabled")) and not bool(item.get("expired"))),
+                    "deployment_node_ids": deployment_ids,
+                    "primary_deployment": primary_deployment,
+                    "deployment_slots": {str(item.get("slot") or "alt") for item in deployments if str(item.get("state") or "") != "removed"},
+                    "display_server": display_server,
                 }
             )
             enriched.append(row)
@@ -1108,7 +1489,23 @@ def create_app(test_config: dict | None = None) -> Flask:
                 if query in str(row.get("name", "")).casefold()
                 or query in str(row.get("uuid", "")).casefold()
                 or query in str(row.get("comment", "")).casefold()
+                or any(
+                    query in str(device.get("name", "")).casefold()
+                    or query in str(device.get("uuid", "")).casefold()
+                    for device in row.get("devices", [])
+                )
             ]
+        if server_filter.startswith("node:"):
+            try:
+                requested_node_id = int(server_filter.split(":", 1)[1])
+            except (TypeError, ValueError):
+                requested_node_id = 0
+            rows = [row for row in rows if requested_node_id in row.get("deployment_node_ids", set())]
+        elif server_filter == "local":
+            rows = [row for row in rows if local_node_id in row.get("deployment_node_ids", set())]
+        elif server_filter != "all":
+            server_filter = "all"
+
         if status_filter == "active":
             rows = [row for row in rows if bool(row["effective_enabled"])]
         elif status_filter == "online":
@@ -1149,7 +1546,7 @@ def create_app(test_config: dict | None = None) -> Flask:
         selected_value = request.args.get("client", "").strip()
         if selected_value.isdigit():
             selected = next(
-                (row for row in enriched if int(row["id"]) == int(selected_value)),
+                (row for row in rows if int(row["id"]) == int(selected_value)),
                 None,
             )
         if selected is None and rows:
@@ -1162,11 +1559,15 @@ def create_app(test_config: dict | None = None) -> Flask:
             "expiring": sum(1 for row in enriched if bool(row["expiring_soon"])),
             "expired": sum(1 for row in enriched if bool(row["expired"])),
             "disabled": sum(1 for row in enriched if not bool(row["enabled"])),
+            "devices": sum(int(row.get("device_count") or 0) for row in enriched),
+            "active_devices": sum(int(row.get("active_device_count") or 0) for row in enriched),
             "lifetime_uplink": sum(int(row["stats"].get("lifetime_uplink") or 0) for row in enriched),
             "lifetime_downlink": sum(int(row["stats"].get("lifetime_downlink") or 0) for row in enriched),
             "speed": sum(int(row["stats"].get("total_bps") or 0) for row in enriched),
         }
         summary["lifetime_total"] = int(summary["lifetime_uplink"]) + int(summary["lifetime_downlink"])
+        summary["with_backup"] = sum(1 for row in enriched if "backup" in row.get("deployment_slots", set()))
+        summary["multi_server"] = sum(1 for row in enriched if len(row.get("deployment_node_ids", set())) > 1)
         errors = sorted(
             {
                 str(row["stats"].get("error") or "")
@@ -1180,7 +1581,12 @@ def create_app(test_config: dict | None = None) -> Flask:
             else []
         )
         selected_deployments = (
-            list_user_deployments(int(selected["id"]))
+            list(selected.get("deployments") or [])
+            if selected is not None
+            else []
+        )
+        selected_devices = (
+            list(selected.get("devices") or [])
             if selected is not None
             else []
         )
@@ -1189,6 +1595,25 @@ def create_app(test_config: dict | None = None) -> Flask:
             if selected is not None
             else None
         )
+        cascade_overview = get_cascade_overview()
+        cascade_enabled = bool(cascade_overview.get("enabled"))
+        route_exit_name = str(cascade_overview.get("exit_name") or "сервер выхода")
+        client_route = {
+            "kind": "cascade" if cascade_enabled else "direct",
+            "label": "Cascade" if cascade_enabled else "Direct",
+            "detail": (
+                f"Cascade через {route_exit_name}"
+                if cascade_enabled
+                else f"Direct через {get_instance_name()}"
+            ),
+        }
+        client_network = {
+            "total_servers": max(1, int(node_summary.get("total") or 0)),
+            "online_servers": max(1, int(node_summary.get("online") or 0)),
+            "rules": len(list_routing_rules()),
+            "outbounds": len(list_outbounds()),
+            "ok": True,
+        }
         return render_template(
             "users.html",
             users=rows,
@@ -1196,17 +1621,27 @@ def create_app(test_config: dict | None = None) -> Flask:
             selected_user=selected,
             selected_history=selected_history,
             selected_deployments=selected_deployments,
+            selected_devices=selected_devices,
             selected_deletion_request=selected_deletion_request,
             client_stats=summary,
             query=request.args.get("q", "").strip(),
             status_filter=status_filter,
             sort_mode=sort_mode,
+            server_filter=server_filter,
+            client_servers=client_servers,
+            deployable_nodes=[item for item in cluster_nodes if not bool(item.get("is_local")) and str(item.get("effective_state") or "") == "online"],
+            client_network=client_network,
+            client_route=client_route,
             server=server,
             profile_label=INBOUND_PROFILE_LABELS.get(
                 str(server["inbound_profile"]), str(server["inbound_profile"])
             ),
             stats_errors=errors,
             open_create=request.args.get("create", "").strip() == "1",
+            open_device=(
+                selected is not None
+                and request.args.get("add_device", "").strip() == "1"
+            ),
         )
 
     @app.get("/users/json")
@@ -1300,6 +1735,109 @@ def create_app(test_config: dict | None = None) -> Flask:
             flash(str(exc), "error")
             return redirect(url_for("users_page"))
 
+    @app.post("/users/<int:user_id>/devices")
+    @login_required
+    def device_add(user_id: int):
+        try:
+            values = {
+                "name": request.form.get("name", ""),
+                "comment": request.form.get("comment", ""),
+                "expiry_at": request.form.get("expiry_at", ""),
+                "enabled": True,
+            }
+            _preflight_change(lambda: add_device(user_id, **values))
+            device = add_device(user_id, **values)
+            apply_saved_change(f"Добавлен доступ «{device['name']}»")
+            return redirect(url_for("device_link", user_id=user_id, device_id=device["id"]))
+        except (ValueError, XPanelError, sqlite3.Error) as exc:
+            flash(str(exc), "error")
+            return redirect(url_for("users_page", client=user_id))
+
+    @app.post("/users/<int:user_id>/devices/<int:device_id>/edit")
+    @login_required
+    def device_edit(user_id: int, device_id: int):
+        try:
+            values = {
+                "name": request.form.get("name", ""),
+                "comment": request.form.get("comment", ""),
+                "expiry_at": request.form.get("expiry_at", ""),
+            }
+            _preflight_change(lambda: update_device(user_id, device_id, **values))
+            device = update_device(user_id, device_id, **values)
+            apply_saved_change(f"Доступ «{device['name']}» обновлён")
+        except (ValueError, XPanelError, sqlite3.Error) as exc:
+            flash(str(exc), "error")
+        return redirect(url_for("users_page", client=user_id))
+
+    @app.post("/users/<int:user_id>/devices/<int:device_id>/toggle")
+    @login_required
+    def device_toggle(user_id: int, device_id: int):
+        try:
+            current = find_device(user_id, device_id)
+            target = not bool(current["enabled"])
+            _preflight_change(lambda: set_device_enabled(user_id, device_id, target))
+            device = set_device_enabled(user_id, device_id, target)
+            apply_saved_change(
+                f"Доступ «{device['name']}» {'включён' if device['enabled'] else 'отключён'}"
+            )
+        except (ValueError, XPanelError, sqlite3.Error) as exc:
+            flash(str(exc), "error")
+        return redirect(url_for("users_page", client=user_id))
+
+    @app.post("/users/<int:user_id>/devices/<int:device_id>/regenerate-uuid")
+    @login_required
+    def device_regenerate_uuid_route(user_id: int, device_id: int):
+        try:
+            _preflight_change(lambda: regenerate_device_uuid(user_id, device_id))
+            device = regenerate_device_uuid(user_id, device_id)
+            apply_saved_change(
+                f"Для доступа «{device['name']}» создан новый UUID; старые ссылки больше не работают"
+            )
+        except (ValueError, XPanelError, sqlite3.Error) as exc:
+            flash(str(exc), "error")
+        return redirect(url_for("users_page", client=user_id))
+
+    @app.post("/users/<int:user_id>/devices/<int:device_id>/subscription/toggle")
+    @login_required
+    def device_subscription_toggle(user_id: int, device_id: int):
+        try:
+            current = find_device(user_id, device_id)
+            device = set_device_subscription_enabled(
+                user_id, device_id, not bool(current["subscription_enabled"])
+            )
+            flash(
+                f"Подписка «{device['name']}»: "
+                f"{'включена' if device['subscription_enabled'] else 'отключена'}",
+                "success",
+            )
+        except (ValueError, XPanelError, sqlite3.Error) as exc:
+            flash(str(exc), "error")
+        return redirect(url_for("subscriptions_page"))
+
+    @app.post("/users/<int:user_id>/devices/<int:device_id>/subscription/regenerate")
+    @login_required
+    def device_subscription_regenerate(user_id: int, device_id: int):
+        try:
+            device = regenerate_device_subscription_token(user_id, device_id)
+            flash(
+                f"Для «{device['display_name']}» создан новый token; старый URL больше не работает.",
+                "success",
+            )
+        except (ValueError, XPanelError, sqlite3.Error) as exc:
+            flash(str(exc), "error")
+        return redirect(url_for("subscriptions_page"))
+
+    @app.post("/users/<int:user_id>/devices/<int:device_id>/delete")
+    @login_required
+    def device_delete(user_id: int, device_id: int):
+        try:
+            _preflight_change(lambda: delete_device(user_id, device_id))
+            device = delete_device(user_id, device_id)
+            apply_saved_change(f"Доступ «{device['name']}» удалён")
+        except (ValueError, XPanelError, sqlite3.Error) as exc:
+            flash(str(exc), "error")
+        return redirect(url_for("users_page", client=user_id))
+
     @app.get("/users/<int:user_id>/edit")
     @login_required
     def user_edit_page(user_id: int):
@@ -1356,10 +1894,20 @@ def create_app(test_config: dict | None = None) -> Flask:
             current = find_user(user_id)
             target_enabled = not bool(current["enabled"])
             _preflight_change(lambda: set_user_enabled(user_id, target_enabled))
+            remote_deployments = [
+                item for item in list_user_deployments(user_id)
+                if not bool(item.get("node_is_local")) and str(item.get("state") or "") != "removed"
+            ]
             updated = set_user_enabled(user_id, target_enabled)
             apply_saved_change(
                 f"{updated['name']}: {'включён' if updated['enabled'] else 'отключён'}"
             )
+            if remote_deployments:
+                flash(
+                    "Стабильная подписка обновлена. Уже импортированные raw-профили SG-Node "
+                    "не отзываются дистанционно: повторно разверните или удалите клиента на Node.",
+                    "warning",
+                )
         except XPanelError as exc:
             flash(str(exc), "error")
         return redirect(url_for("users_page"))
@@ -1369,35 +1917,52 @@ def create_app(test_config: dict | None = None) -> Flask:
     def users_delete(user_id: int):
         try:
             user = find_user(user_id)
-            deployments = [
+            remote_deployments = [
                 item for item in list_user_deployments(user_id)
-                if str(item.get("state") or "") in {"pending", "active", "error", "removing"}
+                if not bool(item.get("node_is_local"))
+                and str(item.get("state") or "") in {"pending", "active", "error", "removing"}
             ]
-            offline = [
-                str(item.get("node_name") or "") for item in deployments
-                if str(item.get("node_effective_state") or "") != "online"
-            ]
-            if offline:
+            busy = sorted({
+                str(item.get("node_name") or "SG-Node") for item in remote_deployments
+                if str(item.get("state") or "") in {"pending", "removing"}
+            })
+            if busy:
                 raise ValueError(
-                    "Сначала верните в сеть ноды: " + ", ".join(offline)
+                    "Сначала дождитесь завершения текущих заданий на нодах: " + ", ".join(busy)
                 )
+            offline = sorted({
+                str(item.get("node_name") or "SG-Node") for item in remote_deployments
+                if str(item.get("node_effective_state") or "") != "online"
+            })
+            if offline:
+                raise ValueError("Сначала верните в сеть ноды: " + ", ".join(offline))
 
             # Verify the future local config before any remote operation starts.
             _preflight_change(lambda: delete_user(user_id))
 
-            job_specs: list[tuple[dict[str, object], dict[str, object], int]] = []
-            for deployment in deployments:
-                node_id = int(deployment["node_id"])
+            by_node: dict[int, list[dict[str, object]]] = {}
+            for deployment in remote_deployments:
+                by_node.setdefault(int(deployment["node_id"]), []).append(deployment)
+
+            job_specs: list[tuple[dict[str, object], list[dict[str, object]], dict[str, object], int]] = []
+            for node_id, node_deployments in by_node.items():
+                representative = node_deployments[0]
                 current_config = latest_node_config(node_id)
                 if not isinstance(current_config, dict):
                     raise ValueError(
-                        f"Для {deployment['node_name']} не найдена последняя применённая конфигурация"
+                        f"Для {representative['node_name']} не найдена последняя применённая конфигурация"
                     )
-                config, removed = _config_without_user(current_config, str(user["uuid"]))
+                stale_uuids = {str(user["uuid"])}
+                stale_uuids.update(
+                    str(item.get("user_uuid") or "") for item in node_deployments
+                )
+                stale_uuids.discard("")
+                config, removed = _config_without_user(current_config, stale_uuids)
                 if removed <= 0:
-                    raise ValueError(
-                        f"На {deployment['node_name']} UUID пользователя не найден в последней конфигурации"
-                    )
+                    # The last confirmed Node config is authoritative: there is
+                    # nothing left to remove on this server. Database history can
+                    # safely be detached when the central client is deleted.
+                    continue
                 count = 0
                 for inbound in config.get("inbounds", []):
                     if not isinstance(inbound, dict):
@@ -1408,7 +1973,7 @@ def create_app(test_config: dict | None = None) -> Flask:
                     values = settings.get("clients") if isinstance(settings.get("clients"), list) else settings.get("users")
                     if isinstance(values, list):
                         count += len(values)
-                job_specs.append((deployment, config, count))
+                job_specs.append((representative, node_deployments, config, count))
 
             if not job_specs:
                 deleted = delete_user(user_id)
@@ -1422,29 +1987,61 @@ def create_app(test_config: dict | None = None) -> Flask:
                 )
 
             jobs: list[dict[str, object]] = []
-            for deployment, config, count in job_specs:
+            for representative, node_deployments, config, count in job_specs:
                 encoded = json.dumps(config, ensure_ascii=False, sort_keys=True).encode("utf-8")
+                removal_items = []
+                seen_uuids: set[str] = set()
+                for deployment in node_deployments:
+                    deployment_uuid = str(deployment.get("user_uuid") or "")
+                    if not deployment_uuid or deployment_uuid in seen_uuids:
+                        continue
+                    seen_uuids.add(deployment_uuid)
+                    removal_items.append({
+                        "action": "remove",
+                        "user_id": int(user["id"]),
+                        "user_uuid": deployment_uuid,
+                        "user_name": str(user["name"]),
+                        "profile": str(deployment.get("profile") or ""),
+                        "slot": str(deployment.get("slot") or "alt"),
+                        "subscription_enabled": False,
+                        "desired_state": "removed",
+                    })
+                if str(user["uuid"]) not in seen_uuids:
+                    removal_items.append({
+                        "action": "remove",
+                        "user_id": int(user["id"]),
+                        "user_uuid": str(user["uuid"]),
+                        "user_name": str(user["name"]),
+                        "profile": str(representative.get("profile") or ""),
+                        "slot": str(representative.get("slot") or "alt"),
+                        "subscription_enabled": False,
+                        "desired_state": "removed",
+                    })
+                xhttp_job = any(
+                    isinstance(inbound, dict)
+                    and isinstance(inbound.get("streamSettings"), dict)
+                    and str(inbound["streamSettings"].get("network") or "").lower() == "xhttp"
+                    and str(inbound["streamSettings"].get("security") or "").lower() == "reality"
+                    for inbound in config.get("inbounds", [])
+                )
                 jobs.append(
                     create_node_job(
-                        int(deployment["node_id"]),
+                        int(representative["node_id"]),
                         job_type="apply_xray_config",
                         title=f"Удаление {user['name']} из конфигурации",
                         payload={
-                            "profile": str(deployment.get("profile") or ""),
+                            "profile": str(representative.get("profile") or ""),
                             "config": config,
                             "config_sha256": hashlib.sha256(encoded).hexdigest(),
                             "client_count": count,
-                            "deployment": {
-                                "action": "remove",
-                                "user_id": int(user["id"]),
-                                "user_uuid": str(user["uuid"]),
-                                "user_name": str(user["name"]),
-                                "profile": str(deployment.get("profile") or ""),
-                            },
+                            "deployment": removal_items[0] if len(removal_items) == 1 else {},
+                            "deployments": removal_items,
+                            "ensure_xhttp_encryption": xhttp_job,
+                            "xhttp_client_mode": "stream-one" if xhttp_job else "",
                         },
                     )
                 )
-            deletion = create_user_deletion_request(
+            create_user_deletion_request(
                 user_id,
                 user_name=str(user["name"]),
                 user_uuid=str(user["uuid"]),
@@ -1459,65 +2056,72 @@ def create_app(test_config: dict | None = None) -> Flask:
             flash(str(exc), "error")
             return redirect(url_for("user_edit_page", user_id=user_id))
 
-    @app.get("/users/<int:user_id>/link")
-    @login_required
-    def user_link(user_id: int):
-        import qrcode
 
+    def _render_access_link_page(user_id: int, device_id: int | None = None):
         user = find_user(user_id)
-        links = make_saved_links(user_id, allow_disabled=True)
+        device = find_device(user_id, device_id)
+        links = make_cluster_saved_links(
+            user_id, allow_disabled=True, device_id=int(device["id"])
+        )
         direct_links: list[dict[str, object]] = []
         for item in links:
-            image = qrcode.make(str(item["link"]))
-            buffer = io.BytesIO()
-            image.save(buffer, format="PNG")
-            direct_links.append({
-                **item,
-                "qr_data": base64.b64encode(buffer.getvalue()).decode("ascii"),
-            })
-        link = str(direct_links[0]["link"])
-        qr_data = str(direct_links[0]["qr_data"])
+            qr = qr_png_base64(str(item["link"]))
+            direct_links.append({**item, "qr_data": qr["data"], "qr_error": qr["error"]})
+        if not direct_links:
+            raise XPanelError("для доступа пока нет сохранённых профилей")
 
         subscription_url = make_subscription_url(
-            user_id, request.url_root.rstrip("/")
+            user_id, request.url_root.rstrip("/"), device_id=int(device["id"])
         )
-        managed_subscription_url = subscription_url + "?format=json"
-        subscription_image = qrcode.make(subscription_url)
-        subscription_buffer = io.BytesIO()
-        subscription_image.save(subscription_buffer, format="PNG")
-        subscription_qr_data = base64.b64encode(
-            subscription_buffer.getvalue()
-        ).decode("ascii")
+        subscription_qr = qr_png_base64(subscription_url)
         return render_template(
             "link.html",
             user=user,
+            device=device,
             direct_links=direct_links,
             active_links=[item for item in direct_links if bool(item.get("active"))],
             inactive_links=[item for item in direct_links if not bool(item.get("active"))],
-            link=link,
-            qr_data=qr_data,
+            link=str(direct_links[0]["link"]),
+            qr_data=str(direct_links[0].get("qr_data") or ""),
             subscription_url=subscription_url,
-            managed_subscription_url=managed_subscription_url,
-            subscription_qr_data=subscription_qr_data,
+            managed_subscription_url=subscription_url + "?format=json",
+            subscription_qr_data=subscription_qr["data"],
+            subscription_qr_error=subscription_qr["error"],
             subscription_settings=get_subscription_settings(),
             subscription_json_enabled=bool(get_security_settings()["subscription_json_enabled"]),
             server=get_server(),
         )
 
+    @app.get("/users/<int:user_id>/link")
+    @login_required
+    def user_link(user_id: int):
+        return _render_access_link_page(user_id)
+
+    @app.get("/users/<int:user_id>/devices/<int:device_id>/link")
+    @login_required
+    def device_link(user_id: int, device_id: int):
+        return _render_access_link_page(user_id, device_id)
+
     @app.get("/subscriptions")
     @login_required
     def subscriptions_page():
-        users = list_users()
         fallback = request.url_root.rstrip("/")
-        urls = {
-            int(user["id"]): make_subscription_url(user["id"], fallback)
-            for user in users
-        }
+        entries: list[dict[str, object]] = []
+        users = list_users()
+        for user in users:
+            for device in list_user_devices(int(user["id"])):
+                entries.append({
+                    "user": dict(user),
+                    "device": device,
+                    "url": make_subscription_url(
+                        int(user["id"]), fallback, device_id=int(device["id"])
+                    ),
+                })
         return render_template(
             "subscriptions.html",
             settings=get_subscription_settings(),
             users=users,
-            subscription_urls=urls,
+            subscription_entries=entries,
             fallback_base_url=fallback,
         )
 
@@ -1548,7 +2152,7 @@ def create_app(test_config: dict | None = None) -> Flask:
             )
             flash(
                 f"Подписка {updated['name']}: "
-                f"{'enabled' if updated['subscription_enabled'] else 'disabled'}",
+                f"{'включена' if updated['subscription_enabled'] else 'отключена'}",
                 "success",
             )
         except XPanelError as exc:
@@ -1571,12 +2175,12 @@ def create_app(test_config: dict | None = None) -> Flask:
     @app.get("/sub/<token>")
     def subscription_public(token: str):
         try:
-            user = find_subscription_user(token)
-            if not subscription_is_available(user):
+            user, device = find_subscription_access(token)
+            if not subscription_is_available(user, device):
                 return Response(
                     "Not found\n", status=404, content_type="text/plain; charset=utf-8"
                 )
-            links = make_links(user["id"])
+            links = make_cluster_links(user["id"], device_id=int(device["id"]))
             link = str(links[0]["link"])
             link_lines = [str(item["link"]) for item in links]
             settings = get_subscription_settings()
@@ -1600,10 +2204,13 @@ def create_app(test_config: dict | None = None) -> Flask:
             body = {
                 "profile": settings["profile_title"],
                 "user": user["name"],
+                "device": device["name"],
+                "deviceId": int(device["id"]),
+                "deviceUuid": str(device["uuid"]),
                 "link": link,
                 "links": links,
-                "managed": managed_client_export(user["id"]),
-                "managedV2": managed_client_export_v2(user["id"]),
+                "managed": managed_client_export(user["id"], device_id=int(device["id"])),
+                "managedV2": managed_client_export_v2(user["id"], device_id=int(device["id"])),
                 "managedPreferred": "managedV2",
                 "generated_at": datetime.now(timezone.utc).isoformat(),
             }
@@ -1614,7 +2221,7 @@ def create_app(test_config: dict | None = None) -> Flask:
         else:
             abort(400, description="format должен быть base64, plain или json")
 
-        record_subscription_access(user["id"])
+        record_subscription_access(user["id"], device_id=int(device["id"]))
         response.headers["Cache-Control"] = "no-store, max-age=0"
         response.headers["Pragma"] = "no-cache"
         response.headers["X-Content-Type-Options"] = "nosniff"
@@ -1646,11 +2253,88 @@ def create_app(test_config: dict | None = None) -> Flask:
     @app.get("/settings/advanced")
     @login_required
     def settings_advanced_page():
+        users = list_users()
+        expert_clients = []
+        for user in users:
+            deployments = list_user_deployments(int(user["id"]))
+            if len(deployments) >= 2:
+                expert_clients.append({"user": user, "deployments": deployments})
+
+        selected_user = None
+        requested_client = request.args.get("client", "").strip()
+        if requested_client:
+            try:
+                selected_user = find_user(int(requested_client))
+            except (ValueError, XPanelError):
+                selected_user = None
+        if selected_user is None and users:
+            selected_user = users[0]
+
+        documents = {
+            "server_json": "",
+            "nginx": nginx_transport_document(),
+            "client_json": "",
+            "links": "",
+            "subscription_url": "",
+            "connections": [],
+            "connection_policy": {},
+        }
+        try:
+            documents["server_json"] = config_json_document()
+        except (ValueError, XPanelError, OSError) as exc:
+            documents["server_json"] = json.dumps({"error": str(exc)}, ensure_ascii=False, indent=2)
+        if selected_user is not None:
+            try:
+                managed = managed_client_export_v2(int(selected_user["id"]))
+                documents["client_json"] = json.dumps(
+                    managed, ensure_ascii=False, indent=2,
+                )
+                documents["connections"] = list(managed.get("connections") or [])
+                documents["connection_policy"] = dict(managed.get("selection") or managed.get("policy") or {})
+                documents["links"] = "\n".join(
+                    str(item.get("link") or "")
+                    for item in make_cluster_links(int(selected_user["id"]), allow_disabled=True)
+                    if str(item.get("link") or "").strip()
+                )
+                try:
+                    documents["subscription_url"] = make_subscription_url(
+                        int(selected_user["id"]), request.url_root.rstrip("/")
+                    )
+                except XPanelError:
+                    documents["subscription_url"] = "Подписка ещё не опубликована"
+            except (ValueError, XPanelError, OSError) as exc:
+                documents["client_json"] = json.dumps({"error": str(exc)}, ensure_ascii=False, indent=2)
+
         return render_template(
             "advanced.html",
             expert=get_transport_expert_overview(),
             server=get_server(),
+            russia_kit=get_russia_kit_overview(),
+            expert_clients=expert_clients,
+            users=users,
+            selected_user=selected_user,
+            documents=documents,
+            scheme_diagnostics=get_expert_scheme_diagnostics(
+                run_checks=request.args.get("checks") == "1"
+            ),
+            expert_core=get_expert_core_overview(),
         )
+
+    @app.post("/settings/advanced/diagnostics")
+    @login_required
+    def settings_advanced_diagnostics():
+        client_id = request.form.get("client", "").strip()
+        query = {"checks": "1"}
+        if client_id:
+            query["client"] = client_id
+        return redirect(url_for("settings_advanced_page", **query) + "#diagnostics")
+
+    @app.post("/settings/advanced/russia-kit/activate")
+    @login_required
+    def settings_advanced_russia_kit_activate():
+        """Compatibility endpoint: scheme selection now belongs to Xray Server."""
+        flash("Набор РФ теперь выбирается и применяется в Xray Server", "success")
+        return redirect(url_for("settings_page"))
 
     @app.get("/settings/expert")
     @login_required
@@ -1665,6 +2349,7 @@ def create_app(test_config: dict | None = None) -> Flask:
         ech_present = request.form.get("ech_present") == "1"
         return {
             "xhttp_mode": request.form.get("xhttp_mode", str(get_server()["xhttp_mode"] or "auto")),
+            "xmux_mode": request.form.get("xmux_mode", current["xmux_mode"]),
             "xhttp_extra_server_json": request.form.get("xhttp_extra_server_json", current["xhttp_extra_server_json"]),
             "xhttp_extra_client_json": request.form.get("xhttp_extra_client_json", current["xhttp_extra_client_json"]),
             "finalmask_enabled": (
@@ -1694,6 +2379,29 @@ def create_app(test_config: dict | None = None) -> Flask:
     @login_required
     def settings_advanced_save():
         scope = "settings:advanced"
+        previous = get_transport_expert_overview()["settings"]
+        previous_server = get_server()
+        previous_values = {
+            "xhttp_mode": str(previous_server["xhttp_mode"] or "auto"),
+            "xmux_mode": str(previous["xmux_mode"] or "auto"),
+            "xhttp_extra_server_json": str(previous["xhttp_extra_server_json"] or "{}"),
+            "xhttp_extra_client_json": str(previous["xhttp_extra_client_json"] or "{}"),
+            "finalmask_enabled": bool(previous["finalmask_enabled"]),
+            "finalmask_server_json": str(previous["finalmask_server_json"] or "{}"),
+            "finalmask_client_json": str(previous["finalmask_client_json"] or "{}"),
+            "ech_mode": str(previous["ech_mode"] or "off"),
+            "ech_public_name": str(previous["ech_public_name"] or ""),
+            "ech_server_keys": str(previous["ech_server_keys"] or ""),
+            "ech_config_list": str(previous["ech_config_list"] or ""),
+            "certificate_pinning_enabled": bool(previous["certificate_pinning_enabled"]),
+            "certificate_pinning_sha256": str(previous["certificate_pinning_sha256"] or ""),
+            "certificate_pinning_source": str(previous["certificate_pinning_source"] or ""),
+            "tls_verify_name_mode": str(previous["tls_verify_name_mode"] or "auto"),
+            "tls_verify_name": str(previous["tls_verify_name"] or ""),
+            "client_ca_pem": str(previous["client_ca_pem"] or ""),
+            "client_ca_source": str(previous["client_ca_source"] or ""),
+        }
+        changed = False
         try:
             values = expert_form_values()
             if _is_validation_action():
@@ -1702,10 +2410,15 @@ def create_app(test_config: dict | None = None) -> Flask:
                     lambda: update_transport_expert_settings(**values),
                     message="Дополнительные параметры транспорта и итоговый config.json корректны.",
                 )
-            _require_validation_token(scope, _draft_payload())
             update_transport_expert_settings(**values)
-            apply_saved_change("Дополнительные параметры транспорта сохранены и применены")
+            changed = True
+            apply_saved_change("Параметры Expert")
         except (ValueError, XPanelError, OSError) as exc:
+            if changed:
+                try:
+                    update_transport_expert_settings(**previous_values)
+                except (ValueError, XPanelError, OSError):
+                    pass
             flash(str(exc), "error")
         return redirect(url_for("settings_advanced_page"))
 
@@ -1741,19 +2454,29 @@ def create_app(test_config: dict | None = None) -> Flask:
             return jsonify({"ok": False, "message": str(exc)}), 400
 
     def geofiles_form_values() -> dict[str, object]:
+        source = str(request.form.get("source", "sgclient") or "sgclient").strip().lower()
         return {
-            "source": request.form.get("source", "xray"),
+            "source": source,
             "geoip_url": request.form.get("geoip_url", ""),
             "geosite_url": request.form.get("geosite_url", ""),
             "geoip_local_path": request.form.get("geoip_local_path", ""),
             "geosite_local_path": request.form.get("geosite_local_path", ""),
+            # RoscomVPN compatibility is inseparable from that source.  The UI
+            # no longer offers an unsafe "raw RoscomVPN without compatibility" path.
+            "server_preset": "roscomvpn" if source == "roscomvpn" else "none",
+            "enable_block": "enable_block" in request.form,
+            "final_outbound_tag": request.form.get("final_outbound_tag", "direct"),
         }
 
     @app.get("/routing/geofiles")
     @login_required
     def geofiles_page():
+        outbound_options = routing_outbound_options(enabled_only=True)
         return render_template(
             "geofiles.html",
+            settings=get_routing_settings(),
+            outbound_options=outbound_options,
+            outbound_by_tag=routing_outbound_map(enabled_only=False),
             geofiles=get_geofiles_overview(),
             format_bytes=format_bytes,
         )
@@ -1763,11 +2486,42 @@ def create_app(test_config: dict | None = None) -> Flask:
     @login_required
     def settings_geofiles_check():
         try:
-            result = validate_geofiles_source(**geofiles_form_values())
-            flash(
-                "GeoFiles проверены: текущие Routing Rules совместимы; применение разблокировано",
-                "success",
-            )
+            source = request.form.get("source", "sgclient")
+            uploaded_geoip = request.files.get("geoip_file")
+            uploaded_geosite = request.files.get("geosite_file")
+            has_geoip = bool(uploaded_geoip and uploaded_geoip.filename)
+            has_geosite = bool(uploaded_geosite and uploaded_geosite.filename)
+            if has_geoip or has_geosite:
+                if source != "local":
+                    raise ValueError(
+                        "загрузка файлов доступна только для источника «Локальные файлы»"
+                    )
+                if not has_geoip or not has_geosite:
+                    raise ValueError(
+                        "выберите одновременно geoip.dat и geosite.dat"
+                    )
+                values = geofiles_form_values()
+                result = validate_uploaded_geofiles(
+                    uploaded_geoip.stream,
+                    uploaded_geosite.stream,
+                    server_preset=str(values["server_preset"]),
+                    enable_block=bool(values["enable_block"]),
+                    final_outbound_tag=str(values["final_outbound_tag"]),
+                )
+            else:
+                result = validate_geofiles_source(**geofiles_form_values())
+            if result.get("compatible"):
+                flash(
+                    "GeoFiles и полный будущий Xray config проверены в staging",
+                    "success",
+                )
+            else:
+                missing = ", ".join(result.get("missing_categories", []))
+                flash(
+                    "Применение заблокировано: отсутствуют категории " + missing
+                    + ". Пользовательские правила не изменены.",
+                    "error",
+                )
             write_audit(
                 "geofiles_checked", detail=str(result.get("source", "")),
                 ip_address=getattr(g, "client_ip", ""),
@@ -1782,8 +2536,14 @@ def create_app(test_config: dict | None = None) -> Flask:
     @login_required
     def settings_geofiles_apply():
         try:
+            # Apply exactly the plan stored by the successful staging check.
+            # No route, block option or compatibility mode may change here.
             result = apply_geofiles_source()
-            flash(f"GeoFiles применены: {result['source']}", "success")
+            detail = (
+                f"GeoFiles применены: {result.get('source_label', result['source'])}; "
+                f"generation {result.get('generation', '')}; Xray active"
+            )
+            flash(detail, "success")
             write_audit(
                 "geofiles_applied", detail=str(result.get("source", "")),
                 ip_address=getattr(g, "client_ip", ""),
@@ -1800,14 +2560,54 @@ def create_app(test_config: dict | None = None) -> Flask:
             "settings.html",
             server=get_server(),
             hysteria_inbounds=list_hysteria_inbounds(),
+            salamander_support=hysteria_salamander_support_status(),
             xhttp_inbounds=list_xhttp_inbounds(),
             reality_inbounds=list_reality_inbounds(),
             inbound_recommendations=get_inbound_recommendations(),
             hysteria_studio=get_hysteria_studio_overview(),
+            russia_kit=get_russia_kit_overview(),
+            xray_encryption=controller_xray_encryption_status(),
+            xray_channels=get_xray_channels_overview(),
+        )
+
+    @app.get("/expert/inbound")
+    @login_required
+    def settings_expert_inbound_page():
+        return render_template(
+            "expert_inbound.html",
+            server=get_server(),
+            hysteria_inbounds=list_hysteria_inbounds(),
+            salamander_support=hysteria_salamander_support_status(),
+            xhttp_inbounds=list_xhttp_inbounds(),
+            reality_inbounds=list_reality_inbounds(),
+            inbound_recommendations=get_inbound_recommendations(),
+            hysteria_studio=get_hysteria_studio_overview(),
+            xray_encryption=controller_xray_encryption_status(),
+            xray_channels=get_xray_channels_overview(),
         )
 
     def server_form_values() -> dict[str, object]:
         current = get_server()
+        if request.form.get("simple_mode") == "1":
+            return {
+                "address": str(current["address"] or ""),
+                "listen": str(current["listen"] or "0.0.0.0"),
+                "port": int(current["port"]),
+                "dest": str(current["dest"] or ""),
+                "server_name": str(current["server_name"] or ""),
+                "private_key": str(current["private_key"] or ""),
+                "public_key": str(current["public_key"] or ""),
+                "short_id": str(current["short_id"] or ""),
+                "fingerprint": str(current["fingerprint"] or "firefox"),
+                "flow": str(current["flow"] or "xtls-rprx-vision"),
+                "loglevel": str(current["loglevel"] or "warning"),
+                "api_listen": str(current["api_listen"] or "127.0.0.1:10085"),
+                "stats_enabled": bool(current["stats_enabled"]),
+                "config_path": str(current["config_path"]),
+                "xray_bin": str(current["xray_bin"]),
+                "xray_service": str(current["xray_service"]),
+                "inbound_profile": request.form.get("inbound_profile", str(current["inbound_profile"] or "raw_reality")),
+            }
         current_instances = {int(row["id"]): row for row in list_hysteria_inbounds()}
         current_xhttp = {int(row["id"]): row for row in list_xhttp_inbounds()}
         current_reality = {int(row["id"]): row for row in list_reality_inbounds()}
@@ -1821,7 +2621,16 @@ def create_app(test_config: dict | None = None) -> Flask:
                 ),
                 "enabled": True,
                 "listen": public_listen,
-                "port": public_port,
+                "port": int(request.form.get(
+                    "hysteria2_port", current_instances[1]["port"]
+                )),
+                "obfs_mode": request.form.get(
+                    "hysteria_instance_1_obfs_mode", current_instances[1]["obfs_mode"]
+                ),
+                "obfs_password": request.form.get(
+                    "hysteria_instance_1_obfs_password", current_instances[1]["obfs_password"] or ""
+                ),
+                "obfs_updated_by": "admin",
             },
             {
                 "id": 2,
@@ -1835,6 +2644,13 @@ def create_app(test_config: dict | None = None) -> Flask:
                 "port": int(request.form.get(
                     "hysteria_instance_2_port", current_instances[2]["port"]
                 )),
+                "obfs_mode": request.form.get(
+                    "hysteria_instance_2_obfs_mode", current_instances[2]["obfs_mode"]
+                ),
+                "obfs_password": request.form.get(
+                    "hysteria_instance_2_obfs_password", current_instances[2]["obfs_password"] or ""
+                ),
+                "obfs_updated_by": "admin",
             },
             {
                 "id": 3,
@@ -1848,6 +2664,13 @@ def create_app(test_config: dict | None = None) -> Flask:
                 "port": int(request.form.get(
                     "hysteria_instance_3_port", current_instances[3]["port"]
                 )),
+                "obfs_mode": request.form.get(
+                    "hysteria_instance_3_obfs_mode", current_instances[3]["obfs_mode"]
+                ),
+                "obfs_password": request.form.get(
+                    "hysteria_instance_3_obfs_password", current_instances[3]["obfs_password"] or ""
+                ),
+                "obfs_updated_by": "admin",
             },
         ]
         reality_instances = [
@@ -1961,7 +2784,9 @@ def create_app(test_config: dict | None = None) -> Flask:
             "config_path": current["config_path"],
             "xray_bin": current["xray_bin"],
             "xray_service": current["xray_service"],
-            "inbound_profile": request.form.get("inbound_profile", "raw_reality"),
+            "inbound_profile": request.form.get(
+                "inbound_profile", str(current["inbound_profile"] or "raw_reality")
+            ),
             "transport_listen": request.form.get(
                 "transport_listen", current["transport_listen"]
             ),
@@ -2049,6 +2874,31 @@ def create_app(test_config: dict | None = None) -> Flask:
             "reality_instances": reality_instances,
         }
 
+    @app.post("/settings/hysteria/<int:inbound_id>/generate-obfs-password")
+    @login_required
+    def settings_hysteria_generate_obfs_password(inbound_id: int):
+        if inbound_id not in {1, 2, 3}:
+            abort(404)
+        support = hysteria_salamander_support_status()
+        if not bool(support["supported"]):
+            return jsonify({
+                "ok": False,
+                "message": (
+                    "Salamander недоступен: установите Xray не ниже "
+                    + str(support["minimum"])
+                    + ". " + str(support["message"])
+                ),
+            }), 400
+        password = generate_hysteria_obfs_password()
+        write_audit(
+            "hysteria_salamander_password_generated",
+            detail=f"inbound_id={inbound_id}",
+            ip_address=getattr(g, "client_ip", ""),
+            user_agent=request.headers.get("User-Agent", ""),
+            success=True,
+        )
+        return jsonify({"ok": True, "password": password})
+
     @app.get("/settings/hysteria/diagnostics")
     @login_required
     def settings_hysteria_diagnostics():
@@ -2063,21 +2913,109 @@ def create_app(test_config: dict | None = None) -> Flask:
         scope = "settings:server"
         try:
             values = server_form_values()
+            # SG-Gateway model: there is no mutually exclusive profile selector.
+            # The legacy column is kept only for migration/old diagnostics.
+            values["inbound_profile"] = "raw_reality"
+            before_rows = {int(row["id"]): dict(row) for row in list_hysteria_inbounds()}
+            if "hysteria_instances" not in values:
+                values["hysteria_instances"] = [dict(row) for row in before_rows.values()]
+            requested_rows = {int(item["id"]): item for item in values["hysteria_instances"]}
+
+            dangerous: list[str] = []
+            for inbound_id, item in requested_rows.items():
+                old = before_rows[inbound_id]
+                old_mode = str(old.get("obfs_mode") or "none")
+                old_password = str(old.get("obfs_password") or "")
+                new_mode = str(item.get("obfs_mode") or "none")
+                new_password = str(item.get("obfs_password") or "")
+                if old_mode != "salamander" and new_mode == "salamander":
+                    dangerous.append(f"включение Salamander для Inbound #{inbound_id}")
+                elif old_mode == "salamander" and new_mode != "salamander":
+                    dangerous.append(f"выключение Salamander для Inbound #{inbound_id}")
+                elif old_mode == "salamander" and new_mode == "salamander" and old_password != new_password:
+                    dangerous.append(f"ротация пароля Salamander для Inbound #{inbound_id}")
+            if dangerous and request.form.get("salamander_confirmation") != "1":
+                raise ValueError(
+                    "Подтвердите изменение Salamander во внутреннем окне: "
+                    + "; ".join(dangerous)
+                )
+
+            def mutator():
+                server = update_server_settings(**values)
+                channels = update_xray_channels_settings(request.form)
+                update_hysteria_inbounds(
+                    list(requested_rows.values()),
+                    primary_listen=str(before_rows[1].get("listen") or "0.0.0.0"),
+                    primary_port=int(channels["hysteria2_port"]),
+                    hop_ports=str(values.get("hysteria_udp_hop_ports") or ""),
+                )
+                # The dedicated function enforces the real installed Xray version
+                # and records the actor for every changed inbound.
+                for inbound_id, item in requested_rows.items():
+                    update_hysteria_obfuscation(
+                        inbound_id,
+                        mode=str(item.get("obfs_mode") or "none"),
+                        password=(
+                            str(item.get("obfs_password"))
+                            if item.get("obfs_password") is not None else None
+                        ),
+                        actor="admin",
+                    )
+                return server
+
             if _is_validation_action():
                 return _validation_response(
                     scope,
-                    lambda: update_server_settings(**values),
+                    mutator,
                     message=(
-                        "Inbound и итоговый config.json корректны. "
-                        "Теперь можно сохранить и применить."
+                        "Все доступные каналы, Salamander FinalMask и итоговый "
+                        "config.json корректны. Теперь можно сохранить и применить."
                     ),
                 )
             _require_validation_token(scope, _draft_payload())
-            server = update_server_settings(**values)
-            label = "XHTTP и Hysteria 2 применены" if server["inbound_profile"] == "xhttp_hysteria_tls" else ("Hysteria 2 применена" if server["inbound_profile"] == "hysteria2_tls" else "Inbound применён")
-            apply_saved_change(label)
+            with tempfile.TemporaryDirectory(prefix="sg-panel-settings-rollback-") as tmpdir:
+                snapshot = Path(tmpdir) / "panel-before.db"
+                _clone_database(snapshot)
+                try:
+                    mutator()
+                    apply_saved_change("Все доступные каналы Xray применены")
+                except (ValueError, XPanelError, PermissionError, FileNotFoundError, OSError, sqlite3.Error) as exc:
+                    try:
+                        _restore_database(snapshot)
+                    except XPanelError as restore_exc:
+                        raise XPanelError(
+                            "Изменение не применено, а автоматическое восстановление базы "
+                            f"завершилось ошибкой: {restore_exc}. Первичная причина: {exc}"
+                        ) from restore_exc
+                    raise XPanelError(
+                        "Изменение не применено. Состояние базы и предыдущий рабочий "
+                        f"Xray config восстановлены. Причина: {exc}"
+                    ) from exc
+
+            after_rows = {int(row["id"]): dict(row) for row in list_hysteria_inbounds()}
+            for inbound_id, old in before_rows.items():
+                new = after_rows[inbound_id]
+                old_mode = str(old.get("obfs_mode") or "none")
+                new_mode = str(new.get("obfs_mode") or "none")
+                old_password = str(old.get("obfs_password") or "")
+                new_password = str(new.get("obfs_password") or "")
+                action = ""
+                if old_mode != "salamander" and new_mode == "salamander":
+                    action = "hysteria_salamander_enabled"
+                elif old_mode == "salamander" and new_mode != "salamander":
+                    action = "hysteria_salamander_disabled"
+                elif old_mode == "salamander" and new_mode == "salamander" and old_password != new_password:
+                    action = "hysteria_salamander_password_rotated"
+                if action:
+                    write_audit(
+                        action,
+                        detail=f"inbound_id={inbound_id}; name={new.get('name', '')}",
+                        ip_address=getattr(g, "client_ip", ""),
+                        user_agent=request.headers.get("User-Agent", ""),
+                        success=True,
+                    )
         except (ValueError, XPanelError) as exc:
-            flash(str(exc), "error")
+            flash(_redact_request_secrets(exc), "error")
         return redirect(url_for("settings_page"))
 
     @app.get("/settings/json")
@@ -3112,16 +4050,27 @@ def create_app(test_config: dict | None = None) -> Flask:
     @app.get("/routing")
     @login_required
     def routing_page():
+        outbound_options = routing_outbound_options(enabled_only=True)
+        outbound_by_tag = routing_outbound_map(enabled_only=False)
+        routing_nodes = list_nodes()
+        for node in routing_nodes:
+            if not node.get("is_local"):
+                node["geofiles_rollout"] = get_node_geofiles_rollout_status(int(node["id"]))
         return render_template(
             "routing.html",
             settings=get_routing_settings(),
-            rules=list_routing_rules(),
-            outbound_tags=list_outbound_tags(enabled_only=True),
+            rules=routing_rules_overview(),
+            outbound_tags=[str(item["tag"]) for item in outbound_options],
+            outbound_options=outbound_options,
+            outbound_by_tag=outbound_by_tag,
             balancer_tags=list_balancer_tags(),
             geodata=get_geodata_status(),
+            geofiles=get_geofiles_overview(),
             format_bytes=format_bytes,
             users=list_users(),
             warp=get_warp_overview(),
+            server_identity=get_instance_identity(),
+            routing_nodes=routing_nodes,
         )
 
     def routing_settings_form_values() -> dict[str, object]:
@@ -3194,6 +4143,18 @@ def create_app(test_config: dict | None = None) -> Flask:
         except (ValueError, XPanelError) as exc:
             flash(str(exc), "error")
             return render_template("routing_json.html", routing_json=source), 400
+
+    @app.post("/routing/presets/roscomvpn")
+    @login_required
+    def routing_roscomvpn_preset_apply():
+        # Compatibility route retained for old bookmarks/forms.  RoscomVPN may no
+        # longer mutate Routing separately from the exact checked GeoFiles pair.
+        flash(
+            "RoscomVPN теперь проверяется и применяется только в Routing → GeoFiles "
+            "как единый транзакционный план.",
+            "warning",
+        )
+        return redirect(url_for("geofiles_page"))
 
     @app.post("/routing/presets/add")
     @login_required
@@ -3306,6 +4267,7 @@ def create_app(test_config: dict | None = None) -> Flask:
             "rule_edit.html",
             rule=find_routing_rule(rule_id),
             outbound_tags=list_outbound_tags(enabled_only=True),
+            outbound_options=routing_outbound_options(enabled_only=True),
             balancer_tags=list_balancer_tags(),
             users=list_users(),
         )
@@ -3359,7 +4321,55 @@ def create_app(test_config: dict | None = None) -> Flask:
     @app.get("/cascade")
     @login_required
     def cascade_page():
-        return render_template("cascade.html", cascade=get_cascade_overview())
+        cascade = get_cascade_overview()
+        outbound = cascade.get("outbound") or {}
+        exit_address = str(outbound.get("address") or cascade.get("last_test_ip") or "").strip()
+        exit_code, exit_flag = _instance_country(
+            exit_address, allow_network=bool(exit_address and not app.config.get("TESTING"))
+        )
+        cascade["exit_country_code"] = exit_code
+        cascade["exit_country_flag"] = exit_flag
+        cluster_nodes = []
+        country_lookup_budget = 4
+        for item in _local_node_overlay(list_nodes()):
+            node = dict(item)
+            if bool(node.get("is_local")) or str(node.get("effective_state") or "") != "online":
+                continue
+            address = str(node.get("public_address") or "").strip()
+            allow_lookup = bool(address and country_lookup_budget > 0 and not app.config.get("TESTING"))
+            code, flag = _instance_country(address, allow_network=allow_lookup)
+            if allow_lookup:
+                country_lookup_budget -= 1
+            node["country_code"] = code
+            node["country_flag"] = flag
+            cluster_nodes.append(node)
+        return render_template("cascade.html", cascade=cascade, cluster_nodes=cluster_nodes)
+
+    @app.post("/cascade/cluster/connect")
+    @login_required
+    def cascade_cluster_connect():
+        try:
+            node_id = int(request.form.get("exit_node_id", "0"))
+            current = get_cascade_overview()
+            same_cluster_node = bool(
+                current.get("configured")
+                and current.get("mode") == "cluster"
+                and int(current.get("exit_node_id") or 0) == node_id
+            )
+            if current.get("configured") and not same_cluster_node:
+                _preflight_change(lambda: remove_cascade(dry_run=True))
+                remove_cascade()
+            _preflight_change(lambda: connect_cascade_cluster_node(node_id, dry_run=True))
+            result = connect_cascade_cluster_node(node_id)
+            apply_saved_change(f"Cascade через SG-Node {result.get('exit_name') or node_id} подготовлен")
+            flash(
+                "Настройка началась. SG-Panel сама подготовит служебный профиль на SG-Node, "
+                "проверит маршрут и включит Cascade после успешного ответа Agent.",
+                "success",
+            )
+        except (ValueError, XPanelError, FileNotFoundError, OSError, PermissionError, sqlite3.Error) as exc:
+            flash(str(exc), "error")
+        return redirect(url_for("cascade_page"))
 
     @app.post("/cascade/access/create")
     @login_required
@@ -3378,11 +4388,24 @@ def create_app(test_config: dict | None = None) -> Flask:
     def cascade_import():
         link = request.form.get("vless_link", "")
         try:
+            current = get_cascade_overview()
+            if current.get("configured") and current.get("mode") == "cluster":
+                _preflight_change(lambda: remove_cascade(dry_run=True))
+                remove_cascade()
             _preflight_change(lambda: import_cascade_link(link))
             import_cascade_link(link)
-            apply_saved_change("Выходной сервер Cascade подключён")
             result = test_cascade()
-            flash(f"Выходной сервер проверен. Выходной IP: {result['ip']}", "success")
+            set_cascade_enabled(True)
+            try:
+                apply_saved_change("Cascade подключён, проверен и включён")
+            except Exception:
+                set_cascade_enabled(False)
+                try:
+                    apply_config()
+                except Exception:
+                    pass
+                raise
+            flash(f"Готово. Выходной IP: {result['ip']}", "success")
         except (ValueError, XPanelError, FileNotFoundError, OSError, PermissionError) as exc:
             flash(str(exc), "error")
         return redirect(url_for("cascade_page"))
@@ -3391,7 +4414,7 @@ def create_app(test_config: dict | None = None) -> Flask:
     @login_required
     def cascade_reset():
         try:
-            _preflight_change(remove_cascade)
+            _preflight_change(lambda: remove_cascade(dry_run=True))
             remove_cascade()
             apply_saved_change("Cascade удалён; основной выход direct")
             flash("Cascade удалён с этого сервера.", "success")
@@ -3424,6 +4447,26 @@ def create_app(test_config: dict | None = None) -> Flask:
                 extra.append(f"WARP {result['warp']}")
             suffix = f" ({', '.join(extra)})" if extra else ""
             flash(f"Каскад проверен. Выходной IP: {result['ip']}{suffix}", "success")
+        except (ValueError, XPanelError, FileNotFoundError, OSError, PermissionError) as exc:
+            flash(str(exc), "error")
+        return redirect(url_for("cascade_page"))
+
+    @app.post("/cascade/check-enable")
+    @login_required
+    def cascade_check_enable():
+        try:
+            result = test_cascade()
+            set_cascade_enabled(True)
+            try:
+                apply_saved_change("Cascade проверен и включён")
+            except Exception:
+                set_cascade_enabled(False)
+                try:
+                    apply_config()
+                except Exception:
+                    pass
+                raise
+            flash(f"Готово. Выходной IP: {result['ip']}", "success")
         except (ValueError, XPanelError, FileNotFoundError, OSError, PermissionError) as exc:
             flash(str(exc), "error")
         return redirect(url_for("cascade_page"))
@@ -3799,10 +4842,13 @@ def create_app(test_config: dict | None = None) -> Flask:
     def _node_install_command(token: str) -> str:
         base = _panel_node_base_url()
         arguments = "--panel " + shlex.quote(base) + " --token " + shlex.quote(token)
+        # One safe command for every supported server state. The installer
+        # detects a clean Ubuntu or an existing SG-Panel locally and then
+        # installs only the components that are actually missing.
         return _single_line_script_command(
-            base + "/node/connect.sh",
+            base + "/node/install-sg-node.sh",
             arguments,
-            "connect-sg-node",
+            "install-and-connect-sg-node",
         )
 
     def _node_request_public_address() -> str:
@@ -3899,6 +4945,13 @@ def create_app(test_config: dict | None = None) -> Flask:
             and (str(node.get("xray_version") or "").strip() or xray_state in {"active", "inactive", "failed"})
         )
         first_profile_pending = bool(node_connected and not deployments and not str(node.get("inbound_profile") or "").strip())
+        node_address = str(node.get("public_address") or "").strip()
+        node_country_code, node_country_flag = _instance_country(
+            node_address,
+            allow_network=bool(node_address and not app.config.get("TESTING")),
+        )
+        node["country_code"] = node_country_code
+        node["country_flag"] = node_country_flag
         return {
             "node": node,
             "node_connected": node_connected,
@@ -3918,10 +4971,20 @@ def create_app(test_config: dict | None = None) -> Flask:
             "runtime_command": _node_runtime_command(),
             "update_command": _node_update_command(),
             "uninstall_command": _node_uninstall_command(),
+            "geofiles": get_geofiles_overview(),
+            "geofiles_rollout": (
+                get_node_geofiles_rollout_status(int(node["id"]))
+                if not node.get("is_local")
+                else {"ready": False, "validated": False, "can_apply": False, "message": "Локальный Controller"}
+            ),
         }
 
-    def _config_without_user(config: dict[str, object], user_uuid: str) -> tuple[dict[str, object], int]:
+    def _config_without_user(
+        config: dict[str, object], user_uuids: str | list[str] | set[str] | tuple[str, ...]
+    ) -> tuple[dict[str, object], int]:
         candidate = json.loads(json.dumps(config))
+        targets = {str(user_uuids)} if isinstance(user_uuids, str) else {str(value) for value in user_uuids}
+        targets.discard("")
         removed = 0
         inbounds = candidate.get("inbounds") if isinstance(candidate, dict) else None
         if not isinstance(inbounds, list):
@@ -3942,12 +5005,303 @@ def create_app(test_config: dict | None = None) -> Flask:
                         kept.append(value)
                         continue
                     identity = str(value.get("id") or value.get("uuid") or "")
-                    if identity == user_uuid:
+                    if identity in targets:
                         removed += 1
                     else:
                         kept.append(value)
                 settings[key] = kept
         return candidate, removed
+
+    def _node_reality_inbound(
+        config: dict[str, object], profile_id: str = ""
+    ) -> dict[str, object]:
+        inbounds = config.get("inbounds")
+        if not isinstance(inbounds, list):
+            raise ValueError("На SG-Node нет совместимого VLESS REALITY-профиля")
+        wanted = "xhttp" if profile_id == "xhttp_reality" else "tcp" if profile_id == "raw_reality" else ""
+        candidates: list[dict[str, object]] = []
+        for inbound in inbounds:
+            if not isinstance(inbound, dict) or str(inbound.get("protocol") or "") != "vless":
+                continue
+            stream = inbound.get("streamSettings")
+            if not isinstance(stream, dict) or str(stream.get("security") or "") != "reality":
+                continue
+            network = str(stream.get("network") or "tcp")
+            if network not in {"tcp", "raw", "xhttp"}:
+                continue
+            settings = inbound.get("settings")
+            reality = stream.get("realitySettings")
+            if isinstance(settings, dict) and isinstance(reality, dict):
+                candidates.append(inbound)
+                normalized = "tcp" if network in {"tcp", "raw"} else network
+                if wanted and normalized == wanted:
+                    return inbound
+        if candidates:
+            return candidates[0]
+        raise ValueError("На SG-Node нет совместимого VLESS REALITY-профиля")
+
+    def _node_link_query(node_id: int) -> str:
+        for deployment in list_node_deployments(node_id, include_removed=True):
+            link = str(deployment.get("client_link") or "").strip()
+            if not link.startswith("vless://") or "?" not in link:
+                continue
+            query = link.split("?", 1)[1].split("#", 1)[0].strip()
+            if query:
+                return query
+        for job in list_node_jobs(node_id, limit=100):
+            link = str(job.get("client_link") or "").strip()
+            if link.startswith("vless://") and "?" in link:
+                query = link.split("?", 1)[1].split("#", 1)[0].strip()
+                if query:
+                    return query
+        return ""
+
+    def _prepare_node_client_job(
+        node: dict[str, object],
+        users: list[sqlite3.Row],
+        *,
+        public_host: str,
+        requested_port: int,
+        dest: str,
+        server_name: str,
+        slot: str,
+        profile_id: str = "xhttp_reality",
+        batch_id: int | None = None,
+    ) -> dict[str, object]:
+        if not users:
+            raise ValueError("Не выбраны активные клиенты")
+        accesses: list[tuple[sqlite3.Row, dict[str, object]]] = []
+        for current_user in users:
+            for device in list_user_devices(int(current_user["id"]), include_disabled=False):
+                if not bool(device.get("expired")):
+                    accesses.append((current_user, device))
+        if not accesses:
+            raise ValueError("У выбранных клиентов нет активных доступов/устройств")
+        if node.get("is_local"):
+            raise ValueError("Controller управляется напрямую, выберите SG-Node")
+        if node.get("effective_state") != "online":
+            raise ValueError("SG-Node должна быть в сети")
+        xray_version = str(node.get("xray_version") or "").strip()
+        xray_state = str(node.get("xray_state") or "").strip()
+        if not xray_version and xray_state not in {"active", "inactive", "failed"}:
+            raise ValueError("Сначала установите Xray Runtime на ноде")
+        profile_id = str(profile_id or "xhttp_reality").strip().lower()
+        if profile_id not in {"raw_reality", "xhttp_reality"}:
+            raise ValueError("Для SG-Node доступен TCP REALITY или XHTTP REALITY")
+        is_xhttp = profile_id == "xhttp_reality"
+        public_host = str(public_host or node.get("public_address") or "").strip()
+        if not public_host or len(public_host) > 255 or any(value in public_host for value in ("/", "?", "#", " ")):
+            raise ValueError("Укажите публичный IP или домен SG-Node без протокола")
+        slot = str(slot or "backup").strip().lower()
+        if slot not in {"primary", "backup", "alt"}:
+            raise ValueError("Выберите допустимое назначение подключения")
+
+        config = latest_node_config(int(node["id"]))
+        stale_deployments: list[dict[str, object]] = []
+        public_key = ""
+        short_id = ""
+        xhttp_path = "/sg-xhttp-reality"
+        if isinstance(config, dict):
+            inbound = _node_reality_inbound(config, profile_id)
+            settings = inbound["settings"]
+            stream = inbound["streamSettings"]
+            reality = stream["realitySettings"]
+            clients = settings.get("clients")
+            if not isinstance(clients, list):
+                clients = []
+            existing_by_uuid = {
+                str(item.get("id") or ""): item
+                for item in clients if isinstance(item, dict) and str(item.get("id") or "")
+            }
+            active_uuids = {str(device["uuid"]) for _person, device in accesses}
+            stale_seen: set[tuple[int, str]] = set()
+            for current_user in users:
+                for deployment in list_user_deployments(int(current_user["id"]), include_removed=True):
+                    stale_uuid = str(deployment.get("device_uuid") or deployment.get("user_uuid") or "")
+                    if (
+                        int(deployment.get("node_id") or 0) != int(node["id"])
+                        or stale_uuid in active_uuids
+                        or str(deployment.get("state") or "") == "removed"
+                        or not stale_uuid
+                    ):
+                        continue
+                    key = (int(current_user["id"]), stale_uuid)
+                    if key in stale_seen:
+                        continue
+                    stale_seen.add(key)
+                    existing_by_uuid.pop(stale_uuid, None)
+                    stale_deployments.append({
+                        "action": "remove",
+                        "user_id": int(current_user["id"]),
+                        "device_id": int(deployment["device_id"]) if deployment.get("device_id") not in (None, "") else None,
+                        "device_uuid": stale_uuid,
+                        "device_name": str(deployment.get("device_name") or "Основной доступ"),
+                        "user_uuid": stale_uuid,
+                        "user_name": str(current_user["name"]),
+                        "profile": str(deployment.get("profile") or ""),
+                        "slot": str(deployment.get("slot") or "alt"),
+                        "subscription_enabled": False,
+                        "desired_state": "removed",
+                    })
+            for current_user, device in accesses:
+                existing_by_uuid[str(device["uuid"])] = {
+                    "id": str(device["uuid"]),
+                    "email": str(device.get("display_name") or current_user["name"]),
+                    "flow": "xtls-rprx-vision",
+                    "level": 0,
+                }
+            settings["clients"] = list(existing_by_uuid.values())
+            port = int(inbound.get("port") or requested_port)
+            reality_dest = str(reality.get("target") or reality.get("dest") or dest).strip()
+            names = reality.get("serverNames") if isinstance(reality.get("serverNames"), list) else []
+            reality_sni = str(names[0] if names else server_name).strip()
+            short_ids = reality.get("shortIds") if isinstance(reality.get("shortIds"), list) else []
+            short_id = str(short_ids[0] if short_ids else "").strip()
+            known_query = _node_link_query(int(node["id"]))
+            if known_query:
+                parsed = parse_qs(known_query, keep_blank_values=True)
+                public_key = str((parsed.get("pbk") or [""])[0]).strip()
+                short_id = short_id or str((parsed.get("sid") or [""])[0]).strip()
+            if not public_key:
+                raise ValueError(
+                    "Конфигурация SG-Node найдена, но Controller не знает её публичный ключ. "
+                    "Повторно разверните первый профиль SG-Node."
+                )
+            if is_xhttp:
+                stream["network"] = "xhttp"
+                stream["security"] = "reality"
+                stream.pop("tcpSettings", None)
+                stream.pop("rawSettings", None)
+                stream["xhttpSettings"] = {"path": xhttp_path, "mode": "auto"}
+                settings["decryption"] = "__SG_NODE_VLESS_DECRYPTION__"
+            else:
+                stream["network"] = "tcp"
+                stream["security"] = "reality"
+                stream.pop("xhttpSettings", None)
+                settings["decryption"] = "none"
+        else:
+            port = int(requested_port)
+            if not 1 <= port <= 65535:
+                raise ValueError("Порт должен быть от 1 до 65535")
+            if port in {22, 80, 443, 61443}:
+                raise ValueError("Для SG-Node используйте отдельный порт, например 64441")
+            if not dest or not server_name:
+                raise ValueError("Укажите Reality target и Server Name")
+            keys = generate_reality_keys(str(get_server()["xray_bin"]))
+            reality_dest = dest
+            reality_sni = server_name
+            public_key = str(keys["public_key"])
+            short_id = str(keys["short_id"])
+            stream_settings: dict[str, object] = {
+                "network": "xhttp" if is_xhttp else "tcp",
+                "security": "reality",
+                "realitySettings": {
+                    "show": False,
+                    "target": reality_dest,
+                    "xver": 0,
+                    "serverNames": [reality_sni],
+                    "privateKey": str(keys["private_key"]),
+                    "shortIds": [short_id],
+                },
+            }
+            if is_xhttp:
+                stream_settings["xhttpSettings"] = {"path": xhttp_path, "mode": "auto"}
+            config = {
+                "log": {"loglevel": "warning"},
+                "inbounds": [{
+                    "tag": "sg-node-xhttp-reality-in" if is_xhttp else "sg-node-reality-in",
+                    "listen": "0.0.0.0",
+                    "port": port,
+                    "protocol": "vless",
+                    "settings": {
+                        "clients": [
+                            {
+                                "id": str(device["uuid"]),
+                                "email": str(device.get("display_name") or current_user["name"]),
+                                "flow": "xtls-rprx-vision",
+                                "level": 0,
+                            }
+                            for current_user, device in accesses
+                        ],
+                        "decryption": "__SG_NODE_VLESS_DECRYPTION__" if is_xhttp else "none",
+                    },
+                    "streamSettings": stream_settings,
+                }],
+                "outbounds": [{"tag": "direct", "protocol": "freedom", "settings": {}}],
+            }
+
+        profile = "VLESS XHTTP REALITY" if is_xhttp else "VLESS REALITY TCP"
+        raw_query = ""
+        if not is_xhttp:
+            raw_query = urlencode({
+                "encryption": "none",
+                "flow": "xtls-rprx-vision",
+                "security": "reality",
+                "sni": reality_sni,
+                "fp": "firefox",
+                "pbk": public_key,
+                "sid": short_id,
+                "type": "tcp",
+            })
+        deployments: list[dict[str, object]] = list(stale_deployments)
+        for current_user, device in accesses:
+            device_title = str(device.get("display_name") or current_user["name"])
+            link = ""
+            if not is_xhttp:
+                label = quote(f"{device_title}/{node['name']}", safe="")
+                link = f"vless://{device['uuid']}@{public_host}:{port}?{raw_query}#{label}"
+            deployments.append({
+                "action": "upsert",
+                "user_id": int(current_user["id"]),
+                "device_id": int(device["id"]),
+                "device_uuid": str(device["uuid"]),
+                "device_name": str(device["name"]),
+                "user_uuid": str(device["uuid"]),
+                "user_name": str(current_user["name"]),
+                "profile": profile,
+                "public_host": public_host,
+                "public_port": port,
+                "client_link": link,
+                "reality_public_key": public_key,
+                "reality_short_id": short_id,
+                "reality_server_name": reality_sni,
+                "xhttp_path": xhttp_path if is_xhttp else "",
+                "xhttp_server_mode": "auto" if is_xhttp else "",
+                "xhttp_client_mode": "stream-one" if is_xhttp else "",
+                "slot": slot,
+                "priority": {"primary": 10, "backup": 20, "alt": 100}[slot],
+                "subscription_enabled": bool(device.get("subscription_enabled", True)),
+                "desired_state": "active",
+            })
+        encoded = json.dumps(config, ensure_ascii=False, sort_keys=True).encode("utf-8")
+        transport_label = f"XHTTP {port}" if is_xhttp else f"TCP {port}"
+        title = (
+            f"{len(accesses)} доступов / {len(users)} клиентов · {transport_label}"
+            if len(accesses) > 1
+            else f"{profile} · {accesses[0][1].get('display_name') or users[0]['name']} · {transport_label}"
+        )
+        job = create_node_job(
+            int(node["id"]),
+            job_type="apply_xray_config",
+            title=title,
+            payload={
+                "profile": profile,
+                "config": config,
+                "config_sha256": hashlib.sha256(encoded).hexdigest(),
+                "client_count": sum(
+                    len((item.get("settings") or {}).get("clients") or [])
+                    for item in config.get("inbounds", []) if isinstance(item, dict)
+                ),
+                "deployments": deployments,
+                "failover_batch_id": batch_id,
+                "ensure_xhttp_encryption": is_xhttp,
+                "xhttp_client_mode": "stream-one" if is_xhttp else "",
+            },
+            client_link=str(deployments[0]["client_link"]) if len(deployments) == 1 else "",
+        )
+        if batch_id is not None:
+            attach_failover_job(batch_id, int(job["id"]))
+        return job
 
     def _finish_ready_user_deletion(request_info: dict[str, object]) -> None:
         if str(request_info.get("status") or "") != "pending":
@@ -3978,15 +5332,49 @@ def create_app(test_config: dict | None = None) -> Flask:
     @login_required
     def nodes_page():
         nodes = _local_node_overlay(list_nodes())
+        country_lookup_budget = 4
+        decorated_nodes = []
+        for item in nodes:
+            node = dict(item)
+            address = str(node.get("public_address") or "").strip()
+            allow_lookup = bool(address and country_lookup_budget > 0 and not app.config.get("TESTING"))
+            code, flag = _instance_country(address, allow_network=allow_lookup)
+            if allow_lookup and address not in {str(get_instance_address() or "").strip()}:
+                country_lookup_budget -= 1
+            node["country_code"] = code
+            node["country_flag"] = flag
+            decorated_nodes.append(node)
+        enabled_users = [row for row in list_users() if bool(row["enabled"]) and not user_is_expired(row)]
+        coverage = {"with_backup": 0, "multi_server": 0, "primary_remote": 0}
+        for current_user in enabled_users:
+            deployments = [item for item in list_user_deployments(int(current_user["id"])) if str(item.get("state") or "") != "removed"]
+            if any(str(item.get("slot") or "") == "backup" and str(item.get("state") or "") == "active" for item in deployments):
+                coverage["with_backup"] += 1
+            if len({int(item.get("node_id") or 0) for item in deployments}) > 1:
+                coverage["multi_server"] += 1
+            if any(str(item.get("slot") or "") == "primary" and not bool(item.get("node_is_local")) for item in deployments):
+                coverage["primary_remote"] += 1
         return render_template(
             "nodes.html",
-            nodes=nodes,
+            nodes=decorated_nodes,
             summary=network_summary(nodes),
             roles=NODE_ROLE_LABELS,
             panel_url=_panel_node_base_url(),
             prepare_command=_node_prepare_command(),
             uninstall_command=_node_uninstall_command(),
+            central_clients=enabled_users,
+            central_client_count=len(enabled_users),
+            client_coverage=coverage,
+            failover_batches=list_failover_batches(limit=8),
         )
+
+    @app.get("/network/nodes/add")
+    @login_required
+    def node_add_get():
+        # The add form renders the one-time command directly after POST. Any
+        # browser refresh or stale redirect must still land on a valid GET page
+        # instead of Flask's generic 405 response.
+        return redirect(url_for("nodes_page"))
 
     @app.post("/network/nodes/add")
     @login_required
@@ -4076,126 +5464,189 @@ def create_app(test_config: dict | None = None) -> Flask:
             }
         )
 
+    @app.post("/network/nodes/<int:node_id>/geofiles/validate")
+    @login_required
+    def node_geofiles_validate(node_id: int):
+        try:
+            jobs = queue_node_geofiles_validate(node_id)
+            stage_job = jobs["stage_job"]
+            validation_job = jobs["validation_job"]
+            flash(
+                f"SG-Node получила двухэтапную проверку GeoFiles: staging #{stage_job['id']}, "
+                f"полный локальный xray run -test #{validation_job['id']}. Live-файлы Node не меняются.",
+                "success",
+            )
+        except (ValueError, XPanelError, OSError, sqlite3.Error) as exc:
+            flash(str(exc), "error")
+        return redirect(url_for("routing_page") + "#routing")
+
+    @app.post("/network/nodes/<int:node_id>/geofiles/apply")
+    @login_required
+    def node_geofiles_apply(node_id: int):
+        try:
+            job = queue_node_geofiles_apply(node_id)
+            flash(
+                f"Проверенное поколение GeoFiles отправлено SG-Node как задание #{job['id']}. "
+                "Node локально проверит категории, полный config, Xray и подтвердит active.",
+                "success",
+            )
+        except (ValueError, XPanelError, OSError, sqlite3.Error) as exc:
+            flash(str(exc), "error")
+        return redirect(url_for("routing_page") + "#routing")
+
     @app.post("/network/nodes/<int:node_id>/deploy/reality")
     @login_required
     def node_deploy_reality(node_id: int):
         try:
             node = find_node(node_id)
-            if node.get("is_local"):
-                raise ValueError("Для локального сервера используйте обычный раздел Xray Server")
-            if node.get("effective_state") != "online":
-                raise ValueError("Нода должна быть в сети")
-            xray_version = str(node.get("xray_version") or "").strip()
-            xray_state = str(node.get("xray_state") or "").strip()
-            if not xray_version and xray_state not in {"active", "inactive", "failed"}:
-                raise ValueError("Сначала установите Xray Runtime на ноде")
-
             user_id = int(request.form.get("user_id", "0") or 0)
             user = find_user(user_id)
-            if not bool(user["enabled"]):
-                raise ValueError("Выбранный клиент отключён")
-
-            public_host = request.form.get("public_host", "").strip()
-            if not public_host or len(public_host) > 255:
-                raise ValueError("Укажите публичный IP или домен ноды")
-            if any(value in public_host for value in ("/", "?", "#", " ")):
-                raise ValueError("Публичный адрес должен быть доменом или IP без протокола")
-
-            port = int(request.form.get("port", "64441") or 64441)
-            if not 1 <= port <= 65535:
-                raise ValueError("Порт должен быть от 1 до 65535")
-            if port in {22, 80, 443, 61443}:
-                raise ValueError("Для первой ноды используйте отдельный порт, например 64441")
-
+            if not bool(user["enabled"]) or user_is_expired(user):
+                raise ValueError("Выбранный клиент отключён или срок действия истёк")
             defaults = get_server()
+            public_host = request.form.get("public_host", "").strip() or str(node.get("public_address") or "")
+            port = int(request.form.get("port", "64441") or 64441)
             dest = request.form.get("dest", str(defaults["dest"])).strip()
             default_sni = str(defaults["dest"] or "www.microsoft.com:443").rsplit(":", 1)[0]
             server_name = request.form.get("server_name", default_sni).strip()
-            if not dest or not server_name:
-                raise ValueError("Укажите Reality target и Server Name")
-
-            keys = generate_reality_keys(str(defaults["xray_bin"]))
-            short_id = str(keys["short_id"])
-            config = {
-                "log": {"loglevel": "warning"},
-                "inbounds": [
-                    {
-                        "tag": "sg-node-reality-in",
-                        "listen": "0.0.0.0",
-                        "port": port,
-                        "protocol": "vless",
-                        "settings": {
-                            "clients": [
-                                {
-                                    "id": str(user["uuid"]),
-                                    "email": str(user["name"]),
-                                    "flow": "xtls-rprx-vision",
-                                    "level": 0,
-                                }
-                            ],
-                            "decryption": "none",
-                        },
-                        "streamSettings": {
-                            "network": "tcp",
-                            "security": "reality",
-                            "realitySettings": {
-                                "show": False,
-                                "dest": dest,
-                                "xver": 0,
-                                "serverNames": [server_name],
-                                "privateKey": str(keys["private_key"]),
-                                "shortIds": [short_id],
-                            },
-                        },
-                    }
-                ],
-                "outbounds": [
-                    {"tag": "direct", "protocol": "freedom", "settings": {}}
-                ],
-            }
-            encoded = json.dumps(config, ensure_ascii=False, sort_keys=True).encode("utf-8")
-            query = urlencode(
-                {
-                    "encryption": "none",
-                    "flow": "xtls-rprx-vision",
-                    "security": "reality",
-                    "sni": server_name,
-                    "fp": "firefox",
-                    "pbk": str(keys["public_key"]),
-                    "sid": short_id,
-                    "type": "tcp",
-                }
-            )
-            label = quote(f"{user['name']}/{node['name']}/Primary", safe="")
-            client_link = f"vless://{user['uuid']}@{public_host}:{port}?{query}#{label}"
-            create_node_job(
-                node_id,
-                job_type="apply_xray_config",
-                title=f"VLESS REALITY · {user['name']} · TCP {port}",
-                payload={
-                    "profile": "VLESS REALITY",
-                    "config": config,
-                    "config_sha256": hashlib.sha256(encoded).hexdigest(),
-                    "client_count": 1,
-                    "deployment": {
-                        "action": "upsert",
-                        "user_id": int(user["id"]),
-                        "user_uuid": str(user["uuid"]),
-                        "user_name": str(user["name"]),
-                        "profile": "VLESS REALITY",
-                        "public_host": public_host,
-                        "public_port": port,
-                    },
-                },
-                client_link=client_link,
+            slot = "alt"
+            _prepare_node_client_job(
+                node, [user], public_host=public_host, requested_port=port,
+                dest=dest, server_name=server_name, slot=slot,
+                profile_id=request.form.get("profile", "xhttp_reality"),
             )
             flash(
-                "Задание отправлено ноде. Она проверит конфигурацию, применит её и выполнит rollback при ошибке.",
+                "Задание отправлено SG-Node. Существующие клиенты сохранены; "
+                "новый deployment появится в подписке после успешной проверки Agent.",
                 "success",
             )
         except (ValueError, XPanelError, OSError, sqlite3.Error) as exc:
             flash(str(exc), "error")
         return redirect(url_for("node_detail_page", node_id=node_id))
+
+    @app.post("/network/nodes/<int:node_id>/clients/deploy")
+    @login_required
+    def node_deploy_clients(node_id: int):
+        batch: dict[str, object] | None = None
+        try:
+            node = find_node(node_id)
+            mode = request.form.get("mode", "copy").strip()
+            if mode not in {"prepare_backup", "make_primary", "copy"}:
+                raise ValueError("Неизвестный режим развёртывания")
+            # Ordinary Cluster always lets Controller choose the order. Legacy
+            # values remain accepted for old bookmarks, but are normalized.
+            mode = "copy"
+            requested_ids = [int(value) for value in request.form.getlist("user_ids") if str(value).isdigit()]
+            if requested_ids:
+                users = [find_user(value) for value in requested_ids]
+            else:
+                users = [row for row in list_users() if bool(row["enabled"]) and not user_is_expired(row)]
+            users = [row for row in users if bool(row["enabled"]) and not user_is_expired(row)]
+            slot = "alt"
+            defaults = get_server()
+            public_host = request.form.get("public_host", "").strip() or str(node.get("public_address") or "")
+            port = int(request.form.get("port", "64441") or 64441)
+            dest = request.form.get("dest", str(defaults["dest"])).strip()
+            default_sni = str(defaults["dest"] or "www.microsoft.com:443").rsplit(":", 1)[0]
+            server_name = request.form.get("server_name", default_sni).strip()
+            local_node = next((item for item in list_nodes() if bool(item.get("is_local"))), None)
+            safety_backup = create_backup()
+            batch = create_failover_batch(
+                target_node_id=node_id, user_ids=[int(row["id"]) for row in users],
+                mode=mode, source_node_id=int(local_node["id"]) if local_node else None,
+                summary="Копирование клиентов на SG-Node с автоматическим порядком",
+                details={
+                    "safety_backup": str(safety_backup.get("name") or ""),
+                    "safety_backup_verified": bool(safety_backup.get("verified")),
+                },
+            )
+            _prepare_node_client_job(
+                node, users, public_host=public_host, requested_port=port,
+                dest=dest, server_name=server_name, slot=slot, batch_id=int(batch["id"]),
+                profile_id=request.form.get("profile", "xhttp_reality"),
+            )
+            flash(
+                f"SG-Node получила одну проверяемую конфигурацию для {len(users)} клиентов. "
+                "После успешной проверки сервер появится в стабильных подписках; порядок выберет Controller. "
+                f"Страховочная копия Controller: {safety_backup['name']}.",
+                "success",
+            )
+        except (ValueError, XPanelError, OSError, sqlite3.Error) as exc:
+            if batch is not None:
+                try:
+                    fail_failover_batch(int(batch["id"]), str(exc))
+                except (ValueError, sqlite3.Error):
+                    pass
+            flash(str(exc), "error")
+        return redirect(url_for("node_detail_page", node_id=node_id))
+
+    @app.post("/users/<int:user_id>/deploy")
+    @login_required
+    def user_deploy_to_node(user_id: int):
+        try:
+            user = find_user(user_id)
+            node_id = int(request.form.get("node_id", "0") or 0)
+            node = find_node(node_id)
+            defaults = get_server()
+            _prepare_node_client_job(
+                node, [user],
+                public_host=request.form.get("public_host", "").strip() or str(node.get("public_address") or ""),
+                requested_port=int(request.form.get("port", "64441") or 64441),
+                dest=request.form.get("dest", str(defaults["dest"])).strip(),
+                server_name=request.form.get(
+                    "server_name", str(defaults["dest"] or "www.microsoft.com:443").rsplit(":", 1)[0]
+                ).strip(),
+                slot="alt",
+                profile_id=request.form.get("profile", "xhttp_reality"),
+            )
+            flash("Развёртывание отправлено SG-Node", "success")
+        except (ValueError, XPanelError, OSError, sqlite3.Error) as exc:
+            flash(str(exc), "error")
+        return redirect(url_for("users_page", client=user_id))
+
+    @app.post("/users/<int:user_id>/deployments/<int:deployment_id>/policy")
+    @login_required
+    def user_deployment_policy(user_id: int, deployment_id: int):
+        try:
+            user = find_user(user_id)
+            if str(user["connection_order_mode"] or "auto") != "manual":
+                raise ValueError("Сначала включите ручной порядок в экспертном блоке клиента")
+            deployment = find_deployment(deployment_id)
+            if int(deployment.get("user_id") or 0) != int(user_id):
+                raise ValueError("Развёртывание принадлежит другому клиенту")
+            updated = update_deployment_policy(
+                deployment_id, slot=request.form.get("slot", "alt"),
+                subscription_enabled="subscription_enabled" in request.form,
+                desired_state=request.form.get("desired_state", "active"),
+                priority=int(request.form.get("priority", "100") or 100),
+            )
+            flash(
+                f"{updated['node_name']}: порядок подключения сохранён как «{updated['slot_label']}». "
+                "Стабильная подписка выдаст подключения в новом порядке.",
+                "success",
+            )
+        except (ValueError, sqlite3.Error) as exc:
+            flash(str(exc), "error")
+        return redirect(request.form.get("next") or url_for("users_page", client=user_id))
+
+    @app.post("/users/<int:user_id>/connection-order")
+    @login_required
+    def user_connection_order(user_id: int):
+        try:
+            user = update_user_connection_order_mode(
+                user_id, request.form.get("connection_order_mode", "auto")
+            )
+            if str(user["connection_order_mode"] or "auto") == "manual":
+                flash(
+                    "Ручной порядок включён. Основное, резервное и порядок переключения "
+                    "доступны только в экспертном блоке этого клиента.",
+                    "success",
+                )
+            else:
+                flash("Автоматический выбор подключений включён", "success")
+        except (ValueError, XPanelError, sqlite3.Error) as exc:
+            flash(str(exc), "error")
+        return redirect(request.form.get("next") or url_for("users_page", client=user_id))
 
     @app.post("/network/nodes/<int:node_id>/edit")
     @login_required
@@ -4279,7 +5730,7 @@ def create_app(test_config: dict | None = None) -> Flask:
         if not NODE_FULL_INSTALLER.exists():
             abort(404)
         return Response(
-            NODE_FULL_INSTALLER.read_text(encoding="utf-8"),
+            _standalone_node_installer(NODE_FULL_INSTALLER),
             content_type="text/x-shellscript; charset=utf-8",
             headers={"Cache-Control": "no-store"},
         )
@@ -4309,7 +5760,7 @@ def create_app(test_config: dict | None = None) -> Flask:
         if not NODE_RUNTIME_INSTALLER.exists():
             abort(404)
         return Response(
-            NODE_RUNTIME_INSTALLER.read_text(encoding="utf-8"),
+            _standalone_node_installer(NODE_RUNTIME_INSTALLER),
             content_type="text/x-shellscript; charset=utf-8",
             headers={"Cache-Control": "no-store"},
         )
@@ -4368,6 +5819,28 @@ def create_app(test_config: dict | None = None) -> Flask:
             return jsonify({"ok": False, "error": str(exc)}), 401
         return jsonify(result)
 
+    @app.get("/api/node/v1/geofiles/<generation>/<name>")
+    def node_api_geofile(generation: str, name: str):
+        authorization = request.headers.get("Authorization", "")
+        token = authorization[7:].strip() if authorization.lower().startswith("bearer ") else ""
+        try:
+            authenticate_node_token(token)
+        except PermissionError as exc:
+            return jsonify({"ok": False, "error": str(exc)}), 401
+        if not re.fullmatch(r"[A-Za-z0-9_.-]{1,128}", generation) or name not in {"geoip.dat", "geosite.dat"}:
+            abort(404)
+        target = Path(os.environ.get("XPANEL_GEOFILES_STATE_DIR", "/var/lib/sg-panel/geofiles")) / "sets" / generation / name
+        if not target.is_file():
+            abort(404)
+        return send_file(
+            target,
+            mimetype="application/octet-stream",
+            as_attachment=True,
+            download_name=name,
+            conditional=False,
+            max_age=0,
+        )
+
     @app.post("/api/node/v1/jobs/next")
     def node_api_job_next():
         authorization = request.headers.get("Authorization", "")
@@ -4393,6 +5866,41 @@ def create_app(test_config: dict | None = None) -> Flask:
             deletion = job.get("deletion_request") if isinstance(job, dict) else None
             if isinstance(deletion, dict):
                 _finish_ready_user_deletion(deletion)
+            # Cluster Cascade is intentionally one action for the administrator.
+            # Return to Agent immediately, then test and enable the real route in a
+            # background app context so the Agent's 20-second HTTP timeout is safe.
+            if bool(payload.get("ok")) and isinstance(job, dict):
+                def finalize_cluster_cascade(completed_job_id: int) -> None:
+                    with app.app_context():
+                        try:
+                            overview = get_cascade_overview()
+                            cluster_job = overview.get("cluster_job") if isinstance(overview, dict) else None
+                            is_current_cluster_job = bool(
+                                overview.get("mode") == "cluster"
+                                and isinstance(cluster_job, dict)
+                                and int(cluster_job.get("id") or 0) == int(completed_job_id)
+                            )
+                            if not is_current_cluster_job:
+                                return
+                            finalize_cascade_cluster_job(int(completed_job_id))
+                        except Exception as exc:
+                            write_audit(
+                                "cascade_auto_finalize_failed",
+                                detail=f"job={completed_job_id}: {exc}",
+                                ip_address="node-agent",
+                                user_agent="SG-Node",
+                                success=False,
+                            )
+                threading.Thread(
+                    target=finalize_cluster_cascade,
+                    args=(int(job_id),),
+                    name=f"cascade-finalize-{job_id}",
+                    daemon=True,
+                ).start()
+                job["cascade_auto"] = {
+                    "ok": None,
+                    "message": "Автоматическая проверка Cascade запущена",
+                }
         except PermissionError as exc:
             return jsonify({"ok": False, "error": str(exc)}), 401
         except ValueError as exc:

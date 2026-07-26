@@ -19,10 +19,11 @@
   <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}?v={{ xpanel_version }}">
   <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='apple-touch-icon.png') }}?v={{ xpanel_version }}">
 <title>Вход — SG-Panel</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}?v={{ xpanel_version }}-sg070">
+  <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}?v={{ xpanel_version }}-sg070-preview9-luxury-jade-depth-fix1">
+  <link rel="stylesheet" href="{{ url_for('static', filename='luxury-jade-depth.css') }}?v={{ xpanel_version }}-sg070-preview9-luxury-jade-depth-fix1">
 </head>
 <body class="login-body">
-  <div class="login-theme-switch" aria-label="Тема"><button type="button" data-login-theme="graphite" title="Тема Графит">◒</button><button type="button" data-login-theme="light" title="Тема Латте">☀</button></div>
+  <div class="login-theme-switch" aria-label="Тема"><button type="button" data-login-theme="graphite" title="Тема Графит">◒</button><button type="button" data-login-theme="light" title="Тема SG Luxury Jade Depth">✦</button></div>
   <div class="login-grid" aria-hidden="true"></div>
   <div class="login-glow login-glow-one" aria-hidden="true"></div>
   <div class="login-glow login-glow-two" aria-hidden="true"></div>
@@ -40,7 +41,7 @@
       <div class="login-brand-copy">
         <p class="login-kicker">УПРАВЛЕНИЕ XRAY</p>
         <h1>SG-Panel</h1><p class="login-instance-name">{{ instance_identity }}</p>
-        <div class="login-status"><span></span> СИСТЕМА ГОТОВА <b>v{{ xpanel_version }}</b></div>
+        <div class="login-status"><span></span> СИСТЕМА ГОТОВА <b>{{ xpanel_build }}</b></div>
       </div>
     </header>
 
@@ -91,7 +92,7 @@
         localStorage.setItem('sg-panel-theme', safe);
         document.querySelectorAll('[data-login-theme]').forEach(button => button.classList.toggle('active', button.dataset.loginTheme === safe));
         const meta = document.getElementById('themeColorMeta');
-        if (meta) meta.content = safe === 'graphite' ? '#0E1723' : '#D8CEC2';
+        if (meta) meta.content = safe === 'graphite' ? '#0E1723' : '#E5ECE7';
       };
       applyTheme(root.dataset.theme || 'graphite');
       document.querySelectorAll('[data-login-theme]').forEach(button => button.addEventListener('click', () => applyTheme(button.dataset.loginTheme)));

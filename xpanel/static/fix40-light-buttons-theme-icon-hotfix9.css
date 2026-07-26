@@ -1,0 +1,70 @@
+/* SG-Panel Preview 9 · FIX40 · Light Button Gradient and Theme Icon Hotfix 9
+   Small verified UI step:
+   - every shared section button in the light theme uses the same Luxury Jade
+     gradient, border, depth and white label as the established primary action;
+   - the top-bar theme selector is a conventional icon-only control;
+   - the dark-theme SG blue-gray palette remains unchanged. */
+
+/* Light theme: shared section buttons inherit the established primary-action material. */
+html[data-theme="light"] body.preview-9-rc6-typography .section-tabs a,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .section-tabs a {
+  color: #FFFDF7 !important;
+  -webkit-text-fill-color: #FFFDF7 !important;
+  border-color: var(--jade-champagne, #B88A45) !important;
+  background: linear-gradient(180deg,
+    var(--jade-action-top, #709A84) 0%,
+    var(--jade-action-bottom, #4D7864) 100%) !important;
+  box-shadow: var(--jade-top-light, inset 0 1px 0 rgba(255,255,255,.60)),
+              var(--jade-button-shadow, 0 2px 12px rgba(43,52,46,.20)) !important;
+  text-shadow: 0 1px 1px rgba(24,48,38,.24) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .section-tabs a:hover,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .section-tabs a:hover {
+  color: #FFFDF7 !important;
+  -webkit-text-fill-color: #FFFDF7 !important;
+  border-color: #C59B5B !important;
+  background: linear-gradient(180deg,
+    var(--jade-hover-top, #7EAA93) 0%,
+    var(--jade-hover-bottom, #5B866F) 100%) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .section-tabs a.active,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .section-tabs a.active {
+  color: #FFFDF7 !important;
+  -webkit-text-fill-color: #FFFDF7 !important;
+  border-color: var(--jade-champagne, #B88A45) !important;
+  background: linear-gradient(180deg,
+    var(--jade-pressed-top, #4F7764) 0%,
+    var(--jade-pressed-bottom, #3E6050) 100%) !important;
+  box-shadow: var(--jade-top-light, inset 0 1px 0 rgba(255,255,255,.60)),
+              0 3px 14px rgba(43,52,46,.24) !important;
+}
+
+/* Conventional icon-only theme selector. Theme names remain available in its menu. */
+body.preview-9-rc6-typography .theme-chip.theme-icon-only {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 42px !important;
+  min-width: 42px !important;
+  height: 38px !important;
+  min-height: 38px !important;
+  padding: 0 !important;
+  gap: 0 !important;
+}
+body.preview-9-rc6-typography .theme-chip.theme-icon-only .theme-switch-icon {
+  display: block !important;
+  width: 19px !important;
+  height: 19px !important;
+  overflow: visible !important;
+  color: currentColor !important;
+}
+body.preview-9-rc6-typography .theme-chip.theme-icon-only .theme-switch-icon circle {
+  fill: none !important;
+  stroke: currentColor !important;
+  stroke-width: 1.8 !important;
+}
+body.preview-9-rc6-typography .theme-chip.theme-icon-only .theme-switch-icon path {
+  fill: currentColor !important;
+  stroke: none !important;
+  opacity: .92 !important;
+}

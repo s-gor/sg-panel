@@ -4,13 +4,13 @@
     <div>
       {% if latest.status in ['queued', 'running'] %}<span class="node-job-spinner" aria-hidden="true"></span>{% endif %}
       <span class="node-job-state">{{ latest.status_label }}</span>
-      <strong>{{ latest.title }}</strong>
+      <strong>{{ latest.display_title }}</strong>
       <small>#{{ latest.id }} · {{ latest.requested_at }}</small>
     </div>
     {% if latest.result.message %}<p>{{ latest.result.message }}</p>{% endif %}
-    {% if latest.client_link and latest.status == 'succeeded' %}
+    {% if latest.display_client_link and latest.status == 'succeeded' %}
     <div class="node-command">
-      <code id="nodeJobLink{{ latest.id }}">{{ latest.client_link }}</code>
+      <code id="nodeJobLink{{ latest.id }}">{{ latest.display_client_link }}</code>
       <button class="button secondary small" type="button" data-copy-target="nodeJobLink{{ latest.id }}">Копировать ссылку</button>
     </div>
     {% endif %}
@@ -24,7 +24,7 @@
       <article class="node-job state-{{ 'resolved' if resolved else job.status }}">
         <div>
           <span class="node-job-state">{{ 'Исправлено' if resolved else job.status_label }}</span>
-          <strong>{{ job.title }}</strong>
+          <strong>{{ job.display_title }}</strong>
           <small>#{{ job.id }} · {{ job.requested_at }}</small>
         </div>
         {% if resolved %}
@@ -35,6 +35,4 @@
     </div>
   </details>
   {% endif %}
-{% else %}
-<p class="muted">Заданий пока нет.</p>
 {% endif %}

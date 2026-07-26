@@ -1,0 +1,1818 @@
+/* ========================================================================== 
+   SG Luxury Jade Depth
+   Light-only material theme for SG-Panel.
+
+   Design system:
+   - pale jade / pearl background;
+   - ivory primary surfaces;
+   - warm stone nested surfaces;
+   - deep jade actions;
+   - champagne used only as a restrained decoration;
+   - soft vertical light, top highlight and separate button/card depth.
+
+   Every selector in this file is explicitly scoped to the light theme.
+   Preview 9 graphite remains controlled by the original stylesheets.
+   ========================================================================== */
+
+html[data-theme="light"],
+html[data-resolved-theme="light"] {
+  color-scheme: light;
+
+  --jade-page: #E5ECE7;
+  --jade-page-deep: #DCE5E0;
+  --jade-pearl: #F1F3EF;
+  --jade-header-bottom: #DCE4DD;
+  --jade-sidebar-top: #E8EFF2;
+  --jade-sidebar-bottom: #D8E1E4;
+  --jade-ivory-top: #FEFCF7;
+  --jade-ivory-bottom: #F2ECE1;
+  --jade-stone-top: #F1EADE;
+  --jade-stone-bottom: #E1D8CA;
+  --jade-raised-top: #F8F0E4;
+  --jade-raised-bottom: #E8D9C3;
+  --jade-input-top: #FFFDFC;
+  --jade-input-bottom: #F6F1E7;
+  --jade-disabled-top: #F6F0E6;
+  --jade-disabled-bottom: #E7DCCB;
+
+  --jade-text: #29312C;
+  --jade-muted: #66716A;
+  --jade-muted-soft: #7A857E;
+  --jade-border: #89968A;
+  --jade-border-strong: #68786C;
+  --jade-border-soft: #B8B8AC;
+
+  --jade-accent: #456F5C;
+  --jade-accent-deep: #356B56;
+  --jade-accent-dark: #294F40;
+  --jade-active-top: #739E88;
+  --jade-active-bottom: #4E7965;
+  --jade-action-top: #709A84;
+  --jade-action-bottom: #4D7864;
+  --jade-hover-top: #7EAA93;
+  --jade-hover-bottom: #5B866F;
+  --jade-pressed-top: #4F7764;
+  --jade-pressed-bottom: #3E6050;
+  --jade-champagne: #B88A45;
+  --jade-champagne-soft: #EFE3CD;
+
+  --jade-success: #356B56;
+  --jade-success-bg: #D5E5DC;
+  --jade-success-border: #7FA28F;
+  --jade-warning: #936A2B;
+  --jade-warning-bg: #EFE3CD;
+  --jade-warning-border: #B6935B;
+  --jade-error: #A34F56;
+  --jade-error-bg: #EBD7D8;
+  --jade-error-border: #BE888D;
+
+  --jade-button-shadow: 0 2px 12px rgba(43, 52, 46, .20);
+  --jade-card-shadow: 0 4px 18px rgba(43, 52, 46, .17);
+  --jade-raised-shadow: 0 12px 30px rgba(43, 52, 46, .18);
+  --jade-top-light: inset 0 1px 0 rgba(255, 255, 255, .60), inset 1px 0 0 rgba(255, 255, 255, .22), inset -1px 0 0 rgba(255, 255, 255, .16);
+
+  /* Historical SG-Panel aliases. */
+  --page-bg: var(--jade-page);
+  --sidebar-bg: var(--jade-page-deep);
+  --topbar-bg: var(--jade-pearl);
+  --card-bg: var(--jade-ivory-top);
+  --nested-bg: var(--jade-stone-top);
+  --row-bg: #F0EBE1;
+  --field-bg: var(--jade-input-top);
+  --border: var(--jade-border);
+  --border-soft: var(--jade-border-soft);
+  --text-primary: var(--jade-text);
+  --text-secondary: var(--jade-muted);
+  --text-muted: var(--jade-muted-soft);
+  --blue: var(--jade-accent);
+  --blue-hover: var(--jade-hover-bottom);
+  --blue-pressed: var(--jade-pressed-bottom);
+  --success: var(--jade-success);
+  --success-bg: var(--jade-success-bg);
+  --success-border: var(--jade-success-border);
+  --warning: var(--jade-warning);
+  --warning-bg: var(--jade-warning-bg);
+  --warning-border: var(--jade-warning-border);
+  --error: var(--jade-error);
+  --error-bg: var(--jade-error-bg);
+  --error-border: var(--jade-error-border);
+
+  --bg: var(--jade-page);
+  --bg-soft: var(--jade-page-deep);
+  --sidebar: var(--jade-page-deep);
+  --panel: var(--jade-ivory-top);
+  --panel-2: var(--jade-stone-top);
+  --panel-3: var(--jade-input-top);
+  --text: var(--jade-text);
+  --muted: var(--jade-muted);
+  --muted-2: var(--jade-muted-soft);
+  --line: var(--jade-border);
+  --line-soft: var(--jade-border-soft);
+  --accent: var(--jade-accent);
+  --accent-2: var(--jade-accent-deep);
+  --accent-soft: rgba(69, 111, 92, .12);
+  --success-soft: var(--jade-success-bg);
+  --danger: var(--jade-error);
+  --danger-soft: var(--jade-error-bg);
+  --shadow: var(--jade-card-shadow);
+  --final-shell-bg: var(--jade-page);
+  --final-sidebar-bg: var(--jade-page-deep);
+  --final-sidebar-border: var(--jade-border);
+  --final-topbar-bg: var(--jade-pearl);
+  --final-line: var(--jade-border);
+  --rc6-text-main: var(--jade-text);
+  --rc6-text-strong: var(--jade-text);
+  --rc6-text-secondary: var(--jade-muted);
+  --rc6-text-tertiary: var(--jade-muted-soft);
+  --rc6-text-disabled: #8D978F;
+}
+
+/* Window light and page atmosphere. */
+html[data-theme="light"] body,
+html[data-theme="light"] body.app-body,
+html[data-resolved-theme="light"] body,
+html[data-resolved-theme="light"] body.app-body {
+  color: var(--jade-text) !important;
+  background:
+    radial-gradient(circle at 78% -8%, #FBF4E8 0, #F1EEE6 22%, rgba(229, 236, 231, .96) 58%, #E5ECE7 100%) fixed !important;
+}
+html[data-theme="light"] body .app-grid,
+html[data-resolved-theme="light"] body .app-grid {
+  opacity: 0 !important;
+  background: none !important;
+}
+
+/* Shell: cool sidebar, pearl header, ivory workspace. */
+html[data-theme="light"] body.preview-9-rc6-typography .sidebar,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .sidebar {
+  background: linear-gradient(180deg, var(--jade-sidebar-top) 0%, var(--jade-sidebar-bottom) 100%) !important;
+  border-right-color: var(--jade-border) !important;
+  box-shadow: 10px 0 30px rgba(43, 52, 46, .11) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .brand,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .brand {
+  background: linear-gradient(180deg, rgba(255,255,255,.22), rgba(255,255,255,.03)) !important;
+  border-bottom-color: rgba(104, 120, 108, .38) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.52) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .brand-copy strong,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .brand-copy strong {
+  color: var(--jade-text) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .brand-copy small,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .brand-copy small {
+  color: var(--jade-muted) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .brand-mark path,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .brand-mark path {
+  fill: rgba(69, 111, 92, .08) !important;
+  stroke: var(--jade-accent) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .brand-mark text,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .brand-mark text {
+  fill: var(--jade-accent-deep) !important;
+}
+
+html[data-theme="light"] body.preview-9-rc6-typography .global-topbar,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .global-topbar {
+  background: linear-gradient(180deg, var(--jade-pearl) 0%, var(--jade-header-bottom) 100%) !important;
+  border-bottom-color: var(--jade-border) !important;
+  box-shadow: 0 3px 16px rgba(43, 52, 46, .13), inset 0 1px 0 rgba(255,255,255,.62) !important;
+  backdrop-filter: none !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .workspace,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .workspace {
+  background: transparent !important;
+}
+
+/* Typography and links. */
+html[data-theme="light"] body.preview-9-rc6-typography :is(h1,h2,h3,h4,strong),
+html[data-resolved-theme="light"] body.preview-9-rc6-typography :is(h1,h2,h3,h4,strong) {
+  color: var(--jade-text) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography :is(p,small,.muted,.hint,.empty,.page-subtitle,.table-note,.field-note,.inline-note),
+html[data-resolved-theme="light"] body.preview-9-rc6-typography :is(p,small,.muted,.hint,.empty,.page-subtitle,.table-note,.field-note,.inline-note) {
+  color: var(--jade-muted) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography :is(.eyebrow,.panel-kicker,.section-kicker,.cluster-stage4-kicker),
+html[data-resolved-theme="light"] body.preview-9-rc6-typography :is(.eyebrow,.panel-kicker,.section-kicker,.cluster-stage4-kicker) {
+  color: var(--jade-accent-deep) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .content a:not(.button):not(.system-pill),
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .content a:not(.button):not(.system-pill) {
+  color: var(--jade-accent-deep) !important;
+}
+
+/* Navigation: quiet jade hover and carved active tile. */
+html[data-theme="light"] body.preview-9-rc6-typography :is(.main-nav,.grouped-main-nav) a,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography :is(.main-nav,.grouped-main-nav) a {
+  color: var(--jade-text) !important;
+  border-color: transparent !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography :is(.main-nav,.grouped-main-nav) a small,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography :is(.main-nav,.grouped-main-nav) a small {
+  color: var(--jade-muted) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography :is(.main-nav,.grouped-main-nav) a:hover,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography :is(.main-nav,.grouped-main-nav) a:hover {
+  color: var(--jade-text) !important;
+  border-color: rgba(69,111,92,.20) !important;
+  background: linear-gradient(180deg, rgba(255,255,255,.30), rgba(69,111,92,.10)) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.42) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography :is(.main-nav,.grouped-main-nav) a.active,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography :is(.main-nav,.grouped-main-nav) a.active {
+  color: #FFFDF7 !important;
+  border-color: var(--jade-accent-deep) !important;
+  background: linear-gradient(180deg, var(--jade-active-top) 0%, var(--jade-active-bottom) 100%) !important;
+  box-shadow: var(--jade-top-light), var(--jade-button-shadow) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography :is(.main-nav,.grouped-main-nav) a.active small,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography :is(.main-nav,.grouped-main-nav) a.active small {
+  color: #F6F3EA !important;
+  opacity: .88 !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography :is(.main-nav,.grouped-main-nav) a::before,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography :is(.main-nav,.grouped-main-nav) a::before {
+  display: none !important;
+}
+
+/* Raised identity elements. */
+html[data-theme="light"] body.preview-9-rc6-typography :is(.sidebar-system,.instance-badge),
+html[data-resolved-theme="light"] body.preview-9-rc6-typography :is(.sidebar-system,.instance-badge) {
+  background: linear-gradient(180deg, #E4EEE8 0%, #CEDDD4 100%) !important;
+  border-color: #7F9B8B !important;
+  box-shadow: var(--jade-top-light), var(--jade-card-shadow) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography :is(.sidebar-system,.instance-badge) :is(strong,b,.system-row),
+html[data-resolved-theme="light"] body.preview-9-rc6-typography :is(.sidebar-system,.instance-badge) :is(strong,b,.system-row) {
+  color: #29483A !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography :is(.sidebar-system,.instance-badge) :is(small,em,.system-server-subline,.system-server-version),
+html[data-resolved-theme="light"] body.preview-9-rc6-typography :is(.sidebar-system,.instance-badge) :is(small,em,.system-server-subline,.system-server-version) {
+  color: #587066 !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .system-dot,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .system-dot {
+  background: var(--jade-success) !important;
+  box-shadow: 0 0 0 4px rgba(53,107,86,.12) !important;
+}
+
+/* Major card level: ivory material and wide soft depth. */
+html[data-theme="light"] body.preview-9-rc6-typography :is(
+  .ui-card,.panel-card,.metric-card,.ui-status-card,.resource-board,.gauge-card,
+  .dashboard-health,.users-summary-card,.memory-dashboard,.memory-panel,
+  .backup-history-card,.security-settings-card,.security-history-card,.help-section,
+  .cluster-stage4-controller,.cluster-stage4-servers,.cluster-stage4-clients,.cluster-stage4-onboarding,
+  .cascade-simple-hero,.cascade-mode-card,.cascade-cluster-builder,.cascade-external-card,.cascade-links-section,
+  .clients-awg-metrics article,.clients-awg-table-card,.clients-awg-inspector,
+  .table-wrap,.routing-table-shell,.security-history-table-shell
+),
+html[data-resolved-theme="light"] body.preview-9-rc6-typography :is(
+  .ui-card,.panel-card,.metric-card,.ui-status-card,.resource-board,.gauge-card,
+  .dashboard-health,.users-summary-card,.memory-dashboard,.memory-panel,
+  .backup-history-card,.security-settings-card,.security-history-card,.help-section,
+  .cluster-stage4-controller,.cluster-stage4-servers,.cluster-stage4-clients,.cluster-stage4-onboarding,
+  .cascade-simple-hero,.cascade-mode-card,.cascade-cluster-builder,.cascade-external-card,.cascade-links-section,
+  .clients-awg-metrics article,.clients-awg-table-card,.clients-awg-inspector,
+  .table-wrap,.routing-table-shell,.security-history-table-shell
+) {
+  background: linear-gradient(180deg, var(--jade-ivory-top) 0%, var(--jade-ivory-bottom) 100%) !important;
+  border-color: var(--jade-border) !important;
+  box-shadow: var(--jade-top-light), var(--jade-card-shadow) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography :is(.ui-card,.panel-card)::before,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography :is(.ui-card,.panel-card)::before {
+  display: none !important;
+}
+
+/* Nested level: warm stone, closer and denser. */
+html[data-theme="light"] body.preview-9-rc6-typography :is(
+  .info-cards > div,.ui-code-list > div,.resource-process-strip > div,.service-list > div,
+  .ui-details-list > div,.switch-row,.protocol-box,.info-strip,.json-info-grid > div,
+  .memory-legend-item,.memory-facts > div,.resource-secondary-strip > div,.security-check,
+  .security-status-card,.backup-policy-strip,.backup-restore-flow > div,.help-note,
+  .cluster-stage4-summary article,.cluster-stage4-step,.cluster-stage4-client-facts > article,
+  .cascade-route-point,.cascade-mode-choice,.cascade-create-card,.clients-awg-filter-panel,
+  .clients-awg-server-card
+),
+html[data-resolved-theme="light"] body.preview-9-rc6-typography :is(
+  .info-cards > div,.ui-code-list > div,.resource-process-strip > div,.service-list > div,
+  .ui-details-list > div,.switch-row,.protocol-box,.info-strip,.json-info-grid > div,
+  .memory-legend-item,.memory-facts > div,.resource-secondary-strip > div,.security-check,
+  .security-status-card,.backup-policy-strip,.backup-restore-flow > div,.help-note,
+  .cluster-stage4-summary article,.cluster-stage4-step,.cluster-stage4-client-facts > article,
+  .cascade-route-point,.cascade-mode-choice,.cascade-create-card,.clients-awg-filter-panel,
+  .clients-awg-server-card
+) {
+  background: linear-gradient(180deg, var(--jade-stone-top) 0%, var(--jade-stone-bottom) 100%) !important;
+  border-color: var(--jade-border-soft) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.52), 0 2px 10px rgba(43,52,46,.10) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .cluster-stage4-server-card,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .cluster-stage4-server-card {
+  background: linear-gradient(180deg, #F8F2E8 0%, #E9E1D4 100%) !important;
+  border-color: var(--jade-border) !important;
+  box-shadow: var(--jade-top-light), 0 3px 14px rgba(43,52,46,.14) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .cluster-stage4-server-card::before,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .cluster-stage4-server-card::before {
+  display: none !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .cluster-stage4-server-card :is(.cluster-stage4-address,dl > div,.cluster-stage4-profile),
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .cluster-stage4-server-card :is(.cluster-stage4-address,dl > div,.cluster-stage4-profile) {
+  background: linear-gradient(180deg, var(--jade-input-top), var(--jade-input-bottom)) !important;
+  border-color: var(--jade-border-soft) !important;
+}
+
+/* Inputs: almost white, never stark white. */
+html[data-theme="light"] body.preview-9-rc6-typography :is(input,textarea,select),
+html[data-resolved-theme="light"] body.preview-9-rc6-typography :is(input,textarea,select) {
+  color: var(--jade-text) !important;
+  background: linear-gradient(180deg, var(--jade-input-top) 0%, var(--jade-input-bottom) 100%) !important;
+  border-color: var(--jade-border) !important;
+  box-shadow: inset 0 1px 2px rgba(43,52,46,.07), inset 0 1px 0 rgba(255,255,255,.72) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography :is(input,textarea)::placeholder,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography :is(input,textarea)::placeholder {
+  color: var(--jade-muted-soft) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography :is(input,textarea,select):focus,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography :is(input,textarea,select):focus {
+  border-color: var(--jade-accent) !important;
+  box-shadow: 0 0 0 3px rgba(69,111,92,.13), inset 0 1px 0 rgba(255,255,255,.70) !important;
+}
+
+/* Buttons: separate compact depth and a top light edge. */
+html[data-theme="light"] body.preview-9-rc6-typography .button.primary,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .button.primary {
+  color: #FFFDF7 !important;
+  border-color: var(--jade-champagne) !important;
+  background: linear-gradient(180deg, var(--jade-action-top) 0%, var(--jade-action-bottom) 100%) !important;
+  box-shadow: var(--jade-top-light), var(--jade-button-shadow) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .button.primary:hover,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .button.primary:hover {
+  border-color: #C59B5B !important;
+  background: linear-gradient(180deg, var(--jade-hover-top) 0%, var(--jade-hover-bottom) 100%) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .button.primary:active,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .button.primary:active {
+  border-color: var(--jade-accent-dark) !important;
+  background: linear-gradient(180deg, var(--jade-pressed-top) 0%, var(--jade-pressed-bottom) 100%) !important;
+  box-shadow: inset 0 2px 4px rgba(43,52,46,.20) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography :is(.button:not(.primary):not(.danger):not(.warning),.theme-chip,.account-button,.icon-button),
+html[data-resolved-theme="light"] body.preview-9-rc6-typography :is(.button:not(.primary):not(.danger):not(.warning),.theme-chip,.account-button,.icon-button) {
+  color: var(--jade-text) !important;
+  border-color: var(--jade-border) !important;
+  background: linear-gradient(180deg, var(--jade-disabled-top) 0%, var(--jade-disabled-bottom) 100%) !important;
+  box-shadow: var(--jade-top-light), var(--jade-button-shadow) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography :is(.button:not(.primary):not(.danger):not(.warning),.theme-chip,.account-button,.icon-button):hover,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography :is(.button:not(.primary):not(.danger):not(.warning),.theme-chip,.account-button,.icon-button):hover {
+  color: var(--jade-accent-dark) !important;
+  border-color: var(--jade-accent) !important;
+  background: linear-gradient(180deg, #FAF5EC 0%, #E9DFD0 100%) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .button.warning,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .button.warning {
+  color: var(--jade-warning) !important;
+  border-color: var(--jade-warning-border) !important;
+  background: linear-gradient(180deg, #F5EBD9 0%, #E7D6B9 100%) !important;
+  box-shadow: var(--jade-top-light), var(--jade-button-shadow) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .button.danger,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .button.danger {
+  color: var(--jade-error) !important;
+  border-color: var(--jade-error-border) !important;
+  background: linear-gradient(180deg, #F3E3E2 0%, #E5CFCF 100%) !important;
+  box-shadow: var(--jade-top-light), var(--jade-button-shadow) !important;
+}
+
+/* Tabs and selectable cards. */
+html[data-theme="light"] body.preview-9-rc6-typography .section-tabs,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .section-tabs {
+  border-bottom-color: var(--jade-border) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .section-tabs a,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .section-tabs a {
+  color: var(--jade-muted) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .section-tabs a.active,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .section-tabs a.active {
+  color: var(--jade-accent-dark) !important;
+  border-bottom-color: var(--jade-champagne) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .cascade-mode-choice.is-selected,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .cascade-mode-choice.is-selected {
+  color: var(--jade-accent-dark) !important;
+  background: linear-gradient(180deg, #E2EEE7 0%, #CBDDD2 100%) !important;
+  border-color: var(--jade-accent) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.58), 0 2px 12px rgba(43,52,46,.13) !important;
+}
+
+/* Tables: ivory rows and warm stone headers. */
+html[data-theme="light"] body.preview-9-rc6-typography table,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography table {
+  color: var(--jade-text) !important;
+  border-color: var(--jade-border) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography th,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography th {
+  color: var(--jade-text) !important;
+  background: linear-gradient(180deg, #ECE8DE 0%, #D9D4C9 100%) !important;
+  border-color: var(--jade-border) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.55) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography td,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography td {
+  color: var(--jade-text) !important;
+  background: linear-gradient(180deg, #FBF8F1 0%, #EEE8DC 100%) !important;
+  border-color: var(--jade-border-soft) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography tbody tr:hover td,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography tbody tr:hover td {
+  background: linear-gradient(180deg, #ECF2ED 0%, #DDE8E1 100%) !important;
+}
+
+/* Menus and popovers sit above the cards. */
+html[data-theme="light"] body.preview-9-rc6-typography :is(.theme-menu,.account-menu,.table-action-menu),
+html[data-resolved-theme="light"] body.preview-9-rc6-typography :is(.theme-menu,.account-menu,.table-action-menu) {
+  color: var(--jade-text) !important;
+  background: linear-gradient(180deg, var(--jade-raised-top) 0%, var(--jade-raised-bottom) 100%) !important;
+  border-color: var(--jade-border) !important;
+  box-shadow: var(--jade-top-light), var(--jade-raised-shadow) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography :is(.theme-menu,.account-menu,.table-action-menu) :is(button,a):hover,
+html[data-theme="light"] body.preview-9-rc6-typography :is(.theme-menu,.account-menu,.table-action-menu) :is(button,a).active,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography :is(.theme-menu,.account-menu,.table-action-menu) :is(button,a):hover,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography :is(.theme-menu,.account-menu,.table-action-menu) :is(button,a).active {
+  color: var(--jade-accent-dark) !important;
+  background: rgba(69,111,92,.12) !important;
+}
+
+/* Status language. */
+html[data-theme="light"] body.preview-9-rc6-typography :is(.status.ok,.status-badge.ok,.system-pill.ok,.cluster-stage4-state.online,.is-success),
+html[data-resolved-theme="light"] body.preview-9-rc6-typography :is(.status.ok,.status-badge.ok,.system-pill.ok,.cluster-stage4-state.online,.is-success) {
+  color: var(--jade-success) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography :is(.system-pill.ok,.cluster-stage4-state.online,.status-badge.ok),
+html[data-resolved-theme="light"] body.preview-9-rc6-typography :is(.system-pill.ok,.cluster-stage4-state.online,.status-badge.ok) {
+  background: linear-gradient(180deg, #E0ECE5 0%, var(--jade-success-bg) 100%) !important;
+  border-color: var(--jade-success-border) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.55) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography :is(.is-warning,.warning,.system-pill.attention),
+html[data-resolved-theme="light"] body.preview-9-rc6-typography :is(.is-warning,.warning,.system-pill.attention) {
+  color: var(--jade-warning) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography :is(.system-pill.attention,.status-badge.warning),
+html[data-resolved-theme="light"] body.preview-9-rc6-typography :is(.system-pill.attention,.status-badge.warning) {
+  background: linear-gradient(180deg, #F5ECD9 0%, var(--jade-warning-bg) 100%) !important;
+  border-color: var(--jade-warning-border) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography :is(.status.bad,.is-danger,.danger,.cluster-stage4-state.offline),
+html[data-resolved-theme="light"] body.preview-9-rc6-typography :is(.status.bad,.is-danger,.danger,.cluster-stage4-state.offline) {
+  color: var(--jade-error) !important;
+}
+
+/* GeoFiles are indicators, not dark action buttons. */
+html[data-theme="light"] body.preview-9-rc6-typography .geodata-file,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .geodata-file {
+  color: var(--jade-warning) !important;
+  border-color: var(--jade-warning-border) !important;
+  background: linear-gradient(180deg, #F5ECD9 0%, var(--jade-warning-bg) 100%) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.55), 0 2px 10px rgba(43,52,46,.10) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .geodata-file.is-ready,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .geodata-file.is-ready {
+  color: var(--jade-success) !important;
+  border-color: var(--jade-success-border) !important;
+  background: linear-gradient(180deg, #E0ECE5 0%, var(--jade-success-bg) 100%) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .geodata-file strong,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .geodata-file strong {
+  color: currentColor !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .geodata-file i,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .geodata-file i {
+  background: currentColor !important;
+  box-shadow: none !important;
+}
+
+/* Code/log surfaces stay dark jade-graphite for legibility. */
+html[data-theme="light"] body.preview-9-rc6-typography :is(.terminal-box,.log-view,.json-preview,.command-box,.json-editor-form .json-editor),
+html[data-resolved-theme="light"] body.preview-9-rc6-typography :is(.terminal-box,.log-view,.json-preview,.command-box,.json-editor-form .json-editor) {
+  color: #E8EEE9 !important;
+  background: linear-gradient(180deg, #253029 0%, #1B2420 100%) !important;
+  border-color: #647269 !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.05), 0 3px 14px rgba(43,52,46,.16) !important;
+}
+
+/* Login is part of the same material system. */
+html[data-theme="light"] .login-body,
+html[data-resolved-theme="light"] .login-body {
+  color: var(--jade-text) !important;
+  background:
+    radial-gradient(circle at 78% -8%, #FBF4E8 0, #F1EEE6 22%, #E5ECE7 58%, #E5ECE7 100%) fixed !important;
+}
+html[data-theme="light"] .login-grid,
+html[data-resolved-theme="light"] .login-grid {
+  opacity: .10 !important;
+  background-image:
+    linear-gradient(rgba(69,111,92,.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(69,111,92,.08) 1px, transparent 1px) !important;
+}
+html[data-theme="light"] .login-glow,
+html[data-resolved-theme="light"] .login-glow {
+  background: var(--jade-accent) !important;
+  opacity: .10 !important;
+}
+html[data-theme="light"] .login-card,
+html[data-resolved-theme="light"] .login-card {
+  color: var(--jade-text) !important;
+  border-color: var(--jade-border) !important;
+  background: linear-gradient(155deg, var(--jade-ivory-top) 0%, var(--jade-ivory-bottom) 100%) !important;
+  box-shadow: var(--jade-top-light), 0 16px 48px rgba(43,52,46,.20) !important;
+}
+html[data-theme="light"] .login-card-line,
+html[data-resolved-theme="light"] .login-card-line {
+  background: linear-gradient(90deg, transparent, var(--jade-champagne) 30%, var(--jade-accent) 70%, transparent) !important;
+  box-shadow: 0 1px 8px rgba(184,138,69,.18) !important;
+}
+html[data-theme="light"] .login-logo .logo-hex,
+html[data-resolved-theme="light"] .login-logo .logo-hex {
+  fill: rgba(69,111,92,.08) !important;
+  stroke: var(--jade-accent) !important;
+}
+html[data-theme="light"] .login-logo .logo-sg,
+html[data-resolved-theme="light"] .login-logo .logo-sg {
+  fill: var(--jade-accent-deep) !important;
+}
+html[data-theme="light"] :is(.login-brand-copy h1,.login-access h2,.login-label),
+html[data-resolved-theme="light"] :is(.login-brand-copy h1,.login-access h2,.login-label) {
+  color: var(--jade-text) !important;
+}
+html[data-theme="light"] :is(.login-intro,.login-footer,.login-instance-name),
+html[data-resolved-theme="light"] :is(.login-intro,.login-footer,.login-instance-name) {
+  color: var(--jade-muted) !important;
+}
+html[data-theme="light"] .login-submit,
+html[data-resolved-theme="light"] .login-submit {
+  color: #FFFDF7 !important;
+  border-color: var(--jade-champagne) !important;
+  background: linear-gradient(180deg, var(--jade-action-top) 0%, var(--jade-action-bottom) 100%) !important;
+  box-shadow: var(--jade-top-light), var(--jade-button-shadow) !important;
+}
+html[data-theme="light"] .login-submit:hover,
+html[data-resolved-theme="light"] .login-submit:hover {
+  background: linear-gradient(180deg, var(--jade-hover-top) 0%, var(--jade-hover-bottom) 100%) !important;
+}
+html[data-theme="light"] .login-theme-switch,
+html[data-resolved-theme="light"] .login-theme-switch {
+  border-color: var(--jade-border) !important;
+  background: linear-gradient(180deg, rgba(248,240,228,.94), rgba(232,217,195,.94)) !important;
+  box-shadow: var(--jade-top-light), var(--jade-raised-shadow) !important;
+}
+html[data-theme="light"] .login-theme-switch button,
+html[data-resolved-theme="light"] .login-theme-switch button {
+  color: var(--jade-muted) !important;
+}
+html[data-theme="light"] .login-theme-switch button:hover,
+html[data-theme="light"] .login-theme-switch button.active,
+html[data-resolved-theme="light"] .login-theme-switch button:hover,
+html[data-resolved-theme="light"] .login-theme-switch button.active {
+  color: #FFFDF7 !important;
+  background: linear-gradient(180deg, var(--jade-active-top), var(--jade-active-bottom)) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.46), 0 2px 8px rgba(43,52,46,.16) !important;
+}
+
+@media (max-width: 760px) {
+  html[data-theme="light"] body.preview-9-rc6-typography .sidebar,
+  html[data-resolved-theme="light"] body.preview-9-rc6-typography .sidebar {
+    box-shadow: 0 8px 24px rgba(43,52,46,.12) !important;
+  }
+}
+
+/* ========================================================================== 
+   SG Luxury Jade Depth — complete light-surface correction (FIX 1)
+
+   Preview 9 contains several late, high-specificity graphite rules.  This
+   section deliberately overrides every compact/page-specific surface that is
+   visible in the light theme.  It is light-scoped only; graphite rules and
+   files remain untouched.
+   ========================================================================== */
+
+html[data-theme="light"],
+html[data-resolved-theme="light"] {
+  --lux-memory-panel: #456F5C;
+  --lux-memory-xray: #A86670;
+  --lux-memory-nginx: #7D73A0;
+  --lux-memory-kernel: #B37A50;
+  --lux-memory-other: #4F8984;
+  --lux-memory-cache: #C4A253;
+  --lux-memory-free: #78A98D;
+  --lux-ring-inner-top: #F8F5EE;
+  --lux-ring-inner-bottom: #E5ECE7;
+  --lux-surface-hi: linear-gradient(180deg, #FEFCF7 0%, #F2ECE1 100%);
+  --lux-surface-mid: linear-gradient(180deg, #F1EADE 0%, #E1D8CA 100%);
+  --lux-surface-low: linear-gradient(180deg, #E7EEE9 0%, #D5E1DA 100%);
+  --lux-surface-raised: linear-gradient(180deg, #F8F0E4 0%, #E8D9C3 100%);
+  --lux-surface-input: linear-gradient(180deg, #FFFDFC 0%, #F6F1E7 100%);
+}
+
+/* --------------------------------------------------------------------------
+   System / Resources — exact compact composition used by dashboard.html
+   -------------------------------------------------------------------------- */
+html[data-theme="light"] body.preview-9-rc6-typography .compact-health-strip,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .compact-health-strip {
+  color: var(--jade-text) !important;
+  border-color: var(--jade-border) !important;
+  background: var(--lux-surface-hi) !important;
+  box-shadow: var(--jade-top-light), var(--jade-card-shadow) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .compact-health-strip.is-ok,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .compact-health-strip.is-ok {
+  border-color: var(--jade-success-border) !important;
+  background: linear-gradient(180deg, #E6F0EA 0%, #D3E3DA 100%) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .compact-health-strip.is-warning,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .compact-health-strip.is-warning {
+  border-color: var(--jade-warning-border) !important;
+  background: linear-gradient(180deg, #F7EEDF 0%, #EADABD 100%) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .compact-health-strip :is(strong,small),
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .compact-health-strip :is(strong,small) {
+  color: var(--jade-text) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .compact-health-strip small,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .compact-health-strip small {
+  color: var(--jade-muted) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .compact-health-strip .health-dot,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .compact-health-strip .health-dot {
+  background: var(--jade-success) !important;
+  box-shadow: 0 0 0 5px rgba(53,107,86,.12), 0 0 12px rgba(53,107,86,.24) !important;
+}
+
+html[data-theme="light"] body.preview-9-rc6-typography .resource-board.compact-resource-board,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .resource-board.compact-resource-board {
+  color: var(--jade-text) !important;
+  border-color: var(--jade-border) !important;
+  background: var(--lux-surface-hi) !important;
+  box-shadow: var(--jade-top-light), var(--jade-card-shadow) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .compact-section-heading :is(h2,strong),
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .compact-section-heading :is(h2,strong) {
+  color: var(--jade-text) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .compact-section-heading :is(p,span),
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .compact-section-heading :is(p,span) {
+  color: var(--jade-muted) !important;
+}
+
+html[data-theme="light"] body.preview-9-rc6-typography .compact-memory-dial,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .compact-memory-dial {
+  background: var(--memory-ring-light, conic-gradient(var(--lux-memory-panel) 0 52%, var(--lux-memory-cache) 52% 88%, var(--lux-memory-free) 88% 100%)) !important;
+  border: 1px solid var(--jade-border) !important;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.45), 0 12px 28px rgba(43,52,46,.16) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .compact-memory-dial::before,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .compact-memory-dial::before {
+  background: radial-gradient(circle at 42% 28%, var(--lux-ring-inner-top) 0%, var(--lux-ring-inner-bottom) 76%) !important;
+  border-color: var(--jade-border-soft) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.72), 0 5px 15px rgba(43,52,46,.11) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .compact-memory-dial strong,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .compact-memory-dial strong {
+  color: var(--jade-text) !important;
+  text-shadow: 0 1px 0 rgba(255,255,255,.58) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .compact-memory-dial span,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .compact-memory-dial span {
+  color: var(--jade-muted) !important;
+}
+
+html[data-theme="light"] body.preview-9-rc6-typography .compact-memory-legend > div,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .compact-memory-legend > div {
+  color: var(--jade-text) !important;
+  border-color: var(--jade-border-soft) !important;
+  background: var(--lux-surface-mid) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.58), 0 2px 9px rgba(43,52,46,.09) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .compact-memory-legend > div:hover,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .compact-memory-legend > div:hover {
+  border-color: var(--jade-border) !important;
+  background: linear-gradient(180deg, #F6EFE4 0%, #E7DDD0 100%) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .compact-memory-legend :is(span,strong),
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .compact-memory-legend :is(span,strong) {
+  color: var(--jade-text) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .compact-memory-legend em,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .compact-memory-legend em {
+  color: var(--jade-muted) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .compact-memory-legend i,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .compact-memory-legend i {
+  box-shadow: 0 0 0 3px rgba(255,255,255,.38), 0 1px 4px rgba(43,52,46,.20) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .compact-memory-legend i.memory-segment-panel,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .compact-memory-legend i.memory-segment-panel { background: var(--lux-memory-panel) !important; }
+html[data-theme="light"] body.preview-9-rc6-typography .compact-memory-legend i.memory-segment-xray,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .compact-memory-legend i.memory-segment-xray { background: var(--lux-memory-xray) !important; }
+html[data-theme="light"] body.preview-9-rc6-typography .compact-memory-legend i.memory-segment-nginx,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .compact-memory-legend i.memory-segment-nginx { background: var(--lux-memory-nginx) !important; }
+html[data-theme="light"] body.preview-9-rc6-typography .compact-memory-legend i.memory-segment-kernel,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .compact-memory-legend i.memory-segment-kernel { background: var(--lux-memory-kernel) !important; }
+html[data-theme="light"] body.preview-9-rc6-typography .compact-memory-legend i.memory-segment-other,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .compact-memory-legend i.memory-segment-other { background: var(--lux-memory-other) !important; }
+html[data-theme="light"] body.preview-9-rc6-typography .compact-memory-legend i.memory-segment-cache,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .compact-memory-legend i.memory-segment-cache { background: var(--lux-memory-cache) !important; }
+html[data-theme="light"] body.preview-9-rc6-typography .compact-memory-legend i.memory-segment-free,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .compact-memory-legend i.memory-segment-free { background: var(--lux-memory-free) !important; }
+
+html[data-theme="light"] body.preview-9-rc6-typography .compact-fact-row > div,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .compact-fact-row > div {
+  color: var(--jade-text) !important;
+  border-color: var(--jade-border-soft) !important;
+  background: var(--lux-surface-mid) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.56), 0 2px 9px rgba(43,52,46,.09) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .compact-fact-row span,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .compact-fact-row span { color: var(--jade-muted) !important; }
+html[data-theme="light"] body.preview-9-rc6-typography .compact-fact-row strong,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .compact-fact-row strong { color: var(--jade-text) !important; }
+html[data-theme="light"] body.preview-9-rc6-typography .compact-fact-row .text-success,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .compact-fact-row .text-success { color: var(--jade-success) !important; }
+
+html[data-theme="light"] body.preview-9-rc6-typography .memory-method,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .memory-method {
+  border-top-color: var(--jade-border-soft) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .memory-method summary,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .memory-method summary { color: var(--jade-accent-dark) !important; }
+
+html[data-theme="light"] body.preview-9-rc6-typography .compact-resource-card,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .compact-resource-card {
+  color: var(--jade-text) !important;
+  border-color: var(--jade-border) !important;
+  background: var(--lux-surface-hi) !important;
+  box-shadow: var(--jade-top-light), var(--jade-card-shadow) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .disk-ring,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .disk-ring {
+  background: conic-gradient(var(--jade-accent) calc(var(--disk-used)*1%), var(--jade-champagne-soft) 0) !important;
+  border: 1px solid var(--jade-border) !important;
+  box-shadow: 0 8px 22px rgba(43,52,46,.14), inset 0 0 0 1px rgba(255,255,255,.40) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .disk-ring::before,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .disk-ring::before {
+  background: radial-gradient(circle at 42% 28%, #FBF8F1 0%, #E7EDE8 78%) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.72) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .disk-ring strong,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .disk-ring strong { color: var(--jade-text) !important; }
+html[data-theme="light"] body.preview-9-rc6-typography .disk-overview dl div,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .disk-overview dl div { border-bottom-color: var(--jade-border-soft) !important; }
+html[data-theme="light"] body.preview-9-rc6-typography .service-facts a,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .service-facts a {
+  color: var(--jade-text) !important;
+  border-color: var(--jade-border-soft) !important;
+  background: var(--lux-surface-mid) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.52), 0 2px 8px rgba(43,52,46,.08) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .service-facts a:hover,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .service-facts a:hover {
+  border-color: var(--jade-accent) !important;
+  background: linear-gradient(180deg, #E8F0EB 0%, #D7E4DC 100%) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .service-facts span,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .service-facts span { color: var(--jade-muted) !important; }
+html[data-theme="light"] body.preview-9-rc6-typography .service-facts strong,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .service-facts strong { color: var(--jade-text) !important; }
+html[data-theme="light"] body.preview-9-rc6-typography .cpu-line i,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .cpu-line i {
+  background: linear-gradient(90deg, var(--jade-accent) calc(var(--cpu-load)*1%), #D5DDD7 0) !important;
+  box-shadow: inset 0 1px 2px rgba(43,52,46,.10) !important;
+}
+
+/* --------------------------------------------------------------------------
+   Shared compact cards introduced by Preview 2–9.
+   -------------------------------------------------------------------------- */
+html[data-theme="light"] body.preview-9-rc6-typography :is(
+  .compact-summary-bar,.compact-clients-table-card,.compact-node-row,.client-inspector,
+  .backup-policy-strip,.traffic-future-strip,.diagnostics-log-summary,.diagnostic-log-panel,
+  .inbound-summary-card,.inbound-detection-card,.ob-system-panel,.ob-form-card,
+  .ob-user-outputs-panel,.ob-output-editor,.hysteria-studio-panel,.hysteria-expert-details,
+  .hysteria-diagnostic-hero,.clients-awg-inspector,.client-deployment-panel,
+  .cluster-controller-card,.cluster-list-section,.cluster-stage4-controller,
+  .cluster-stage4-servers,.cluster-stage4-clients,.cluster-stage4-onboarding
+),
+html[data-resolved-theme="light"] body.preview-9-rc6-typography :is(
+  .compact-summary-bar,.compact-clients-table-card,.compact-node-row,.client-inspector,
+  .backup-policy-strip,.traffic-future-strip,.diagnostics-log-summary,.diagnostic-log-panel,
+  .inbound-summary-card,.inbound-detection-card,.ob-system-panel,.ob-form-card,
+  .ob-user-outputs-panel,.ob-output-editor,.hysteria-studio-panel,.hysteria-expert-details,
+  .hysteria-diagnostic-hero,.clients-awg-inspector,.client-deployment-panel,
+  .cluster-controller-card,.cluster-list-section,.cluster-stage4-controller,
+  .cluster-stage4-servers,.cluster-stage4-clients,.cluster-stage4-onboarding
+) {
+  color: var(--jade-text) !important;
+  border-color: var(--jade-border) !important;
+  background: var(--lux-surface-hi) !important;
+  box-shadow: var(--jade-top-light), var(--jade-card-shadow) !important;
+}
+
+html[data-theme="light"] body.preview-9-rc6-typography :is(
+  .compact-summary-bar > div,.compact-node-row > div,.backup-restore-flow > div,
+  .backup-content-list b,.diagnostic-log-panel > summary,.hysteria-studio-overview article,
+  .hysteria-readiness > div,.hysteria-preset-card > span,.hysteria-diagnostic-row,
+  .inbound-detection-grid > div,.inbound-mode-route > div,.client-deployment-v2,
+  .client-deploy-new,.node-bulk-mode-grid label,.cluster-stage4-client-facts article,
+  .cluster-stage4-step,.cluster-stage4-server-card dl div,.cluster-stage4-address,
+  .cluster-stage4-profile,.clients-awg-server-card,.clients-awg-filter-panel
+),
+html[data-resolved-theme="light"] body.preview-9-rc6-typography :is(
+  .compact-summary-bar > div,.compact-node-row > div,.backup-restore-flow > div,
+  .backup-content-list b,.diagnostic-log-panel > summary,.hysteria-studio-overview article,
+  .hysteria-readiness > div,.hysteria-preset-card > span,.hysteria-diagnostic-row,
+  .inbound-detection-grid > div,.inbound-mode-route > div,.client-deployment-v2,
+  .client-deploy-new,.node-bulk-mode-grid label,.cluster-stage4-client-facts article,
+  .cluster-stage4-step,.cluster-stage4-server-card dl div,.cluster-stage4-address,
+  .cluster-stage4-profile,.clients-awg-server-card,.clients-awg-filter-panel
+) {
+  color: var(--jade-text) !important;
+  border-color: var(--jade-border-soft) !important;
+  background: var(--lux-surface-mid) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.52), 0 2px 9px rgba(43,52,46,.09) !important;
+}
+
+html[data-theme="light"] body.preview-9-rc6-typography .compact-summary-bar > div,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .compact-summary-bar > div { border-right-color: var(--jade-border-soft) !important; }
+
+/* --------------------------------------------------------------------------
+   Generic form/editor cards — no graphite islands in light mode.
+   -------------------------------------------------------------------------- */
+html[data-theme="light"] body.preview-9-rc6-typography :is(
+  .ui-card-heading,.ob-section-heading,.ob-form-header,.ui-form-section,
+  .ui-toggle-row,.ui-details,.ui-info-note,.ui-warning-note,.routing-protocol-row,
+  .routing-add-editor,.dns-host-item,.json-callout,.json-warning,.inbound-field-group,
+  .inbound-profile-family,.inbound-mode-route,.profile-card-top b,.inbound-active-banner,
+  .panel-access-current,.security-check,.security-settings-card,.security-history-card
+),
+html[data-resolved-theme="light"] body.preview-9-rc6-typography :is(
+  .ui-card-heading,.ob-section-heading,.ob-form-header,.ui-form-section,
+  .ui-toggle-row,.ui-details,.ui-info-note,.ui-warning-note,.routing-protocol-row,
+  .routing-add-editor,.dns-host-item,.json-callout,.json-warning,.inbound-field-group,
+  .inbound-profile-family,.inbound-mode-route,.profile-card-top b,.inbound-active-banner,
+  .panel-access-current,.security-check,.security-settings-card,.security-history-card
+) {
+  color: var(--jade-text) !important;
+  border-color: var(--jade-border-soft) !important;
+  background: var(--lux-surface-mid) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.50) !important;
+}
+
+html[data-theme="light"] body.preview-9-rc6-typography :is(
+  .operation-list > div,.switch-row,.info-strip,.advanced-box,.compact-switch,
+  .ui-code-list > div,.ui-details-list > div,.ob-system-row,.ob-scheme,.ob-step,
+  .ob-conditional,[data-raw-fields],.ob-output-editor .ob-form-header,
+  .dns-check-row span,.json-mode-badge,.managed-server-value,.disabled-select,
+  .deployment-state-badge,.cluster-stage4-state,.cluster-stage4-count,
+  .cluster-stage4-onboarding > summary > i
+),
+html[data-resolved-theme="light"] body.preview-9-rc6-typography :is(
+  .operation-list > div,.switch-row,.info-strip,.advanced-box,.compact-switch,
+  .ui-code-list > div,.ui-details-list > div,.ob-system-row,.ob-scheme,.ob-step,
+  .ob-conditional,[data-raw-fields],.ob-output-editor .ob-form-header,
+  .dns-check-row span,.json-mode-badge,.managed-server-value,.disabled-select,
+  .deployment-state-badge,.cluster-stage4-state,.cluster-stage4-count,
+  .cluster-stage4-onboarding > summary > i
+) {
+  color: var(--jade-text) !important;
+  border-color: var(--jade-border-soft) !important;
+  background: var(--lux-surface-input) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.62) !important;
+}
+
+/* Xray / Outbounds material hierarchy. */
+html[data-theme="light"] body.preview-9-rc6-typography :is(.ob-system-icon,.ob-state,.ob-step-header > span,.ob-checkmark),
+html[data-resolved-theme="light"] body.preview-9-rc6-typography :is(.ob-system-icon,.ob-state,.ob-step-header > span,.ob-checkmark) {
+  color: var(--jade-accent-dark) !important;
+  border-color: var(--jade-border) !important;
+  background: var(--lux-surface-low) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography :is(.ob-system-meta code,.protocol-label,.roadmap-flow span),
+html[data-resolved-theme="light"] body.preview-9-rc6-typography :is(.ob-system-meta code,.protocol-label,.roadmap-flow span) {
+  color: var(--jade-text) !important;
+  border-color: var(--jade-border-soft) !important;
+  background: var(--lux-surface-input) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .profile-card-body,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .profile-card-body {
+  color: var(--jade-text) !important;
+  border-color: var(--jade-border) !important;
+  background: var(--lux-surface-hi) !important;
+  box-shadow: var(--jade-top-light), 0 3px 14px rgba(43,52,46,.12) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .inbound-profile-card:hover .profile-card-body,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .inbound-profile-card:hover .profile-card-body {
+  border-color: var(--jade-accent) !important;
+  background: linear-gradient(180deg, #F6F8F4 0%, #E3ECE6 100%) !important;
+}
+
+/* Clients and deployments. */
+html[data-theme="light"] body.preview-9-rc6-typography .clients-awg-metrics article,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .clients-awg-metrics article {
+  color: var(--jade-text) !important;
+  border-color: var(--jade-border) !important;
+  background: var(--lux-surface-hi) !important;
+  box-shadow: var(--jade-top-light), var(--jade-card-shadow) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .clients-awg-table tbody tr.selected td,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .clients-awg-table tbody tr.selected td {
+  background: linear-gradient(180deg, #E3EEE7 0%, #D1E1D7 100%) !important;
+  border-color: var(--jade-accent) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .clients-row-actions .client-action.more,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .clients-row-actions .client-action.more {
+  color: var(--jade-text) !important;
+  border-color: var(--jade-border) !important;
+  background: var(--lux-surface-mid) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .client-deployment-panel-body,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .client-deployment-panel-body {
+  border-color: var(--jade-border-soft) !important;
+  background: linear-gradient(180deg, #F3EEE5 0%, #E5DED2 100%) !important;
+}
+
+/* Cluster cards and count/status capsules. */
+html[data-theme="light"] body.preview-9-rc6-typography .cluster-stage4-server-card,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .cluster-stage4-server-card {
+  color: var(--jade-text) !important;
+  border-color: var(--jade-border) !important;
+  background: var(--lux-surface-hi) !important;
+  box-shadow: var(--jade-top-light), var(--jade-card-shadow) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .cluster-stage4-state.online,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .cluster-stage4-state.online {
+  color: var(--jade-success) !important;
+  border-color: var(--jade-success-border) !important;
+  background: linear-gradient(180deg, #E3EFE8 0%, #D1E2D8 100%) !important;
+}
+
+/* Routing / DNS / GeoFiles / JSON controls. */
+html[data-theme="light"] body.preview-9-rc6-typography .dns-check-row input:checked + span,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .dns-check-row input:checked + span {
+  color: var(--jade-accent-dark) !important;
+  border-color: var(--jade-accent) !important;
+  background: linear-gradient(180deg, #E2EDE6 0%, #CFDED5 100%) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .route-tag.balancer,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .route-tag.balancer {
+  color: #6E5A84 !important;
+  border-color: #A999B8 !important;
+  background: #E8E0EC !important;
+}
+
+/* Security, diagnostics, backup and update surfaces. */
+html[data-theme="light"] body.preview-9-rc6-typography :is(.security-check.ok,.hysteria-readiness .is-ok),
+html[data-resolved-theme="light"] body.preview-9-rc6-typography :is(.security-check.ok,.hysteria-readiness .is-ok) {
+  color: var(--jade-success) !important;
+  border-color: var(--jade-success-border) !important;
+  background: linear-gradient(180deg, #E3EFE8 0%, #D2E3D9 100%) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography :is(.security-check.warn,.hysteria-readiness .is-warning),
+html[data-resolved-theme="light"] body.preview-9-rc6-typography :is(.security-check.warn,.hysteria-readiness .is-warning) {
+  color: var(--jade-warning) !important;
+  border-color: var(--jade-warning-border) !important;
+  background: linear-gradient(180deg, #F6EDDD 0%, #EADABB 100%) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .update-progress-card,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .update-progress-card {
+  color: var(--jade-text) !important;
+  border-color: var(--jade-border) !important;
+  background: var(--lux-surface-hi) !important;
+  box-shadow: var(--jade-top-light), var(--jade-card-shadow) !important;
+}
+
+/* Keep genuine technical consoles dark, but use jade graphite and readable text. */
+html[data-theme="light"] body.preview-9-rc6-typography :is(
+  .terminal-box,.log-view,.diagnostic-log-panel-body,.diagnostics-log-console,
+  .json-preview,.json-editor-form .json-editor,.command-box,.update-log
+),
+html[data-resolved-theme="light"] body.preview-9-rc6-typography :is(
+  .terminal-box,.log-view,.diagnostic-log-panel-body,.diagnostics-log-console,
+  .json-preview,.json-editor-form .json-editor,.command-box,.update-log
+) {
+  color: #EAF0EB !important;
+  border-color: #647269 !important;
+  background: linear-gradient(180deg, #26332C 0%, #19231E 100%) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.05), 0 3px 14px rgba(43,52,46,.16) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography :is(
+  .terminal-box,.log-view,.diagnostic-log-panel-body,.diagnostics-log-console,
+  .json-preview,.json-editor-form .json-editor,.command-box,.update-log
+) *,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography :is(
+  .terminal-box,.log-view,.diagnostic-log-panel-body,.diagnostics-log-console,
+  .json-preview,.json-editor-form .json-editor,.command-box,.update-log
+) * { color: inherit !important; }
+
+/* --------------------------------------------------------------------------
+   Cascade RC6 — separate page stylesheet is loaded before this file.
+   -------------------------------------------------------------------------- */
+html[data-theme="light"] body.sg-awg-cascade-rc6 :is(
+  .cascade-simple-hero,.cascade-mode-card,.cascade-cluster-builder,
+  .cascade-external-card,.cascade-links-section,.cascade-exit-service-card,
+  .cascade-outbound-reset-card
+),
+html[data-resolved-theme="light"] body.sg-awg-cascade-rc6 :is(
+  .cascade-simple-hero,.cascade-mode-card,.cascade-cluster-builder,
+  .cascade-external-card,.cascade-links-section,.cascade-exit-service-card,
+  .cascade-outbound-reset-card
+) {
+  color: var(--jade-text) !important;
+  border-color: var(--jade-border) !important;
+  background: var(--lux-surface-hi) !important;
+  box-shadow: var(--jade-top-light), var(--jade-card-shadow) !important;
+}
+html[data-theme="light"] body.sg-awg-cascade-rc6 :is(
+  .cascade-route-point,.cascade-mode-choice,.cascade-create-card,
+  .cascade-server-select-card,.cascade-fixed-server,.cascade-confirm-preview,
+  .cascade-external-step,.cascade-enrollment-status,.cascade-link-card,
+  .cascade-live-route,.cascade-link-facts
+),
+html[data-resolved-theme="light"] body.sg-awg-cascade-rc6 :is(
+  .cascade-route-point,.cascade-mode-choice,.cascade-create-card,
+  .cascade-server-select-card,.cascade-fixed-server,.cascade-confirm-preview,
+  .cascade-external-step,.cascade-enrollment-status,.cascade-link-card,
+  .cascade-live-route,.cascade-link-facts
+) {
+  color: var(--jade-text) !important;
+  border-color: var(--jade-border-soft) !important;
+  background: var(--lux-surface-mid) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.52), 0 2px 9px rgba(43,52,46,.09) !important;
+}
+html[data-theme="light"] body.sg-awg-cascade-rc6 .cascade-mode-choice.is-selected,
+html[data-theme="light"] body.sg-awg-cascade-rc6 .cascade-awg-option.is-active,
+html[data-resolved-theme="light"] body.sg-awg-cascade-rc6 .cascade-mode-choice.is-selected,
+html[data-resolved-theme="light"] body.sg-awg-cascade-rc6 .cascade-awg-option.is-active {
+  color: var(--jade-accent-dark) !important;
+  border-color: var(--jade-accent) !important;
+  background: linear-gradient(180deg, #E4EFE8 0%, #CFDFD5 100%) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.60), 0 3px 12px rgba(43,52,46,.12) !important;
+}
+
+/* --------------------------------------------------------------------------
+   Final text safety pass.  It intentionally excludes buttons and consoles.
+   -------------------------------------------------------------------------- */
+html[data-theme="light"] body.preview-9-rc6-typography .content :is(
+  .ui-card,.panel-card,.resource-board,.compact-health-strip,.compact-summary-bar,
+  .table-wrap,.clients-awg-inspector,.cluster-stage4-server-card,.cascade-mode-card
+) :is(h1,h2,h3,h4,h5,h6,strong,b,dt,dd,label,summary),
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .content :is(
+  .ui-card,.panel-card,.resource-board,.compact-health-strip,.compact-summary-bar,
+  .table-wrap,.clients-awg-inspector,.cluster-stage4-server-card,.cascade-mode-card
+) :is(h1,h2,h3,h4,h5,h6,strong,b,dt,dd,label,summary) {
+  color: var(--jade-text) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .content :is(
+  .ui-card,.panel-card,.resource-board,.compact-health-strip,.compact-summary-bar,
+  .table-wrap,.clients-awg-inspector,.cluster-stage4-server-card,.cascade-mode-card
+) :is(p,small,.muted,.hint,em),
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .content :is(
+  .ui-card,.panel-card,.resource-board,.compact-health-strip,.compact-summary-bar,
+  .table-wrap,.clients-awg-inspector,.cluster-stage4-server-card,.cascade-mode-card
+) :is(p,small,.muted,.hint,em) {
+  color: var(--jade-muted) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .button.primary :is(span,strong,b),
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .button.primary :is(span,strong,b) { color: #FFFDF7 !important; }
+html[data-theme="light"] body.preview-9-rc6-typography :is(.text-success,.status.ok,.pill.success),
+html[data-resolved-theme="light"] body.preview-9-rc6-typography :is(.text-success,.status.ok,.pill.success) { color: var(--jade-success) !important; }
+html[data-theme="light"] body.preview-9-rc6-typography :is(.text-warning,.pill.warning),
+html[data-resolved-theme="light"] body.preview-9-rc6-typography :is(.text-warning,.pill.warning) { color: var(--jade-warning) !important; }
+html[data-theme="light"] body.preview-9-rc6-typography :is(.text-danger,.pill.danger),
+html[data-resolved-theme="light"] body.preview-9-rc6-typography :is(.text-danger,.pill.danger) { color: var(--jade-error) !important; }
+
+/* Remaining late-preview components and state surfaces. */
+html[data-theme="light"] body.preview-9-rc6-typography :is(.access-switch-state,.ui-counter,.validation-gate),
+html[data-resolved-theme="light"] body.preview-9-rc6-typography :is(.access-switch-state,.ui-counter,.validation-gate) {
+  color: var(--jade-text) !important;
+  border-color: var(--jade-border-soft) !important;
+  background: var(--lux-surface-input) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.58) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .ui-page-toolbar,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .ui-page-toolbar {
+  color: var(--jade-text) !important;
+  border-color: var(--jade-border) !important;
+  background: var(--lux-surface-hi) !important;
+  box-shadow: var(--jade-top-light), var(--jade-card-shadow) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography :is(.ob-form-footer,.ob-user-outputs-heading,.ob-link-import-result),
+html[data-resolved-theme="light"] body.preview-9-rc6-typography :is(.ob-form-footer,.ob-user-outputs-heading,.ob-link-import-result) {
+  color: var(--jade-text) !important;
+  border-color: var(--jade-border-soft) !important;
+  background: var(--lux-surface-mid) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .ob-link-import,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .ob-link-import {
+  color: var(--jade-text) !important;
+  border-color: var(--jade-success-border) !important;
+  background: linear-gradient(180deg, #E6F0EA 0%, #D5E5DC 100%) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .ob-switch,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .ob-switch {
+  border-color: var(--jade-border) !important;
+  background: #D3DBD5 !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .ob-switch input:checked + span,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .ob-switch input:checked + span {
+  background: var(--jade-accent) !important;
+  box-shadow: 0 0 0 3px rgba(69,111,92,.12) !important;
+}
+
+html[data-theme="light"] body.preview-9-rc6-typography :is(.hysteria-immediate-settings,.hysteria-instance-card),
+html[data-resolved-theme="light"] body.preview-9-rc6-typography :is(.hysteria-immediate-settings,.hysteria-instance-card) {
+  color: var(--jade-text) !important;
+  border-color: var(--jade-border-soft) !important;
+  background: var(--lux-surface-mid) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.52) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .hysteria-live-badge,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .hysteria-live-badge {
+  color: var(--jade-muted) !important;
+  border-color: var(--jade-border) !important;
+  background: var(--lux-surface-input) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .hysteria-live-badge.is-live,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .hysteria-live-badge.is-live {
+  color: var(--jade-success) !important;
+  border-color: var(--jade-success-border) !important;
+  background: linear-gradient(180deg, #E3EFE8 0%, #D2E3D9 100%) !important;
+}
+
+html[data-theme="light"] body.preview-9-rc6-typography .inbound-active-banner.is-draft,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .inbound-active-banner.is-draft {
+  color: var(--jade-warning) !important;
+  border-color: var(--jade-warning-border) !important;
+  background: linear-gradient(180deg, #F7EEDF 0%, #EADABB 100%) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography :is(.saved-link-inactive .link-box,.saved-link-inactive .hysteria-link-endpoint,.saved-link-inactive .saved-link-copy,.saved-link-inactive .saved-link-warning,.pill.saved),
+html[data-resolved-theme="light"] body.preview-9-rc6-typography :is(.saved-link-inactive .link-box,.saved-link-inactive .hysteria-link-endpoint,.saved-link-inactive .saved-link-copy,.saved-link-inactive .saved-link-warning,.pill.saved) {
+  color: var(--jade-warning) !important;
+  border-color: var(--jade-warning-border) !important;
+  background: linear-gradient(180deg, #F7EEDF 0%, #EADABB 100%) !important;
+}
+
+html[data-theme="light"] body.preview-9-rc6-typography :is(.client-danger-zone,.cluster-stage4-warning),
+html[data-resolved-theme="light"] body.preview-9-rc6-typography :is(.client-danger-zone,.cluster-stage4-warning) {
+  color: var(--jade-error) !important;
+  border-color: var(--jade-error-border) !important;
+  background: linear-gradient(180deg, #F3E3E2 0%, #E7D2D2 100%) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .client-delete-progress,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .client-delete-progress,
+html[data-theme="light"] body.preview-9-rc6-typography .update-inline-confirm,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .update-inline-confirm {
+  color: var(--jade-warning) !important;
+  border-color: var(--jade-warning-border) !important;
+  background: linear-gradient(180deg, #F7EEDF 0%, #EADABB 100%) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .clients-awg-server-card .server-role,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .clients-awg-server-card .server-role {
+  color: var(--jade-accent-dark) !important;
+  border-color: var(--jade-success-border) !important;
+  background: linear-gradient(180deg, #E5EFE9 0%, #D2E2D8 100%) !important;
+}
+
+html[data-theme="light"] body.preview-9-rc6-typography :is(.country-flag,.country-flag-fallback),
+html[data-resolved-theme="light"] body.preview-9-rc6-typography :is(.country-flag,.country-flag-fallback) {
+  background-color: transparent !important;
+  box-shadow: 0 0 0 1px rgba(104,120,108,.30), 0 2px 5px rgba(43,52,46,.10) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .country-flag-fallback,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .country-flag-fallback {
+  color: var(--jade-accent-dark) !important;
+  border-color: var(--jade-border) !important;
+  background: var(--lux-surface-low) !important;
+}
+
+html[data-theme="light"] body.preview-9-rc6-typography .sidebar-collapse:hover,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .sidebar-collapse:hover,
+html[data-theme="light"] body.preview-9-rc6-typography .logout-button:hover,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .logout-button:hover {
+  color: var(--jade-accent-dark) !important;
+  border-color: rgba(69,111,92,.20) !important;
+  background: rgba(69,111,92,.09) !important;
+}
+
+html[data-theme="light"] body.preview-9-rc6-typography .flash-toast.success,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .flash-toast.success {
+  color: var(--jade-success) !important;
+  border-color: var(--jade-success-border) !important;
+  background: linear-gradient(180deg, #E5F0E9 0%, #D2E3D9 100%) !important;
+  box-shadow: var(--jade-top-light), var(--jade-raised-shadow) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography :is(.alert.error,.login-alert.error),
+html[data-resolved-theme="light"] body.preview-9-rc6-typography :is(.alert.error,.login-alert.error) {
+  color: var(--jade-error) !important;
+  border-color: var(--jade-error-border) !important;
+  background: linear-gradient(180deg, #F4E5E4 0%, #E8D2D2 100%) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography :is(.alert.warning,.secure-note),
+html[data-resolved-theme="light"] body.preview-9-rc6-typography :is(.alert.warning,.secure-note) {
+  color: var(--jade-warning) !important;
+  border-color: var(--jade-warning-border) !important;
+  background: linear-gradient(180deg, #F7EEDF 0%, #EADABB 100%) !important;
+}
+
+html[data-theme="light"] body.preview-9-rc6-typography .clients-dialog::backdrop,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .clients-dialog::backdrop {
+  background: rgba(34,45,39,.45) !important;
+  backdrop-filter: blur(3px) !important;
+}
+
+/* ========================================================================== 
+   FIX 1 FINAL MATERIAL OVERRIDES
+   Some late Preview 9 rules set background-color as an individual !important
+   property.  Explicitly replace both image and colour so no cold/graphite
+   islands can remain in the light theme. Dark Preview 9 is not addressed here.
+   ========================================================================== */
+
+/* Cluster — actual nodes page body includes cluster-stage4-ui. */
+html[data-theme="light"] body.preview-9-rc6-typography.cluster-stage4-ui :is(
+  .cluster-stage4-controller,.cluster-stage4-servers,.cluster-stage4-clients,
+  .cluster-stage4-onboarding,.cluster-stage4-server-card
+),
+html[data-resolved-theme="light"] body.preview-9-rc6-typography.cluster-stage4-ui :is(
+  .cluster-stage4-controller,.cluster-stage4-servers,.cluster-stage4-clients,
+  .cluster-stage4-onboarding,.cluster-stage4-server-card
+),
+html[data-theme="light"] body.preview-9-rc6-typography.awg-cluster-page :is(
+  .cluster-stage4-controller,.cluster-stage4-servers,.cluster-stage4-clients,
+  .cluster-stage4-onboarding,.cluster-stage4-server-card
+),
+html[data-resolved-theme="light"] body.preview-9-rc6-typography.awg-cluster-page :is(
+  .cluster-stage4-controller,.cluster-stage4-servers,.cluster-stage4-clients,
+  .cluster-stage4-onboarding,.cluster-stage4-server-card
+) {
+  color: var(--jade-text) !important;
+  background-color: var(--jade-ivory-top) !important;
+  background-image: linear-gradient(180deg, var(--jade-ivory-top) 0%, var(--jade-ivory-bottom) 100%) !important;
+  border-color: var(--jade-border) !important;
+  box-shadow: var(--jade-top-light), var(--jade-card-shadow) !important;
+}
+
+html[data-theme="light"] body.preview-9-rc6-typography.cluster-stage4-ui :is(
+  .cluster-stage4-summary article,.cluster-stage4-step,.cluster-stage4-client-facts article,
+  .cluster-stage4-address,.cluster-stage4-server-card dl,.cluster-stage4-server-card dl div,
+  .cluster-stage4-profile
+),
+html[data-resolved-theme="light"] body.preview-9-rc6-typography.cluster-stage4-ui :is(
+  .cluster-stage4-summary article,.cluster-stage4-step,.cluster-stage4-client-facts article,
+  .cluster-stage4-address,.cluster-stage4-server-card dl,.cluster-stage4-server-card dl div,
+  .cluster-stage4-profile
+),
+html[data-theme="light"] body.preview-9-rc6-typography.awg-cluster-page :is(
+  .cluster-stage4-summary article,.cluster-stage4-step,.cluster-stage4-client-facts article,
+  .cluster-stage4-address,.cluster-stage4-server-card dl,.cluster-stage4-server-card dl div,
+  .cluster-stage4-profile
+),
+html[data-resolved-theme="light"] body.preview-9-rc6-typography.awg-cluster-page :is(
+  .cluster-stage4-summary article,.cluster-stage4-step,.cluster-stage4-client-facts article,
+  .cluster-stage4-address,.cluster-stage4-server-card dl,.cluster-stage4-server-card dl div,
+  .cluster-stage4-profile
+) {
+  color: var(--jade-text) !important;
+  background-color: var(--jade-stone-top) !important;
+  background-image: linear-gradient(180deg, var(--jade-stone-top) 0%, var(--jade-stone-bottom) 100%) !important;
+  border-color: var(--jade-border-soft) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.52), 0 2px 9px rgba(43,52,46,.09) !important;
+}
+
+html[data-theme="light"] body.preview-9-rc6-typography.cluster-stage4-ui .cluster-stage4-server-card dl,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography.cluster-stage4-ui .cluster-stage4-server-card dl,
+html[data-theme="light"] body.preview-9-rc6-typography.awg-cluster-page .cluster-stage4-server-card dl,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography.awg-cluster-page .cluster-stage4-server-card dl {
+  overflow: hidden !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography.cluster-stage4-ui .cluster-stage4-server-card dl div,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography.cluster-stage4-ui .cluster-stage4-server-card dl div,
+html[data-theme="light"] body.preview-9-rc6-typography.awg-cluster-page .cluster-stage4-server-card dl div,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography.awg-cluster-page .cluster-stage4-server-card dl div {
+  background-color: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+}
+
+/* Cascade — explicit material hierarchy after cascade-rc6 and typography. */
+html[data-theme="light"] body.preview-9-rc6-typography.sg-awg-cascade-rc6 :is(
+  .cascade-simple-hero,.cascade-mode-card,.cascade-cluster-builder,.cascade-external-card,
+  .cascade-links-section,.cascade-exit-service-card,.cascade-outbound-reset-card
+),
+html[data-resolved-theme="light"] body.preview-9-rc6-typography.sg-awg-cascade-rc6 :is(
+  .cascade-simple-hero,.cascade-mode-card,.cascade-cluster-builder,.cascade-external-card,
+  .cascade-links-section,.cascade-exit-service-card,.cascade-outbound-reset-card
+) {
+  color: var(--jade-text) !important;
+  background-color: var(--jade-ivory-top) !important;
+  background-image: linear-gradient(180deg, var(--jade-ivory-top) 0%, var(--jade-ivory-bottom) 100%) !important;
+  border-color: var(--jade-border) !important;
+  box-shadow: var(--jade-top-light), var(--jade-card-shadow) !important;
+}
+
+html[data-theme="light"] body.preview-9-rc6-typography.sg-awg-cascade-rc6 :is(
+  .cascade-route-point,.cascade-mode-choice,.cascade-create-card,.cascade-server-select-card,
+  .cascade-fixed-server,.cascade-confirm-preview,.cascade-external-step,.cascade-enrollment-status,
+  .cascade-link-card,.cascade-live-route,.cascade-link-facts,.cascade-managed-server,
+  .managed-server-value
+),
+html[data-resolved-theme="light"] body.preview-9-rc6-typography.sg-awg-cascade-rc6 :is(
+  .cascade-route-point,.cascade-mode-choice,.cascade-create-card,.cascade-server-select-card,
+  .cascade-fixed-server,.cascade-confirm-preview,.cascade-external-step,.cascade-enrollment-status,
+  .cascade-link-card,.cascade-live-route,.cascade-link-facts,.cascade-managed-server,
+  .managed-server-value
+) {
+  color: var(--jade-text) !important;
+  background-color: var(--jade-stone-top) !important;
+  background-image: linear-gradient(180deg, var(--jade-stone-top) 0%, var(--jade-stone-bottom) 100%) !important;
+  border-color: var(--jade-border-soft) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.52), 0 2px 9px rgba(43,52,46,.09) !important;
+}
+
+html[data-theme="light"] body.preview-9-rc6-typography.sg-awg-cascade-rc6 :is(.cascade-mode-choice.is-selected,.cascade-awg-option.is-active),
+html[data-resolved-theme="light"] body.preview-9-rc6-typography.sg-awg-cascade-rc6 :is(.cascade-mode-choice.is-selected,.cascade-awg-option.is-active) {
+  color: var(--jade-accent-dark) !important;
+  background-color: #D8E6DD !important;
+  background-image: linear-gradient(180deg, #E4EFE8 0%, #CFDFD5 100%) !important;
+  border-color: var(--jade-accent) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.60), 0 3px 12px rgba(43,52,46,.12) !important;
+}
+
+/* Audit-completion: late dark component families not represented by the
+   synthetic dashboard are materialised explicitly for the light theme. */
+html[data-theme="light"] body.preview-9-rc6-typography .backup-technical-grid,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .backup-technical-grid {
+  background: transparent !important;
+  gap: 8px !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .backup-technical-grid > div,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .backup-technical-grid > div {
+  color: var(--jade-text) !important;
+  background-color: var(--jade-stone-top) !important;
+  background-image: linear-gradient(180deg, var(--jade-stone-top) 0%, var(--jade-stone-bottom) 100%) !important;
+  border: 1px solid var(--jade-border-soft) !important;
+  border-radius: 10px !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.52), 0 2px 9px rgba(43,52,46,.09) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .backup-technical-grid > div :is(strong,span),
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .backup-technical-grid > div :is(strong,span) {
+  color: inherit !important;
+}
+
+html[data-theme="light"] body.preview-9-rc6-typography :is(
+  .cascade-awg-cluster-form > article,.cascade-awg-disabled-pair > article,
+  .cascade-awg-external-grid > article,.cascade-awg-route > article,
+  .cascade-awg-active-route > section
+),
+html[data-resolved-theme="light"] body.preview-9-rc6-typography :is(
+  .cascade-awg-cluster-form > article,.cascade-awg-disabled-pair > article,
+  .cascade-awg-external-grid > article,.cascade-awg-route > article,
+  .cascade-awg-active-route > section
+) {
+  color: var(--jade-text) !important;
+  background-color: var(--jade-stone-top) !important;
+  background-image: linear-gradient(180deg, var(--jade-stone-top) 0%, var(--jade-stone-bottom) 100%) !important;
+  border-color: var(--jade-border-soft) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.52), 0 2px 9px rgba(43,52,46,.09) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography :is(
+  .cascade-awg-cluster-form,.cascade-awg-disabled-pair,.cascade-awg-external-grid,
+  .cascade-awg-route,.cascade-awg-active-route
+) :is(h2,h3,h4,strong,b),
+html[data-resolved-theme="light"] body.preview-9-rc6-typography :is(
+  .cascade-awg-cluster-form,.cascade-awg-disabled-pair,.cascade-awg-external-grid,
+  .cascade-awg-route,.cascade-awg-active-route
+) :is(h2,h3,h4,strong,b) { color: var(--jade-text) !important; }
+html[data-theme="light"] body.preview-9-rc6-typography :is(
+  .cascade-awg-cluster-form,.cascade-awg-disabled-pair,.cascade-awg-external-grid,
+  .cascade-awg-route,.cascade-awg-active-route
+) :is(p,small,span,em),
+html[data-resolved-theme="light"] body.preview-9-rc6-typography :is(
+  .cascade-awg-cluster-form,.cascade-awg-disabled-pair,.cascade-awg-external-grid,
+  .cascade-awg-route,.cascade-awg-active-route
+) :is(p,small,span,em) { color: var(--jade-muted) !important; }
+
+html[data-theme="light"] body.preview-9-rc6-typography.awg-clients-page .clients-filter-field :is(input,select),
+html[data-resolved-theme="light"] body.preview-9-rc6-typography.awg-clients-page .clients-filter-field :is(input,select) {
+  color: var(--jade-text) !important;
+  background-color: var(--jade-input-top) !important;
+  background-image: linear-gradient(180deg, var(--jade-input-top) 0%, var(--jade-input-bottom) 100%) !important;
+  border-color: var(--jade-border) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography.awg-clients-page .clients-filter-field > span,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography.awg-clients-page .clients-filter-field > span {
+  color: var(--jade-muted) !important;
+}
+
+/* Error states keep their meaning without falling back to graphite panels. */
+html[data-theme="light"] body.preview-9-rc6-typography :is(
+  .dashboard-health.is-error,.validation-gate.is-error,.config-summary-card.is-error,
+  .hysteria-diagnostic-hero.is-error,.geofiles-check-result.is-error,
+  .ob-link-import-result.is-error,.diagnostics-log-summary.is-error
+),
+html[data-resolved-theme="light"] body.preview-9-rc6-typography :is(
+  .dashboard-health.is-error,.validation-gate.is-error,.config-summary-card.is-error,
+  .hysteria-diagnostic-hero.is-error,.geofiles-check-result.is-error,
+  .ob-link-import-result.is-error,.diagnostics-log-summary.is-error
+) {
+  color: var(--jade-error) !important;
+  background-color: var(--jade-error-bg) !important;
+  background-image: linear-gradient(180deg, #F2E2E3 0%, var(--jade-error-bg) 100%) !important;
+  border-color: var(--jade-error-border) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.54), 0 2px 10px rgba(96,47,52,.10) !important;
+}
+
+/* --------------------------------------------------------------------------
+   FIX12 full pass — structure cleanup, calm jade states, light scrollbars.
+   -------------------------------------------------------------------------- */
+html[data-theme="light"] body.preview-9-rc6-typography [hidden],
+html[data-resolved-theme="light"] body.preview-9-rc6-typography [hidden] {
+  display: none !important;
+}
+
+/* Remove nested card-on-card frames in tables and headings. */
+html[data-theme="light"] body.preview-9-rc6-typography :is(.ui-table-card,.clients-awg-table-card,.routing-rules-card,.security-history-card) .table-wrap,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography :is(.ui-table-card,.clients-awg-table-card,.routing-rules-card,.security-history-card) .table-wrap,
+html[data-theme="light"] body.preview-9-rc6-typography .routing-rules-card .routing-table-shell,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .routing-rules-card .routing-table-shell {
+  background: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography :is(.security-page .ui-card-heading,.expert-card > .ui-card-heading,.routing-page .compact-section-heading),
+html[data-resolved-theme="light"] body.preview-9-rc6-typography :is(.security-page .ui-card-heading,.expert-card > .ui-card-heading,.routing-page .compact-section-heading) {
+  background: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+
+/* Clients: remove right-side emptiness when nothing is selected and keep empty state wide. */
+html[data-theme="light"] body.preview-9-rc6-typography .clients-awg-master-detail.no-selection,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .clients-awg-master-detail.no-selection {
+  grid-template-columns: minmax(0, 1fr) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .clients-empty-state,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .clients-empty-state {
+  min-height: 280px;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .clients-filter-footer-actions,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .clients-filter-footer-actions {
+  gap: 10px;
+}
+
+/* Calm badges instead of bright sale-like pills. */
+html[data-theme="light"] body.preview-9-rc6-typography :is(.route-badge.direct,.expert-status.configured,.panel-access-card .pill.enabled,.status-badge.success),
+html[data-resolved-theme="light"] body.preview-9-rc6-typography :is(.route-badge.direct,.expert-status.configured,.panel-access-card .pill.enabled,.status-badge.success) {
+  color: #355e4a !important;
+  border-color: #9db6a8 !important;
+  border-radius: 12px !important;
+  background: linear-gradient(180deg, #E4EEE8 0%, #D6E4DB 100%) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.66) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .panel-access-card .pill.enabled i,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .panel-access-card .pill.enabled i {
+  box-shadow: none !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .panel-exposure-card .expert-status,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .panel-exposure-card .expert-status {
+  min-height: 36px;
+  padding: 8px 12px;
+  font-size: 11px;
+}
+
+/* Security / expert notes and current-state blocks should read as part of the card, not alien stickers. */
+html[data-theme="light"] body.preview-9-rc6-typography :is(.panel-access-current,.panel-exposure-current > div,.ui-info-note,.ui-warning-note),
+html[data-resolved-theme="light"] body.preview-9-rc6-typography :is(.panel-access-current,.panel-exposure-current > div,.ui-info-note,.ui-warning-note) {
+  border-radius: 14px !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .expert-card > :is(.ui-info-note,.ui-warning-note),
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .expert-card > :is(.ui-info-note,.ui-warning-note) {
+  margin-top: 0 !important;
+}
+
+/* Routing specific cleanup. */
+html[data-theme="light"] body.preview-9-rc6-typography .routing-summary-bar,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .routing-summary-bar {
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .routing-page-actions > div,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .routing-page-actions > div {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .routing-page .table-action-menu > summary,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .routing-page .table-action-menu > summary {
+  background: linear-gradient(180deg, #F4F1EA 0%, #E5DDD1 100%) !important;
+  border-color: var(--jade-border-soft) !important;
+  color: var(--jade-text) !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography .routing-page .table-action-menu > div,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .routing-page .table-action-menu > div {
+  background: linear-gradient(180deg, #F7F3EC 0%, #EAE2D7 100%) !important;
+  border-color: var(--jade-border) !important;
+}
+
+/* Light scrollbars: remove black bars and square arrows. */
+html[data-theme="light"] body.preview-9-rc6-typography,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography {
+  scrollbar-width: thin;
+  scrollbar-color: #8DA397 #DCE5DF;
+}
+html[data-theme="light"] body.preview-9-rc6-typography *::-webkit-scrollbar,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography *::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+html[data-theme="light"] body.preview-9-rc6-typography *::-webkit-scrollbar-track,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography *::-webkit-scrollbar-track {
+  background: #DCE5DF;
+  border-radius: 999px;
+}
+html[data-theme="light"] body.preview-9-rc6-typography *::-webkit-scrollbar-thumb,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography *::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #98B0A2 0%, #7E9789 100%);
+  border: 2px solid #DCE5DF;
+  border-radius: 999px;
+}
+html[data-theme="light"] body.preview-9-rc6-typography *::-webkit-scrollbar-thumb:hover,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography *::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, #8CA696 0%, #71887C 100%);
+}
+html[data-theme="light"] body.preview-9-rc6-typography *::-webkit-scrollbar-button,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography *::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
+}
+html[data-theme="light"] body.preview-9-rc6-typography *::-webkit-scrollbar-corner,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography *::-webkit-scrollbar-corner {
+  background: #DCE5DF;
+}
+@media (max-width: 1250px) {
+  html[data-theme="light"] body.preview-9-rc6-typography .routing-summary-bar,
+  html[data-resolved-theme="light"] body.preview-9-rc6-typography .routing-summary-bar {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+@media (max-width: 760px) {
+  html[data-theme="light"] body.preview-9-rc6-typography .routing-summary-bar,
+  html[data-resolved-theme="light"] body.preview-9-rc6-typography .routing-summary-bar {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* ========================================================================== 
+   FIX16 — Clients light-only precision pass, based on clean FIX12.
+   No shared Graphite rule is changed here.
+   ========================================================================== */
+
+/* Align the brand and global header border into one continuous line. */
+html[data-theme="light"] body.awg-clients-page.preview-9-rc6-typography .brand,
+html[data-resolved-theme="light"] body.awg-clients-page.preview-9-rc6-typography .brand,
+html[data-theme="light"] body.awg-clients-page.preview-9-rc6-typography .global-topbar,
+html[data-resolved-theme="light"] body.awg-clients-page.preview-9-rc6-typography .global-topbar {
+  box-sizing: border-box !important;
+  min-height: 72px !important;
+  height: 72px !important;
+  border-bottom-color: rgba(104,120,108,.50) !important;
+}
+html[data-theme="light"] body.awg-clients-page.preview-9-rc6-typography .brand,
+html[data-resolved-theme="light"] body.awg-clients-page.preview-9-rc6-typography .brand {
+  padding-top: 14px !important;
+  padding-bottom: 14px !important;
+}
+
+/* Thin jade scrollbar in the sidebar navigation; never a black divider. */
+html[data-theme="light"] body.awg-clients-page.preview-9-rc6-typography :is(.sidebar,.grouped-main-nav),
+html[data-resolved-theme="light"] body.awg-clients-page.preview-9-rc6-typography :is(.sidebar,.grouped-main-nav) {
+  scrollbar-width: thin !important;
+  scrollbar-color: #879D91 transparent !important;
+}
+html[data-theme="light"] body.awg-clients-page.preview-9-rc6-typography :is(.sidebar,.grouped-main-nav)::-webkit-scrollbar,
+html[data-resolved-theme="light"] body.awg-clients-page.preview-9-rc6-typography :is(.sidebar,.grouped-main-nav)::-webkit-scrollbar {
+  width: 8px !important;
+  height: 8px !important;
+}
+html[data-theme="light"] body.awg-clients-page.preview-9-rc6-typography :is(.sidebar,.grouped-main-nav)::-webkit-scrollbar-track,
+html[data-resolved-theme="light"] body.awg-clients-page.preview-9-rc6-typography :is(.sidebar,.grouped-main-nav)::-webkit-scrollbar-track {
+  background: transparent !important;
+}
+html[data-theme="light"] body.awg-clients-page.preview-9-rc6-typography :is(.sidebar,.grouped-main-nav)::-webkit-scrollbar-thumb,
+html[data-resolved-theme="light"] body.awg-clients-page.preview-9-rc6-typography :is(.sidebar,.grouped-main-nav)::-webkit-scrollbar-thumb {
+  min-height: 54px;
+  border: 2px solid transparent !important;
+  border-radius: 999px !important;
+  background: #879D91 !important;
+  background-clip: padding-box !important;
+}
+html[data-theme="light"] body.awg-clients-page.preview-9-rc6-typography :is(.sidebar,.grouped-main-nav)::-webkit-scrollbar-thumb:hover,
+html[data-resolved-theme="light"] body.awg-clients-page.preview-9-rc6-typography :is(.sidebar,.grouped-main-nav)::-webkit-scrollbar-thumb:hover {
+  background: #71897C !important;
+  background-clip: padding-box !important;
+}
+html[data-theme="light"] body.awg-clients-page.preview-9-rc6-typography :is(.sidebar,.grouped-main-nav)::-webkit-scrollbar-button,
+html[data-resolved-theme="light"] body.awg-clients-page.preview-9-rc6-typography :is(.sidebar,.grouped-main-nav)::-webkit-scrollbar-button {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+/* The reset form is a compact footer action, not a second filter grid. */
+html[data-theme="light"] body.awg-clients-page.preview-9-rc6-typography .clients-awg-filter-panel > footer,
+html[data-resolved-theme="light"] body.awg-clients-page.preview-9-rc6-typography .clients-awg-filter-panel > footer {
+  justify-content: space-between !important;
+}
+html[data-theme="light"] body.awg-clients-page.preview-9-rc6-typography .clients-filter-footer-actions,
+html[data-resolved-theme="light"] body.awg-clients-page.preview-9-rc6-typography .clients-filter-footer-actions {
+  display: flex !important;
+  flex: 0 0 auto !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  margin-left: auto !important;
+}
+html[data-theme="light"] body.awg-clients-page.preview-9-rc6-typography .clients-awg-filter-panel footer form.clients-footer-inline-form,
+html[data-resolved-theme="light"] body.awg-clients-page.preview-9-rc6-typography .clients-awg-filter-panel footer form.clients-footer-inline-form {
+  display: inline-flex !important;
+  grid-template-columns: none !important;
+  width: auto !important;
+  min-width: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  gap: 0 !important;
+}
+html[data-theme="light"] body.awg-clients-page.preview-9-rc6-typography .clients-footer-inline-form .button,
+html[data-resolved-theme="light"] body.awg-clients-page.preview-9-rc6-typography .clients-footer-inline-form .button {
+  width: auto !important;
+  min-width: 156px !important;
+  min-height: 32px !important;
+  padding-inline: 13px !important;
+}
+
+/* Selected row: visible, but no green carpet. */
+html[data-theme="light"] body.awg-clients-page.preview-9-rc6-typography .clients-awg-table tbody tr.selected,
+html[data-resolved-theme="light"] body.awg-clients-page.preview-9-rc6-typography .clients-awg-table tbody tr.selected {
+  background: transparent !important;
+  box-shadow: inset 3px 0 0 #648675 !important;
+}
+html[data-theme="light"] body.awg-clients-page.preview-9-rc6-typography .clients-awg-table tbody tr.selected td,
+html[data-resolved-theme="light"] body.awg-clients-page.preview-9-rc6-typography .clients-awg-table tbody tr.selected td {
+  color: var(--jade-text) !important;
+  border-color: rgba(104,120,108,.22) !important;
+  background: linear-gradient(180deg, #F0F5F1 0%, #E7EEE9 100%) !important;
+}
+
+/* Client state: compact, readable deep jade. */
+html[data-theme="light"] body.awg-clients-page.preview-9-rc6-typography .client-status-badge.active,
+html[data-resolved-theme="light"] body.awg-clients-page.preview-9-rc6-typography .client-status-badge.active {
+  min-height: 26px !important;
+  padding-inline: 10px !important;
+  color: #FFFDF7 !important;
+  border-color: #456F5C !important;
+  background: linear-gradient(180deg, #6F9581 0%, #4D755F 100%) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.24), 0 2px 7px rgba(43,52,46,.14) !important;
+  letter-spacing: .025em !important;
+}
+
+/* Route: warm stone with a restrained jade marker, distinct from status. */
+html[data-theme="light"] body.awg-clients-page.preview-9-rc6-typography .route-badge.direct,
+html[data-resolved-theme="light"] body.awg-clients-page.preview-9-rc6-typography .route-badge.direct {
+  gap: 6px !important;
+  padding: 5px 9px !important;
+  color: #355646 !important;
+  border-color: #AAA99B !important;
+  background: linear-gradient(180deg, #F5F0E7 0%, #E7DED1 100%) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.70) !important;
+}
+html[data-theme="light"] body.awg-clients-page.preview-9-rc6-typography .route-badge.direct::before,
+html[data-resolved-theme="light"] body.awg-clients-page.preview-9-rc6-typography .route-badge.direct::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  flex: 0 0 6px;
+  border-radius: 50%;
+  background: #527965;
+}
+
+/* Row actions: one jade action and one warm neutral action. */
+html[data-theme="light"] body.awg-clients-page.preview-9-rc6-typography .clients-row-actions,
+html[data-resolved-theme="light"] body.awg-clients-page.preview-9-rc6-typography .clients-row-actions {
+  display: grid !important;
+  grid-template-columns: minmax(94px,1fr) 36px !important;
+  align-items: stretch !important;
+  gap: 7px !important;
+}
+html[data-theme="light"] body.awg-clients-page.preview-9-rc6-typography .clients-row-actions .client-action,
+html[data-resolved-theme="light"] body.awg-clients-page.preview-9-rc6-typography .clients-row-actions .client-action {
+  min-height: 34px !important;
+  border-radius: 9px !important;
+  white-space: nowrap !important;
+}
+html[data-theme="light"] body.awg-clients-page.preview-9-rc6-typography .clients-row-actions .client-action.primary,
+html[data-resolved-theme="light"] body.awg-clients-page.preview-9-rc6-typography .clients-row-actions .client-action.primary {
+  width: 100% !important;
+  padding-inline: 9px !important;
+  color: #FFFDF7 !important;
+  border-color: #456F5C !important;
+  background: linear-gradient(180deg, #709A84 0%, #4D7864 100%) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.24), 0 2px 8px rgba(43,52,46,.16) !important;
+  font-size: 0 !important;
+}
+html[data-theme="light"] body.awg-clients-page.preview-9-rc6-typography .clients-row-actions .client-action.primary::after,
+html[data-resolved-theme="light"] body.awg-clients-page.preview-9-rc6-typography .clients-row-actions .client-action.primary::after {
+  content: attr(data-light-label);
+  font-size: 9px !important;
+  font-weight: 800 !important;
+}
+html[data-theme="light"] body.awg-clients-page.preview-9-rc6-typography .clients-row-actions .client-action.more,
+html[data-resolved-theme="light"] body.awg-clients-page.preview-9-rc6-typography .clients-row-actions .client-action.more {
+  width: 36px !important;
+  min-width: 36px !important;
+  padding: 0 !important;
+  color: #35413A !important;
+  border-color: #AAA99B !important;
+  background: linear-gradient(180deg, #F7F2E9 0%, #E7DDD0 100%) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.68), 0 2px 7px rgba(43,52,46,.10) !important;
+}
+
+/* Inspector: readable UUID/copy and quieter fact separators. */
+html[data-theme="light"] body.awg-clients-page.preview-9-rc6-typography .clients-awg-facts-compact,
+html[data-resolved-theme="light"] body.awg-clients-page.preview-9-rc6-typography .clients-awg-facts-compact {
+  border-top-color: rgba(104,120,108,.25) !important;
+}
+html[data-theme="light"] body.awg-clients-page.preview-9-rc6-typography .clients-awg-facts-compact > div,
+html[data-resolved-theme="light"] body.awg-clients-page.preview-9-rc6-typography .clients-awg-facts-compact > div {
+  border-bottom-color: rgba(104,120,108,.22) !important;
+}
+html[data-theme="light"] body.awg-clients-page.preview-9-rc6-typography .client-auth-line code,
+html[data-resolved-theme="light"] body.awg-clients-page.preview-9-rc6-typography .client-auth-line code {
+  color: #34423A !important;
+  font-weight: 700 !important;
+  opacity: 1 !important;
+}
+html[data-theme="light"] body.awg-clients-page.preview-9-rc6-typography .client-copy-icon,
+html[data-resolved-theme="light"] body.awg-clients-page.preview-9-rc6-typography .client-copy-icon {
+  min-height: 30px !important;
+  padding-inline: 10px !important;
+  color: #355646 !important;
+  border-color: #9EA99F !important;
+  background: linear-gradient(180deg, #F7F3EB 0%, #E9E1D6 100%) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.68), 0 2px 6px rgba(43,52,46,.09) !important;
+}
+html[data-theme="light"] body.awg-clients-page.preview-9-rc6-typography .client-subscription-state.enabled,
+html[data-resolved-theme="light"] body.awg-clients-page.preview-9-rc6-typography .client-subscription-state.enabled {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  padding: 0 !important;
+  color: #356B56 !important;
+  border: 0 !important;
+  background: transparent !important;
+  font-weight: 850 !important;
+}
+html[data-theme="light"] body.awg-clients-page.preview-9-rc6-typography .client-subscription-state.enabled::before,
+html[data-resolved-theme="light"] body.awg-clients-page.preview-9-rc6-typography .client-subscription-state.enabled::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  flex: 0 0 6px;
+  border-radius: 50%;
+  background: #527965;
+}
+
+/* FIX20 — keep the current Cascade route as one Luxury Jade card. */
+html[data-theme="light"] body.preview-9-rc6-typography.sg-awg-cascade-rc6 .cascade-current-card > :is(.cascade-link-card,.cascade-empty-state),
+html[data-resolved-theme="light"] body.preview-9-rc6-typography.sg-awg-cascade-rc6 .cascade-current-card > :is(.cascade-link-card,.cascade-empty-state) {
+  background-color: transparent !important;
+  background-image: none !important;
+  border-right: 0 !important;
+  border-bottom: 0 !important;
+  border-left: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography.sg-awg-cascade-rc6 .cascade-current-card > .cascade-link-card,
+html[data-theme="light"] body.preview-9-rc6-typography.sg-awg-cascade-rc6 .cascade-current-card > .cascade-empty-state,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography.sg-awg-cascade-rc6 .cascade-current-card > .cascade-link-card,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography.sg-awg-cascade-rc6 .cascade-current-card > .cascade-empty-state {
+  border-top: 1px solid var(--jade-border-soft) !important;
+}

@@ -1,0 +1,61 @@
+/* SG-Panel Preview 9 FIX35 — full recovery: devices, safe dialogs, QR guard. */
+.sg-global-dialog,
+.clients-dialog {
+  width:min(680px, calc(100vw - 32px));
+  max-height:calc(100vh - 32px);
+  overflow:auto;
+  border:1px solid var(--line-soft);
+  border-radius:18px;
+  padding:0;
+  background:var(--panel);
+  color:var(--text);
+  box-shadow:0 24px 72px rgba(0,0,0,.35);
+}
+.sg-global-dialog::backdrop,
+.clients-dialog::backdrop { background:rgba(7,12,18,.68); backdrop-filter:blur(3px); }
+.sg-global-dialog form { display:grid; gap:18px; padding:22px; }
+.sg-global-dialog header { display:flex; gap:14px; align-items:center; }
+.sg-global-dialog header h2 { margin:2px 0 0; }
+.sg-global-dialog [data-sg-dialog-message] { margin:0; line-height:1.55; white-space:pre-line; color:var(--text-muted); }
+.sg-dialog-mark { display:grid; place-items:center; width:42px; height:42px; flex:0 0 42px; border-radius:13px; border:1px solid var(--line-soft); background:var(--panel-soft); font-weight:800; }
+.sg-global-dialog .ui-actions { justify-content:flex-end; margin:0; }
+
+body.access-devices-fix35 .clients-awg-master-detail { align-items:start; }
+body.access-devices-fix35 .clients-awg-table th:nth-child(3),
+body.access-devices-fix35 .clients-awg-table td:nth-child(3) { width:96px; }
+.device-count-badge { display:inline-grid; grid-template-columns:auto auto; align-items:baseline; gap:4px; min-width:70px; }
+.device-count-badge b { font-size:18px; }
+.device-count-badge small { grid-column:1 / -1; color:var(--text-muted); font-size:11px; }
+.client-devices-section { display:grid; gap:12px; padding:14px; border:1px solid var(--line-soft); border-radius:16px; background:var(--panel-soft); }
+.client-devices-section > header { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.client-devices-section > header > div { display:flex; align-items:baseline; gap:9px; }
+.client-devices-section > header span { color:var(--text-muted); font-size:11px; font-weight:800; letter-spacing:.08em; }
+.client-device-list { display:grid; gap:10px; }
+.client-device-card { display:grid; gap:10px; padding:13px; border:1px solid var(--line-soft); border-radius:14px; background:var(--panel); }
+.client-device-card.is-primary { box-shadow:inset 3px 0 0 var(--accent); }
+.client-device-card.is-disabled { opacity:.78; }
+.client-device-title { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
+.client-device-title > div { min-width:0; }
+.client-device-title strong { display:inline-block; margin-right:7px; }
+.client-device-title small { display:block; margin-top:3px; color:var(--text-muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.device-primary-badge { display:inline-flex; padding:2px 7px; border:1px solid var(--line-soft); border-radius:999px; font-size:10px; font-weight:800; color:var(--text-muted); vertical-align:middle; }
+.client-device-uuid { display:flex; align-items:center; gap:8px; min-width:0; }
+.client-device-uuid code { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.client-device-uuid button { border:0; background:transparent; color:var(--accent); font:inherit; font-size:12px; cursor:pointer; }
+.client-device-meta { display:flex; flex-wrap:wrap; gap:8px 16px; color:var(--text-muted); font-size:12px; }
+.client-device-actions { display:flex; flex-wrap:wrap; gap:7px; }
+.client-device-actions form { margin:0; }
+.subscription-device-uuid { display:block; max-width:520px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text-muted); }
+.qr-overflow-note { display:grid; place-items:center; min-height:220px; padding:26px; border:1px dashed var(--line-soft); border-radius:16px; text-align:center; background:var(--panel-soft); }
+.qr-overflow-note p { max-width:420px; margin:8px 0 0; color:var(--text-muted); line-height:1.5; }
+
+@media (max-width:1100px) {
+  body.access-devices-fix35 .clients-awg-master-detail { grid-template-columns:1fr; }
+  body.access-devices-fix35 .clients-awg-inspector { position:static; }
+}
+@media (max-width:680px) {
+  .client-devices-section > header,
+  .client-device-title { align-items:stretch; flex-direction:column; }
+  .client-device-actions > *, .client-device-actions form, .client-device-actions button, .client-device-actions a { width:100%; }
+  .client-device-uuid { align-items:stretch; flex-direction:column; }
+}

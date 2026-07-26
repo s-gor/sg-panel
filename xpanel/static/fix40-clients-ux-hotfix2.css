@@ -1,0 +1,143 @@
+/* SG-Panel Preview 9 FIX40 · Clients UX Hotfix 2
+ * Scope: expose per-device access actions and rebuild the client-management hierarchy.
+ */
+
+body.clients-ux-hotfix2 .clients-awg-table th:nth-child(1) { width: 19% !important; }
+body.clients-ux-hotfix2 .clients-awg-table th:nth-child(2) { width: 20% !important; }
+body.clients-ux-hotfix2 .clients-awg-table th:nth-child(3) { width: 9% !important; }
+body.clients-ux-hotfix2 .clients-awg-table th:nth-child(4) { width: 9% !important; }
+body.clients-ux-hotfix2 .clients-awg-table th:nth-child(5) { width: 10% !important; }
+body.clients-ux-hotfix2 .clients-awg-table th:nth-child(6) { width: 33% !important; min-width: 286px !important; }
+
+body.clients-ux-hotfix2 .clients-device-row-actions {
+  display: grid !important;
+  grid-template-columns: minmax(166px, 1fr) minmax(92px, auto) !important;
+  align-items: stretch !important;
+  justify-content: end !important;
+  gap: 8px !important;
+  width: 100% !important;
+  min-width: 266px !important;
+  max-width: 330px !important;
+  margin-left: auto !important;
+}
+body.clients-ux-hotfix2 .clients-device-row-actions .client-action {
+  min-width: 0 !important;
+  min-height: 36px !important;
+  padding: 8px 11px !important;
+  border-radius: 9px !important;
+  font-size: 9px !important;
+  line-height: 1.15 !important;
+  white-space: nowrap !important;
+}
+body.clients-ux-hotfix2 .clients-device-row-actions .devices-link {
+  width: 100% !important;
+  font-size: 9px !important;
+}
+body.clients-ux-hotfix2 .clients-device-row-actions .devices-link::after {
+  content: none !important;
+  display: none !important;
+}
+body.clients-ux-hotfix2 .clients-device-row-actions .add-device-link {
+  color: var(--text) !important;
+  border: 1px solid var(--line) !important;
+  background: var(--panel-2) !important;
+  box-shadow: none !important;
+}
+body.clients-ux-hotfix2 .clients-device-row-actions .add-device-link:hover {
+  color: var(--accent-strong, var(--accent)) !important;
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--line)) !important;
+  background: color-mix(in srgb, var(--accent-soft) 62%, var(--panel-2)) !important;
+}
+
+body.clients-ux-hotfix2 .client-management-panel {
+  display: grid;
+  gap: 11px;
+  margin-top: 14px;
+  padding-top: 13px;
+  border-top: 1px solid var(--line);
+  background: transparent !important;
+}
+body.clients-ux-hotfix2 .client-management-panel h3 {
+  margin: 0;
+  color: var(--text);
+  font-size: 11px;
+  font-weight: 800;
+}
+body.clients-ux-hotfix2 .client-management-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+body.clients-ux-hotfix2 .client-management-panel form,
+body.clients-ux-hotfix2 .client-management-panel .button {
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+}
+body.clients-ux-hotfix2 .client-management-panel .button {
+  min-height: 42px;
+  padding: 9px 10px;
+  border-radius: 10px;
+  font-size: 10px;
+  line-height: 1.2;
+}
+body.clients-ux-hotfix2 .client-management-delete {
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+body.clients-ux-hotfix2 .client-management-delete .danger-outline {
+  color: var(--danger, #b34b55) !important;
+  border-color: color-mix(in srgb, var(--danger, #b34b55) 58%, var(--line)) !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+body.clients-ux-hotfix2 .client-management-delete .danger-outline:hover {
+  color: #fff !important;
+  border-color: var(--danger, #b34b55) !important;
+  background: var(--danger, #b34b55) !important;
+}
+
+html[data-theme="light"] body.clients-ux-hotfix2 .clients-device-row-actions .add-device-link,
+html[data-resolved-theme="light"] body.clients-ux-hotfix2 .clients-device-row-actions .add-device-link {
+  color: #35413a !important;
+  border-color: #aaa99b !important;
+  background: linear-gradient(180deg, #f7f2e9 0%, #e7ddd0 100%) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.68), 0 2px 7px rgba(43,52,46,.10) !important;
+}
+html[data-theme="light"] body.clients-ux-hotfix2 .client-management-panel,
+html[data-resolved-theme="light"] body.clients-ux-hotfix2 .client-management-panel {
+  border-top-color: rgba(104,120,108,.26) !important;
+}
+html[data-theme="light"] body.clients-ux-hotfix2 .client-management-delete,
+html[data-resolved-theme="light"] body.clients-ux-hotfix2 .client-management-delete {
+  border-top-color: rgba(104,120,108,.22) !important;
+}
+html[data-theme="light"] body.clients-ux-hotfix2 .client-management-reset,
+html[data-resolved-theme="light"] body.clients-ux-hotfix2 .client-management-reset {
+  color: #34423a !important;
+  border-color: #aaa99b !important;
+  background: linear-gradient(180deg, #f7f2e9 0%, #e7ddd0 100%) !important;
+}
+html[data-theme="light"] body.clients-ux-hotfix2 .client-management-toggle.warning,
+html[data-resolved-theme="light"] body.clients-ux-hotfix2 .client-management-toggle.warning {
+  color: #6a4b12 !important;
+  border-color: #c8a75c !important;
+  background: #f1e4c7 !important;
+}
+html[data-theme="light"] body.clients-ux-hotfix2 .client-management-delete .danger-outline,
+html[data-resolved-theme="light"] body.clients-ux-hotfix2 .client-management-delete .danger-outline {
+  color: #a74750 !important;
+  border-color: #c9848b !important;
+  background: #fffaf8 !important;
+}
+
+@media (max-width: 1380px) {
+  body.clients-ux-hotfix2 .clients-awg-table th:nth-child(6) { min-width: 250px !important; }
+  body.clients-ux-hotfix2 .clients-device-row-actions {
+    grid-template-columns: minmax(145px, 1fr) minmax(86px, auto) !important;
+    min-width: 236px !important;
+  }
+}
+@media (max-width: 760px) {
+  body.clients-ux-hotfix2 .client-management-actions { grid-template-columns: 1fr; }
+}

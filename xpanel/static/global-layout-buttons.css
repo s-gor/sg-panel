@@ -1,0 +1,364 @@
+/* ========================================================================== 
+   SG-Panel Preview 9 — FIX18 audited global alignment and intact-button pass.
+   Shared geometry only: Graphite and SG Luxury Jade Depth use the same layout.
+   ========================================================================== */
+
+body.preview-9-rc6-typography {
+  --sg-shell-sidebar-width: 260px;
+  --sg-shell-header-height: 72px;
+  --sg-content-gutter: 24px;
+  --sg-content-max: 1540px;
+}
+
+/* One shell grid and one continuous seam between sidebar and workspace. */
+body.preview-9-rc6-typography .shell:not(.sidebar-collapsed) {
+  grid-template-columns: var(--sg-shell-sidebar-width) minmax(0, 1fr) !important;
+}
+body.preview-9-rc6-typography .shell:not(.sidebar-collapsed) > .sidebar {
+  width: var(--sg-shell-sidebar-width) !important;
+}
+body.preview-9-rc6-typography .workspace {
+  min-width: 0 !important;
+  width: 100% !important;
+  border-left: 0 !important;
+}
+body.preview-9-rc6-typography .brand,
+body.preview-9-rc6-typography .global-topbar {
+  box-sizing: border-box !important;
+  min-height: var(--sg-shell-header-height) !important;
+  height: var(--sg-shell-header-height) !important;
+  border-bottom-width: 1px !important;
+  border-bottom-style: solid !important;
+}
+body.preview-9-rc6-typography .brand {
+  padding-top: 14px !important;
+  padding-bottom: 14px !important;
+}
+body.preview-9-rc6-typography .global-topbar {
+  padding-inline: var(--sg-content-gutter) !important;
+}
+
+/* Every real top-level page root uses the same left/right guides. */
+body.preview-9-rc6-typography .content,
+body.preview-9-rc6-typography.preview-7-awg-exact.awg-clients-page .content,
+body.preview-9-rc6-typography.preview-7-awg-exact.awg-cluster-page .content,
+body.preview-9-rc6-typography.preview-7-awg-exact.awg-cascade-page .content,
+body.preview-9-rc6-typography.sg-awg-cascade-rc6 .content {
+  box-sizing: border-box !important;
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 25px var(--sg-content-gutter) 32px !important;
+}
+body.preview-9-rc6-typography .content > :is(
+  .topbar.page-header,
+  .section-tabs,
+  .flash-stack,
+  .ui-page,
+  .cascade-registry-page,
+  .ob-page,
+  .link-grid,
+  .client-link-page-actions,
+  .client-link-group,
+  .single-form-wrap,
+  .panel-card,
+  .app-footer
+) {
+  box-sizing: border-box !important;
+  width: min(var(--sg-content-max), 100%) !important;
+  max-width: var(--sg-content-max) !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+}
+body.preview-9-rc6-typography .content > .client-link-group > .link-grid,
+body.preview-9-rc6-typography .content > .client-link-group > .direct-link-instance {
+  width: 100% !important;
+  max-width: none !important;
+}
+
+/* Button boxes grow to their real labels. Text never escapes outside the box. */
+body.preview-9-rc6-typography :is(
+  .button,
+  .client-action,
+  .client-copy-icon,
+  .theme-chip,
+  .account-button
+) {
+  box-sizing: border-box !important;
+  inline-size: auto !important;
+  width: auto !important;
+  min-inline-size: max-content !important;
+  min-width: max-content !important;
+  max-inline-size: 100% !important;
+  max-width: 100% !important;
+  flex: 0 0 auto !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: clip !important;
+  overflow-wrap: normal !important;
+  word-break: normal !important;
+}
+body.preview-9-rc6-typography :is(
+  .icon-button,
+  .sidebar-collapse,
+  .logout-button,
+  .clients-dialog-close,
+  .password-toggle,
+  .table-action-menu > summary,
+  .compact-action-menu > summary,
+  .cascade-more-menu > summary
+) {
+  box-sizing: border-box !important;
+  flex-shrink: 0 !important;
+}
+body.preview-9-rc6-typography .button {
+  min-height: 40px !important;
+  padding-inline: 16px !important;
+  line-height: 1.2 !important;
+}
+body.preview-9-rc6-typography .button.small {
+  min-height: 34px !important;
+  padding-inline: 13px !important;
+}
+body.preview-9-rc6-typography .button.full,
+body.preview-9-rc6-typography .login-submit.full {
+  inline-size: 100% !important;
+  width: 100% !important;
+  min-inline-size: 0 !important;
+  min-width: 0 !important;
+}
+
+/* Action areas wrap whole buttons instead of narrowing their labels. */
+body.preview-9-rc6-typography :is(
+  .topbar-actions,
+  .topbar-page-actions,
+  .ui-actions,
+  .actions,
+  .row-actions,
+  .ui-heading-actions,
+  .client-link-page-actions,
+  .clients-awg-actions,
+  .clients-filter-footer-actions,
+  .clients-awg-inspector-actions,
+  .cluster-stage4-actions,
+  .cluster-stage4-step-actions,
+  .cascade-card-actions,
+  .cascade-cluster-heading-actions,
+  .cascade-link-actions,
+  .panel-exposure-actions,
+  .security-settings-actions,
+  .backup-page-actions,
+  .routing-page-actions,
+  .update-action-buttons,
+  .update-result-actions,
+  .json-editor-actions,
+  .editor-toolbar-actions,
+  .dns-preview-actions,
+  .warp-actions,
+  .warp-routing-actions,
+  .warp-preset-actions,
+  .ob-link-import-actions,
+  .advanced-safety-actions,
+  .geofiles-apply-actions,
+  .hysteria-studio-actions,
+  .xray-channel-actions
+) {
+  min-width: 0 !important;
+  max-width: 100% !important;
+  overflow: visible !important;
+  flex-wrap: wrap !important;
+}
+body.preview-9-rc6-typography :is(
+  .topbar-page-actions,
+  .ui-actions,
+  .actions,
+  .row-actions,
+  .ui-heading-actions,
+  .client-link-page-actions,
+  .clients-awg-actions,
+  .clients-filter-footer-actions,
+  .cluster-stage4-actions,
+  .cascade-card-actions,
+  .panel-exposure-actions,
+  .backup-page-actions,
+  .routing-page-actions,
+  .update-action-buttons,
+  .update-result-actions,
+  .json-editor-actions
+) > form {
+  min-width: max-content;
+  max-width: 100%;
+  margin: 0;
+}
+
+/* Clients: reserve the real width of “Конфигурация” and the overflow menu. */
+body.preview-9-rc6-typography .clients-awg-table th:nth-child(1) { width: 23% !important; }
+body.preview-9-rc6-typography .clients-awg-table th:nth-child(2) { width: 24% !important; }
+body.preview-9-rc6-typography .clients-awg-table th:nth-child(3) { width: 11% !important; }
+body.preview-9-rc6-typography .clients-awg-table th:nth-child(4) { width: 10% !important; }
+body.preview-9-rc6-typography .clients-awg-table th:nth-child(5) { width: 12% !important; }
+body.preview-9-rc6-typography .clients-awg-table th:nth-child(6) { width: 20% !important; min-width: 178px !important; }
+body.preview-9-rc6-typography .clients-awg-table :is(th,td):last-child { overflow: visible !important; }
+body.preview-9-rc6-typography .clients-row-actions {
+  display: grid !important;
+  grid-template-columns: minmax(122px, max-content) 40px !important;
+  align-items: stretch !important;
+  justify-content: end !important;
+  gap: 7px !important;
+  width: max-content !important;
+  min-width: 169px !important;
+  max-width: none !important;
+  margin-left: auto !important;
+  overflow: visible !important;
+}
+body.preview-9-rc6-typography .clients-row-actions .client-action {
+  min-height: 34px !important;
+  padding-inline: 11px !important;
+}
+body.preview-9-rc6-typography .clients-row-actions .client-action.primary { min-width: 122px !important; }
+body.preview-9-rc6-typography .clients-row-actions .client-action.primary::after { content: none !important; display: none !important; }
+body.preview-9-rc6-typography .clients-row-actions .client-action.more {
+  inline-size: 40px !important;
+  width: 40px !important;
+  min-inline-size: 40px !important;
+  min-width: 40px !important;
+  padding: 0 !important;
+}
+
+/* Other real action tables keep full labels and scroll as a table when needed. */
+body.preview-9-rc6-typography .subscription-users table { min-width: 1120px !important; }
+body.preview-9-rc6-typography .subscription-users th:last-child { min-width: 300px !important; }
+body.preview-9-rc6-typography .subscription-users td:last-child .row-actions {
+  flex-wrap: nowrap !important;
+  min-width: max-content !important;
+}
+body.preview-9-rc6-typography .dns-page .ui-table-card table { min-width: 1080px !important; }
+body.preview-9-rc6-typography .dns-page .ui-table-card th:last-child { min-width: 270px !important; }
+body.preview-9-rc6-typography .dns-page .ui-table-card td:last-child .row-actions {
+  flex-wrap: nowrap !important;
+  min-width: max-content !important;
+}
+body.preview-9-rc6-typography :is(
+  .routing-rule-actions,
+  .backup-row-actions,
+  .compact-node-actions,
+  .client-inspector-actions,
+  .node-action-stack,
+  .node-action-stack-simple,
+  .node-action-stack-maintenance
+) {
+  min-width: max-content;
+  max-width: 100%;
+  overflow: visible !important;
+}
+body.preview-9-rc6-typography :is(.table-action-menu,.compact-action-menu,.cascade-more-menu) { overflow: visible !important; }
+
+/* Menus and scenario cards are deliberately multiline. */
+body.preview-9-rc6-typography :is(
+  .theme-menu button,
+  .account-menu button,
+  .table-action-menu button,
+  .compact-action-menu button,
+  .routing-preset-buttons button,
+  .cascade-mode-choice
+) {
+  white-space: normal !important;
+  overflow-wrap: anywhere !important;
+}
+
+@media (max-width: 1100px) {
+  body.preview-9-rc6-typography { --sg-content-gutter: 20px; }
+  body.preview-9-rc6-typography .shell:not(.sidebar-collapsed) {
+    grid-template-columns: 220px minmax(0, 1fr) !important;
+  }
+  body.preview-9-rc6-typography .shell:not(.sidebar-collapsed) > .sidebar { width: 220px !important; }
+  body.preview-9-rc6-typography .clients-awg-master-detail { grid-template-columns: 1fr !important; }
+  body.preview-9-rc6-typography .clients-awg-table { min-width: 980px !important; }
+  body.preview-9-rc6-typography .clients-awg-table-card .table-wrap,
+  body.preview-9-rc6-typography .subscription-users .table-wrap,
+  body.preview-9-rc6-typography .dns-page .ui-table-card .table-wrap { overflow-x: auto !important; }
+}
+
+@media (max-width: 760px) {
+  body.preview-9-rc6-typography { --sg-content-gutter: 12px; }
+  body.preview-9-rc6-typography .shell,
+  body.preview-9-rc6-typography .shell:not(.sidebar-collapsed) { display: block !important; }
+  body.preview-9-rc6-typography .shell > .sidebar,
+  body.preview-9-rc6-typography .shell:not(.sidebar-collapsed) > .sidebar {
+    position: relative !important;
+    width: 100% !important;
+    height: auto !important;
+  }
+  body.preview-9-rc6-typography .brand,
+  body.preview-9-rc6-typography .global-topbar {
+    height: auto !important;
+    min-height: var(--sg-shell-header-height) !important;
+  }
+  body.preview-9-rc6-typography :is(.button,.client-action,.client-copy-icon) {
+    min-inline-size: 0 !important;
+    min-width: 0 !important;
+    white-space: normal !important;
+    overflow-wrap: anywhere !important;
+  }
+  body.preview-9-rc6-typography .clients-row-actions {
+    grid-template-columns: minmax(0, 1fr) 40px !important;
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+}
+
+html[data-theme="light"] body.preview-9-rc6-typography .clients-row-actions .client-action.primary,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography .clients-row-actions .client-action.primary,
+html[data-theme="light"] body.awg-clients-page.preview-9-rc6-typography .clients-row-actions .client-action.primary,
+html[data-resolved-theme="light"] body.awg-clients-page.preview-9-rc6-typography .clients-row-actions .client-action.primary {
+  font-size: 10px !important;
+}
+
+/* FIX19 — Luxury Jade sidebar scrollbar parity on every page.
+   Keep the standard sidebar width used by the rest of the panel, but replace
+   the black thumb with the muted jade treatment first used on Clients. */
+html[data-theme="light"] body.preview-9-rc6-typography :is(.sidebar,.grouped-main-nav),
+html[data-resolved-theme="light"] body.preview-9-rc6-typography :is(.sidebar,.grouped-main-nav) {
+  scrollbar-width: auto !important;
+  scrollbar-color: #879D91 transparent !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography :is(.sidebar,.grouped-main-nav)::-webkit-scrollbar,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography :is(.sidebar,.grouped-main-nav)::-webkit-scrollbar {
+  width: 12px !important;
+  height: 12px !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography :is(.sidebar,.grouped-main-nav)::-webkit-scrollbar-track,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography :is(.sidebar,.grouped-main-nav)::-webkit-scrollbar-track {
+  background: transparent !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography :is(.sidebar,.grouped-main-nav)::-webkit-scrollbar-thumb,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography :is(.sidebar,.grouped-main-nav)::-webkit-scrollbar-thumb {
+  min-height: 54px;
+  border: 2px solid transparent !important;
+  border-radius: 999px !important;
+  background: #879D91 !important;
+  background-clip: padding-box !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography :is(.sidebar,.grouped-main-nav)::-webkit-scrollbar-thumb:hover,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography :is(.sidebar,.grouped-main-nav)::-webkit-scrollbar-thumb:hover {
+  background: #71897C !important;
+  background-clip: padding-box !important;
+}
+html[data-theme="light"] body.preview-9-rc6-typography :is(.sidebar,.grouped-main-nav)::-webkit-scrollbar-button,
+html[data-resolved-theme="light"] body.preview-9-rc6-typography :is(.sidebar,.grouped-main-nav)::-webkit-scrollbar-button {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+/* Clients used a narrower legacy override; normalize it to the same 12 px width. */
+html[data-theme="light"] body.awg-clients-page.preview-9-rc6-typography :is(.sidebar,.grouped-main-nav),
+html[data-resolved-theme="light"] body.awg-clients-page.preview-9-rc6-typography :is(.sidebar,.grouped-main-nav) {
+  scrollbar-width: auto !important;
+  scrollbar-color: #879D91 transparent !important;
+}
+html[data-theme="light"] body.awg-clients-page.preview-9-rc6-typography :is(.sidebar,.grouped-main-nav)::-webkit-scrollbar,
+html[data-resolved-theme="light"] body.awg-clients-page.preview-9-rc6-typography :is(.sidebar,.grouped-main-nav)::-webkit-scrollbar {
+  width: 12px !important;
+  height: 12px !important;
+}

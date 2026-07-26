@@ -1,0 +1,198 @@
+/* SG-Panel Preview 9 · FIX40 UI Compact Hotfix 6
+   Final compact pass for Outbounds. Loaded after Hotfix 5. */
+
+/* Keep the page full-width and use the same vertical rhythm as the rest of SG-Panel. */
+body.outbounds-page .ob-page {
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 !important;
+  gap: 14px !important;
+}
+
+body.outbounds-page :is(.ob-system-panel,.warp-panel,.ob-user-outputs-panel) {
+  margin: 0 !important;
+  border-radius: 16px !important;
+  box-shadow: var(--shadow-sm) !important;
+}
+
+/* System and custom headings: ordinary card typography, not display typography. */
+body.outbounds-page :is(.ob-section-heading,.ob-user-outputs-heading) {
+  min-height: 0 !important;
+  padding: 13px 18px !important;
+  gap: 14px !important;
+}
+body.outbounds-page :is(.ob-section-heading,.ob-user-outputs-heading) h2 {
+  margin: 0 0 3px !important;
+  font-size: 17px !important;
+  line-height: 1.22 !important;
+  letter-spacing: -.01em !important;
+}
+body.outbounds-page :is(.ob-section-heading,.ob-user-outputs-heading) p:last-child {
+  margin: 0 !important;
+  font-size: 12.5px !important;
+  line-height: 1.4 !important;
+}
+body.outbounds-page .ob-user-outputs-heading .panel-kicker {
+  margin: 0 0 4px !important;
+  font-size: 9px !important;
+}
+
+/* Two system outputs should read as compact rows, not oversized cards. */
+body.outbounds-page .ob-system-row {
+  min-height: 56px !important;
+  padding: 9px 16px !important;
+  gap: 11px !important;
+}
+body.outbounds-page .ob-system-icon {
+  width: 32px !important;
+  height: 32px !important;
+  border-radius: 9px !important;
+}
+body.outbounds-page .ob-system-title {
+  gap: 6px !important;
+  margin-bottom: 2px !important;
+}
+body.outbounds-page .ob-system-title strong {
+  font-size: 14px !important;
+  line-height: 1.25 !important;
+}
+body.outbounds-page .ob-system-title span {
+  font-size: 11.5px !important;
+  line-height: 1.3 !important;
+}
+body.outbounds-page .ob-system-main p {
+  font-size: 12px !important;
+  line-height: 1.35 !important;
+}
+body.outbounds-page .ob-system-main small,
+body.outbounds-page .ob-system-meta code,
+body.outbounds-page .ob-meta-label {
+  font-size: 10.5px !important;
+}
+
+/* WARP becomes one compact operational card. */
+body.outbounds-page .warp-panel {
+  padding: 16px 18px !important;
+}
+body.outbounds-page .warp-heading {
+  align-items: center !important;
+  gap: 18px !important;
+  margin: 0 0 12px !important;
+}
+body.outbounds-page .warp-heading .panel-kicker {
+  margin: 0 0 4px !important;
+  font-size: 9px !important;
+}
+body.outbounds-page .warp-heading h2 {
+  margin: 0 0 4px !important;
+  font-size: 19px !important;
+  line-height: 1.18 !important;
+  letter-spacing: -.015em !important;
+}
+body.outbounds-page .warp-heading p:last-child {
+  max-width: 900px !important;
+  margin: 0 !important;
+  font-size: 12.5px !important;
+  line-height: 1.4 !important;
+}
+body.outbounds-page .warp-status {
+  gap: 7px !important;
+  min-height: 30px !important;
+  padding: 5px 10px !important;
+  font-size: 12px !important;
+}
+body.outbounds-page .warp-status i {
+  width: 8px !important;
+  height: 8px !important;
+}
+body.outbounds-page .warp-create-box {
+  gap: 16px !important;
+  padding: 12px 14px !important;
+  border-radius: 12px !important;
+}
+body.outbounds-page .warp-create-box strong {
+  font-size: 14px !important;
+  line-height: 1.3 !important;
+}
+body.outbounds-page .warp-create-box p {
+  margin: 4px 0 0 !important;
+  font-size: 12px !important;
+  line-height: 1.4 !important;
+}
+body.outbounds-page .warp-helper-warning {
+  margin-top: 5px !important;
+  font-size: 11px !important;
+}
+body.outbounds-page .warp-summary-grid {
+  gap: 10px !important;
+  margin: 0 0 10px !important;
+}
+body.outbounds-page .warp-summary-grid article {
+  padding: 11px 13px !important;
+  border-radius: 11px !important;
+}
+body.outbounds-page .warp-summary-grid span,
+body.outbounds-page .warp-summary-grid small {
+  font-size: 11px !important;
+  line-height: 1.35 !important;
+}
+body.outbounds-page .warp-summary-grid strong {
+  margin: 3px 0 !important;
+  font-size: 13.5px !important;
+}
+body.outbounds-page .warp-actions {
+  gap: 8px !important;
+  margin: 0 !important;
+}
+
+/* Local action sizing: same compact controls used elsewhere in the panel. */
+body.outbounds-page :is(.warp-panel,.ob-system-panel,.ob-user-outputs-panel) .button {
+  min-height: 38px !important;
+  padding: 8px 13px !important;
+  font-size: 12.5px !important;
+  line-height: 1.2 !important;
+}
+body.outbounds-page :is(.warp-panel,.ob-system-panel,.ob-user-outputs-panel) .button.small {
+  min-height: 34px !important;
+  padding: 7px 10px !important;
+  font-size: 11.5px !important;
+}
+
+/* Empty custom-output state must not create another large visual block. */
+body.outbounds-page .ob-user-output-empty {
+  min-height: 64px !important;
+  padding: 12px 18px !important;
+}
+body.outbounds-page .ob-user-output-empty strong {
+  font-size: 13.5px !important;
+}
+body.outbounds-page .ob-user-output-empty p {
+  margin-top: 3px !important;
+  font-size: 12px !important;
+}
+
+/* The page-level Instruction button is the only help control on this page. */
+body.outbounds-page .warp-routing-link,
+body.outbounds-page .warp-routing-actions {
+  display: none !important;
+}
+
+@media (max-width: 760px) {
+  body.outbounds-page .warp-heading,
+  body.outbounds-page .warp-create-box {
+    align-items: stretch !important;
+    flex-direction: column !important;
+  }
+  body.outbounds-page .warp-create-box form,
+  body.outbounds-page .warp-create-box .button {
+    width: 100% !important;
+  }
+  body.outbounds-page .ob-system-row {
+    grid-template-columns: 32px minmax(0, 1fr) !important;
+  }
+  body.outbounds-page .ob-system-meta,
+  body.outbounds-page .ob-system-actions {
+    grid-column: 2 !important;
+    justify-content: flex-start !important;
+  }
+}

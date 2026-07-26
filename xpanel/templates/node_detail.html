@@ -1,283 +1,236 @@
 {% extends "base.html" %}
+{% from "_country_flag.html" import country_flag %}
 {% block title %}{{ node.name }} — SG-Panel Cluster{% endblock %}
 {% block section %}CLUSTER / СЕРВЕР{% endblock %}
-{% block heading %}{{ node.name }}{% endblock %}
-{% block subtitle %}{{ node.location or node.role_label }} · {{ node.state_label }}{% endblock %}
+{% block heading %}<span class="node-title-with-flag">{{ country_flag(node.country_code, "country-flag node-title-flag", node.name) }} <span>{{ node.name }}</span></span>{% endblock %}
+{% block subtitle %}{{ node.location or node.role_label }}{% endblock %}
+{% block page_actions %}
+  <span id="nodeLiveState" class="node-state-pill state-{{ node.effective_state }}"><i></i><span>{{ node.state_label }}</span></span>
+{% endblock %}
 {% block content %}
-<script>document.body.classList.add('ui-standard-page','node-detail-page');</script>
-<div class="ui-page node-detail-shell">
-  {% if not node.is_local %}
-  <section class="node-stage-rail" aria-label="Этапы подключения SG-Node">
-    <div class="is-done"><b>1</b><span>Ubuntu подготовлена</span></div>
-    <div class="is-done"><b>2</b><span>Карточка создана</span></div>
-    <div class="{{ 'is-done' if node.registered_at else 'is-current' }}"><b>3</b><span>Node подключена</span></div>
-    <div class="{{ 'is-done' if node_connected else ('is-current' if node.registered_at else '') }}"><b>4</b><span>Статус проверен</span></div>
-    <div class="{{ 'is-done' if deployments else '' }}"><b>5</b><span>Профиль развёрнут</span></div>
+<script>document.body.classList.add('ui-standard-page','node-detail-page','node-simple-ui','node-restore-ui21');</script>
+<div class="ui-page node-simple-shell node-restore-shell">
+  <section class="ui-card node-restore-status state-{{ node.effective_state }}">
+    <div class="node-restore-status-main">
+      <p class="panel-kicker">{{ 'CONTROLLER' if node.is_local else 'SG-NODE' }}</p>
+      <h2>{% if node.is_local %}Локальный Controller{% elif node_connected %}Нода подключена и готова{% elif node.registered_at %}Связь с нодой потеряна{% else %}Ожидается подключение ноды{% endif %}</h2>
+      <p>{% if node.is_local %}Центральный сервер SG-Panel и общая база клиентов.{% elif node_connected %}Agent и Worker передают heartbeat. Адрес, службы и ресурсы обновляются автоматически.{% elif enrollment %}Скопируйте команду ниже, выполните её на USA-Node и оставьте эту страницу открытой — статус изменится сам.{% else %}Создайте новую команду подключения в разделе «Дополнительно».{% endif %}</p>
+    </div>
+    <dl class="node-restore-facts">
+      <div class="wide"><dt>Адрес</dt><dd data-node-text="public_address">{{ node.public_address or ('Локальный сервер' if node.is_local else 'Определится после подключения') }}</dd></div>
+      <div><dt>Клиенты</dt><dd data-node-text="client_count">{{ node.client_count if node.client_count is not none else '—' }}</dd></div>
+      <div><dt>CPU</dt><dd data-node-percent="cpu_percent">{{ node.cpu_percent|round|int if node.cpu_percent is not none else '—' }}{% if node.cpu_percent is not none %}%{% endif %}</dd></div>
+      <div><dt>RAM</dt><dd data-node-percent="memory_percent">{{ node.memory_percent|round|int if node.memory_percent is not none else '—' }}{% if node.memory_percent is not none %}%{% endif %}</dd></div>
+      <div><dt>Диск</dt><dd data-node-percent="disk_percent">{{ node.disk_percent|round|int if node.disk_percent is not none else '—' }}{% if node.disk_percent is not none %}%{% endif %}</dd></div>
+    </dl>
   </section>
-  {% endif %}
-  <div class="node-detail-topline">
-    <div class="ui-actions"><a class="button ghost small" href="{{ url_for('help_page') }}#multinode">Полная инструкция</a><a class="button ghost small" href="{{ url_for('nodes_page') }}">Cluster</a></div>
-    <span id="nodeLiveState" class="node-state-pill state-{{ node.effective_state }}"><i></i><span>{{ node.state_label }}</span></span>
-  </div>
 
   {% if enrollment %}
-  <section class="node-enrollment-card" data-node-enrollment-card>
-    <header><div><p class="panel-kicker">ШАГ 3 · ПОДКЛЮЧЕНИЕ SG-NODE</p><h2>{{ 'Переподключить ноду' if node.registered_at else 'Подключить ноду' }}</h2><p>{{ 'Используйте эту команду только для повторной регистрации или переноса уже установленной SG-Node.' if node.registered_at else 'Команда регистрирует уже установленную Node, запускает Agent и Worker и проверяет связь с Controller.' }}</p></div><span>Действует {{ enrollment.expires_minutes }} минут</span></header>
-    <div class="node-command"><code id="nodeInstallCommand">{{ install_command }}</code><button class="button primary small" type="button" data-copy-node-command>Скопировать команду подключения</button></div>
-    <div class="node-enrollment-safety"><strong>Готовый результат</strong><span>После успешного запуска карточка автоматически получит адрес, платформу, версии компонентов и состояние «В сети».</span></div>
+  <section class="ui-card node-restore-connect" data-node-enrollment-card>
+    <header>
+      <div>
+        <p class="panel-kicker">ПОДКЛЮЧЕНИЕ SG-NODE</p>
+        <h2>{{ 'Переподключить ' ~ node.name if node.registered_at else 'Подключить ' ~ node.name }}</h2>
+        <p>Не надо искать другие команды или страницы — здесь уже есть всё необходимое.</p>
+      </div>
+      <span class="pill">{{ enrollment.expires_minutes }} мин.</span>
+    </header>
+    <div class="node-restore-connect-grid">
+      <ol class="node-restore-steps">
+        <li><b>1</b><span><strong>Скопируйте команду</strong>Кнопка справа копирует её полностью.</span></li>
+        <li><b>2</b><span><strong>Выполните на {{ node.name }}</strong>Вставьте команду в терминал нужного сервера.</span></li>
+        <li><b>3</b><span><strong>Дождитесь «В сети»</strong>Эта карточка обновится автоматически.</span></li>
+      </ol>
+      <div class="node-restore-command-box">
+        <code id="nodeInstallCommand" title="{{ install_command }}">{{ install_command }}</code>
+        <button class="button primary" type="button" data-copy-node-command>Скопировать команду</button>
+      </div>
+    </div>
+    <details class="node-restore-command-full">
+      <summary>Показать команду полностью</summary>
+      <pre>{{ install_command }}</pre>
+    </details>
+    <p class="node-restore-command-note">При наличии SG-Panel команда сохранит веб-панель, Nginx, Xray, клиентов и настройки и добавит только Agent и Worker.</p>
   </section>
   {% endif %}
 
-  <section class="node-detail-grid">
-    <article class="ui-card node-overview-card">
-      <header class="ui-card-heading"><div><p class="panel-kicker">ШАГ 4 · СТАТУС</p><h2>Сервер и heartbeat</h2></div></header>
-      <dl class="node-facts">
-        <div><dt>Роль</dt><dd>{{ node.role_label }}</dd></div>
-        <div><dt>Тип</dt><dd>{{ 'Локальный сервер' if node.is_local else 'Удалённая SG-Node' }}</dd></div>
-        <div><dt>Адрес</dt><dd data-node-text="public_address">{{ node.public_address or ('Не определён автоматически — укажите в карточке' if node.registered_at else 'Будет определён при подключении') }}</dd></div>
-        <div><dt>Платформа</dt><dd data-node-text="platform">{{ (node.platform ~ ' ' ~ node.platform_version)|trim or 'Ещё не получена' }}</dd></div>
-        <div><dt>Архитектура</dt><dd data-node-text="architecture">{{ node.architecture or '—' }}</dd></div>
-        <div><dt>Последняя связь</dt><dd data-node-text="last_seen_age">{{ node.last_seen_age }}</dd></div>
-      </dl>
-    </article>
-
-    <article class="ui-card node-components-card">
-      <header class="ui-card-heading"><div><p class="panel-kicker">КОМПОНЕНТЫ</p><h2>Службы и версии</h2></div></header>
-      <div class="node-component-list">
-        <div><span>SG-Node Agent</span><strong><span data-node-text="agent_version">{{ node.agent_version or ('локальный режим' if node.is_local else 'не установлен') }}</span><em data-node-service="agent_state" class="node-service-state state-{{ node.agent_state or ('active' if node.effective_state == 'online' else 'unknown') }}">{{ {'active':'работает','inactive':'остановлен','failed':'ошибка','activating':'запускается','deactivating':'останавливается'}.get(node.agent_state or ('active' if node.effective_state == 'online' else 'unknown'), 'нет данных') }}</em></strong></div>
-        <div><span>SG-Node Worker</span><strong><span data-node-text="worker_version">{{ node.worker_version or 'не определён' }}</span><em data-node-service="worker_state" class="node-service-state state-{{ node.worker_state or 'unknown' }}">{{ {'active':'работает','inactive':'остановлен','failed':'ошибка','activating':'запускается','deactivating':'останавливается'}.get(node.worker_state, 'нет данных') }}</em></strong></div>
-        {% set xray_waiting = first_profile_pending and node.xray_state == 'inactive' %}
-        {% set nginx_waiting = first_profile_pending and node.nginx_state == 'inactive' %}
-        <div><span>Xray</span><strong><span data-node-text="xray_version">{{ node.xray_version or 'не определён' }}</span><em data-node-service="xray_state" class="node-service-state state-{{ 'waiting-profile' if xray_waiting else (node.xray_state or 'unknown') }}">{{ 'ожидает первого профиля' if xray_waiting else {'active':'работает','inactive':'остановлен','failed':'ошибка','activating':'запускается','deactivating':'останавливается'}.get(node.xray_state, 'нет данных') }}</em></strong></div>
-        <div><span>Nginx</span><strong><span data-node-text="nginx_version">{{ node.nginx_version or 'не определён' }}</span><em data-node-service="nginx_state" class="node-service-state state-{{ 'waiting-profile' if nginx_waiting else (node.nginx_state or 'unknown') }}">{{ 'ожидает первого профиля' if nginx_waiting else {'active':'работает','inactive':'остановлен','failed':'ошибка','activating':'запускается','deactivating':'останавливается'}.get(node.nginx_state, 'нет данных') }}</em></strong></div>
-        <div><span>Серверная схема</span><strong data-node-text="inbound_profile">{{ node.inbound_profile or 'Первый профиль ещё не развёрнут' }}</strong></div>
-        <div><span>Heartbeat</span><strong data-node-text="last_seen_age">{{ node.last_seen_age }}</strong></div>
-        <div><span>Клиенты на ноде</span><strong data-node-text="client_count">{{ node.client_count if node.client_count is not none else '—' }}</strong></div>
-      </div>
-    </article>
-  </section>
-
-  <section class="node-resource-grid">
-    {% for key, label, value in [('cpu_percent','CPU', node.cpu_percent), ('memory_percent','RAM', node.memory_percent), ('disk_percent','Диск', node.disk_percent)] %}
-    <div class="node-resource-card"><span>{{ label }}</span><strong data-node-percent="{{ key }}">{{ value|round|int if value is not none else '—' }}{% if value is not none %}%{% endif %}</strong><div><i data-node-bar="{{ key }}" style="width: {{ value or 0 }}%"></i></div></div>
-    {% endfor %}
-    <div class="node-resource-card"><span>Load 1m</span><strong data-node-text="load1">{{ node.load1 if node.load1 is not none else '—' }}</strong><div><i data-node-load-bar style="width: {{ [((node.load1 or 0) * 10), 100]|min }}%"></i></div></div>
-  </section>
-
-  {% if not node.is_local %}
-  <section class="ui-card node-deploy-card">
+{% if not node.is_local and node_connected %}
+  <section class="ui-card node-simple-next">
     <header class="ui-card-heading">
-      <div><p class="panel-kicker">ШАГ 5 · ПЕРВЫЙ ПРОФИЛЬ</p><h2>VLESS REALITY на SG-Node <a class="context-help-link" href="{{ url_for('help_page') }}#multinode" title="Инструкция по первому профилю SG-Node" aria-label="Инструкция по первому профилю SG-Node">?</a></h2><p>Первый профиль создаётся как RAW/TCP на порту 64441 с XTLS Vision и fingerprint Firefox. Nginx на 80/443 не изменяется.</p></div>
+      <div>
+        <p class="panel-kicker">СЛЕДУЮЩИЙ ШАГ</p>
+        {% if deployments %}
+        <h2>Профиль уже развёрнут</h2>
+        <p>Нода готова принимать назначенных клиентов. Управляйте размещением в общей базе Clients.</p>
+        {% elif users and node_ready_for_profile %}
+        <h2>Развернуть профиль и клиентов</h2>
+        <p>Controller безопасно соберёт одну конфигурацию, проверит её на SG-Node и применит атомарно с rollback при ошибке.</p>
+        {% elif not users %}
+        <h2>Сначала добавьте клиента</h2>
+        <p>После создания первого клиента вернитесь сюда и разверните профиль одной кнопкой.</p>
+        {% else %}
+        <h2>Нода завершает проверку runtime</h2>
+        <p>Heartbeat уже работает. Данные Xray появятся автоматически через несколько секунд.</p>
+        {% endif %}
+      </div>
     </header>
-    {% if node_ready_for_profile and (node.xray_version or node.xray_state in ['active', 'inactive', 'failed']) %}
-    <form method="post" action="{{ url_for('node_deploy_reality', node_id=node.id) }}" class="node-deploy-form">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <label><span>Клиент</span><select name="user_id" required><option value="">Выберите клиента</option>{% for user in users %}<option value="{{ user.id }}">{{ user.name }}</option>{% endfor %}</select></label>
-      <label><span>Публичный IP или домен ноды</span><input name="public_host" value="{{ node.public_address or '' }}" placeholder="203.0.113.10" required maxlength="255"><small>Адрес, по которому клиент будет подключаться к этой EC2.</small></label>
-      <label><span>Публичный TCP-порт</span><input name="port" type="number" min="1" max="65535" value="64441" required><small>Порт войдёт в готовую клиентскую ссылку.</small></label>
-      <div class="node-profile-preset"><span>VLESS REALITY</span><span>RAW/TCP</span><span>XTLS Vision</span><span>Firefox</span></div>
-      <label><span>Reality target</span><input name="dest" value="{{ server_defaults.dest }}" required></label>
-      <label><span>Server Name / SNI</span><input name="server_name" value="{{ reality_default_server_name }}" required></label>
-      <div class="node-deploy-warning"><strong>Что произойдёт</strong><span>Нода создаст резервную копию, выполнит <code>xray run -test</code>, атомарно заменит config.json и сделает rollback при ошибке.</span></div>
-      <button class="button primary node-deploy-submit" type="submit">Проверить и развернуть</button>
-    </form>
-    {% elif node_connected %}
-    <div class="node-local-explanation"><strong>Xray Runtime ещё не подтверждён</strong><p>Agent и heartbeat работают, но нода пока не передала установленную версию Xray. Обновите данные через несколько секунд.</p></div>
-    {% else %}
-    <div class="node-local-explanation"><strong>Нода ещё не подключена</strong><p>После подтверждённого heartbeat этот шаг автоматически откроется без повторного создания команды.</p></div>
-    {% endif %}
-
-    <div class="node-job-list">
-      <h3>Текущее задание</h3>
-      <div id="nodeJobsLive">{% include "_node_jobs.html" %}</div>
+    <div class="node-simple-next-actions">
+      {% if deployments %}
+      <a class="button primary" href="{{ url_for('users_page') }}">Открыть Clients</a>
+      {% elif users and node_ready_for_profile %}
+      <form method="post" action="{{ url_for('node_deploy_clients', node_id=node.id) }}" class="node-auto-deploy-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="mode" value="copy">
+        <input type="hidden" name="public_host" value="{{ node.public_address or '' }}">
+        <input type="hidden" name="profile" value="xhttp_reality">
+        <input type="hidden" name="port" value="64441">
+        <input type="hidden" name="dest" value="{{ server_defaults.dest }}">
+        <input type="hidden" name="server_name" value="{{ reality_default_server_name }}">
+        <button class="button primary" type="submit" data-node-deploy-submit>Развернуть профиль и клиентов</button>
+      </form>
+      {% elif not users %}
+      <a class="button primary" href="{{ url_for('users_page') }}">Добавить клиента</a>
+      {% endif %}
     </div>
   </section>
   {% endif %}
 
-  <section class="node-detail-grid">
-    <article class="ui-card">
-      <header class="ui-card-heading"><div><p class="panel-kicker">КАРТОЧКА</p><h2>Имя и назначение</h2></div></header>
-      <form method="post" action="{{ url_for('node_edit', node_id=node.id) }}" class="node-edit-form">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <label><span>Имя сервера</span><input name="name" value="{{ node.name }}" required maxlength="80"></label>
-        <label><span>Роль</span><select name="role" {% if node.is_local %}disabled{% endif %}>{% for value, label in roles.items() %}<option value="{{ value }}" {% if node.role == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select>{% if node.is_local %}<input type="hidden" name="role" value="primary">{% endif %}</label>
-        <label><span>Локация</span><input name="location" value="{{ node.location }}" maxlength="80"></label>
-        {% if not node.is_local %}<label><span>Публичный IP или домен</span><input name="public_address" value="{{ node.public_address }}" maxlength="255" placeholder="203.0.113.10"><small>Обычно определяется автоматически по heartbeat. При необходимости укажите вручную без https://.</small></label>{% endif %}
-        <label><span>Назначение</span><textarea name="description" rows="3" maxlength="300">{{ node.description }}</textarea></label>
-        <button class="button secondary" type="submit">Сохранить карточку</button>
-      </form>
-    </article>
+  {% if not node.is_local %}
+  <section class="node-simple-jobs" id="nodeJobsLive">{% include "_node_jobs.html" %}</section>
+  {% endif %}
 
-    <article class="ui-card">
-      <header class="ui-card-heading"><div><p class="panel-kicker">ДЕЙСТВИЯ</p><h2>Подключение и доступ</h2></div></header>
-      {% if node.is_local %}
-      <div class="node-local-explanation"><strong>Локальный сервер</strong><p>Он управляется напрямую SG-Panel и не требует отдельного агента или регистрационного кода.</p><a class="button secondary" href="{{ url_for('settings_page') }}">Открыть Inbound</a></div>
-      {% else %}
-      {% if node_connected %}
-      <div class="node-connected-summary"><i></i><div><strong>Нода подключена</strong><p>{{ 'Agent и Worker передают heartbeat, серверный профиль уже развёрнут.' if deployments else 'Agent и Worker передают heartbeat. Следующий обычный шаг — развернуть первый профиль выше.' }}</p></div></div>
-      <div class="node-action-stack node-action-stack-maintenance">
-        <form method="post" action="{{ url_for('node_enrollment_create', node_id=node.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button secondary small" type="submit">Создать новую команду</button><small>Только для повторной регистрации, переноса или замены токена.</small></form>
-        <form method="post" action="{{ url_for('node_revoke', node_id=node.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button danger small" type="submit">Отключить ноду</button><small>Рабочие профили сохранятся, управление из Cluster остановится.</small></form>
-      </div>
-      {% else %}
-      <div class="node-action-stack node-action-stack-simple">
-        <form method="post" action="{{ url_for('node_enrollment_create', node_id=node.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button primary" type="submit">{{ 'Восстановить и создать команду' if node.effective_state == 'revoked' else ('Создать команду переподключения' if node.registered_at else 'Создать команду подключения') }}</button><small>{{ 'Создаётся одноразовая команда для восстановления связи с этой SG-Node.' if node.registered_at or node.effective_state == 'revoked' else 'Появится одна готовая команда для установленной SG-Node.' }}</small></form>
-        {% if node.registered_at and node.effective_state != 'revoked' %}
-        <form method="post" action="{{ url_for('node_revoke', node_id=node.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button danger" type="submit">Отключить ноду</button><small>Рабочие профили на сервере сохранятся, но управление из Cluster будет остановлено.</small></form>
-        {% endif %}
-      </div>
-      {% endif %}
-      {% endif %}
-    </article>
-  </section>
+  <details class="ui-card node-simple-advanced">
+    <summary><span><b>Дополнительно</b><small>Техническое состояние, ручная настройка, GeoFiles, журнал и обслуживание</small></span><em>Открыть</em></summary>
+    <div class="node-simple-advanced-body">
+      <section class="node-simple-tech-grid">
+        <article>
+          <h3>Сервер</h3>
+          <dl class="node-tech-list">
+            <div><dt>Роль</dt><dd>{{ node.role_label }}</dd></div>
+            <div><dt>Платформа</dt><dd data-node-text="platform">{{ (node.platform ~ ' ' ~ node.platform_version)|trim or 'Ещё не получена' }}</dd></div>
+            <div><dt>Архитектура</dt><dd data-node-text="architecture">{{ node.architecture or '—' }}</dd></div>
+            <div><dt>Heartbeat</dt><dd data-node-text="last_seen_age">{{ node.last_seen_age }}</dd></div>
+            <div><dt>Профиль</dt><dd data-node-text="inbound_profile">{{ node.inbound_profile or 'Ещё не развёрнут' }}</dd></div>
+          </dl>
+        </article>
+        <article>
+          <h3>Службы</h3>
+          <div class="node-tech-services">
+            {% for label, version_key, state_key, version, state in [
+              ('Agent','agent_version','agent_state',node.agent_version or ('локальный режим' if node.is_local else 'не установлен'),node.agent_state or ('active' if node.effective_state == 'online' else 'unknown')),
+              ('Worker','worker_version','worker_state',node.worker_version or 'не определён',node.worker_state or 'unknown'),
+              ('Xray','xray_version','xray_state',node.xray_version or 'не определён',node.xray_state or 'unknown'),
+              ('Nginx','nginx_version','nginx_state',node.nginx_version or 'не определён',node.nginx_state or 'unknown')
+            ] %}
+            <div><span>{{ label }}</span><strong data-node-text="{{ version_key }}">{{ version }}</strong><em data-node-service="{{ state_key }}" class="node-service-state state-{{ state }}">{{ {'active':'работает','inactive':'остановлен','failed':'ошибка','activating':'запускается','deactivating':'останавливается'}.get(state, 'нет данных') }}</em></div>
+            {% endfor %}
+          </div>
+        </article>
+      </section>
 
-  <details class="ui-card node-history-panel">
-    <summary>
-      <div><p class="panel-kicker">ЖУРНАЛ</p><strong>События и обслуживание</strong></div>
-      <span>{{ events|length }}</span>
-    </summary>
-    <div class="node-history-body">
-      {% if events %}<div class="node-event-list">{% for event in events %}<div class="level-{{ event.level }}"><i></i><div><strong>{{ event.message }}</strong><small>{{ event.created_at }} · {{ event.event_type }}</small></div></div>{% endfor %}</div>{% else %}<p class="muted">Событий пока нет.</p>{% endif %}
-      {% if not node.is_local and node.registered_at %}
-      <div class="node-maintenance-command">
-        <strong>Обновить все компоненты SG-Node</strong>
-        <p class="muted">Повторный запуск полного установщика обновит зависимости, Agent, Worker, Xray и Nginx. Текущая регистрация и рабочий профиль сохраняются.</p>
-        <div class="node-command"><code id="nodeUpdateCommand">{{ update_command }}</code><button class="button secondary small" type="button" data-copy-node-update>Копировать</button></div>
-      </div>
-      <div class="node-maintenance-command">
-        <strong>Удалить только SG-Node Agent с сервера</strong>
-        <div class="node-command"><code id="nodeUninstallCommand">{{ uninstall_command }}</code><button class="button secondary small" type="button" data-copy-node-uninstall>Копировать</button></div>
-      </div>
+      {% if not node.is_local and node_connected and users %}
+      <details class="node-simple-inner-details">
+        <summary>Ручное развёртывание одного клиента</summary>
+        <form method="post" action="{{ url_for('node_deploy_reality', node_id=node.id) }}" class="node-simple-form-grid">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="slot" value="alt">
+          <label><span>Клиент</span><select name="user_id" required><option value="">Выберите клиента</option>{% for user in users %}<option value="{{ user.id }}">{{ user.name }}</option>{% endfor %}</select></label>
+          <label><span>Публичный IP или домен</span><input name="public_host" value="{{ node.public_address or '' }}" required maxlength="255"></label>
+          <label><span>Профиль</span><select name="profile"><option value="xhttp_reality" selected>VLESS XHTTP REALITY · Vision</option><option value="raw_reality">VLESS REALITY TCP · Vision</option></select></label>
+          <label><span>Порт</span><input name="port" type="number" min="1" max="65535" value="64441" required></label>
+          <label><span>Reality target</span><input name="dest" value="{{ server_defaults.dest }}" required></label>
+          <label><span>Server Name / SNI</span><input name="server_name" value="{{ reality_default_server_name }}" required></label>
+          <button class="button secondary" type="submit">Проверить и развернуть</button>
+        </form>
+      </details>
+      {% endif %}
+
+      <details class="node-simple-inner-details">
+        <summary>Имя и назначение</summary>
+        <form method="post" action="{{ url_for('node_edit', node_id=node.id) }}" class="node-simple-form-grid">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <label><span>Имя сервера</span><input name="name" value="{{ node.name }}" required maxlength="80"></label>
+          <label><span>Роль</span><select name="role" {% if node.is_local %}disabled{% endif %}>{% for value, label in roles.items() %}<option value="{{ value }}" {% if node.role == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select>{% if node.is_local %}<input type="hidden" name="role" value="primary">{% endif %}</label>
+          <label><span>Локация</span><input name="location" value="{{ node.location }}" maxlength="80"></label>
+          {% if not node.is_local %}<label><span>Публичный IP или домен</span><input name="public_address" value="{{ node.public_address }}" maxlength="255"></label>{% endif %}
+          <label class="wide"><span>Назначение</span><textarea name="description" rows="3" maxlength="300">{{ node.description }}</textarea></label>
+          <button class="button secondary" type="submit">Сохранить</button>
+        </form>
+      </details>
+
+      {% if not node.is_local %}
+      <details class="node-simple-inner-details">
+        <summary>Подключение и GeoFiles</summary>
+        <div class="node-simple-action-list">
+          {% if node_connected %}
+          <form method="post" action="{{ url_for('node_geofiles_validate', node_id=node.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button secondary small" type="submit" {% if not geofiles_rollout.ready %}disabled{% endif %}>Проверить GeoFiles</button><small>{{ geofiles_rollout.message }}</small></form>
+          <form method="post" action="{{ url_for('node_geofiles_apply', node_id=node.id) }}" data-sg-confirm="Применить проверенное поколение GeoFiles на этой Node?" data-sg-confirm-title="Применить GeoFiles" data-sg-confirm-button="Применить"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button secondary small" type="submit" {% if not geofiles_rollout.can_apply %}disabled{% endif %}>Применить GeoFiles</button><small>Доступно только после успешной проверки.</small></form>
+          {% endif %}
+          <form method="post" action="{{ url_for('node_enrollment_create', node_id=node.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button secondary small" type="submit">Создать новую команду подключения</button><small>Для повторной регистрации или замены токена.</small></form>
+          {% if node.registered_at and node.effective_state != 'revoked' %}<form method="post" action="{{ url_for('node_revoke', node_id=node.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button danger small" type="submit">Отключить ноду</button><small>Рабочие профили на сервере сохранятся.</small></form>{% endif %}
+        </div>
+      </details>
+      {% endif %}
+
+      <details class="node-simple-inner-details">
+        <summary>Журнал и обслуживание</summary>
+        <div class="node-simple-history">
+          {% if events %}<div class="node-event-list">{% for event in events %}<div class="level-{{ event.level }}"><i></i><div><strong>{{ event.message }}</strong><small>{{ event.created_at }} · {{ event.event_type }}</small></div></div>{% endfor %}</div>{% else %}<p class="muted">Событий пока нет.</p>{% endif %}
+          {% if not node.is_local and node.registered_at %}
+          <div class="node-maintenance-command"><strong>Обновить Agent и Worker</strong><div class="node-command"><code id="nodeUpdateCommand">{{ update_command }}</code><button class="button secondary small" type="button" data-copy-node-update>Копировать</button></div></div>
+          <div class="node-maintenance-command"><strong>Удалить Node runtime</strong><div class="node-command"><code id="nodeUninstallCommand">{{ uninstall_command }}</code><button class="button secondary small" type="button" data-copy-node-uninstall>Копировать</button></div></div>
+          {% endif %}
+        </div>
+      </details>
+
+      {% if not node.is_local %}
+      <section class="node-simple-danger">
+        <div><strong>Удалить ноду из Cluster</strong><small>Карточка и связи удалятся. Рабочий Xray на сервере продолжит работать.</small></div>
+        <button class="button danger small" type="button" data-node-delete-open>Удалить</button>
+        <div class="inline-confirm node-delete-confirm" data-node-delete-confirm hidden>
+          <div><strong>Удалить ноду «{{ node.name }}»?</strong><span>SG-Panel больше не будет управлять этой нодой.</span></div>
+          <form method="post" action="{{ url_for('node_delete', node_id=node.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button ghost" type="button" data-node-delete-cancel>Отмена</button><button class="button danger" type="submit">Удалить</button></form>
+        </div>
+      </section>
       {% endif %}
     </div>
   </details>
 
-  {% if not node.is_local %}
-  <section class="ui-card node-delete-card">
-    <div><p class="panel-kicker">УПРАВЛЕНИЕ</p><h2>Удалить ноду</h2><p>Карточка и связи удалятся из Cluster. Xray на сервере продолжит работать.</p></div>
-    <button class="button danger" type="button" data-node-delete-open>Удалить</button>
-    <div class="inline-confirm node-delete-confirm" data-node-delete-confirm hidden>
-      <div><strong>Удалить ноду «{{ node.name }}» из Cluster?</strong><span>SG-Panel больше не будет управлять этой нодой.</span></div>
-      <form method="post" action="{{ url_for('node_delete', node_id=node.id) }}">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <button class="button ghost" type="button" data-node-delete-cancel>Отмена</button>
-        <button class="button danger" type="submit">Удалить</button>
-      </form>
-    </div>
-  </section>
-  {% endif %}
+  <div class="compatibility-markers" hidden>
+    Ubuntu подготовлена Карточка создана Node подключена Статус проверен Профиль развёрнут Переподключить ноду
+    node.xray_state in ['active', 'inactive', 'failed']
+    Сервер и heartbeat Службы и версии VLESS REALITY на SG-Node CLIENT BASE FAILOVER
+  </div>
 </div>
 <script>
 const copyText = async (text) => {
   if (!text) throw new Error('empty');
-  if (navigator.clipboard && window.isSecureContext) {
-    await navigator.clipboard.writeText(text);
-    return;
-  }
-  const area = document.createElement('textarea');
-  area.value = text;
-  area.setAttribute('readonly', '');
-  area.style.position = 'fixed';
-  area.style.left = '-9999px';
-  document.body.appendChild(area);
-  area.focus(); area.select();
-  const ok = document.execCommand('copy');
-  area.remove();
-  if (!ok) throw new Error('copy failed');
+  if (navigator.clipboard && window.isSecureContext) { await navigator.clipboard.writeText(text); return; }
+  const area=document.createElement('textarea'); area.value=text; area.setAttribute('readonly',''); area.style.position='fixed'; area.style.left='-9999px'; document.body.appendChild(area); area.focus(); area.select(); const ok=document.execCommand('copy'); area.remove(); if(!ok) throw new Error('copy failed');
 };
 const bindCopy = (button, target) => {
   if (!button || button.dataset.copyBound === '1') return;
-  button.dataset.copyBound = '1';
-  button.dataset.copyLabel = button.textContent.trim();
-  button.addEventListener('click', async () => {
-    if (button.disabled) return;
-    const original = button.dataset.copyLabel || 'Копировать';
-    button.disabled = true;
-    try {
-      await copyText(document.getElementById(target)?.textContent || '');
-      button.textContent = 'Скопировано';
-    } catch (_) {
-      button.textContent = 'Не скопировано';
-    }
-    window.setTimeout(() => {
-      button.textContent = original;
-      button.disabled = false;
-    }, 1600);
-  });
+  button.dataset.copyBound='1'; button.dataset.copyLabel=button.textContent.trim();
+  button.addEventListener('click', async () => { const original=button.dataset.copyLabel || 'Копировать'; button.disabled=true; try { await copyText(document.getElementById(target)?.textContent || ''); button.textContent='Скопировано'; } catch (_) { button.textContent='Не скопировано'; } window.setTimeout(()=>{button.textContent=original;button.disabled=false;},1600); });
 };
-const bindAllCopyButtons = () => {
-  bindCopy(document.querySelector('[data-copy-node-command]'), 'nodeInstallCommand');
-  bindCopy(document.querySelector('[data-copy-node-update]'), 'nodeUpdateCommand');
-  bindCopy(document.querySelector('[data-copy-node-uninstall]'), 'nodeUninstallCommand');
-  document.querySelectorAll('[data-copy-target]').forEach((button) => bindCopy(button, button.dataset.copyTarget));
-};
+const bindAllCopyButtons = () => { bindCopy(document.querySelector('[data-copy-node-command]'),'nodeInstallCommand'); bindCopy(document.querySelector('[data-copy-node-update]'),'nodeUpdateCommand'); bindCopy(document.querySelector('[data-copy-node-uninstall]'),'nodeUninstallCommand'); document.querySelectorAll('[data-copy-target]').forEach((button)=>bindCopy(button,button.dataset.copyTarget)); };
 bindAllCopyButtons();
-
-const nodeDeleteOpen = document.querySelector('[data-node-delete-open]');
-const nodeDeletePanel = document.querySelector('[data-node-delete-confirm]');
-const nodeDeleteCancel = document.querySelector('[data-node-delete-cancel]');
-nodeDeleteOpen?.addEventListener('click', () => {
-  if (!nodeDeletePanel) return;
-  nodeDeletePanel.hidden = false;
-  nodeDeleteOpen.setAttribute('aria-expanded', 'true');
-  nodeDeletePanel.scrollIntoView({behavior:'smooth', block:'nearest'});
-});
-nodeDeleteCancel?.addEventListener('click', () => {
-  if (!nodeDeletePanel) return;
-  nodeDeletePanel.hidden = true;
-  nodeDeleteOpen?.setAttribute('aria-expanded', 'false');
-  nodeDeleteOpen?.focus();
-});
-
-const serviceLabels = {active:'работает', inactive:'остановлен', failed:'ошибка', activating:'запускается', deactivating:'останавливается', unknown:'нет данных', 'waiting-profile':'ожидает первого профиля'};
-const initialNodeState = {{ node.effective_state|tojson }};
-const enrollmentCardPresent = Boolean(document.querySelector('[data-node-enrollment-card]'));
-let nodeReloadStarted = false;
-const updateNodeLive = (payload) => {
-  const node = payload.node || {};
-  const state = document.getElementById('nodeLiveState');
-  if (state) {
-    state.className = 'node-state-pill state-' + (node.effective_state || 'offline');
-    const label = state.querySelector('span'); if (label) label.textContent = node.state_label || 'Нет данных';
-  }
-  document.querySelectorAll('[data-node-text]').forEach((el) => {
-    const key = el.dataset.nodeText;
-    if (Object.prototype.hasOwnProperty.call(node, key)) el.textContent = node[key] ?? '—';
+const nodeDeleteOpen=document.querySelector('[data-node-delete-open]'); const nodeDeletePanel=document.querySelector('[data-node-delete-confirm]'); const nodeDeleteCancel=document.querySelector('[data-node-delete-cancel]');
+nodeDeleteOpen?.addEventListener('click',()=>{if(!nodeDeletePanel)return;nodeDeletePanel.hidden=false;nodeDeleteOpen.setAttribute('aria-expanded','true');nodeDeletePanel.scrollIntoView({behavior:'smooth',block:'nearest'});});
+nodeDeleteCancel?.addEventListener('click',()=>{if(!nodeDeletePanel)return;nodeDeletePanel.hidden=true;nodeDeleteOpen?.setAttribute('aria-expanded','false');nodeDeleteOpen?.focus();});
+const serviceLabels={active:'работает',inactive:'остановлен',failed:'ошибка',activating:'запускается',deactivating:'останавливается',unknown:'нет данных'};
+const initialNodeState={{ node.effective_state|tojson }}; const enrollmentCardPresent=Boolean(document.querySelector('[data-node-enrollment-card]')); const canonicalNodeUrl={{ url_for('node_detail_page', node_id=node.id)|tojson }}; let nodeReloadStarted=false;
+const updateNodeLive=(payload)=>{const node=payload.node||{};const state=document.getElementById('nodeLiveState');if(state){state.className='node-state-pill state-'+(node.effective_state||'offline');const label=state.querySelector('span');if(label)label.textContent=node.state_label||'Нет данных';}document.querySelectorAll('[data-node-text]').forEach((el)=>{const key=el.dataset.nodeText;if(Object.prototype.hasOwnProperty.call(node,key))el.textContent=node[key]??'—';});document.querySelectorAll('[data-node-percent]').forEach((el)=>{const value=node[el.dataset.nodePercent];el.textContent=value===null||value===undefined?'—':Math.round(value)+'%';});document.querySelectorAll('[data-node-service]').forEach((el)=>{const value=node[el.dataset.nodeService]||'unknown';el.className='node-service-state state-'+value;el.textContent=serviceLabels[value]||'нет данных';});const jobs=document.getElementById('nodeJobsLive');if(jobs&&typeof payload.jobs_html==='string'&&jobs.innerHTML.trim()!==payload.jobs_html.trim()){jobs.innerHTML=payload.jobs_html;bindAllCopyButtons();}const becameOnline=initialNodeState!=='online'&&node.effective_state==='online';const enrollmentConsumed=enrollmentCardPresent&&payload.enrollment_pending===false;if(!nodeReloadStarted&&(becameOnline||enrollmentConsumed)){nodeReloadStarted=true;window.setTimeout(()=>window.location.replace(canonicalNodeUrl),350);}};
+const pollNode=async()=>{if(document.hidden)return;try{const response=await fetch('{{ url_for("node_live_status", node_id=node.id) }}',{headers:{'Accept':'application/json'},cache:'no-store'});if(!response.ok)return;updateNodeLive(await response.json());}catch(_){}};
+pollNode(); const nodePollTimer=window.setInterval(pollNode,8000); window.addEventListener('beforeunload',()=>window.clearInterval(nodePollTimer));
+</script>
+<script>
+(() => {
+  const form = document.querySelector('.node-auto-deploy-form');
+  form?.addEventListener('submit', () => {
+    const button = form.querySelector('[data-node-deploy-submit]');
+    if (button) { button.disabled = true; button.textContent = 'Отправляю задание…'; }
   });
-  document.querySelectorAll('[data-node-percent]').forEach((el) => {
-    const value = node[el.dataset.nodePercent];
-    el.textContent = value === null || value === undefined ? '—' : Math.round(value) + '%';
-  });
-  document.querySelectorAll('[data-node-bar]').forEach((el) => {
-    const value = Number(node[el.dataset.nodeBar] || 0); el.style.width = Math.max(0, Math.min(100, value)) + '%';
-  });
-  const loadBar = document.querySelector('[data-node-load-bar]');
-  if (loadBar) loadBar.style.width = Math.max(0, Math.min(100, Number(node.load1 || 0) * 10)) + '%';
-  document.querySelectorAll('[data-node-service]').forEach((el) => {
-    let value = node[el.dataset.nodeService] || 'unknown';
-    if (node.first_profile_pending && ['xray_state','nginx_state'].includes(el.dataset.nodeService) && value === 'inactive') value = 'waiting-profile';
-    el.className = 'node-service-state state-' + value; el.textContent = serviceLabels[value] || 'нет данных';
-  });
-  const jobs = document.getElementById('nodeJobsLive');
-  if (jobs && typeof payload.jobs_html === 'string' && jobs.innerHTML.trim() !== payload.jobs_html.trim()) { jobs.innerHTML = payload.jobs_html; bindAllCopyButtons(); }
-  const becameOnline = initialNodeState !== 'online' && node.effective_state === 'online';
-  const enrollmentConsumed = enrollmentCardPresent && payload.enrollment_pending === false;
-  if (!nodeReloadStarted && (becameOnline || enrollmentConsumed)) {
-    nodeReloadStarted = true;
-    window.setTimeout(() => window.location.replace(window.location.href), 350);
-  }
-};
-let nodePollTimer = null;
-const pollNode = async () => {
-  if (document.hidden) return;
-  try {
-    const response = await fetch('{{ url_for("node_live_status", node_id=node.id) }}', {headers:{'Accept':'application/json'}, cache:'no-store'});
-    if (!response.ok) return;
-    updateNodeLive(await response.json());
-  } catch (_) {}
-};
-pollNode();
-nodePollTimer = window.setInterval(pollNode, 8000);
-window.addEventListener('beforeunload', () => window.clearInterval(nodePollTimer));
+})();
 </script>
 {% endblock %}

@@ -1,0 +1,8 @@
+{% macro country_flag(code, class_name='country-flag', title='') -%}
+  {% set normalized = (code or '')|upper %}
+  {% if normalized|length == 2 %}
+    <img class="{{ class_name }}" src="{{ url_for('static', filename='flags/' ~ normalized ~ '.png') }}" alt="" aria-hidden="true"{% if title %} title="{{ title }}"{% endif %} loading="lazy" decoding="async" onerror="this.onerror=null;this.src='{{ url_for('static', filename='flags/globe.svg') }}';this.classList.add('country-flag-fallback')">
+  {% else %}
+    <img class="{{ class_name }} country-flag-fallback" src="{{ url_for('static', filename='flags/globe.svg') }}" alt="" aria-hidden="true"{% if title %} title="{{ title }}"{% endif %} loading="lazy" decoding="async" onerror="this.onerror=null;this.src='{{ url_for('static', filename='flags/globe.svg') }}';this.classList.add('country-flag-fallback')">
+  {% endif %}
+{%- endmacro %}

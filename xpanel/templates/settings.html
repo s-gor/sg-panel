@@ -1,810 +1,389 @@
 {% extends "base.html" %}
 {% from '_fingerprint_select.html' import fingerprint_select %}
-{% block title %}Inbound — SG-Panel{% endblock %}
+{% block title %}Xray Server — SG-Panel{% endblock %}
 {% block section %}XRAY SERVER{% endblock %}
-{% block heading %}Xray Server{% endblock %}
-{% block subtitle %}Основное входящее подключение Xray, транспорт и параметры клиентских ссылок{% endblock %}
+{% block heading %}Все доступные каналы{% endblock %}
+{% block subtitle %}Always-On Xray: Reality и XHTTP Reality работают сразу; TLS-каналы подключаются автоматически после готовности HTTPS{% endblock %}
 {% block content %}
-<script>document.body.classList.add('ui-standard-page','server-settings-page','inbound-page');</script>
-<div class="ui-page ui-page-wide">
-  {% set profile_labels = {'raw_reality':'VLESS REALITY','xhttp_tls':'VLESS XHTTP-TLS','xhttp_reality':'VLESS XHTTP-REALITY','grpc_tls':'VLESS gRPC-TLS','hysteria2_tls':'Hysteria 2','xhttp_hysteria_tls':'XHTTP-TLS + Hysteria 2'} %}
-  {% set profile_name = profile_labels.get(server.inbound_profile, server.inbound_profile) %}
-  {% if server.inbound_profile == 'raw_reality' and server.flow == 'xtls-rprx-vision' %}{% set profile_name = 'VLESS REALITY · Vision' %}{% endif %}
-  {% set enabled_xhttp_inbounds = xhttp_inbounds|selectattr('enabled')|list %}
-  {% set enabled_hysteria_inbounds = hysteria_inbounds|selectattr('enabled')|list %}
-  {% set enabled_reality_inbounds = reality_inbounds|selectattr('enabled')|list %}
-  {% set xhttp_inbound_count = enabled_xhttp_inbounds|length %}
-  {% set hysteria_inbound_count = enabled_hysteria_inbounds|length %}
-  {% set reality_inbound_count = enabled_reality_inbounds|length %}
-  {% if server.inbound_profile == 'raw_reality' %}
-    {% set protection_label = 'REALITY · Vision · TCP' if server.flow == 'xtls-rprx-vision' else 'REALITY · TCP' %}
-    {% set protection_hint = ('VLESS REALITY Vision: ' ~ reality_inbound_count ~ ' TCP-точки') if server.flow == 'xtls-rprx-vision' and reality_inbound_count > 1 else ('VLESS REALITY: ' ~ reality_inbound_count ~ ' TCP Inbound') %}
-    {% set route_client = 'VLESS · TCP/' ~ server.port %}
-    {% set route_security = 'REALITY · сертификат не нужен' %}
-    {% set route_server = ('Один общий Vision Inbound Xray') if server.flow == 'xtls-rprx-vision' and reality_inbound_count > 1 else 'Прямой Inbound Xray' %}
-  {% elif server.inbound_profile == 'xhttp_tls' %}
-    {% set protection_label = 'TLS · TCP' %}
-    {% set protection_hint = 'XHTTP-TLS: TCP/' ~ server.port ~ ' · ' ~ xhttp_inbound_count ~ ' Path' %}
-    {% set route_client = 'VLESS XHTTP · TCP/' ~ server.port %}
-    {% set route_security = 'TLS завершается в Nginx' %}
-    {% set route_server = 'Локальные XHTTP Inbound Xray' %}
-  {% elif server.inbound_profile == 'xhttp_reality' %}
-    {% set protection_label = 'REALITY · TCP' %}
-    {% set protection_hint = 'XHTTP-REALITY: TCP/' ~ server.port ~ ' · 1 Path' %}
-    {% set route_client = 'VLESS XHTTP · TCP/' ~ server.port %}
-    {% set route_security = 'REALITY · сертификат не нужен' %}
-    {% set route_server = 'Прямой XHTTP Inbound Xray' %}
-  {% elif server.inbound_profile == 'xhttp_hysteria_tls' %}
-    {% set protection_label = 'TCP + UDP' %}
-    {% set protection_hint = '' %}
-    {% set route_client = 'VLESS TCP + Hysteria UDP' %}
-    {% set route_security = 'Общий TLS-сертификат' %}
-    {% set route_server = 'Nginx/XHTTP + прямой QUIC Xray' %}
-  {% elif server.inbound_profile == 'hysteria2_tls' %}
-    {% set protection_label = 'TLS · UDP/QUIC' %}
-    {% set protection_hint = '' %}
-    {% set route_client = 'Hysteria 2 · UDP/' ~ server.port %}
-    {% set route_security = 'TLS-сертификат' %}
-    {% set route_server = 'Прямой QUIC Inbound Xray' %}
-  {% else %}
-    {% set protection_label = 'Текущий профиль' %}
-    {% set protection_hint = 'Параметры активного Inbound' %}
-    {% set route_client = 'Клиентское подключение' %}
-    {% set route_security = 'Защита профиля' %}
-    {% set route_server = 'Inbound Xray' %}
-  {% endif %}
-
-  <section class="inbound-summary-grid">
-    <article class="inbound-summary-card">
-      <span>Активный профиль</span>
-      <strong>{{ profile_name }}</strong>
-      {% if server.inbound_profile == 'xhttp_hysteria_tls' %}
-        <small class="inbound-summary-lines">
-          <em>XHTTP-TLS Inbound: {{ xhttp_inbound_count }}</em>
-          <em>Hysteria 2 Inbound: {{ hysteria_inbound_count }}</em>
-        </small>
-      {% elif server.inbound_profile == 'xhttp_tls' %}
-        <small>XHTTP-TLS Inbound: {{ xhttp_inbound_count }}</small>
-      {% elif server.inbound_profile == 'xhttp_reality' %}
-        <small>XHTTP-REALITY Inbound: 1</small>
-      {% elif server.inbound_profile == 'hysteria2_tls' %}
-        <small>Hysteria 2 Inbound: {{ hysteria_inbound_count }}</small>
-      {% else %}
-        <small>{{ 'REALITY Vision точек: ' if server.flow == 'xtls-rprx-vision' and reality_inbound_count > 1 else 'VLESS REALITY Inbound: ' }}{{ reality_inbound_count }}</small>
-      {% endif %}
-    </article>
-    <article class="inbound-summary-card">
-      <span>Публичная точка</span>
-      <strong class="mono">{{ server.address }}:{{ server.port }}</strong>
-      <small>Этот адрес попадает в ссылки и QR-коды</small>
-    </article>
-    <article class="inbound-summary-card">
-      <span>Защита и транспорт</span>
-      <strong>{{ protection_label }}</strong>
-      {% if server.inbound_profile == 'xhttp_hysteria_tls' %}
-        <small class="inbound-summary-lines">
-          <em>XHTTP-TLS: TCP/{{ server.port }} · {{ xhttp_inbound_count }} Path</em>
-          <em>Hysteria 2: {% for inbound in enabled_hysteria_inbounds %}UDP/{{ inbound.port }}{% if not loop.last %}, {% endif %}{% endfor %}</em>
-        </small>
-      {% elif server.inbound_profile == 'hysteria2_tls' %}
-        <small class="inbound-summary-lines">
-          <em>Hysteria 2: {% for inbound in enabled_hysteria_inbounds %}UDP/{{ inbound.port }}{% if not loop.last %}, {% endif %}{% endfor %}</em>
-        </small>
-      {% else %}
-        <small>{{ protection_hint }}</small>
-      {% endif %}
-    </article>
-    <article class="inbound-summary-card">
-      <span>Пользователи и ID</span>
-      <strong>Сохраняются</strong>
-      <small>UUID и Hysteria auth не удаляются при смене профиля</small>
-    </article>
-  </section>
-
-  <section class="inbound-detection-card {{ 'is-ready' if inbound_recommendations.certificate_found else 'needs-attention' }}" aria-labelledby="inbound-detection-title">
-    <div class="inbound-detection-header">
-      <div class="inbound-detection-copy">
-        <p class="panel-kicker">AUTO DETECTION</p>
-        <h2 id="inbound-detection-title">Обнаружено автоматически</h2>
-        <p>SG-Panel использует уже настроенные домен, сертификат и сетевые параметры как безопасные значения по умолчанию.</p>
-      </div>
-      <button class="button secondary" type="button" id="apply-inbound-recommendations">Подставить рекомендуемые значения</button>
-    </div>
-    <div class="inbound-detection-grid">
-      <div class="inbound-detection-domain"><span>Домен</span><strong>{{ inbound_recommendations.domain or 'не найден' }}</strong></div>
-      <div><span>Сертификат</span><strong class="{{ 'text-success' if inbound_recommendations.certificate_found else 'text-warning' }}">{{ 'найден' if inbound_recommendations.certificate_found else 'не найден' }}</strong></div>
-      <div><span>TCP 443</span><strong>{{ inbound_recommendations.tcp_443 }}</strong></div>
-      <div><span>UDP 443</span><strong>{{ inbound_recommendations.udp_443 }}</strong></div>
-      <div><span>Xray для теста</span><strong>{{ inbound_recommendations.xray_recommended_version }}</strong></div>
-    </div>
-  </section>
-
-  <section class="ui-card server-main-card inbound-main-card">
-    <header class="ui-card-heading ui-card-heading-row">
-      <div>
-        <p class="panel-kicker">PRIMARY INBOUND</p>
-        <h2>Серверная схема подключения</h2>
-        <p>Сначала выберите семейство защиты и транспорт. Затем настройте значения, которые увидит клиент, и внутренние параметры сервера.</p>
-      </div>
-      <div class="ui-heading-actions"><a class="button secondary" href="{{ url_for('inbound_json_page') }}">{ } Inbound JSON</a></div>
+<script>document.body.classList.add('ui-standard-page','server-settings-page','sg-always-on-xray-page');</script>
+<style>
+.sg-ao-page{display:grid;gap:18px;color:var(--text)}
+.sg-ao-card{position:relative;overflow:hidden;color:var(--text);background:linear-gradient(180deg,var(--panel),var(--panel-2));border:1px solid var(--line);border-radius:16px;padding:20px;box-shadow:0 14px 34px rgba(0,0,0,.14)}
+.sg-ao-card::before{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(125deg,rgba(255,255,255,.018),transparent 30%)}
+.sg-ao-card>*{position:relative;z-index:1}
+.sg-ao-head{display:flex;justify-content:space-between;gap:18px;align-items:flex-start}
+.sg-ao-head h2{margin:4px 0 7px;color:var(--text);font-size:25px;line-height:1.16;letter-spacing:-.03em}
+.sg-ao-head p:not(.panel-kicker){margin:0;color:var(--muted);font-size:13px;line-height:1.55}
+.sg-ao-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+.sg-vision-contract{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px;margin-top:14px;padding:13px;border:1px solid color-mix(in srgb,var(--success) 36%,var(--line));border-radius:14px;background:color-mix(in srgb,var(--success) 5%,var(--panel-2))}
+.sg-vision-fact{display:grid;gap:5px;min-width:0;padding:10px 11px;border:1px solid var(--line-soft);border-radius:11px;background:var(--panel-3)}
+.sg-vision-fact span{color:var(--muted);font-size:9px;font-weight:850;letter-spacing:.055em;text-transform:uppercase}
+.sg-vision-fact strong{overflow-wrap:anywhere;color:var(--text);font-size:12px;line-height:1.3}
+.sg-vision-fact.is-ready strong{color:var(--success)}
+.sg-ao-profile{display:flex;flex-direction:column;gap:13px;min-height:210px;padding:18px;color:var(--text);border:1px solid var(--line);border-radius:15px;background:linear-gradient(180deg,var(--panel-2),var(--panel-3));box-shadow:0 9px 24px rgba(0,0,0,.09)}
+.sg-ao-profile.is-active{border-color:color-mix(in srgb,var(--success) 68%,var(--line));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--success) 18%,transparent),0 10px 26px rgba(0,0,0,.10)}
+.sg-ao-profile.is-ready{border-color:color-mix(in srgb,var(--accent) 55%,var(--line));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 12%,transparent),0 10px 26px rgba(0,0,0,.09)}
+.sg-ao-profile.is-locked{border-color:color-mix(in srgb,var(--warning) 48%,var(--line));background:linear-gradient(180deg,var(--panel-2),color-mix(in srgb,var(--warning) 4%,var(--panel-3)))}
+.sg-ao-kicker{font-size:10px;font-weight:850;letter-spacing:.09em;text-transform:uppercase;color:var(--success)}
+.sg-ao-profile.is-locked .sg-ao-kicker{color:var(--warning)}
+.sg-ao-profile h3{margin:0;color:var(--text);font-size:20px;line-height:1.2;letter-spacing:-.025em}
+.sg-ao-profile>p{margin:0;color:var(--muted);font-size:12px;line-height:1.5}
+.sg-ao-status{align-self:flex-start;margin-top:auto;display:inline-flex;align-items:center;min-height:30px;padding:6px 10px;border:1px solid var(--line);border-radius:999px;font-size:11px;font-weight:850;line-height:1}
+.sg-ao-status.active{color:var(--success);border-color:color-mix(in srgb,var(--success) 38%,var(--line));background:var(--success-soft)}
+.sg-ao-status.ready{color:var(--accent);border-color:color-mix(in srgb,var(--accent) 38%,var(--line));background:var(--accent-soft)}
+.sg-ao-status.locked{color:var(--warning);border-color:color-mix(in srgb,var(--warning) 38%,var(--line));background:color-mix(in srgb,var(--warning) 10%,transparent)}
+.sg-ao-lock-detail{display:grid;gap:9px;margin-top:1px;padding-top:11px;border-top:1px solid var(--line-soft)}
+.sg-ao-lock-detail p{margin:0;color:var(--muted);font-size:10px;line-height:1.45}
+.sg-ao-security-link{justify-self:start;min-height:32px!important;padding-inline:11px!important;font-size:10px!important}
+.sg-ao-param-list{display:grid;gap:12px}
+.sg-ao-param{display:grid;grid-template-columns:minmax(210px,.8fr) repeat(3,minmax(160px,1fr));gap:12px;align-items:end;color:var(--text);border:1px solid var(--line);border-radius:14px;padding:15px;background:var(--panel-2)}
+.sg-ao-param.is-locked{opacity:1;border-color:color-mix(in srgb,var(--warning) 38%,var(--line));background:linear-gradient(180deg,var(--panel-2),color-mix(in srgb,var(--warning) 3%,var(--panel-3)))}
+.sg-ao-param-title{align-self:center;display:grid;gap:4px}
+.sg-ao-param-title strong{display:block;color:var(--text);font-size:16px;line-height:1.25}
+.sg-ao-param-title>span{color:var(--muted);font-size:10px;font-weight:800;letter-spacing:.035em}
+.sg-ao-param label{display:grid;gap:6px}
+.sg-ao-param label>span,.sg-ao-field>span,.sg-ao-flow>span{color:var(--muted);font-size:10px;font-weight:850;text-transform:uppercase;letter-spacing:.055em}
+.sg-ao-param input,.sg-ao-param select,.sg-ao-common input,.sg-ao-common select{width:100%;color:var(--text);border-color:var(--line);background:var(--panel-3)}
+.sg-ao-param.is-locked input,.sg-ao-param.is-locked select{color:var(--muted);background:color-mix(in srgb,var(--panel-3) 88%,var(--warning) 12%);pointer-events:none;cursor:not-allowed}
+.sg-ao-flow{display:grid;gap:5px;min-height:67px;padding:10px 12px;border:1px solid var(--line);border-radius:11px;background:var(--panel-3)}
+.sg-ao-flow strong{color:var(--text);font-size:13px}
+.sg-ao-flow small{color:var(--muted);font-size:9px;line-height:1.35}
+.sg-ao-flow.is-success strong{color:var(--success)}
+.sg-ao-param-lock-note{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:14px;margin-top:1px;padding:11px 12px;border:1px solid color-mix(in srgb,var(--warning) 30%,var(--line));border-radius:11px;background:color-mix(in srgb,var(--warning) 7%,var(--panel-3))}
+.sg-ao-param-lock-note p{margin:0;color:var(--muted);font-size:10px;line-height:1.45}
+.sg-ao-param-lock-note strong{display:block;margin-bottom:2px;color:var(--warning);font-size:11px}
+.sg-ao-param-lock-note .button{flex:0 0 auto}
+.sg-hy-card{grid-template-columns:minmax(210px,.8fr) minmax(150px,.65fr) minmax(230px,1fr)}
+.sg-hy-obfs{grid-column:1/-1;display:grid;grid-template-columns:minmax(240px,.8fr) minmax(300px,1.45fr) minmax(220px,.75fr);gap:13px;align-items:stretch;padding:15px;border:1px solid color-mix(in srgb,var(--sg-xray-blue) 38%,var(--line));border-radius:13px;background:color-mix(in srgb,var(--sg-xray-blue) 5%,var(--panel-3))}
+.sg-hy-obfs-head{display:grid;align-content:start;gap:6px}.sg-hy-obfs-head strong{font-size:15px;color:var(--text)}.sg-hy-obfs-head p{margin:0;color:var(--muted);font-size:10px;line-height:1.5}
+.sg-hy-mode{display:grid;gap:7px}.sg-hy-mode>span,.sg-hy-secret>span{color:var(--muted);font-size:10px;font-weight:850;text-transform:uppercase;letter-spacing:.055em}
+.sg-hy-mode-options{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.sg-hy-mode-option{position:relative;display:flex!important;align-items:center;gap:8px;min-height:42px;padding:9px 11px;border:1px solid var(--line);border-radius:11px;background:var(--panel-3);cursor:pointer}
+.sg-hy-mode-option:has(input:checked){border-color:var(--sg-xray-blue-border);background:var(--sg-xray-blue-soft);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--sg-xray-blue) 12%,transparent)}
+.sg-hy-mode-option input{width:auto!important;margin:0}.sg-hy-mode-option b{color:var(--text);font-size:11px}.sg-hy-mode-option small{display:block;color:var(--muted);font-size:9px}
+.sg-hy-secret{display:grid;gap:7px}.sg-hy-secret-row{display:grid;grid-template-columns:minmax(0,1fr) auto auto auto;gap:7px}.sg-hy-secret-row input{min-width:0;font-family:ui-monospace,SFMono-Regular,Consolas,monospace}.sg-hy-secret-row .button{min-height:40px;padding-inline:10px;font-size:10px}
+.sg-hy-support{display:grid;align-content:center;gap:6px;padding:11px 12px;border:1px solid var(--line);border-radius:11px;background:var(--panel-3)}.sg-hy-support span{font-size:10px;font-weight:850;text-transform:uppercase;letter-spacing:.055em;color:var(--muted)}.sg-hy-support strong{font-size:12px;color:var(--text)}.sg-hy-support small{font-size:9px;line-height:1.4;color:var(--muted)}.sg-hy-support.is-ok strong{color:var(--success)}.sg-hy-support.is-warning strong{color:var(--warning)}
+.sg-hy-change-note{grid-column:1/-1;display:flex;align-items:flex-start;gap:9px;margin:0;color:var(--muted);font-size:10px;line-height:1.5}.sg-hy-change-note b{color:var(--warning)}
+.sg-hy-secret[hidden]{display:none!important}
+.sg-ao-common{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.sg-ao-common label{display:grid;gap:6px;color:var(--text)}
+.sg-ao-common label>span{color:var(--muted);font-size:10px;font-weight:800}
+.sg-ao-common .wide{grid-column:1/-1}
+.sg-ao-card summary{color:var(--text);cursor:pointer}
+.sg-ao-actions{display:flex;justify-content:space-between;gap:14px;align-items:center}
+.sg-ao-actions p{margin:0;color:var(--muted);max-width:800px;font-size:11px;line-height:1.5}
+.sg-ao-actions>div{display:flex;gap:10px}
+html[data-resolved-theme="light"] .sg-ao-card{background:linear-gradient(180deg,#fff,var(--panel-2));box-shadow:var(--shadow)}
+html[data-resolved-theme="light"] .sg-ao-profile,html[data-resolved-theme="light"] .sg-ao-param{background:linear-gradient(180deg,#fff,var(--panel-2))}
+html[data-resolved-theme="light"] .sg-ao-profile.is-locked,html[data-resolved-theme="light"] .sg-ao-param.is-locked{background:linear-gradient(180deg,#fff,color-mix(in srgb,var(--warning) 5%,var(--panel-2)))}
+html[data-resolved-theme="light"] .sg-ao-flow,html[data-resolved-theme="light"] .sg-ao-param input,html[data-resolved-theme="light"] .sg-ao-param select,html[data-resolved-theme="light"] .sg-ao-common input,html[data-resolved-theme="light"] .sg-ao-common select{background:#fff}
+/* Hotfix 14: Xray Server uses cool blue structure; green is reserved for success. */
+.sg-always-on-xray-page{
+  --sg-xray-blue:#6f8fb8;
+  --sg-xray-blue-strong:#587ba7;
+  --sg-xray-blue-soft:rgba(111,143,184,.10);
+  --sg-xray-blue-border:rgba(111,143,184,.42);
+}
+.sg-always-on-xray-page .panel-kicker,
+.sg-always-on-xray-page .sg-ao-kicker{
+  color:var(--sg-xray-blue-strong);
+}
+.sg-always-on-xray-page .sg-ao-profile.is-active,
+.sg-always-on-xray-page .sg-ao-profile.is-ready{
+  border-color:var(--sg-xray-blue-border);
+  box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--sg-xray-blue) 13%,transparent),0 10px 26px rgba(0,0,0,.09);
+}
+.sg-always-on-xray-page .sg-vision-contract,
+.sg-always-on-xray-page .sg-vision-explainer{
+  border-color:var(--sg-xray-blue-border);
+  background:color-mix(in srgb,var(--sg-xray-blue) 5%,var(--panel-2));
+}
+.sg-always-on-xray-page .sg-vision-contract{
+  box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--sg-xray-blue) 8%,transparent);
+}
+html[data-resolved-theme="dark"] .sg-always-on-xray-page{
+  --sg-xray-blue:#8dbaf0;
+  --sg-xray-blue-strong:#a8cff8;
+  --sg-xray-blue-soft:rgba(141,186,240,.10);
+  --sg-xray-blue-border:rgba(141,186,240,.40);
+}
+html[data-resolved-theme="dark"] .sg-always-on-xray-page .sg-ao-card{
+  border-color:#2d425a;
+}
+html[data-resolved-theme="dark"] .sg-always-on-xray-page .sg-ao-profile.is-active,
+html[data-resolved-theme="dark"] .sg-always-on-xray-page .sg-ao-profile.is-ready{
+  border-color:var(--sg-xray-blue-border);
+  box-shadow:inset 0 0 0 1px rgba(141,186,240,.11),0 10px 26px rgba(0,0,0,.12);
+}
+html[data-resolved-theme="dark"] .sg-always-on-xray-page .sg-vision-contract,
+html[data-resolved-theme="dark"] .sg-always-on-xray-page .sg-vision-explainer{
+  border-color:var(--sg-xray-blue-border);
+  background:linear-gradient(180deg,rgba(141,186,240,.055),rgba(141,186,240,.025));
+}
+html[data-resolved-theme="dark"] .sg-always-on-xray-page .sg-vision-fact{
+  border-color:rgba(141,186,240,.15);
+  background:#182638;
+}
+html[data-resolved-theme="dark"] .sg-always-on-xray-page .sg-vision-explainer code{
+  color:var(--sg-xray-blue-strong);
+}
+html[data-resolved-theme="light"] .sg-always-on-xray-page{
+  --sg-xray-blue:#718eaa;
+  --sg-xray-blue-strong:#526f8d;
+  --sg-xray-blue-soft:#edf3f8;
+  --sg-xray-blue-border:#9eb4c8;
+}
+html[data-resolved-theme="light"] .sg-always-on-xray-page .sg-ao-card{
+  border-color:#aebfca;
+  background:linear-gradient(180deg,#fffdfa,#f4f7f7);
+}
+html[data-resolved-theme="light"] .sg-always-on-xray-page .sg-ao-profile.profile-reality_tcp,
+html[data-resolved-theme="light"] .sg-always-on-xray-page .sg-ao-profile.profile-xhttp_reality{
+  border-color:#9fb9cc;
+  background:linear-gradient(180deg,#fbfdff,#edf4f8);
+  box-shadow:inset 0 0 0 1px rgba(113,142,170,.08),0 10px 24px rgba(50,72,92,.08);
+}
+html[data-resolved-theme="light"] .sg-always-on-xray-page .sg-ao-profile.profile-xhttp_tls,
+html[data-resolved-theme="light"] .sg-always-on-xray-page .sg-ao-profile.profile-hysteria2{
+  border-color:#c9b88e;
+  background:linear-gradient(180deg,#fffdf8,#f3ecdf);
+  box-shadow:inset 0 0 0 1px rgba(167,132,57,.06),0 10px 24px rgba(91,73,41,.07);
+}
+html[data-resolved-theme="light"] .sg-always-on-xray-page .sg-vision-contract{
+  border-color:#9fb5c8;
+  background:linear-gradient(180deg,#eef5fa,#e6eef4);
+}
+html[data-resolved-theme="light"] .sg-always-on-xray-page .sg-vision-fact:nth-child(odd){
+  border-color:#c4d2dc;
+  background:#f8fbfd;
+}
+html[data-resolved-theme="light"] .sg-always-on-xray-page .sg-vision-fact:nth-child(even){
+  border-color:#d4d1c8;
+  background:#fbfaf6;
+}
+html[data-resolved-theme="light"] .sg-always-on-xray-page .sg-vision-explainer{
+  border-color:#9fb5c8;
+  background:linear-gradient(180deg,#f3f8fb,#edf3f6);
+}
+html[data-resolved-theme="light"] .sg-always-on-xray-page .sg-vision-explainer code{
+  color:var(--sg-xray-blue-strong);
+}
+@media(max-width:1300px){.sg-ao-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.sg-vision-contract{grid-template-columns:repeat(3,minmax(0,1fr))}.sg-ao-param{grid-template-columns:repeat(2,minmax(0,1fr))}.sg-ao-param-title{grid-column:1/-1}.sg-hy-obfs{grid-template-columns:1fr 1.5fr}.sg-hy-support{grid-column:1/-1}}
+@media(max-width:760px){.sg-ao-grid,.sg-ao-common,.sg-ao-param,.sg-vision-contract,.sg-hy-obfs{grid-template-columns:1fr}.sg-ao-head,.sg-ao-actions,.sg-ao-param-lock-note{align-items:stretch;flex-direction:column}.sg-ao-actions>div,.sg-ao-actions .button,.sg-ao-param-lock-note .button{width:100%}.sg-ao-profile{min-height:0}.sg-hy-secret-row{grid-template-columns:1fr 1fr 1fr}.sg-hy-secret-row input{grid-column:1/-1}}
+</style>
+<div class="ui-page ui-page-wide sg-ao-page">
+  <section class="sg-ao-card">
+    <header class="sg-ao-head">
+      <div><p class="panel-kicker">XRAY · ALWAYS ON</p><h2>Четыре независимых канала</h2><p>Выбирать один профиль больше не нужно. Панель собирает единый Xray config со всеми каналами, которые технически доступны серверу.</p></div>
+      <a class="button secondary" href="{{ url_for('settings_expert_inbound_page') }}">Эксперт · резервные Inbound</a>
     </header>
-
-    <form method="post" action="{{ url_for('settings_save') }}" class="ui-form server-settings-form inbound-settings-form" id="server-profile-form" data-validated-form>
-      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-
-      <section class="ui-form-section inbound-profile-section">
-        <header><span>1</span><div><h3>Выбор серверной схемы <a class="context-help-link" href="{{ url_for('help_page') }}#profiles" title="Справка о профилях" aria-label="Справка о профилях">?</a></h3><p>Сначала выберите способ защиты и транспорт. Зелёная метка показывает схему, которая работает на сервере сейчас.</p></div></header>
-
-        <div class="inbound-profile-families" role="radiogroup" aria-label="Серверная схема входящего подключения">
-          <section class="inbound-profile-family inbound-profile-family-reality" aria-labelledby="profile-family-reality-title">
-            <header class="profile-family-heading">
-              <span class="profile-family-icon">R</span>
-              <div><strong id="profile-family-reality-title">REALITY · без сертификата</strong><small>Маскировка REALITY, обычный TLS-сертификат не требуется</small></div>
-            </header>
-            <div class="profile-family-grid profile-family-grid-2">
-              <label class="inbound-profile-card {% if server.inbound_profile == 'raw_reality' %}is-active{% endif %}">
-                <input type="radio" name="inbound_profile" value="raw_reality" {% if server.inbound_profile == 'raw_reality' %}checked{% endif %}>
-                <span class="profile-card-body">
-                  <span class="profile-card-status-row"><span class="profile-card-active-state">Работает сейчас</span><span class="profile-card-draft-state">Выбрано, ещё не применено</span></span>
-                  <span class="profile-card-protocol">VLESS · TCP</span>
-                  <span class="profile-card-top"><strong>VLESS REALITY</strong></span>
-                  <small>Прямое подключение к Xray. До трёх точек; XTLS Vision выбирается внутри профиля.</small>
-                </span>
-              </label>
-              <label class="inbound-profile-card {% if server.inbound_profile == 'xhttp_reality' %}is-active{% endif %}">
-                <input type="radio" name="inbound_profile" value="xhttp_reality" {% if server.inbound_profile == 'xhttp_reality' %}checked{% endif %}>
-                <span class="profile-card-body">
-                  <span class="profile-card-status-row"><span class="profile-card-active-state">Работает сейчас</span><span class="profile-card-draft-state">Выбрано, ещё не применено</span></span>
-                  <span class="profile-card-protocol">VLESS · XHTTP</span>
-                  <span class="profile-card-top"><strong>VLESS XHTTP-REALITY</strong></span>
-                  <small>XHTTP напрямую в Xray с защитой REALITY. Один публичный Path.</small>
-                </span>
-              </label>
-            </div>
-          </section>
-
-          <section class="inbound-profile-family inbound-profile-family-tls" aria-labelledby="profile-family-tls-title">
-            <header class="profile-family-heading">
-              <span class="profile-family-icon">TLS</span>
-              <div><strong id="profile-family-tls-title">TLS · нужен сертификат</strong><small>Обычный домен и TLS-сертификат для XHTTP, Hysteria 2 или обоих сразу</small></div>
-            </header>
-            <div class="profile-family-grid profile-family-grid-3">
-              <label class="inbound-profile-card {% if server.inbound_profile == 'xhttp_tls' %}is-active{% endif %}">
-                <input type="radio" name="inbound_profile" value="xhttp_tls" {% if server.inbound_profile == 'xhttp_tls' %}checked{% endif %}>
-                <span class="profile-card-body">
-                  <span class="profile-card-status-row"><span class="profile-card-active-state">Работает сейчас</span><span class="profile-card-draft-state">Выбрано, ещё не применено</span></span>
-                  <span class="profile-card-protocol">VLESS · XHTTP · TCP</span>
-                  <span class="profile-card-top"><strong>VLESS XHTTP-TLS</strong></span>
-                  <small>Nginx принимает TLS. До трёх XHTTP Path на одном публичном TCP-порту.</small>
-                </span>
-              </label>
-              <label class="inbound-profile-card {% if server.inbound_profile == 'hysteria2_tls' %}is-active{% endif %}">
-                <input type="radio" name="inbound_profile" value="hysteria2_tls" {% if server.inbound_profile == 'hysteria2_tls' %}checked{% endif %}>
-                <span class="profile-card-body">
-                  <span class="profile-card-status-row"><span class="profile-card-active-state">Работает сейчас</span><span class="profile-card-draft-state">Выбрано, ещё не применено</span></span>
-                  <span class="profile-card-protocol">HYSTERIA 2 · UDP/QUIC</span>
-                  <span class="profile-card-top"><strong>Hysteria 2</strong></span>
-                  <small>Прямой QUIC/UDP в Xray. До трёх независимых UDP-портов.</small>
-                </span>
-              </label>
-              <label class="inbound-profile-card {% if server.inbound_profile == 'xhttp_hysteria_tls' %}is-active{% endif %}">
-                <input type="radio" name="inbound_profile" value="xhttp_hysteria_tls" {% if server.inbound_profile == 'xhttp_hysteria_tls' %}checked{% endif %}>
-                <span class="profile-card-body">
-                  <span class="profile-card-status-row"><span class="profile-card-active-state">Работает сейчас</span><span class="profile-card-draft-state">Выбрано, ещё не применено</span></span>
-                  <span class="profile-card-protocol">XHTTP TCP + HYSTERIA UDP</span>
-                  <span class="profile-card-top"><strong>XHTTP-TLS + Hysteria 2</strong></span>
-                  <small>Обе семьи работают одновременно и используют общий TLS-сертификат.</small>
-                </span>
-              </label>
-            </div>
-          </section>
+    <div class="sg-ao-grid" style="margin-top:16px">
+      {% for profile in xray_channels.profiles %}
+      {% set is_active = profile.status == 'Работает сейчас' %}
+      {% set shown_status = 'Нужен TLS-сертификат' if profile.id == 'hysteria2' and not profile.ready else profile.status %}
+      <article class="sg-ao-profile profile-{{ profile.id }} {{ 'is-active' if is_active else ('is-ready' if profile.ready else 'is-locked') }}">
+        <div class="sg-ao-kicker">{{ profile.transport }} · {{ profile.security }}{% if profile.flow %} · XTLS VISION{% endif %}</div>
+        <h3>{{ profile.title }}</h3>
+        <p>{{ profile.note }}</p>
+        <span class="sg-ao-status {{ 'active' if is_active else ('ready' if profile.ready else 'locked') }}">{{ shown_status }}</span>
+        {% if not profile.ready %}
+        <div class="sg-ao-lock-detail">
+          {% if profile.id == 'xhttp_tls' %}
+          <p>Нужны домен, HTTPS и действующий TLS-сертификат. После готовности канал подключится автоматически.</p>
+          <a class="button secondary small sg-ao-security-link" href="{{ url_for('security_page') }}#panel-exposure">Настроить в Security</a>
+          {% elif profile.id == 'hysteria2' %}
+          <p>Нужны домен и TLS-сертификат. Для самого Hysteria 2 Nginx и HTTPS-сайт не обязательны.</p>
+          <a class="button secondary small sg-ao-security-link" href="{{ url_for('security_page') }}#panel-exposure">Настроить сертификат</a>
+          {% elif profile.id == 'xhttp_reality' %}
+          <p>Канал станет доступен после подготовки и проверки VLESS Encryption ML-KEM-768.</p>
+          {% endif %}
         </div>
-
-        <div class="ui-info-note profile-change-note"><span>i</span><p><strong>Выбор карточки ещё не переключает сервер.</strong> Сначала проверьте черновик через <code>xray run -test</code>, затем нажмите «Сохранить и применить». UUID, ключи, Path и auth других схем сохраняются.</p></div>
-      </section>
-
-      <section class="inbound-active-banner" id="inbound-active-banner" aria-live="polite">
-        <div class="inbound-active-banner-main">
-          <span>Сейчас открыты настройки схемы</span>
-          <strong id="inbound-selected-profile-name">{{ profile_name }}</strong>
-          <small id="inbound-selected-profile-hint">Ниже показаны только относящиеся к ней параметры.</small>
-        </div>
-        <div class="inbound-active-banner-side">
-          <span class="inbound-selection-state is-active" id="inbound-selected-state">Работает сейчас</span>
-          <b id="inbound-selected-profile-tag">{{ protection_label }}</b>
-          <small id="inbound-selected-profile-note">{{ protection_hint }}</small>
-        </div>
-        <div class="inbound-mode-route" aria-label="Как проходит подключение">
-          <div><span>Клиентское соединение</span><strong id="inbound-route-client">{{ route_client }}</strong></div>
-          <div><span>Защита снаружи</span><strong id="inbound-route-security">{{ route_security }}</strong></div>
-          <div><span>Обработка на сервере</span><strong id="inbound-route-server">{{ route_server }}</strong></div>
-        </div>
-      </section>
-
-      <section class="ui-form-section inbound-core-settings">
-        <header><span>2</span><div><h3>Параметры подключения клиента</h3><p>Сначала идут значения из клиентской ссылки, отдельно — техническая привязка Xray на сервере.</p></div></header>
-        <div class="inbound-field-groups">
-          <section class="inbound-field-group">
-            <header><span>В клиентской ссылке</span><small>Адрес, порт, SNI и параметры, которые получает клиент.</small></header>
-            <div class="ui-field-grid server-client-grid">
-              <label><span>Публичный адрес / домен</span><input name="address" value="{{ server.address }}" required></label>
-              <label><span>Публичный порт</span><input name="port" type="number" min="1" max="65535" value="{{ server.port }}" required></label>
-              <label><span>Server name / SNI</span><input name="server_name" value="{{ server.server_name }}" required></label>
-              <label data-profile-section="raw_reality xhttp_tls xhttp_reality grpc_tls xhttp_hysteria_tls"><span>Fingerprint браузера</span>{{ fingerprint_select(server.fingerprint) }}</label>
-              <label data-profile-section="raw_reality"><span>XTLS Flow <a class="context-help-link context-help-inline" href="{{ url_for('help_page') }}#reality-vision" title="Чем отличается Vision" aria-label="Справка о REALITY и Vision">?</a></span><select name="flow"><option value="xtls-rprx-vision" {% if server.flow == 'xtls-rprx-vision' %}selected{% endif %}>XTLS Vision — рекомендуется</option><option value="" {% if not server.flow %}selected{% endif %}>Стандартный VLESS без Vision</option></select><small>SG-Panel задаёт Flow одновременно серверу и клиентской ссылке. Не включайте Vision только в клиенте.</small></label>
-            </div>
-          </section>
-          <div class="ui-info-note flow-consistency-note" data-profile-section="raw_reality"><span>i</span><p><strong>Vision — серверно-клиентская настройка.</strong> После изменения SG-Panel обновит серверный <code>flow</code> и все новые ссылки. Старые ссылки с другим Flow перестанут соответствовать серверу.</p></div>
-          <section class="inbound-field-group inbound-field-group-server">
-            <header><span>На сервере</span><small>Технический интерфейс, на котором Xray принимает прямое подключение.</small></header>
-            <div class="ui-field-grid server-listen-grid">
-              <label><span>Listen Xray</span><input name="listen" value="{{ server.listen }}" required><small>Для Hysteria 2 рекомендуется <code>0.0.0.0</code>. Локальные listener XHTTP-TLS задаются ниже отдельно.</small></label>
-            </div>
-          </section>
-        </div>
-      </section>
-
-      <section class="ui-form-section profile-section hysteria-immediate-settings" data-profile-section="hysteria2_tls xhttp_hysteria_tls">
-        <header class="hysteria-studio-heading">
-          <span>3</span>
-          <div>
-            <p class="panel-kicker">HYSTERIA STUDIO</p>
-            <h3>Hysteria 2</h3>
-            <p>Центр настройки QUIC/UDP: безопасные пресеты, производительность, masquerade, port hopping и экспертные параметры.</p>
-          </div>
-          <div class="hysteria-studio-actions">
-            <a class="button ghost small" href="{{ url_for('settings_hysteria_diagnostics') }}">Полная проверка</a>
-            <div class="hysteria-live-badge {{ 'is-live' if hysteria_studio.active and hysteria_studio.service == 'active' else 'is-draft' }}">
-              <i></i><strong>{{ 'АКТИВНА' if hysteria_studio.active and hysteria_studio.service == 'active' else 'ГОТОВА К НАСТРОЙКЕ' }}</strong>
-            </div>
-          </div>
-        </header>
-
-        <div class="hysteria-studio-overview">
-          <article><span>Публичная точка</span><strong>{{ hysteria_studio.endpoint }}</strong><small>{{ 'Порт слушается' if hysteria_studio.udp_listener == 'занят' else 'Появится после применения' }}</small></article>
-          <article><span>Xray</span><strong>{{ hysteria_studio.xray_version }}</strong><small>Служба: {{ hysteria_studio.service }}</small></article>
-          <article><span>TLS</span><strong class="{{ 'text-success' if hysteria_studio.certificate_ready else 'text-warning' }}">{{ hysteria_studio.certificate_label }}</strong><small>{{ hysteria_studio.domain or 'домен не определён' }}</small></article>
-          <article><span>Hysteria Inbound</span><strong>{{ hysteria_studio.instances }}</strong><small>UDP-порты: {{ hysteria_studio.ports_label }}</small></article>
-          <article><span>Пользователи</span><strong>{{ hysteria_studio.users }}</strong><small>Отдельный auth на каждом Inbound</small></article>
-        </div>
-
-        <div class="hysteria-readiness">
-          <div class="{{ 'is-ok' if inbound_recommendations.domain else 'is-warning' }}"><i></i><span>DNS и домен</span><strong>{{ inbound_recommendations.domain or 'не найден' }}</strong></div>
-          <div class="{{ 'is-ok' if inbound_recommendations.certificate_found else 'is-warning' }}"><i></i><span>Сертификат</span><strong>{{ 'найден' if inbound_recommendations.certificate_found else 'требует настройки' }}</strong></div>
-          <div class="{{ 'is-ok' if hysteria_studio.udp_listener == 'занят' else 'is-neutral' }}"><i></i><span>UDP {{ server.port }}</span><strong>{{ hysteria_studio.udp_listener }}</strong></div>
-          <div class="{{ 'is-ok' if hysteria_studio.service == 'active' else 'is-warning' }}"><i></i><span>Служба Xray</span><strong>{{ hysteria_studio.service }}</strong></div>
-        </div>
-
-        <div class="ui-info-note"><span>i</span><p>Все параметры выбранного UDP/QUIC-профиля находятся здесь. Основной Inbound сохраняет прежний UUID как auth. Для второго и третьего Inbound панель создаёт отдельный стабильный auth каждому клиенту. Все включённые UDP-порты необходимо открыть в Security Group. Port hopping на первом этапе совместим только с одним Hysteria 2 Inbound.</p></div>
-
-        <section class="hysteria-studio-panel hysteria-instance-panel">
-          <div class="hysteria-panel-heading"><div><span>MULTI-INBOUND</span><h4>До трёх Hysteria 2 одновременно <a class="context-help-link" href="{{ url_for('help_page') }}#hysteria2" title="Справка о Hysteria 2" aria-label="Справка о Hysteria 2">?</a></h4><p>Основной UDP-порт задаётся в блоке «Публичная точка». Дополнительные Inbound получают собственные порт, tag, auth, ссылку и QR-код.</p></div></div>
-          <div class="hysteria-instance-grid">
-            <article class="hysteria-instance-card is-required">
-              <div class="hysteria-instance-card-head"><div><b>Основной</b><small>Всегда включён для совместимости</small></div><span class="pill enabled"><i></i>Включён</span></div>
-              <label><span>Название</span><input name="hysteria_instance_1_name" maxlength="80" value="{{ hysteria_inbounds[0].name }}"></label>
-              <div class="hysteria-instance-meta"><span>Tag</span><code>{{ 'hysteria2-primary-in' if server.inbound_profile == 'xhttp_hysteria_tls' else hysteria_inbounds[0].tag }}</code></div>
-              <div class="hysteria-instance-meta"><span>UDP</span><strong>{{ server.listen }}:{{ server.port }}</strong></div>
-            </article>
-            {% for item in hysteria_inbounds[1:] %}
-            <article class="hysteria-instance-card {{ 'is-enabled' if item.enabled else '' }}">
-              <div class="hysteria-instance-card-head">
-                <div><b>{{ 'Резервный' if item.id == 2 else 'Дополнительный' }}</b><small>Отдельная клиентская точка</small></div>
-                <label class="switch-row compact" data-hysteria-instance-toggle><input type="checkbox" name="hysteria_instance_{{ item.id }}_enabled" value="1" {% if item.enabled %}checked{% endif %}><span class="switch" aria-hidden="true"></span><div><strong>{{ 'Отключить' if item.enabled else 'Включить' }}</strong></div></label>
-              </div>
-              <label><span>Название</span><input name="hysteria_instance_{{ item.id }}_name" maxlength="80" value="{{ item.name }}"></label>
-              <div class="ui-field-grid hysteria-instance-fields">
-                <label><span>Listen</span><input name="hysteria_instance_{{ item.id }}_listen" value="{{ item.listen }}"></label>
-                <label><span>UDP-порт</span><input name="hysteria_instance_{{ item.id }}_port" type="number" min="1" max="65535" value="{{ item.port }}"></label>
-              </div>
-              <div class="hysteria-instance-meta"><span>Тег</span><code>{{ item.tag }}</code></div>
-            </article>
-            {% endfor %}
-          </div>
-          <div class="ui-warning-note"><span>!</span><p>Для второго и третьего Inbound откройте соответствующие порты именно по UDP. Одинаковый UDP-порт двум Inbound назначить нельзя.</p></div>
-        </section>
-
-        <section class="hysteria-studio-panel">
-          <div class="hysteria-panel-heading"><div><span>ОСНОВНЫЕ</span><h4>Подключение и TLS</h4><p>Панель уже знает домен и сертификат. Обычно эти поля достаточно проверить, а не заполнять вручную.</p></div><button class="button ghost small" type="button" id="hysteria-restore-recommended">Вернуть рекомендуемые</button></div>
-          <div class="ui-field-grid server-tls-grid hysteria-tls-grid">
-            <label><span>TLS certificate</span><input name="tls_cert_path" data-exclusive-profile-field value="{{ server.tls_cert_path }}" placeholder="/etc/letsencrypt/live/domain/fullchain.pem"></label>
-            <label><span>TLS private key</span><input name="tls_key_path" data-exclusive-profile-field value="{{ server.tls_key_path }}" placeholder="/etc/letsencrypt/live/domain/privkey.pem"></label>
-          </div>
-          <div class="ui-field-grid hysteria-basic-grid">
-            <label><span>UDP idle timeout, сек.</span><input name="hysteria_udp_idle_timeout" data-hysteria-tunable type="number" min="10" max="3600" value="{{ server.hysteria_udp_idle_timeout }}"><small>Ожидание неактивного UDP-потока. Безопасное значение — 60.</small></label>
-            <label><span>QUIC max idle timeout, сек.</span><input name="hysteria_max_idle_timeout" data-hysteria-tunable type="number" min="4" max="120" value="{{ server.hysteria_max_idle_timeout }}"><small>Закрытие всего QUIC-соединения при полном простое.</small></label>
-            <label><span>QUIC KeepAlive, сек.</span><input name="hysteria_keepalive_period" data-hysteria-tunable type="number" min="0" max="60" value="{{ server.hysteria_keepalive_period }}"><small>0 — выключено; допустимо 2–60.</small></label>
-          </div>
-        </section>
-
-        <section class="hysteria-studio-panel">
-          <div class="hysteria-panel-heading"><div><span>ПРОИЗВОДИТЕЛЬНОСТЬ</span><h4>Профиль сети</h4><p>Пресет меняет только параметры Hysteria. Перед применением все значения всё равно проходят проверку Xray.</p></div></div>
-          <div class="hysteria-preset-grid" role="radiogroup" aria-label="Пресет производительности Hysteria 2">
-            {% set preset_items = [
-              ('auto','Автоматически','Штатный Brutal без ограничения скорости.'),
-              ('mobile','Мобильная сеть','Более спокойный BBR и KeepAlive для нестабильной сети.'),
-              ('speed','Высокая скорость','Brutal и больше одновременных QUIC-потоков.'),
-              ('limited','Ограниченный сервер','BBR и умеренное число потоков.'),
-              ('custom','Пользовательский','Ваши собственные значения без автозамены.')
-            ] %}
-            {% for value, title, note in preset_items %}
-              <label class="hysteria-preset-card">
-                <input type="radio" name="hysteria_performance_profile" value="{{ value }}" {% if server.hysteria_performance_profile == value %}checked{% endif %}>
-                <span><b>{{ title }}</b><small>{{ note }}</small></span>
-              </label>
-            {% endfor %}
-          </div>
-          <div class="hysteria-preset-summary" id="hysteria-preset-summary"></div>
-          <div class="ui-field-grid hysteria-performance-grid">
-            <label><span>Congestion control</span><select name="hysteria_congestion" data-hysteria-tunable><option value="brutal" {% if server.hysteria_congestion == 'brutal' %}selected{% endif %}>Brutal — штатный Hysteria</option><option value="bbr" {% if server.hysteria_congestion == 'bbr' %}selected{% endif %}>BBR</option><option value="reno" {% if server.hysteria_congestion == 'reno' %}selected{% endif %}>Reno</option><option value="force-brutal" {% if server.hysteria_congestion == 'force-brutal' %}selected{% endif %}>Force Brutal</option></select></label>
-            <label><span>Профиль BBR</span><select name="hysteria_bbr_profile" data-hysteria-tunable><option value="conservative" {% if server.hysteria_bbr_profile == 'conservative' %}selected{% endif %}>Conservative</option><option value="standard" {% if server.hysteria_bbr_profile == 'standard' %}selected{% endif %}>Standard</option><option value="aggressive" {% if server.hysteria_bbr_profile == 'aggressive' %}selected{% endif %}>Aggressive</option></select></label>
-            <label><span>Лимит Upload сервера</span><input name="hysteria_brutal_up" data-hysteria-tunable value="{{ server.hysteria_brutal_up }}" placeholder="0 или 100 mbps"><small>0 — без серверного ограничения.</small></label>
-            <label><span>Лимит Download сервера</span><input name="hysteria_brutal_down" data-hysteria-tunable value="{{ server.hysteria_brutal_down }}" placeholder="0 или 100 mbps"><small>Направления указаны относительно сервера.</small></label>
-          </div>
-        </section>
-
-        <section class="hysteria-studio-panel">
-          <div class="hysteria-panel-heading"><div><span>HTTP/3 MASQUERADE</span><h4>Что увидит обычный посетитель</h4><p>Можно оставить стандартную 404, вернуть свой HTML, отдать статический сайт или проксировать настоящий HTTPS-сайт.</p></div></div>
-          <div class="ui-field-grid hysteria-masq-grid">
-            <label><span>Режим masquerade</span><select name="hysteria_masquerade_type" id="hysteria-masquerade-type"><option value="" {% if not server.hysteria_masquerade_type %}selected{% endif %}>Стандартная страница 404</option><option value="string" {% if server.hysteria_masquerade_type == 'string' %}selected{% endif %}>Собственный HTML-текст</option><option value="file" {% if server.hysteria_masquerade_type == 'file' %}selected{% endif %}>Статический сайт из каталога</option><option value="proxy" {% if server.hysteria_masquerade_type == 'proxy' %}selected{% endif %}>Проксировать настоящий сайт</option></select></label>
-            <label data-masq-mode="string"><span>HTTP status</span><input name="hysteria_masquerade_status" type="number" min="200" max="599" value="{{ server.hysteria_masquerade_status }}"></label>
-            <label class="ui-field-wide" data-masq-mode="proxy"><span>URL сайта</span><input name="hysteria_masquerade_url" value="{{ server.hysteria_masquerade_url }}" placeholder="https://example.com/"></label>
-            <label class="ui-field-wide" data-masq-mode="file"><span>Каталог статического сайта</span><input name="hysteria_masquerade_dir" value="{{ server.hysteria_masquerade_dir }}" placeholder="/var/www/hysteria-cover"><small>Xray должен иметь права чтения этого каталога.</small></label>
-            <label class="ui-field-wide" data-masq-mode="string"><span>HTML-текст</span><textarea name="hysteria_masquerade_content" rows="5" maxlength="8192" placeholder="&lt;h1&gt;Not Found&lt;/h1&gt;">{{ server.hysteria_masquerade_content }}</textarea></label>
-            <label class="ui-field-wide" data-masq-mode="string"><span>HTTP-заголовки, JSON</span><textarea name="hysteria_masquerade_headers" rows="4" maxlength="4096" placeholder='{"content-type":"text/html; charset=utf-8"}'>{{ server.hysteria_masquerade_headers }}</textarea></label>
-          </div>
-          <div class="hysteria-switch-grid" data-masq-mode="proxy">
-            <label class="switch-row"><input type="checkbox" name="hysteria_masquerade_rewrite_host" value="1" {% if server.hysteria_masquerade_rewrite_host %}checked{% endif %}><span></span><div><strong>Rewrite Host</strong><small>Передавать проксируемому сайту его собственный Host.</small></div></label>
-            <label class="switch-row"><input type="checkbox" name="hysteria_masquerade_insecure" value="1" {% if server.hysteria_masquerade_insecure %}checked{% endif %}><span></span><div><strong>Игнорировать TLS upstream</strong><small>Небезопасно; включать только для тестового сайта.</small></div></label>
-          </div>
-        </section>
-
-        <details class="hysteria-expert-details">
-          <summary><span>Экспертные параметры Hysteria 2</span><small>Port hopping, QUIC-потоки, PMTU, окна и диагностический журнал</small></summary>
-          <div class="hysteria-expert-body">
-            <section>
-              <div class="hysteria-panel-heading"><div><span>PORT HOPPING</span><h4>Прыжки по UDP-портам</h4><p>Оставьте поле пустым, чтобы функция была выключена. В AWS необходимо открыть весь диапазон UDP.</p></div></div>
-              <div class="ui-field-grid hysteria-hop-grid">
-                <label><span>Порты и диапазоны</span><input name="hysteria_udp_hop_ports" data-hysteria-tunable value="{{ server.hysteria_udp_hop_ports }}" placeholder="443,20000-20100"><small>Поддерживаются отдельные порты, диапазоны и запятые.</small></label>
-                <label><span>Интервал, сек.</span><input name="hysteria_udp_hop_interval" data-hysteria-tunable value="{{ server.hysteria_udp_hop_interval }}" placeholder="30 или 15-45"><small>Минимум 5 секунд.</small></label>
-              </div>
-            </section>
-            <section>
-              <div class="hysteria-panel-heading"><div><span>QUIC ENGINE</span><h4>Потоки и обнаружение MTU</h4><p>Без необходимости оставьте рекомендуемые значения. Некорректные окна могут ухудшить скорость и расход памяти.</p></div></div>
-              <div class="ui-field-grid hysteria-quic-grid">
-                <label><span>Максимум входящих потоков</span><input name="hysteria_max_incoming_streams" data-hysteria-tunable type="number" min="8" value="{{ server.hysteria_max_incoming_streams }}"></label>
-                <label class="switch-row switch-field"><input type="checkbox" name="hysteria_disable_pmtud" data-hysteria-tunable value="1" {% if server.hysteria_disable_pmtud %}checked{% endif %}><span></span><div><strong>Отключить Path MTU Discovery</strong><small>Обычно оставляется выключенным.</small></div></label>
-                <label class="switch-row switch-field"><input type="checkbox" name="hysteria_quic_debug" data-hysteria-tunable value="1" {% if server.hysteria_quic_debug %}checked{% endif %}><span></span><div><strong>Диагностика congestion control</strong><small>Добавляет подробные записи BBR/Brutal в журнал Xray.</small></div></label>
-              </div>
-              <div class="ui-field-grid hysteria-window-grid">
-                <label><span>Init stream window</span><input name="hysteria_init_stream_receive_window" data-hysteria-tunable type="number" min="65536" value="{{ server.hysteria_init_stream_receive_window }}"></label>
-                <label><span>Max stream window</span><input name="hysteria_max_stream_receive_window" data-hysteria-tunable type="number" min="65536" value="{{ server.hysteria_max_stream_receive_window }}"></label>
-                <label><span>Init connection window</span><input name="hysteria_init_connection_receive_window" data-hysteria-tunable type="number" min="65536" value="{{ server.hysteria_init_connection_receive_window }}"></label>
-                <label><span>Max connection window</span><input name="hysteria_max_connection_receive_window" data-hysteria-tunable type="number" min="65536" value="{{ server.hysteria_max_connection_receive_window }}"></label>
-              </div>
-            </section>
-          </div>
-        </details>
-      </section>
-
-      <section class="ui-form-section profile-section" data-profile-section="raw_reality xhttp_reality">
-        <header><span>3</span><div><h3>REALITY</h3><p>Общие ключи, маскировочный target и отдельные TCP-listener.</p></div></header>
-        <div class="ui-field-grid server-reality-grid">
-          <label><span>Reality target</span><input name="dest" value="{{ server.dest }}"></label>
-          <label class="ui-field-wide"><span>Закрытый ключ REALITY</span><input id="private-key" name="private_key" type="password" value="{{ server.private_key }}"></label>
-          <label><span>Открытый ключ REALITY / пароль</span><input name="public_key" value="{{ server.public_key }}"></label>
-          <label data-profile-section="xhttp_reality"><span>Short ID</span><input name="short_id" data-exclusive-profile-field value="{{ server.short_id }}"></label>
-        </div>
-
-        <div class="reality-multi-panel" data-profile-section="raw_reality">
-          <div class="hysteria-panel-heading"><div><span>MULTI-REALITY</span><h4>До трёх VLESS REALITY точек входа <a class="context-help-link" href="{{ url_for('help_page') }}#reality-vision" title="Справка о REALITY и Vision" aria-label="Справка о REALITY и Vision">?</a></h4><p>Ключи, target, SNI и fingerprint общие. У каждой точки собственные TCP-порт, Short ID, ссылка и QR-код.</p></div></div>
-          <div class="ui-info-note"><span>i</span><p>Основной Inbound сохраняет прежний порт и Short ID. Резервный и дополнительный после обновления выключены. В AWS открывайте TCP только для реально включённых портов.</p></div>
-          <div class="hysteria-instance-grid reality-instance-grid">
-            <article class="hysteria-instance-card reality-instance-card is-required is-enabled">
-              <div class="hysteria-instance-card-head"><div><b>Основной</b><small>Сохраняет прежние UUID, порт, тег и Short ID</small></div><span class="pill enabled"><i></i><span data-reality-status>{{ 'Работает' if server.inbound_profile == 'raw_reality' else 'Готов к применению' }}</span></span></div>
-              <label><span>Название</span><input name="reality_instance_1_name" maxlength="80" value="{{ reality_inbounds[0].name }}"></label>
-              <div class="ui-field-grid reality-instance-fields">
-                <label><span>Short ID</span><input name="short_id" data-exclusive-profile-field value="{{ reality_inbounds[0].short_id or server.short_id }}"></label>
-              </div>
-              <div class="hysteria-instance-meta"><span>Тег</span><code>{{ reality_inbounds[0].tag }}</code></div>
-              <div class="hysteria-instance-meta"><span>Публично</span><strong>{{ server.address }}:{{ server.port }}/TCP</strong></div>
-            </article>
-            {% for item in reality_inbounds[1:] %}
-            <article class="hysteria-instance-card reality-instance-card {{ 'is-enabled' if item.enabled else '' }}">
-              <div class="hysteria-instance-card-head">
-                <div><b>{{ 'Резервный' if item.id == 2 else 'Дополнительный' }}</b><small>Собственные TCP-порт, тег и Short ID</small></div>
-                <label class="switch-row compact" data-reality-instance-toggle><input type="checkbox" name="reality_instance_{{ item.id }}_enabled" value="1" {% if item.enabled %}checked{% endif %}><span class="switch" aria-hidden="true"></span><div><strong>{{ 'Отключить' if item.enabled else 'Включить' }}</strong><small data-reality-status>{{ 'Работает' if server.inbound_profile == 'raw_reality' and item.enabled else ('Готов к применению' if item.enabled else 'Выключен') }}</small></div></label>
-              </div>
-              <label><span>Название</span><input name="reality_instance_{{ item.id }}_name" maxlength="80" value="{{ item.name }}"></label>
-              <div class="ui-field-grid reality-instance-fields">
-                <label><span>Адрес прослушивания</span><input name="reality_instance_{{ item.id }}_listen" value="{{ item.listen }}"></label>
-                <label><span>Публичный порт</span><input name="reality_instance_{{ item.id }}_port" type="number" min="1" max="65535" value="{{ item.port }}"></label>
-                <label><span>Short ID</span><input name="reality_instance_{{ item.id }}_short_id" value="{{ item.short_id }}"></label>
-              </div>
-              <div class="hysteria-instance-meta"><span>Тег</span><code>{{ item.tag }}</code></div>
-              <div class="hysteria-instance-meta"><span>Публично</span><strong>{{ server.address }}:{{ item.port }}/TCP</strong></div>
-            </article>
-            {% endfor %}
-          </div>
-          <div class="ui-warning-note"><span>!</span><p>TCP-порты, названия и Short ID должны быть уникальными. После изменения сначала выполните обязательную проверку, затем сохраните и примените конфигурацию.</p></div>
-        </div>
-      </section>
-
-      <section class="ui-form-section profile-section" data-profile-section="xhttp_reality">
-        <header><span>4</span><div><h3>VLESS XHTTP-REALITY <a class="context-help-link" href="{{ url_for('help_page') }}#xhttp-reality" title="Справка о XHTTP-REALITY" aria-label="Справка о XHTTP-REALITY">?</a></h3><p>Прямой XHTTP использует один Path и один публичный listener Xray.</p></div></header>
-        <div class="ui-field-grid server-xhttp-grid">
-          <label><span>XHTTP Path</span><input name="xhttp_path" data-exclusive-profile-field value="{{ server.xhttp_path }}" placeholder="/sg-xhttp"></label>
-          <label><span>Mode</span><select name="xhttp_mode" data-exclusive-profile-field>{% for value in ['auto','packet-up','stream-up','stream-one'] %}<option value="{{ value }}" {% if server.xhttp_mode == value %}selected{% endif %}>{{ value }}</option>{% endfor %}</select></label>
-        </div>
-      </section>
-
-      <section class="ui-form-section profile-section xhttp-multi-section" data-profile-section="xhttp_tls xhttp_hysteria_tls">
-        <header><span>4</span><div><p class="panel-kicker">MULTI-XHTTP</p><h3>До трёх XHTTP-TLS Inbound одновременно <a class="context-help-link" href="{{ url_for('help_page') }}#xhttp-tls" title="Справка о XHTTP-TLS" aria-label="Справка о XHTTP-TLS">?</a></h3><p>Nginx принимает один внешний TCP-порт и направляет каждый уникальный Path на собственный локальный listener Xray.</p></div></header>
-        <div class="ui-info-note"><span>i</span><p>В AWS остаётся открыт только публичный TCP-порт {{ server.port }}. Локальные порты 8443–8445 доступны только на loopback. Основной Path, UUID и рабочие параметры прежней клиентской ссылки сохраняются.</p></div>
-        <div class="xhttp-mode-row">
-          <label><span>Общий XHTTP Mode</span><select name="xhttp_mode" data-exclusive-profile-field>{% for value in ['auto','packet-up','stream-up','stream-one'] %}<option value="{{ value }}" {% if server.xhttp_mode == value %}selected{% endif %}>{{ value }}</option>{% endfor %}</select><small>Один режим используется всеми тремя XHTTP Inbound.</small></label>
-        </div>
-        <div class="hysteria-instance-grid xhttp-instance-grid">
-          <article class="hysteria-instance-card xhttp-instance-card is-required is-enabled">
-            <div class="hysteria-instance-card-head"><div><b>Основной</b><small>Сохраняет прежние Path, порт, tag и UUID</small></div><span class="pill enabled"><i></i><span data-xhttp-status>{{ 'Работает' if server.inbound_profile in ['xhttp_tls','xhttp_hysteria_tls'] else 'Готов к применению' }}</span></span></div>
-            <label><span>Название</span><input name="xhttp_instance_1_name" maxlength="80" value="{{ xhttp_inbounds[0].name }}"></label>
-            <div class="ui-field-grid xhttp-instance-fields">
-              <label><span>Path</span><input name="xhttp_path" data-exclusive-profile-field value="{{ server.xhttp_path }}" placeholder="/sg-xhttp"></label>
-              <label><span>Listen</span><input name="transport_listen" data-exclusive-profile-field value="{{ server.transport_listen }}" placeholder="127.0.0.1"></label>
-              <label><span>Локальный TCP-порт</span><input name="transport_port" data-exclusive-profile-field type="number" min="1" max="65535" value="{{ server.transport_port }}"></label>
-            </div>
-            <div class="hysteria-instance-meta"><span>Tag</span><code>{{ xhttp_inbounds[0].tag }}</code></div>
-            <div class="hysteria-instance-meta"><span>Публично</span><strong>{{ server.address }}:{{ server.port }}/TCP</strong></div>
-          </article>
-          {% for item in xhttp_inbounds[1:] %}
-          <article class="hysteria-instance-card xhttp-instance-card {{ 'is-enabled' if item.enabled else '' }}">
-            <div class="hysteria-instance-card-head">
-              <div><b>{{ 'Резервный' if item.id == 2 else 'Дополнительный' }}</b><small>Собственный Path и локальный listener</small></div>
-              <label class="switch-row compact" data-xhttp-instance-toggle><input type="checkbox" name="xhttp_instance_{{ item.id }}_enabled" value="1" {% if item.enabled %}checked{% endif %}><span class="switch" aria-hidden="true"></span><div><strong>{{ 'Отключить' if item.enabled else 'Включить' }}</strong><small data-xhttp-status>{{ 'Работает' if server.inbound_profile in ['xhttp_tls','xhttp_hysteria_tls'] and item.enabled else ('Готов к применению' if item.enabled else 'Выключен') }}</small></div></label>
-            </div>
-            <label><span>Название</span><input name="xhttp_instance_{{ item.id }}_name" maxlength="80" value="{{ item.name }}"></label>
-            <div class="ui-field-grid xhttp-instance-fields">
-              <label><span>Path</span><input name="xhttp_instance_{{ item.id }}_path" value="{{ item.path }}" placeholder="/sg-xhttp-{{ item.id }}"></label>
-              <label><span>Listen</span><input name="xhttp_instance_{{ item.id }}_listen" value="{{ item.listen }}"></label>
-              <label><span>Локальный TCP-порт</span><input name="xhttp_instance_{{ item.id }}_port" type="number" min="1" max="65535" value="{{ item.port }}"></label>
-            </div>
-            <div class="hysteria-instance-meta"><span>Тег</span><code>{{ item.tag }}</code></div>
-            <div class="hysteria-instance-meta"><span>Публично</span><strong>{{ server.address }}:{{ server.port }}{{ item.path }}</strong></div>
-          </article>
-          {% endfor %}
-        </div>
-        <div class="ui-warning-note"><span>!</span><p>Path и локальные TCP-порты должны быть уникальными. После изменения сначала выполните обязательную проверку, затем сохраните и примените конфигурацию.</p></div>
-      </section>
-
-      <section class="ui-form-section profile-section" data-profile-section="xhttp_tls">
-        <header><span>6</span><div><h3>TLS-сертификат <a class="context-help-link" href="{{ url_for('help_page') }}#tls-https" title="Справка о сертификатах" aria-label="Справка о сертификатах">?</a></h3><p>Общий сертификат для Nginx/XHTTP и Hysteria 2 в TLS-профилях.</p></div></header>
-        <div class="ui-field-grid server-tls-grid">
-          <label><span>TLS certificate</span><input name="tls_cert_path" data-exclusive-profile-field value="{{ server.tls_cert_path }}" placeholder="/etc/letsencrypt/live/domain/fullchain.pem"></label>
-          <label><span>TLS private key</span><input name="tls_key_path" data-exclusive-profile-field value="{{ server.tls_key_path }}" placeholder="/etc/letsencrypt/live/domain/privkey.pem"></label>
-        </div>
-      </section>
-
-      <div class="ui-actions"><button class="button primary" type="submit">Сохранить и применить</button><button type="button" class="button ghost reality-key-toggle" onclick="const e=document.getElementById('private-key');e.type=e.type==='password'?'text':'password';this.textContent=e.type==='password'?'Показать закрытый ключ':'Скрыть закрытый ключ'">Показать закрытый ключ</button></div>
-    </form>
-  </section>
-
-  <section class="ui-card ui-action-card reality-action-card inbound-reality-actions">
-    <header class="ui-card-heading"><div><p class="panel-kicker">КЛЮЧИ REALITY</p><h2>Сгенерировать новый комплект</h2><p>Заменяет закрытый ключ, открытый ключ и Short ID в базе данных.</p></div></header>
-    <div class="ui-warning-note"><span>!</span><p>После применения текущие REALITY-ссылки перестанут работать.</p></div>
-    <div class="reality-key-action-row">
-      <details class="reality-key-inline-confirm" data-reality-key-confirm>
-        <summary class="button danger">Сгенерировать новые ключи</summary>
-        <div class="reality-key-inline-confirm-body">
-          <div><strong>Подтвердите генерацию нового комплекта</strong><p>Закрытый ключ, открытый ключ и Short ID будут заменены. После применения конфигурации прежние REALITY-ссылки перестанут работать.</p></div>
-          <form method="post" action="{{ url_for('settings_generate_reality') }}">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <div class="ui-actions">
-              <button class="button danger" type="submit">Да, сгенерировать</button>
-              <button class="button ghost" type="button" data-reality-key-cancel>Отмена</button>
-            </div>
-          </form>
-        </div>
-      </details>
+        {% endif %}
+      </article>
+      {% endfor %}
+    </div>
+    <div class="sg-vision-contract" aria-label="Контракт VLESS Encryption и XTLS Vision">
+      <div class="sg-vision-fact {{ 'is-ready' if xray_encryption.ready }}"><span>VLESS Encryption</span><strong>{{ 'Готово' if xray_encryption.ready else 'Не готово' }}</strong></div>
+      <div class="sg-vision-fact"><span>Authentication</span><strong>ML-KEM-768</strong></div>
+      <div class="sg-vision-fact is-ready"><span>XTLS Vision</span><strong>Включён</strong></div>
+      <div class="sg-vision-fact"><span>Server mode</span><strong>auto</strong></div>
+      <div class="sg-vision-fact"><span>Client mode</span><strong>stream-one</strong></div>
+      <div class="sg-vision-fact {{ 'is-ready' if xray_encryption.ready }}"><span>Xray</span><strong>{{ xray_encryption.version or xray_encryption.minimum }}{% if xray_encryption.version %} · минимум {{ xray_encryption.minimum }}{% endif %}</strong></div>
+    </div>
+    <div class="sg-vision-explainer">
+      <div><strong>Vision не устанавливается отдельным модулем</strong><p>Он включается параметром <code>flow=xtls-rprx-vision</code> одновременно в серверной записи клиента, ссылке, QR, JSON и subscription. Для XHTTP Reality дополнительно обязательны проверенная ML-KEM-пара, server mode <code>auto</code> и client mode <code>stream-one</code>.</p></div>
+      <a class="button secondary" href="{{ url_for('help_page') }}#vision-mlkem">Полная инструкция</a>
     </div>
   </section>
+
+  <form method="post" action="{{ url_for('settings_save') }}" class="ui-form sg-ao-page" data-validated-form>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="salamander_confirmation" value="0" data-salamander-confirmation>
+    <input type="hidden" name="inbound_profile" value="raw_reality">
+    <input type="hidden" name="listen" value="{{ server.listen }}">
+    <input type="hidden" name="flow" value="xtls-rprx-vision">
+    <input type="hidden" name="transport_listen" value="127.0.0.1">
+    <input type="hidden" name="tls_cert_path" value="{{ server.tls_cert_path }}">
+    <input type="hidden" name="tls_key_path" value="{{ server.tls_key_path }}">
+    <input type="hidden" name="hysteria_udp_idle_timeout" value="{{ server.hysteria_udp_idle_timeout }}">
+    <input type="hidden" name="hysteria_masquerade_type" value="{{ server.hysteria_masquerade_type }}">
+    <input type="hidden" name="hysteria_masquerade_url" value="{{ server.hysteria_masquerade_url }}">
+    <input type="hidden" name="hysteria_masquerade_content" value="{{ server.hysteria_masquerade_content }}">
+    <input type="hidden" name="hysteria_masquerade_status" value="{{ server.hysteria_masquerade_status }}">
+    <input type="hidden" name="hysteria_masquerade_dir" value="{{ server.hysteria_masquerade_dir }}">
+    <input type="hidden" name="hysteria_masquerade_headers" value="{{ server.hysteria_masquerade_headers|e }}">
+    <input type="hidden" name="hysteria_performance_profile" value="{{ server.hysteria_performance_profile }}">
+    <input type="hidden" name="hysteria_congestion" value="{{ server.hysteria_congestion }}">
+    <input type="hidden" name="hysteria_bbr_profile" value="{{ server.hysteria_bbr_profile }}">
+    <input type="hidden" name="hysteria_brutal_up" value="{{ server.hysteria_brutal_up }}">
+    <input type="hidden" name="hysteria_brutal_down" value="{{ server.hysteria_brutal_down }}">
+    <input type="hidden" name="hysteria_max_idle_timeout" value="{{ server.hysteria_max_idle_timeout }}">
+    <input type="hidden" name="hysteria_keepalive_period" value="{{ server.hysteria_keepalive_period }}">
+    <input type="hidden" name="hysteria_max_incoming_streams" value="{{ server.hysteria_max_incoming_streams }}">
+    <input type="hidden" name="hysteria_udp_hop_ports" value="{{ server.hysteria_udp_hop_ports }}">
+    <input type="hidden" name="hysteria_udp_hop_interval" value="{{ server.hysteria_udp_hop_interval }}">
+    <input type="hidden" name="hysteria_init_stream_receive_window" value="{{ server.hysteria_init_stream_receive_window }}">
+    <input type="hidden" name="hysteria_max_stream_receive_window" value="{{ server.hysteria_max_stream_receive_window }}">
+    <input type="hidden" name="hysteria_init_connection_receive_window" value="{{ server.hysteria_init_connection_receive_window }}">
+    <input type="hidden" name="hysteria_max_connection_receive_window" value="{{ server.hysteria_max_connection_receive_window }}">
+    {% if server.hysteria_masquerade_rewrite_host %}<input type="hidden" name="hysteria_masquerade_rewrite_host" value="1">{% endif %}
+    {% if server.hysteria_masquerade_insecure %}<input type="hidden" name="hysteria_masquerade_insecure" value="1">{% endif %}
+    {% if server.hysteria_quic_debug %}<input type="hidden" name="hysteria_quic_debug" value="1">{% endif %}
+    {% if server.hysteria_disable_pmtud %}<input type="hidden" name="hysteria_disable_pmtud" value="1">{% endif %}
+    {% for item in reality_inbounds[1:] %}<input type="hidden" name="reality_instance_{{ item.id }}_name" value="{{ item.name }}"><input type="hidden" name="reality_instance_{{ item.id }}_listen" value="{{ item.listen }}"><input type="hidden" name="reality_instance_{{ item.id }}_port" value="{{ item.port }}"><input type="hidden" name="reality_instance_{{ item.id }}_short_id" value="{{ item.short_id }}">{% if item.enabled %}<input type="hidden" name="reality_instance_{{ item.id }}_enabled" value="1">{% endif %}{% endfor %}
+    {% for item in xhttp_inbounds[1:] %}<input type="hidden" name="xhttp_instance_{{ item.id }}_name" value="{{ item.name }}"><input type="hidden" name="xhttp_instance_{{ item.id }}_listen" value="{{ item.listen }}"><input type="hidden" name="xhttp_instance_{{ item.id }}_port" value="{{ item.port }}"><input type="hidden" name="xhttp_instance_{{ item.id }}_path" value="{{ item.path }}">{% if item.enabled %}<input type="hidden" name="xhttp_instance_{{ item.id }}_enabled" value="1">{% endif %}{% endfor %}
+    {% for item in hysteria_inbounds[1:] %}<input type="hidden" name="hysteria_instance_{{ item.id }}_name" value="{{ item.name }}"><input type="hidden" name="hysteria_instance_{{ item.id }}_listen" value="{{ item.listen }}"><input type="hidden" name="hysteria_instance_{{ item.id }}_port" value="{{ item.port }}"><input type="hidden" name="hysteria_instance_{{ item.id }}_obfs_mode" value="{{ item.obfs_mode or 'none' }}"><input type="hidden" name="hysteria_instance_{{ item.id }}_obfs_password" value="{{ item.obfs_password or '' }}">{% if item.enabled %}<input type="hidden" name="hysteria_instance_{{ item.id }}_enabled" value="1">{% endif %}{% endfor %}
+
+    <section class="sg-ao-card">
+      <header class="sg-ao-head"><div><p class="panel-kicker">ПАРАМЕТРЫ</p><h2>Настройки каналов</h2><p>Reality и XHTTP Reality применяются всегда. TLS-каналы автоматически добавляются, когда Security сообщает о готовом домене и сертификате.</p></div></header>
+      <div class="sg-ao-param-list" style="margin-top:14px">
+        <article class="sg-ao-param"><div class="sg-ao-param-title"><strong>VLESS Reality TCP</strong><span>RAW / TCP · REALITY</span></div><label><span>TCP-порт</span><input name="port" type="number" min="1" max="65535" value="{{ xray_channels.settings.reality_tcp_port }}"></label><div class="sg-ao-flow"><span>Flow</span><strong>xtls-rprx-vision</strong><small>Всегда включён</small></div><div class="sg-ao-flow"><span>Path</span><strong>Не используется</strong></div></article>
+        <article class="sg-ao-param"><div class="sg-ao-param-title"><strong>VLESS XHTTP Reality</strong><span>XHTTP / TCP · REALITY · XTLS VISION</span></div><label><span>TCP-порт</span><input name="xhttp_reality_port" type="number" min="1" max="65535" value="{{ xray_channels.settings.xhttp_reality_port }}"></label><label><span>Public Path</span><input name="xhttp_path" value="{{ xray_channels.settings.xhttp_reality_path }}"></label><input type="hidden" name="xhttp_reality_mode" value="stream-one"><div class="sg-ao-flow is-success"><span>Vision / modes</span><strong>xtls-rprx-vision</strong><small>server auto · client stream-one</small></div></article>
+        <article class="sg-ao-param {{ 'is-locked' if not xray_channels.https_ready }}"><div class="sg-ao-param-title"><strong>VLESS XHTTP TLS</strong><span>XHTTP / TCP · TLS · XTLS VISION</span></div><label><span>TCP-порт</span><input name="transport_port" type="number" min="1" max="65535" value="{{ xray_channels.settings.xhttp_tls_port }}"></label><label><span>Public Path</span><input name="xhttp_tls_path" value="{{ xray_channels.settings.xhttp_tls_path }}"></label><label><span>Client mode</span><select name="xhttp_mode">{% for mode in ['auto','stream-one','stream-up','packet-up'] %}<option value="{{ mode }}" {% if xray_channels.settings.xhttp_tls_mode == mode %}selected{% endif %}>{{ mode }}</option>{% endfor %}</select></label>{% if not xray_channels.https_ready %}<div class="sg-ao-param-lock-note"><p><strong>Канал пока недоступен</strong>Нужны домен, HTTPS и действующий TLS-сертификат. Параметры сохранены и станут активны автоматически.</p><a class="button secondary small" href="{{ url_for('security_page') }}#panel-exposure">Перейти в Security</a></div>{% endif %}</article>
+        {% set hy_primary = hysteria_inbounds[0] %}
+        <article class="sg-ao-param sg-hy-card {{ 'is-locked' if not xray_channels.https_ready }}" data-hysteria-salamander-card data-inbound-id="1">
+          <div class="sg-ao-param-title"><strong>Hysteria 2</strong><span>QUIC / UDP · TLS</span></div>
+          <label><span>UDP-порт</span><input name="hysteria2_port" type="number" min="1" max="65535" value="{{ xray_channels.settings.hysteria2_port }}"></label>
+          <div class="sg-ao-flow {{ 'is-success' if xray_channels.https_ready }}"><span>TLS-сертификат</span><strong>{{ xray_channels.https_domain if xray_channels.https_ready else 'Не готов' }}</strong><small>Используется напрямую Hysteria 2</small></div>
+          <div class="sg-hy-obfs">
+            <div class="sg-hy-obfs-head"><strong>Обфускация FinalMask</strong><p>Salamander изменяет вид UDP-пакетов Hysteria2. Один пароль используется всеми клиентами этого Inbound.</p></div>
+            <div class="sg-hy-mode">
+              <span>Режим</span>
+              <div class="sg-hy-mode-options">
+                <label class="sg-hy-mode-option"><input type="radio" name="hysteria_instance_1_obfs_mode" value="none" {% if (hy_primary.obfs_mode or 'none') == 'none' %}checked{% endif %}><span><b>Выключена</b><small>Обычный Hysteria2</small></span></label>
+                <label class="sg-hy-mode-option"><input type="radio" name="hysteria_instance_1_obfs_mode" value="salamander" {% if hy_primary.obfs_mode == 'salamander' %}checked{% endif %} {% if not salamander_support.supported and hy_primary.obfs_mode != 'salamander' %}disabled{% endif %}><span><b>Salamander</b><small>Общий пароль Inbound</small></span></label>
+              </div>
+            </div>
+            <div class="sg-hy-support {{ 'is-ok' if salamander_support.supported else 'is-warning' }}"><span>Xray</span><strong>{{ salamander_support.version or 'Версия не определена' }}</strong><small>{% if salamander_support.supported %}Salamander FinalMask поддерживается.{% else %}Нужна версия не ниже {{ salamander_support.minimum }}. {{ salamander_support.message }}{% endif %}</small></div>
+            <div class="sg-hy-secret" data-salamander-secret {% if hy_primary.obfs_mode != 'salamander' %}hidden{% endif %}>
+              <span>Пароль Salamander</span>
+              <div class="sg-hy-secret-row"><input type="password" name="hysteria_instance_1_obfs_password" value="{{ hy_primary.obfs_password or '' }}" autocomplete="new-password" spellcheck="false" data-salamander-password><button class="button secondary" type="button" data-salamander-show>Показать</button><button class="button secondary" type="button" data-salamander-copy>Копировать</button><button class="button primary" type="button" data-salamander-generate {% if not salamander_support.supported %}disabled title="Сначала обновите Xray до {{ salamander_support.minimum }}"{% endif %}>Сгенерировать</button></div>
+            </div>
+            <p class="sg-hy-change-note"><b>Важно:</b><span>Включение, выключение или смена пароля изменяет все ранее выданные Hysteria2-профили этого Inbound. После применения обновятся ссылки, QR-коды и subscriptions.</span></p>
+          </div>
+          {% if not xray_channels.https_ready %}<div class="sg-ao-param-lock-note"><p><strong>Нужен TLS-сертификат</strong>Нужны домен и сертификат. Для самого Hysteria 2 Nginx и HTTPS-сайт не обязательны.</p><a class="button secondary small" href="{{ url_for('security_page') }}#panel-exposure">Настроить сертификат</a></div>{% endif %}
+        </article>
+      </div>
+    </section>
+
+    <details class="sg-ao-card">
+      <summary><strong>Общие параметры Reality и сервера</strong> · адрес, SNI и ключи</summary>
+      <div class="sg-ao-common" style="margin-top:14px">
+        <label><span>Публичный адрес</span><input name="address" value="{{ server.address }}" required></label>
+        <label><span>Reality target</span><input name="dest" value="{{ server.dest }}" required></label>
+        <label><span>Reality SNI</span><input name="server_name" value="{{ server.server_name }}" required></label>
+        <label><span>Fingerprint</span>{{ fingerprint_select(server.fingerprint) }}</label>
+        <label class="wide"><span>Reality private key</span><input name="private_key" value="{{ server.private_key }}" required></label>
+        <label class="wide"><span>Reality public key</span><input name="public_key" value="{{ server.public_key }}" required></label>
+        <label><span>Short ID</span><input name="short_id" value="{{ server.short_id }}" required></label>
+      </div>
+    </details>
+
+    <section class="sg-ao-card sg-ao-actions"><p>Проверка создаёт candidate и запускает реальный <code>xray run -test</code>. После успешной проверки в одном атомарном применении запускаются все доступные каналы.</p><div><button class="button primary" type="submit">Сохранить и применить</button></div></section>
+  </form>
 </div>
 <script>
 (() => {
-  const form = document.getElementById('server-profile-form');
-  if (!form) return;
-  const recommendations = {{ inbound_recommendations|tojson }};
-  const activeProfile = '{{ server.inbound_profile }}';
-  const selected = () => form.querySelector('input[name="inbound_profile"]:checked')?.value || 'raw_reality';
-  const address = form.querySelector('input[name="address"]');
-  const serverName = form.querySelector('input[name="server_name"]');
-  const dest = form.querySelector('input[name="dest"]');
-  const flow = form.querySelector('select[name="flow"]');
-  const bannerName = document.getElementById('inbound-selected-profile-name');
-  const bannerHint = document.getElementById('inbound-selected-profile-hint');
-  const bannerTag = document.getElementById('inbound-selected-profile-tag');
-  const bannerNote = document.getElementById('inbound-selected-profile-note');
-  const bannerState = document.getElementById('inbound-selected-state');
-  const banner = document.getElementById('inbound-active-banner');
-  const routeClient = document.getElementById('inbound-route-client');
-  const routeSecurity = document.getElementById('inbound-route-security');
-  const routeServer = document.getElementById('inbound-route-server');
-  const profileMeta = {
-    raw_reality: {
-      label: 'VLESS REALITY',
-      hint: 'Прямой inbound Xray с REALITY, Vision и клиентским fingerprint.',
-      tag: 'RAW/TCP · REALITY',
-      note: 'Показываются параметры Fingerprint, Flow и REALITY.',
-      client: 'VLESS · TCP',
-      security: 'REALITY · сертификат не нужен',
-      server: 'Прямой Inbound Xray'
-    },
-    xhttp_tls: {
-      label: 'VLESS XHTTP-TLS',
-      hint: 'TLS завершается в Nginx, а Xray принимает локальный XHTTP по loopback.',
-      tag: 'XHTTP-TLS · TCP',
-      note: 'Показываются XHTTP Path, локальные порты Xray и TLS-сертификат.',
-      client: 'VLESS XHTTP · TCP',
-      security: 'TLS завершается в Nginx',
-      server: 'Локальные XHTTP Inbound Xray'
-    },
-    xhttp_reality: {
-      label: 'VLESS XHTTP-REALITY',
-      hint: 'Прямой XHTTP с REALITY без Let’s Encrypt и без участия Nginx на внешнем TLS.',
-      tag: 'XHTTP-REALITY · TCP',
-      note: 'Показываются XHTTP-параметры и полный набор REALITY.',
-      client: 'VLESS XHTTP · TCP',
-      security: 'REALITY · сертификат не нужен',
-      server: 'Прямой XHTTP Inbound Xray'
-    },
-    hysteria2_tls: {
-      label: 'Hysteria 2',
-      hint: 'Прямой QUIC/UDP inbound Xray: TLS, masquerade и отдельный auth каждого пользователя.',
-      tag: 'UDP / QUIC · TLS',
-      note: 'Показываются только параметры Hysteria 2, TLS и публичной точки.',
-      client: 'Hysteria 2 · UDP/QUIC',
-      security: 'TLS-сертификат',
-      server: 'Прямой QUIC Inbound Xray'
-    },
-    xhttp_hysteria_tls: {
-      label: 'XHTTP-TLS + Hysteria 2',
-      hint: 'XHTTP работает через Nginx на TCP 443, Hysteria 2 — напрямую через UDP.',
-      tag: 'TCP + UDP',
-      note: 'Одновременно активны все включённые XHTTP и Hysteria 2 Inbound.',
-      client: 'VLESS TCP + Hysteria UDP',
-      security: 'Общий TLS-сертификат',
-      server: 'Nginx/XHTTP + прямой QUIC Xray'
-    }
+  const form = document.querySelector('form[data-validated-form]');
+  const card = form?.querySelector('[data-hysteria-salamander-card]');
+  if (!form || !card) return;
+  const modeInputs = [...card.querySelectorAll('input[name="hysteria_instance_1_obfs_mode"]')];
+  const password = card.querySelector('[data-salamander-password]');
+  const secret = card.querySelector('[data-salamander-secret]');
+  const confirmation = form.querySelector('[data-salamander-confirmation]');
+  const initialMode = modeInputs.find(item => item.checked)?.value || 'none';
+  const initialPassword = password?.value || '';
+  const selectedMode = () => modeInputs.find(item => item.checked)?.value || 'none';
+  const resetConfirmation = () => { if (confirmation) confirmation.value = '0'; };
+  const sync = () => {
+    const enabled = selectedMode() === 'salamander';
+    if (secret) secret.hidden = !enabled;
+    if (password) password.required = enabled;
   };
-  let previousProfile = '{{ server.inbound_profile }}';
+  modeInputs.forEach(input => input.addEventListener('change', () => { resetConfirmation(); sync(); }));
+  password?.addEventListener('input', resetConfirmation);
+  sync();
 
-  function realityName() {
-    const value = (dest?.value || '').trim();
-    if (!value) return '';
-    if (value.startsWith('[')) return value.slice(1, value.indexOf(']'));
-    return value.includes(':') ? value.slice(0, value.lastIndexOf(':')) : value;
-  }
-
-  function setRecommendedField(name, value, force = false) {
-    if (value === undefined || value === null || value === '') return;
-    const fields = [...form.querySelectorAll(`[name="${name}"]`)];
-    let field = fields.find((item) => !item.disabled) || fields[0];
-    if (!field) return;
-    if (field.type === 'radio') field = fields.find((item) => item.value === String(value)) || field;
-    if (!force && field.dataset.userEdited === '1') return;
-    if (field.type === 'checkbox' || field.type === 'radio') field.checked = Boolean(value) && (field.type !== 'radio' || field.value === String(value));
-    else field.value = String(value);
-    field.dispatchEvent(new Event('change', {bubbles: true}));
-  }
-
-  function applyProfileDefaults(profile, force = false) {
-    const values = recommendations.profiles?.[profile] || {};
-    Object.entries(values).forEach(([name, value]) => setRecommendedField(name, value, force));
-    if (profile === 'raw_reality' || profile === 'xhttp_reality') {
-      const name = realityName();
-      if (serverName && name && (force || serverName.dataset.userEdited !== '1')) serverName.value = name;
-      if (flow && (force || flow.dataset.userEdited !== '1')) flow.value = profile === 'raw_reality' ? 'xtls-rprx-vision' : '';
+  card.querySelector('[data-salamander-show]')?.addEventListener('click', event => {
+    if (!password) return;
+    const show = password.type === 'password';
+    password.type = show ? 'text' : 'password';
+    event.currentTarget.textContent = show ? 'Скрыть' : 'Показать';
+  });
+  card.querySelector('[data-salamander-copy]')?.addEventListener('click', async () => {
+    if (!password?.value) return window.sgDialogAlert?.('Сначала создайте пароль Salamander.', {title:'Salamander'});
+    try {
+      await navigator.clipboard.writeText(password.value);
+      await window.sgDialogAlert?.('Пароль Salamander скопирован.', {title:'Salamander'});
+    } catch (_) {
+      password.type = 'text'; password.select();
+      await window.sgDialogAlert?.('Автокопирование недоступно. Пароль выделен — скопируйте его вручную.', {title:'Salamander'});
     }
-    previousProfile = profile;
-  }
+  });
+  card.querySelector('[data-salamander-generate]')?.addEventListener('click', async event => {
+    const button = event.currentTarget;
+    button.disabled = true;
+    const old = button.textContent;
+    button.textContent = 'Создаю…';
+    try {
+      const data = new FormData();
+      data.set('csrf_token', form.querySelector('input[name="csrf_token"]').value);
+      const response = await fetch('{{ url_for("settings_hysteria_generate_obfs_password", inbound_id=1) }}', {method:'POST', body:data, credentials:'same-origin'});
+      const body = await response.json();
+      if (!response.ok || !body.ok || !body.password) throw new Error(body.message || 'Пароль не создан');
+      password.value = body.password;
+      password.dispatchEvent(new Event('input', {bubbles:true}));
+      if (selectedMode() !== 'salamander') {
+        const salamander = modeInputs.find(item => item.value === 'salamander');
+        if (salamander && !salamander.disabled) { salamander.checked = true; salamander.dispatchEvent(new Event('change', {bubbles:true})); }
+      }
+    } catch (error) {
+      await window.sgDialogAlert?.(error.message || String(error), {title:'Salamander'});
+    } finally { button.disabled = false; button.textContent = old; }
+  });
 
-  const hysteriaPresetValues = {
-    auto: {
-      hysteria_congestion: 'brutal', hysteria_bbr_profile: 'standard',
-      hysteria_brutal_up: '0', hysteria_brutal_down: '0',
-      hysteria_max_idle_timeout: 30, hysteria_keepalive_period: 0,
-      hysteria_disable_pmtud: false, hysteria_max_incoming_streams: 1024,
-      hysteria_quic_debug: false
-    },
-    mobile: {
-      hysteria_congestion: 'bbr', hysteria_bbr_profile: 'conservative',
-      hysteria_brutal_up: '0', hysteria_brutal_down: '0',
-      hysteria_max_idle_timeout: 60, hysteria_keepalive_period: 10,
-      hysteria_disable_pmtud: false, hysteria_max_incoming_streams: 512,
-      hysteria_quic_debug: false
-    },
-    speed: {
-      hysteria_congestion: 'brutal', hysteria_bbr_profile: 'aggressive',
-      hysteria_brutal_up: '0', hysteria_brutal_down: '0',
-      hysteria_max_idle_timeout: 30, hysteria_keepalive_period: 0,
-      hysteria_disable_pmtud: false, hysteria_max_incoming_streams: 2048,
-      hysteria_quic_debug: false
-    },
-    limited: {
-      hysteria_congestion: 'bbr', hysteria_bbr_profile: 'conservative',
-      hysteria_brutal_up: '0', hysteria_brutal_down: '0',
-      hysteria_max_idle_timeout: 30, hysteria_keepalive_period: 0,
-      hysteria_disable_pmtud: false, hysteria_max_incoming_streams: 256,
-      hysteria_quic_debug: false
+  document.addEventListener('click', async event => {
+    const button = event.target.closest('button[data-validate-button]');
+    if (!button || !form.contains(button) || confirmation?.value === '1') return;
+    const mode = selectedMode();
+    const changedMode = mode !== initialMode;
+    const rotated = mode === 'salamander' && initialMode === 'salamander' && (password?.value || '') !== initialPassword;
+    if (!changedMode && !rotated) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    let text;
+    if (initialMode !== 'salamander' && mode === 'salamander') {
+      text = 'Включение Salamander изменит транспорт Hysteria2. Все ранее выданные профили без Salamander перестанут подключаться. SG-Panel обновит ссылки, QR-коды и subscriptions после успешной проверки Xray.';
+    } else if (initialMode === 'salamander' && mode !== 'salamander') {
+      text = 'Выключение Salamander сделает текущие профили с обфускацией недействительными. После применения потребуется обновить профиль или subscription на каждом устройстве.';
+    } else {
+      text = 'После замены пароля все старые Hysteria2-профили перестанут подключаться. Потребуется обновить профиль или subscription на каждом устройстве.';
     }
-  };
-  const hysteriaPresetText = {
-    auto: 'Brutal · без ограничения скорости · 1024 потока',
-    mobile: 'BBR Conservative · KeepAlive 10 сек. · 512 потоков',
-    speed: 'Brutal · 2048 потоков · приоритет максимальной производительности',
-    limited: 'BBR Conservative · 256 потоков · умеренное потребление ресурсов',
-    custom: 'Пользовательские значения. Панель не меняет их автоматически.'
-  };
-  let applyingHysteriaPreset = false;
-
-  function selectedHysteriaPreset() {
-    return form.querySelector('input[name="hysteria_performance_profile"]:checked')?.value || 'auto';
-  }
-
-  function updateHysteriaPresetUi() {
-    const preset = selectedHysteriaPreset();
-    document.querySelectorAll('.hysteria-preset-card').forEach((card) => {
-      card.classList.toggle('is-selected', !!card.querySelector('input:checked'));
-    });
-    const summary = document.getElementById('hysteria-preset-summary');
-    if (summary) summary.textContent = hysteriaPresetText[preset] || hysteriaPresetText.custom;
-  }
-
-  function applyHysteriaPreset(preset) {
-    const values = hysteriaPresetValues[preset];
-    if (!values) { updateHysteriaPresetUi(); return; }
-    applyingHysteriaPreset = true;
-    Object.entries(values).forEach(([name, value]) => setRecommendedField(name, value, true));
-    applyingHysteriaPreset = false;
-    updateHysteriaPresetUi();
-  }
-
-  function markHysteriaCustom() {
-    if (applyingHysteriaPreset) return;
-    const custom = form.querySelector('input[name="hysteria_performance_profile"][value="custom"]');
-    if (custom) custom.checked = true;
-    updateHysteriaPresetUi();
-  }
-
-  function updateRealityInstanceToggle(toggle) {
-    const checkbox = toggle.querySelector('input[type="checkbox"]');
-    if (!checkbox) return;
-    const card = toggle.closest('.reality-instance-card');
-    const label = toggle.querySelector('div strong');
-    const status = toggle.querySelector('[data-reality-status]');
-    if (card) card.classList.toggle('is-enabled', checkbox.checked);
-    if (label) label.textContent = checkbox.checked ? 'Отключить' : 'Включить';
-    if (status) status.textContent = checkbox.checked
-      ? (activeProfile === 'raw_reality' ? 'Работает' : 'Готов к применению')
-      : 'Выключен';
-  }
-
-  form.querySelectorAll('[data-reality-instance-toggle]').forEach((toggle) => {
-    const checkbox = toggle.querySelector('input[type="checkbox"]');
-    checkbox?.addEventListener('change', () => updateRealityInstanceToggle(toggle));
-    updateRealityInstanceToggle(toggle);
-  });
-
-  function updateHysteriaInstanceToggle(toggle) {
-    const checkbox = toggle.querySelector('input[type="checkbox"]');
-    if (!checkbox) return;
-    const card = toggle.closest('.hysteria-instance-card');
-    const label = toggle.querySelector('div strong');
-    if (card) card.classList.toggle('is-enabled', checkbox.checked);
-    if (label) label.textContent = checkbox.checked ? 'Отключить' : 'Включить';
-  }
-
-  form.querySelectorAll('[data-hysteria-instance-toggle]').forEach((toggle) => {
-    const checkbox = toggle.querySelector('input[type="checkbox"]');
-    checkbox?.addEventListener('change', () => updateHysteriaInstanceToggle(toggle));
-    updateHysteriaInstanceToggle(toggle);
-  });
-
-  function updateXhttpInstanceToggle(toggle) {
-    const checkbox = toggle.querySelector('input[type="checkbox"]');
-    if (!checkbox) return;
-    const card = toggle.closest('.xhttp-instance-card');
-    const label = toggle.querySelector('div strong');
-    const status = toggle.querySelector('[data-xhttp-status]');
-    if (card) card.classList.toggle('is-enabled', checkbox.checked);
-    if (label) label.textContent = checkbox.checked ? 'Отключить' : 'Включить';
-    if (status) {
-      status.textContent = checkbox.checked
-        ? (['xhttp_tls','xhttp_hysteria_tls'].includes(activeProfile) ? 'Работает' : 'Готов к применению')
-        : 'Выключен';
-    }
-  }
-
-  form.querySelectorAll('[data-xhttp-instance-toggle]').forEach((toggle) => {
-    const checkbox = toggle.querySelector('input[type="checkbox"]');
-    checkbox?.addEventListener('change', () => updateXhttpInstanceToggle(toggle));
-    updateXhttpInstanceToggle(toggle);
-  });
-
-  function updateMasqueradeFields() {
-    const mode = form.querySelector('[name="hysteria_masquerade_type"]')?.value || '';
-    document.querySelectorAll('[data-masq-mode]').forEach((node) => {
-      const visible = node.dataset.masqMode === mode;
-      node.hidden = !visible;
-      node.querySelectorAll('input,select,textarea').forEach((field) => { field.disabled = !visible; });
-      if (node.matches('label, .switch-row')) node.querySelectorAll('input,select,textarea').forEach((field) => { field.disabled = !visible; });
-    });
-  }
-
-  const update = (useDefaults = false) => {
-    const profile = selected();
-    document.querySelectorAll('[data-profile-section]').forEach((node) => {
-      const allowed = (node.dataset.profileSection || '').split(/\s+/).filter(Boolean);
-      const visible = allowed.includes(profile);
-      node.hidden = !visible;
-      node.querySelectorAll('[data-exclusive-profile-field]').forEach((field) => { field.disabled = !visible; });
-    });
-    const visibleProfileSections = [...form.querySelectorAll(':scope > .ui-form-section.profile-section:not([hidden])')];
-    form.querySelectorAll(':scope > .ui-form-section.profile-section').forEach((section) => section.classList.remove('is-last-visible-profile-section'));
-    visibleProfileSections.at(-1)?.classList.add('is-last-visible-profile-section');
-    if (useDefaults) applyProfileDefaults(profile, false);
-    document.querySelectorAll('.inbound-profile-card').forEach((card) => {
-      const value = card.querySelector('input[name="inbound_profile"]')?.value;
-      card.classList.toggle('is-selected', value === profile);
-      card.classList.toggle('is-draft-selected', value === profile && value !== activeProfile);
-    });
-    document.querySelectorAll('.reality-action-card,.reality-key-toggle').forEach((node) => {
-      node.hidden = !['raw_reality','xhttp_reality'].includes(profile);
-    });
-    const meta = profileMeta[profile] || profileMeta.raw_reality;
-    if (bannerName) bannerName.textContent = meta.label;
-    if (bannerHint) bannerHint.textContent = meta.hint;
-    if (bannerTag) bannerTag.textContent = meta.tag;
-    if (bannerNote) bannerNote.textContent = meta.note;
-    if (routeClient) routeClient.textContent = meta.client;
-    if (routeSecurity) routeSecurity.textContent = meta.security;
-    if (routeServer) routeServer.textContent = meta.server;
-    const isDraft = profile !== activeProfile;
-    if (bannerState) { bannerState.textContent = isDraft ? 'Черновик — ещё не применён' : 'Работает сейчас'; bannerState.classList.toggle('is-draft', isDraft); bannerState.classList.toggle('is-active', !isDraft); }
-    if (banner) banner.classList.toggle('is-draft', isDraft);
-  };
-  form.querySelectorAll('input,select,textarea').forEach((field) => {
-    field.addEventListener('input', () => { field.dataset.userEdited = '1'; });
-  });
-  form.querySelectorAll('input[name="inbound_profile"]').forEach((radio) => radio.addEventListener('change', () => update(true)));
-  document.getElementById('apply-inbound-recommendations')?.addEventListener('click', () => {
-    applyProfileDefaults(selected(), true);
-    update(false);
-  });
-  document.getElementById('hysteria-restore-recommended')?.addEventListener('click', () => {
-    applyProfileDefaults('hysteria2_tls', true);
-    const auto = form.querySelector('input[name="hysteria_performance_profile"][value="auto"]');
-    if (auto) auto.checked = true;
-    applyHysteriaPreset('auto');
-    updateMasqueradeFields();
-  });
-  form.querySelectorAll('input[name="hysteria_performance_profile"]').forEach((radio) => radio.addEventListener('change', () => applyHysteriaPreset(radio.value)));
-  form.querySelectorAll('[data-hysteria-tunable]').forEach((field) => {
-    field.addEventListener('input', markHysteriaCustom);
-    field.addEventListener('change', markHysteriaCustom);
-  });
-  form.querySelector('[name="hysteria_masquerade_type"]')?.addEventListener('change', updateMasqueradeFields);
-  updateHysteriaPresetUi();
-  updateMasqueradeFields();
-  update();
-})();
-
-(() => {
-  document.querySelectorAll('[data-reality-key-confirm]').forEach((panel) => {
-    panel.querySelector('[data-reality-key-cancel]')?.addEventListener('click', () => {
-      panel.removeAttribute('open');
-      panel.querySelector('summary')?.focus();
-    });
-  });
+    const accepted = await window.sgDialogConfirm(text, {title:'Изменение Hysteria2 Salamander', okLabel:'Подтвердить и проверить'});
+    if (!accepted) return;
+    confirmation.value = '1';
+    button.click();
+  }, true);
 })();
 </script>
 {% endblock %}
