@@ -1,0 +1,40 @@
+SG-Panel Preview 9 · FIX40 · UI23 Repair4
+Xray Radio Fix 1 audit
+Date: 2026-07-26
+
+TARGETED CHANGE
+- Removed tall rectangular input frames inherited by radio controls on Xray Server.
+- Applied one compact circular radio style page-wide to XMUX and Hysteria2 Salamander.
+- Preserved selected-card highlighting, disabled state and keyboard focus.
+
+UNCHANGED
+- XMUX profiles and numeric values.
+- Hysteria2 and Salamander behavior.
+- Xray candidate generation and apply/rollback.
+- Database, clients, Cluster, Cascade, Routing and GeoFiles.
+
+PACKAGES
+- SG-PANEL-FIX40-UI23-REPAIR4-XRAY-RADIO-FIX1.run: in-place updater through install-or-upgrade.sh.
+- SG-PANEL-FIX40-FULL-UI23-REPAIR4-XRAY-RADIO-FIX1.run: clean installer through install.sh.
+- SG-PANEL-FIX40-UI23-REPAIR4-SOURCE.zip: common source payload.
+
+PAYLOAD
+- SHA-256: 7fa82b40b7a9b4226ef007c59594aed7dd643051cd4ff254cd88c3534289021c
+- Size: 30253567 bytes
+- updater payload == source ZIP: yes
+- full installer payload == source ZIP: yes
+- updater payload == full installer payload: yes
+
+LOCAL VERIFICATION
+- pytest: 168 passed
+- Jinja templates: 38 parsed
+- Python compileall: passed
+- Bash syntax: passed
+- workflow YAML: passed
+- source ZIP integrity and byte-for-byte comparison: passed
+- both .run --verify-only: passed
+
+LIVE ACCEPTANCE STILL REQUIRED
+- GitHub Actions green after publication.
+- In-place update first on SG-Node, then Controller.
+- Visual browser confirmation on Xray Server.

@@ -43,7 +43,14 @@
 .sg-ao-param-title>span{color:var(--muted);font-size:10px;font-weight:800;letter-spacing:.035em}
 .sg-ao-param label{display:grid;gap:6px}
 .sg-ao-param label>span,.sg-ao-field>span,.sg-ao-flow>span{color:var(--muted);font-size:10px;font-weight:850;text-transform:uppercase;letter-spacing:.055em}
-.sg-ao-param input,.sg-ao-param select,.sg-ao-common input,.sg-ao-common select{width:100%;color:var(--text);border-color:var(--line);background:var(--panel-3)}
+ .sg-ao-param input,.sg-ao-param select,.sg-ao-common input,.sg-ao-common select{width:100%;color:var(--text);border-color:var(--line);background:var(--panel-3)}
+.sg-ao-page input[type="radio"]{appearance:none!important;-webkit-appearance:none!important;box-sizing:border-box!important;display:grid!important;place-items:center!important;flex:0 0 16px!important;width:16px!important;min-width:16px!important;max-width:16px!important;height:16px!important;min-height:16px!important;max-height:16px!important;margin:2px 0 0!important;padding:0!important;border:1px solid color-mix(in srgb,var(--muted) 72%,transparent)!important;border-radius:50%!important;background:var(--panel)!important;box-shadow:none!important;outline:none;cursor:pointer}
+.sg-ao-page input[type="radio"]::after{content:"";width:7px;height:7px;border-radius:50%;background:var(--sg-xray-blue);transform:scale(0);transition:transform .14s ease}
+.sg-ao-page input[type="radio"]:checked{border-color:var(--sg-xray-blue)!important;background:var(--panel)!important;box-shadow:none!important}
+.sg-ao-page input[type="radio"]:checked::after{transform:scale(1)}
+.sg-ao-page input[type="radio"]:focus,.sg-ao-page input[type="radio"]:focus-visible{box-shadow:none!important}
+.sg-ao-page input[type="radio"]:focus-visible{outline:2px solid color-mix(in srgb,var(--sg-xray-blue) 55%,transparent);outline-offset:3px}
+.sg-ao-page input[type="radio"]:disabled{opacity:.45;cursor:not-allowed}
 .sg-ao-param.is-locked input,.sg-ao-param.is-locked select{color:var(--muted);background:color-mix(in srgb,var(--panel-3) 88%,var(--warning) 12%);pointer-events:none;cursor:not-allowed}
 .sg-ao-flow{display:grid;gap:5px;min-height:67px;padding:10px 12px;border:1px solid var(--line);border-radius:11px;background:var(--panel-3)}
 .sg-ao-flow strong{color:var(--text);font-size:13px}

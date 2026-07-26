@@ -1,19 +1,27 @@
-# SG-Panel UI23 Repair4 XMUX UI Fix 1
+# SG-Panel UI23 Repair4 — Xray Radio Fix 1
 
-## Update an existing installation
+Current cumulative Repair4 package.
 
-Use `SG-PANEL-FIX40-UI23-REPAIR4-XMUX-UI-FIX1.run`:
+## Update an existing SG-Panel or SG-Node
 
 ```bash
-chmod +x SG-PANEL-FIX40-UI23-REPAIR4-XMUX-UI-FIX1.run
-sudo ./SG-PANEL-FIX40-UI23-REPAIR4-XMUX-UI-FIX1.run
+curl -fL https://raw.githubusercontent.com/s-gor/sg-panel/main/artifacts/UI23-REPAIR4/SG-PANEL-FIX40-UI23-REPAIR4-XRAY-RADIO-FIX1.run -o SG-PANEL-FIX40-UI23-REPAIR4-XRAY-RADIO-FIX1.run
+chmod +x SG-PANEL-FIX40-UI23-REPAIR4-XRAY-RADIO-FIX1.run
+sudo ./SG-PANEL-FIX40-UI23-REPAIR4-XRAY-RADIO-FIX1.run
 ```
 
-Run first on SG-Node, then on Controller. This is an in-place update through
-`install-or-upgrade.sh`; a clean reinstall is not required.
+Run first on SG-Node, then on Controller.
 
-## Clean installation
+## Clean installation on a new Ubuntu EC2
 
-Use `SG-PANEL-FIX40-FULL-UI23-REPAIR4-XMUX-UI-FIX1.run` only on a new server.
+```bash
+curl -fL https://raw.githubusercontent.com/s-gor/sg-panel/main/artifacts/UI23-REPAIR4/SG-PANEL-FIX40-FULL-UI23-REPAIR4-XRAY-RADIO-FIX1.run -o SG-PANEL-FIX40-FULL-UI23-REPAIR4-XRAY-RADIO-FIX1.run
+chmod +x SG-PANEL-FIX40-FULL-UI23-REPAIR4-XRAY-RADIO-FIX1.run
+sudo ./SG-PANEL-FIX40-FULL-UI23-REPAIR4-XRAY-RADIO-FIX1.run
+```
 
-Both packages support `--verify-only` and contain the exact same source payload.
+## What changed
+
+All radio controls on Xray Server now use compact circular indicators. The inherited tall rectangular input frames were removed page-wide. XMUX and Salamander logic and values were not changed.
+
+Both `.run` files contain the exact same `SG-PANEL-FIX40-UI23-REPAIR4-SOURCE.zip` payload and support `--verify-only`.
