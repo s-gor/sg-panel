@@ -45,6 +45,12 @@ log(){
   fi
 }
 
+print_service_summary(){
+  printf '\n[SG-Panel] SG-Panel: %sactive%s\n' "$COLOR_GREEN" "$COLOR_RESET"
+  printf '[SG-Panel] Nginx:    %sactive%s\n' "$COLOR_GREEN" "$COLOR_RESET"
+  printf '[SG-Panel] Xray:     %sactive%s\n' "$COLOR_GREEN" "$COLOR_RESET"
+}
+
 stage(){
   printf '\n[SG-Panel] Этап %s/%s: %s\n' "$1" "$2" "$3"
   printf '[SG-Panel] Этап %s/%s: %s\n' "$1" "$2" "$3" >>"$LOG_FILE"
@@ -403,7 +409,7 @@ if existing_install_is_complete && [[ $RECONFIGURE -eq 0 ]]; then
   log "Обнаружена завершённая SG-Panel $CURRENT_VERSION"
   log "Журнал: $LOG_FILE"
 
-  update_panel_stage(){ bash "$SOURCE_DIR/install-or-upgrade.sh"; }
+  update_panel_stage(){ SG_PANEL_SUPPRESS_SUCCESS_SUMMARY=1 bash "$SOURCE_DIR/install-or-upgrade.sh"; }
   validate_updated_panel_stage(){
     NEW_VERSION="$(cd "$TARGET" && .venv/bin/python -m xpanel --version | awk '{print $2}')"
     [[ "$NEW_VERSION" == "$EXPECTED_VERSION" ]] || return 1
@@ -428,23 +434,7 @@ if existing_install_is_complete && [[ $RECONFIGURE -eq 0 ]]; then
     PANEL_URL="http://$PANEL_HOST:$PANEL_PUBLIC_PORT"
   fi
   write_install_marker "$PANEL_MODE" "$PANEL_HOST" "$PANEL_PUBLIC_PORT"
-  cat <<EOF_UPDATE
-
-============================================================
- SG-Panel $NEW_VERSION — обновление завершено
-============================================================
-
-[OK] Приложение обновлено
-[OK] Текущий режим ${PANEL_MODE^^} сохранён
-[OK] Пользователи, SQLite и Xray-конфигурация сохранены
-
-Панель:
-  $PANEL_URL
-
-Резервная копия создана установщиком в /root/sg-panel-backups/
-Журнал: $LOG_FILE
-============================================================
-EOF_UPDATE
+  print_service_summary
   exit 0
 fi
 
@@ -646,7 +636,7 @@ install_panel_stage(){
   if [[ -n "${XPANEL_ADMIN_PASSWORD:-}" ]]; then
     export XPANEL_ADMIN_PASSWORD
   fi
-  bash "$SOURCE_DIR/install-or-upgrade.sh"
+  SG_PANEL_SUPPRESS_SUCCESS_SUMMARY=1 bash "$SOURCE_DIR/install-or-upgrade.sh"
 }
 
 configure_panel_data_stage(){
@@ -827,39 +817,4 @@ else
 fi
 ACTIVE_XRAY_VERSION="v$(/usr/local/bin/xray version | awk 'NR==1 {print $2}' | sed 's/^v//')"
 
-cat <<EOF_RESULT
-
-============================================================
- SG-Panel $EXPECTED_RELEASE_LABEL ($EXPECTED_BUILD; core $EXPECTED_VERSION) — установка завершена успешно
-============================================================
-
-ПАНЕЛЬ УПРАВЛЕНИЯ
-  Адрес:           $PANEL_URL
-  Режим:           ${PANEL_MODE^^}
-  Backend:         127.0.0.1:$DEFAULT_BACKEND_PORT
-  HTTPS:           $PANEL_HTTPS_STATUS
-
-XRAY REALITY
-  Сервер:          $XRAY_ADDRESS:443
-  Пользователь:    $FIRST_USER
-  VLESS-ссылка:    $LINK_FILE
-  Показать ссылку: cat $LINK_FILE
-
-ПРОВЕРКИ
-  SG-Panel:        active
-  Nginx:           active — :$PANEL_PUBLIC_PORT
-  Xray:            active — $ACTIVE_XRAY_VERSION — Reality :443
-
-FIREWALL / SECURITY GROUP
-  22/tcp           $SSH_SOURCE
-  443/tcp          клиенты Xray
-  $PANEL_PUBLIC_PORT/tcp       только ваш IP или локальная сеть
-  $DEFAULT_BACKEND_PORT/tcp         НЕ ОТКРЫВАТЬ
-  80/tcp           нужен только при последующем включении Let's Encrypt
-
-ЖУРНАЛ
-  $LOG_FILE
-
-Откройте панель и войдите с заданным паролем.
-============================================================
-EOF_RESULT
+print_service_summary

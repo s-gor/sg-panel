@@ -515,15 +515,16 @@ main(){
   trap - ERR INT TERM
   stop_spinner
 
-  printf '\n[SG-Panel] [%sГОТОВО%s] SG-Panel %s (%s; core %s) установлена и проверена.\n' \
-    "$COLOR_GREEN" "$COLOR_RESET" "$EXPECTED_RELEASE_LABEL" "$EXPECTED_BUILD" "$EXPECTED_VERSION"
-  printf '[SG-Panel] Резервная копия: %s\n' "$BACKUP_ROOT"
-  printf '[SG-Panel] Журнал: %s\n' "$LOG_FILE"
   if [[ $WGCF_WARNING -eq 1 ]]; then
     log "WARP-helper не обновлён; необязательный компонент оставлен без изменений."
   fi
   if [[ $ACCESS_WARNING -eq 1 ]]; then
     printf '[SG-Panel] [%sПРЕДУПРЕЖДЕНИЕ%s] Публичный адрес оставлен без автоматического исправления.\n' "$COLOR_YELLOW" "$COLOR_RESET"
+  fi
+  if [[ "${SG_PANEL_SUPPRESS_SUCCESS_SUMMARY:-0}" != "1" ]]; then
+    printf '\n[SG-Panel] SG-Panel: %sactive%s\n' "$COLOR_GREEN" "$COLOR_RESET"
+    printf '[SG-Panel] Nginx:    %sactive%s\n' "$COLOR_GREEN" "$COLOR_RESET"
+    printf '[SG-Panel] Xray:     %sactive%s\n' "$COLOR_GREEN" "$COLOR_RESET"
   fi
 }
 
