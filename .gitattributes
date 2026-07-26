@@ -9,3 +9,5 @@
 *.yaml text eol=lf
 
 *.dat binary
+*.run binary
+*.zip binary

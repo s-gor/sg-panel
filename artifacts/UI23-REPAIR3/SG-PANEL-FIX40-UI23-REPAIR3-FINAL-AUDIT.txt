@@ -1,0 +1,51 @@
+SG-PANEL FIX40 UI23 REPAIR3 FINAL BUILD AUDIT
+
+Accepted source
+===============
+SG-PANEL-FIX40-UI23-REPAIR3-SOURCE.zip
+SHA-256: 1e543846ef6f9aaa3c68891e20f79c00487a0ec0c8a458d0c5363a80bc8215ba
+Size: 29653060 bytes
+
+Status before packaging
+=======================
+- GitHub Actions: green, confirmed by the user.
+- Local pytest: 154 passed.
+- Accepted application line: UI23 Repair3.
+- Rejected UI24, UI25, Repair1 and REBUILT1 are not used.
+
+Built artifacts
+===============
+- SG-PANEL-FIX40-UI23-REPAIR3.run
+- SG-PANEL-FIX40-FULL-UI23-REPAIR3.run
+- SG-PANEL-FIX40-UI23-REPAIR3-FINAL-SOURCE.zip
+- SG-PANEL-FIX40-FULL-UI23-REPAIR3-SOURCE.zip
+
+Installer contract
+==================
+- The updater and full installer embed the exact same Repair3 SOURCE ZIP.
+- Embedded payload is byte-for-byte identical to the distributed SOURCE ZIP.
+- Both wrappers support --verify-only.
+- Both wrappers verify payload size, SHA-256 and ZIP integrity.
+- Clean-Ubuntu full wrapper can inspect/extract with python3 when unzip is absent.
+- Temporary wrapper data is stored under /var/tmp by default.
+- Full installation suppresses the nested updater success summary.
+- A successful final result is owned by the outer installer and contains only:
+  SG-Panel: active
+  Nginx: active
+  Xray: active
+- Log paths remain available on actual errors only.
+
+Validation
+==========
+- pytest: 154 passed
+- both .run --verify-only: passed
+- textual wrapper bash syntax: passed
+- embedded payload equality: passed
+- SOURCE ZIP copies equality: passed
+
+Acceptance boundary
+===================
+- GitHub Actions is green.
+- Real updater installation of Repair3 is not yet confirmed.
+- Real clean EC2 installation of FULL Repair3 is not yet confirmed.
+- Real Hysteria2 + Salamander client connectivity is not yet confirmed.
