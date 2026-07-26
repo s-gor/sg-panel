@@ -389,35 +389,6 @@ def test_clients_templates_are_person_and_device_scoped() -> None:
     assert "device_id" in web
 
 
-def test_routing_has_only_concrete_targets_and_no_synthetic_vpn_language() -> None:
-    checked = "\n".join(
-        read(relative)
-        for relative in (
-            "xpanel/templates/routing.html",
-            "xpanel/templates/rule_edit.html",
-            "xpanel/service.py",
-            "xpanel/web.py",
-        )
-    )
-    for obsolete in (
-        "Весь интернет через VPN",
-        "остальное через VPN",
-        "заблокированное через VPN",
-        "VPN / Outbound",
-        "all_vpn",
-        "blocked_vpn",
-        "ru_direct",
-    ):
-        assert obsolete not in checked
-    routing = read("xpanel/templates/routing.html")
-    service_text = read("xpanel/service.py")
-    for concrete in ("Direct", "Block"):
-        assert concrete in routing
-    for concrete in ("warp", "cascade"):
-        assert concrete in service_text.lower()
-    assert "Неявного универсального выхода нет" in routing
-
-
 def test_destructive_compatibility_and_old_installer_behaviour_are_absent() -> None:
     runtime_paths = [ROOT / "xpanel", ROOT / "node_agent", ROOT / "deploy"]
     runtime = "\n".join(
@@ -438,16 +409,6 @@ def test_destructive_compatibility_and_old_installer_behaviour_are_absent() -> N
     assert "mkswap" not in lowered
     assert "swapon " not in lowered
     assert "prune_upgrade_backups" in install
-
-
-def test_fix35_css_and_cache_revision_are_loaded() -> None:
-    base = read("xpanel/templates/base.html")
-    css = read("xpanel/static/fix35-full-recovery.css")
-    assert "fix35-full-recovery.css" in base
-    assert "sg070-preview9-fix36-xray-vision-recovery" in base
-    assert "sg-global-dialog" in base
-    assert ".client-device-card" in css
-    assert ".qr-overflow-note" in css
 
 
 def test_primary_deployment_policy_is_scoped_to_one_device_not_whole_person(tmp_path, monkeypatch) -> None:

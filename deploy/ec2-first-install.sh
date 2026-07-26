@@ -228,7 +228,31 @@ ensure_xray_version(){
     return 1
   fi
   systemctl enable xray >/dev/null 2>&1 || true
-  if [[ -s "$config" ]]; then
+
+  # На совершенно новой Ubuntu официальный Xray-install создаёт временный
+  # config.json со значением {}. Такой placeholder синтаксически корректен,
+  # но Xray может завершиться сразу, потому что рабочих inbound/outbound ещё нет.
+  # Настоящий конфиг SG-Panel создаётся на этапе 8/9; там же служба обязана
+  # запуститься и затем строго проверяется на этапе 9/9.
+  local bootstrap_placeholder=0
+  if [[ ! -d "$TARGET" && -s "$config" ]]; then
+    if python3 - "$config" <<'PY_XRAY_PLACEHOLDER'
+import json
+import sys
+
+try:
+    with open(sys.argv[1], "r", encoding="utf-8") as handle:
+        value = json.load(handle)
+except Exception:
+    raise SystemExit(1)
+raise SystemExit(0 if value == {} else 1)
+PY_XRAY_PLACEHOLDER
+    then
+      bootstrap_placeholder=1
+    fi
+  fi
+
+  if [[ -s "$config" && "$bootstrap_placeholder" -eq 0 ]]; then
     systemctl restart xray
     sleep 1
     systemctl is-active --quiet xray || {
@@ -236,6 +260,9 @@ ensure_xray_version(){
       rollback_xray
       return 1
     }
+  else
+    systemctl stop xray >/dev/null 2>&1 || true
+    log "Xray $XRAY_VERSION установлен; запуск отложен до создания рабочего конфига SG-Panel"
   fi
 }
 

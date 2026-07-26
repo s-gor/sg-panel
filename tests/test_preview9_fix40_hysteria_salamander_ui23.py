@@ -83,55 +83,6 @@ def test_ui23_migrates_old_hysteria_table_idempotently(tmp_path: Path) -> None:
             os.environ["XPANEL_DB"] = previous
 
 
-def test_ui23_migrates_short_lived_not_null_obfs_schema_idempotently(tmp_path: Path, monkeypatch) -> None:
-    database = tmp_path / "old-not-null.db"
-    con = sqlite3.connect(database)
-    con.execute(
-        """
-        CREATE TABLE hysteria_inbounds (
-            id INTEGER PRIMARY KEY, name TEXT NOT NULL, tag TEXT NOT NULL,
-            enabled INTEGER NOT NULL DEFAULT 0, listen TEXT NOT NULL,
-            port INTEGER NOT NULL,
-            obfs_mode TEXT NOT NULL DEFAULT 'none',
-            obfs_password TEXT NOT NULL DEFAULT '',
-            obfs_updated_at TEXT,
-            obfs_updated_by TEXT NOT NULL DEFAULT '',
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-            updated_at TEXT DEFAULT CURRENT_TIMESTAMP
-        )
-        """
-    )
-    con.execute(
-        "INSERT INTO hysteria_inbounds(id,name,tag,enabled,listen,port,obfs_mode,obfs_password) "
-        "VALUES(1,'Partial','partial',1,'0.0.0.0',443,'none','stale-secret')"
-    )
-    con.commit(); con.close()
-    previous = os.environ.get("XPANEL_DB")
-    os.environ["XPANEL_DB"] = str(database)
-    try:
-        init_db(); init_db()
-        monkeypatch.setattr(service, "_require_hysteria_salamander_support", lambda *_: (26, 6, 27))
-        service.update_hysteria_obfuscation(
-            1, mode="salamander", password="temporary-secret", actor="admin"
-        )
-        service.update_hysteria_obfuscation(
-            1, mode="none", password=None, actor="admin"
-        )
-        with connect() as migrated:
-            row = migrated.execute(
-                "SELECT obfs_mode,obfs_password,obfs_updated_by "
-                "FROM hysteria_inbounds WHERE id=1"
-            ).fetchone()
-        assert row["obfs_mode"] == "none"
-        assert row["obfs_password"] == ""
-        assert row["obfs_updated_by"] == "admin"
-    finally:
-        if previous is None:
-            os.environ.pop("XPANEL_DB", None)
-        else:
-            os.environ["XPANEL_DB"] = previous
-
-
 def test_ui23_generates_strong_base64url_passwords() -> None:
     values = {service.generate_hysteria_obfs_password() for _ in range(20)}
     assert len(values) == 20
@@ -451,3 +402,79 @@ def test_ui23_release_and_installers_require_salamander_contract() -> None:
         assert "HYSTERIA_SALAMANDER_MIN_VERSION = (26, 3, 27)" in body
         assert "data-hysteria-salamander-card" in body
     assert 'LOCAL_ARCHIVE_NAME="SG-PANEL-FIX40-FULL-UI23-SOURCE.zip"' in (ROOT / "install.sh").read_text(encoding="utf-8")
+
+
+def test_ui23_repair2_legacy_inbound_mapping_defaults_to_no_obfuscation() -> None:
+    assert service._hysteria_obfs_values({"id": 1, "name": "Legacy"}) == ("none", None)
+    inbound = {
+        "protocol": "hysteria",
+        "streamSettings": {
+            "network": "hysteria",
+            "finalmask": {"quicParams": {"keepAlivePeriod": 10}},
+        },
+    }
+    service._apply_hysteria_salamander_to_inbound(inbound, {"id": 1})
+    assert inbound["streamSettings"]["finalmask"] == {
+        "quicParams": {"keepAlivePeriod": 10}
+    }
+
+
+def test_ui23_repair2_not_null_prerelease_schema_can_disable_and_resave(
+    tmp_path: Path, monkeypatch
+) -> None:
+    database = tmp_path / "legacy-not-null.db"
+    con = sqlite3.connect(database)
+    con.execute(
+        """
+        CREATE TABLE hysteria_inbounds (
+            id INTEGER PRIMARY KEY,
+            name TEXT NOT NULL,
+            tag TEXT NOT NULL,
+            enabled INTEGER NOT NULL DEFAULT 0,
+            listen TEXT NOT NULL,
+            port INTEGER NOT NULL,
+            obfs_mode TEXT NOT NULL DEFAULT 'none',
+            obfs_password TEXT NOT NULL DEFAULT '',
+            obfs_updated_at TEXT,
+            obfs_updated_by TEXT NOT NULL DEFAULT '',
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+    con.execute(
+        """
+        INSERT INTO hysteria_inbounds(
+            id,name,tag,enabled,listen,port,obfs_mode,obfs_password
+        ) VALUES(1,'Legacy','sg-hysteria2',1,'0.0.0.0',443,'none','')
+        """
+    )
+    con.commit()
+    con.close()
+
+    previous = os.environ.get("XPANEL_DB")
+    os.environ["XPANEL_DB"] = str(database)
+    monkeypatch.setattr(service, "_require_hysteria_salamander_support", lambda binary=None: (26, 6, 27))
+    try:
+        init_db()
+        values = [dict(row) for row in service.list_hysteria_inbounds()]
+        service.update_hysteria_inbounds(
+            values, primary_listen="0.0.0.0", primary_port=443
+        )
+        service.update_hysteria_obfuscation(
+            1, mode="salamander", password="repair2-secret", actor="admin"
+        )
+        service.update_hysteria_obfuscation(
+            1, mode="none", password=None, actor="admin"
+        )
+        with connect() as migrated:
+            row = migrated.execute(
+                "SELECT obfs_mode,obfs_password FROM hysteria_inbounds WHERE id=1"
+            ).fetchone()
+        assert row["obfs_mode"] == "none"
+        assert row["obfs_password"] == ""
+    finally:
+        if previous is None:
+            os.environ.pop("XPANEL_DB", None)
+        else:
+            os.environ["XPANEL_DB"] = previous

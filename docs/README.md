@@ -17,6 +17,7 @@
 - [Clients & Traffic Studio](CLIENTS.md)
 - [Ссылки, QR-коды и подписки](PROTECTED-LINKS.md)
 - [Xray Server и Inbound-профили](SERVER.md)
+- [Hysteria2 Salamander FinalMask](HYSTERIA2-SALAMANDER.md)
 - [Схемы движения трафика](TRAFFIC-FLOWS.md)
 
 ## Routing и каскад

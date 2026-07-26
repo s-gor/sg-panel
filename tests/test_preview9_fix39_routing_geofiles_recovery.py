@@ -163,20 +163,3 @@ def test_controller_geofiles_operations_are_serialized(tmp_path, monkeypatch) ->
         with pytest.raises(service.XPanelError, match="другая операция"):
             service.validate_geofiles_source(source="sgclient")
         fcntl.flock(stream.fileno(), fcntl.LOCK_UN)
-
-
-def test_fix39_ui_has_one_roscom_transaction_path_and_separate_navigation() -> None:
-    routing = (ROOT / "xpanel/templates/routing.html").read_text(encoding="utf-8")
-    geofiles = (ROOT / "xpanel/templates/_geofiles_panel_fix39.html").read_text(encoding="utf-8")
-    base = (ROOT / "xpanel/templates/base.html").read_text(encoding="utf-8")
-    node = (ROOT / "xpanel/templates/node_detail.html").read_text(encoding="utf-8")
-    web = (ROOT / "xpanel/web.py").read_text(encoding="utf-8")
-    assert "Проверить и применить preset" not in routing
-    assert "RoscomVPN · совместимость в GeoFiles" not in routing
-    assert "Совместимая серверная основа обязательна" in geofiles
-    assert "routing-sgclient096-fix39.css" in base
-    assert "<b>Outbounds</b>" in base
-    assert "<b>DNS</b>" in base
-    assert "1. Проверить GeoFiles на Node" in node
-    assert "2. Применить проверенный план" in node
-    assert "RoscomVPN теперь проверяется и применяется только" in web

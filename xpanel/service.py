@@ -161,15 +161,46 @@ def _require_hysteria_salamander_support(xray_bin: str | None = None) -> tuple[i
     return version
 
 
+def _row_value(row: object, key: str, default: object = None) -> object:
+    """Read a sqlite.Row or legacy mapping without requiring new columns.
+
+    Older saved-link fixtures and restored databases can represent Hysteria
+    inbounds without the UI23 obfuscation fields.  Treat those records as the
+    backwards-compatible default: no obfuscation and no password.
+    """
+    try:
+        keys = row.keys()  # type: ignore[attr-defined]
+    except (AttributeError, TypeError):
+        keys = None
+    if keys is not None and key not in keys:
+        return default
+    try:
+        return row[key]  # type: ignore[index]
+    except (KeyError, IndexError, TypeError):
+        if isinstance(row, dict):
+            return row.get(key, default)
+        return default
+
+
+def _hysteria_obfs_values(row: object) -> tuple[str, str | None]:
+    mode = str(_row_value(row, "obfs_mode", "none") or "none").strip().lower()
+    if mode not in HYSTERIA_OBFS_MODES:
+        mode = "none"
+    raw_password = _row_value(row, "obfs_password", None)
+    password = None if raw_password is None or str(raw_password) == "" else str(raw_password)
+    return mode, password
+
+
 def redact_hysteria_obfs_secrets(value: object, *, extra: list[str] | None = None) -> str:
     """Remove stored or request-local Salamander passwords from user-visible diagnostics."""
     text = str(value or "")
     secrets_to_hide: list[str] = []
     try:
         secrets_to_hide.extend(
-            str(row["obfs_password"])
+            str(_hysteria_obfs_values(row)[1])
             for row in list_hysteria_inbounds()
-            if row["obfs_password"] is not None and len(str(row["obfs_password"])) >= 6
+            if _hysteria_obfs_values(row)[1] is not None
+            and len(str(_hysteria_obfs_values(row)[1])) >= 6
         )
     except (sqlite3.Error, OSError, KeyError, TypeError):
         pass
@@ -597,9 +628,6 @@ def update_reality_inbounds(
     )
     with connect() as con:
         for item in cleaned:
-            stored_obfs_password = _hysteria_obfs_password_for_storage(
-                con, item["obfs_password"]
-            )
             con.execute(
                 """
                 INSERT INTO reality_inbounds (id, name, tag, enabled, listen, port, short_id)
@@ -861,14 +889,18 @@ def _normalise_hysteria_instances(
 def _hysteria_obfs_password_for_storage(
     con: sqlite3.Connection, password: str | None
 ) -> str | None:
-    """Keep writes compatible with a short-lived NOT NULL pre-release schema."""
+    """Write disabled Salamander state to both current and legacy schemas."""
     if password is not None:
         return password
-    not_null = any(
-        str(row[1]) == "obfs_password" and bool(row[3])
-        for row in con.execute("PRAGMA table_info(hysteria_inbounds)").fetchall()
+    column = next(
+        (
+            row
+            for row in con.execute("PRAGMA table_info(hysteria_inbounds)").fetchall()
+            if str(row[1]) == "obfs_password"
+        ),
+        None,
     )
-    return "" if not_null else None
+    return "" if column is not None and bool(column[3]) else None
 
 
 def update_hysteria_inbounds(
@@ -885,6 +917,9 @@ def update_hysteria_inbounds(
         _require_hysteria_salamander_support()
     with connect() as con:
         for item in cleaned:
+            stored_obfs_password = _hysteria_obfs_password_for_storage(
+                con, item.get("obfs_password")  # type: ignore[arg-type]
+            )
             con.execute(
                 """
                 INSERT INTO hysteria_inbounds (
@@ -6251,9 +6286,9 @@ def get_hysteria_diagnostics() -> dict[str, object]:
     all_instances = list_hysteria_inbounds()
     enabled_instances = [row for row in all_instances if bool(row["enabled"])]
     protected_secrets = [
-        str(row["obfs_password"])
+        str(_hysteria_obfs_values(row)[1])
         for row in all_instances
-        if row["obfs_password"] is not None and str(row["obfs_password"])
+        if _hysteria_obfs_values(row)[1] is not None
     ]
     checks: list[dict[str, str]] = []
 
@@ -6407,7 +6442,7 @@ def get_hysteria_diagnostics() -> dict[str, object]:
         inbound_id = int(instance["id"])
         tag = "sg-hysteria2" if inbound_id == 1 else str(instance["tag"])
         mode, password = _normalise_hysteria_obfs(
-            instance["obfs_mode"], instance["obfs_password"]
+            *_hysteria_obfs_values(instance)
         )
         candidate_present, candidate_password = layer_password(candidate_by_tag.get(tag))
         live_present, live_password = layer_password(live_by_tag.get(tag))
@@ -9730,7 +9765,7 @@ def _apply_hysteria_salamander_to_inbound(
         raise XPanelError("Hysteria 2: finalmask.udp должен быть массивом")
 
     mode, password = _normalise_hysteria_obfs(
-        instance["obfs_mode"], instance["obfs_password"]
+        *_hysteria_obfs_values(instance)
     )
     foreign_salamander = [
         layer for layer in udp_layers
@@ -13603,13 +13638,13 @@ def _make_russia_kit_links(
             "kind": "hysteria", "name": "Hysteria 2", "client_title": titles["hysteria2_tls"],
             "tag": HYSTERIA_COMBINED_PRIMARY_TAG, "listen": "0.0.0.0", "port": 443,
             "authority_ports": "443", "auth": auth, "deployment_public_host": domain,
-            "obfs_mode": str(hysteria_primary["obfs_mode"] or "none"),
-            "obfs_password_configured": bool(hysteria_primary["obfs_password"]),
+            "obfs_mode": _hysteria_obfs_values(hysteria_primary)[0],
+            "obfs_password_configured": bool(_hysteria_obfs_values(hysteria_primary)[1]),
             "link": build_hysteria2_uri(
                 auth=auth, host=domain, port=443, sni=domain,
                 profile_name=titles["hysteria2_tls"],
-                obfs_mode=str(hysteria_primary["obfs_mode"] or "none"),
-                obfs_password=(str(hysteria_primary["obfs_password"]) if hysteria_primary["obfs_password"] is not None else None),
+                obfs_mode=_hysteria_obfs_values(hysteria_primary)[0],
+                obfs_password=_hysteria_obfs_values(hysteria_primary)[1],
             ),
         },
         {
@@ -13739,13 +13774,13 @@ def _make_links_for_profile(
                 "port": int(instance["port"]),
                 "authority_ports": authority_ports,
                 "auth": raw_auth,
-                "obfs_mode": str(instance["obfs_mode"] or "none"),
-                "obfs_password_configured": bool(instance["obfs_password"]),
+                "obfs_mode": _hysteria_obfs_values(instance)[0],
+                "obfs_password_configured": bool(_hysteria_obfs_values(instance)[1]),
                 "link": build_hysteria2_uri(
                     auth=raw_auth, host=host, port=authority_ports,
                     sni=_link_sni_for_profile(server, profile), profile_name=title,
-                    obfs_mode=str(instance["obfs_mode"] or "none"),
-                    obfs_password=(str(instance["obfs_password"]) if instance["obfs_password"] is not None else None),
+                    obfs_mode=_hysteria_obfs_values(instance)[0],
+                    obfs_password=_hysteria_obfs_values(instance)[1],
                 ),
             })
         if not result:
@@ -15289,8 +15324,8 @@ def make_links(
                     "port": port,
                     "authority_ports": authority_ports,
                     "auth": auth,
-                    "obfs_mode": str(instance["obfs_mode"] or "none"),
-                    "obfs_password_configured": bool(instance["obfs_password"]),
+                    "obfs_mode": _hysteria_obfs_values(instance)[0],
+                    "obfs_password_configured": bool(_hysteria_obfs_values(instance)[1]),
                     "transport_priority": 40 + max(instance_id - 1, 0),
                     "active": True,
                     "deployment_public_host": domain,
@@ -15300,11 +15335,8 @@ def make_links(
                         port=authority_ports,
                         sni=domain,
                         profile_name=title,
-                        obfs_mode=str(instance["obfs_mode"] or "none"),
-                        obfs_password=(
-                            str(instance["obfs_password"])
-                            if instance["obfs_password"] is not None else None
-                        ),
+                        obfs_mode=_hysteria_obfs_values(instance)[0],
+                        obfs_password=_hysteria_obfs_values(instance)[1],
                     ),
                 }
             )
