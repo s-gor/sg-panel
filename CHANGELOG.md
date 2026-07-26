@@ -4,6 +4,15 @@
 
 This repository starts from the cleaned cumulative UI23 baseline.
 
+### Repair4 — visible XMUX presets
+
+- XMUX moved into Xray Server as a visible setting shared by both XHTTP channels;
+- added the Standard and Russia-reduced presets with explicit values;
+- retained manual Client Extra JSON;
+- zero-valued `maxConcurrency` is accepted beside positive `maxConnections`;
+- positive `maxConcurrency` and positive `maxConnections` remain blocked;
+- the full candidate still passes `xray run -test` before apply.
+
 ### UI23 — Hysteria2 Salamander FinalMask
 
 - per-Hysteria2-Inbound state: `none` or `salamander`;

@@ -53,6 +53,14 @@
 .sg-ao-param-lock-note p{margin:0;color:var(--muted);font-size:10px;line-height:1.45}
 .sg-ao-param-lock-note strong{display:block;margin-bottom:2px;color:var(--warning);font-size:11px}
 .sg-ao-param-lock-note .button{flex:0 0 auto}
+.sg-xmux-card{grid-template-columns:minmax(220px,.72fr) minmax(220px,.55fr) minmax(0,1.45fr);align-items:stretch}
+.sg-xmux-presets{display:grid;grid-template-columns:1fr 1fr;gap:10px;min-width:0}
+.sg-xmux-preset{display:grid;gap:7px;padding:11px 12px;border:1px solid var(--line);border-radius:11px;background:var(--panel-3);min-width:0}
+.sg-xmux-preset.is-selected{border-color:var(--sg-xray-blue-border);background:var(--sg-xray-blue-soft);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--sg-xray-blue) 12%,transparent)}
+.sg-xmux-preset strong{color:var(--text);font-size:11px}.sg-xmux-preset small{color:var(--muted);font-size:9px;line-height:1.4}
+.sg-xmux-preset code{white-space:normal;overflow-wrap:anywhere;color:var(--text);font-size:9px;line-height:1.45}
+.sg-xmux-manual{grid-column:1/-1;display:grid;gap:7px}.sg-xmux-manual textarea{width:100%;min-height:180px;resize:vertical;color:var(--text);border-color:var(--line);background:var(--panel-3);font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:11px;line-height:1.45}
+.sg-xmux-note{grid-column:1/-1;margin:0;color:var(--muted);font-size:10px;line-height:1.5}.sg-xmux-note b{color:var(--warning)}
 .sg-hy-card{grid-template-columns:minmax(210px,.8fr) minmax(150px,.65fr) minmax(230px,1fr)}
 .sg-hy-obfs{grid-column:1/-1;display:grid;grid-template-columns:minmax(240px,.8fr) minmax(300px,1.45fr) minmax(220px,.75fr);gap:13px;align-items:stretch;padding:15px;border:1px solid color-mix(in srgb,var(--sg-xray-blue) 38%,var(--line));border-radius:13px;background:color-mix(in srgb,var(--sg-xray-blue) 5%,var(--panel-3))}
 .sg-hy-obfs-head{display:grid;align-content:start;gap:6px}.sg-hy-obfs-head strong{font-size:15px;color:var(--text)}.sg-hy-obfs-head p{margin:0;color:var(--muted);font-size:10px;line-height:1.5}
@@ -73,6 +81,8 @@
 .sg-ao-actions{display:flex;justify-content:space-between;gap:14px;align-items:center}
 .sg-ao-actions p{margin:0;color:var(--muted);max-width:800px;font-size:11px;line-height:1.5}
 .sg-ao-actions>div{display:flex;gap:10px}
+@media (max-width:1100px){.sg-xmux-card{grid-template-columns:1fr 1fr}.sg-xmux-presets{grid-column:1/-1}}
+@media (max-width:720px){.sg-xmux-card,.sg-xmux-presets{grid-template-columns:1fr}}
 html[data-resolved-theme="light"] .sg-ao-card{background:linear-gradient(180deg,#fff,var(--panel-2));box-shadow:var(--shadow)}
 html[data-resolved-theme="light"] .sg-ao-profile,html[data-resolved-theme="light"] .sg-ao-param{background:linear-gradient(180deg,#fff,var(--panel-2))}
 html[data-resolved-theme="light"] .sg-ao-profile.is-locked,html[data-resolved-theme="light"] .sg-ao-param.is-locked{background:linear-gradient(180deg,#fff,color-mix(in srgb,var(--warning) 5%,var(--panel-2)))}
@@ -260,6 +270,20 @@ html[data-resolved-theme="light"] .sg-always-on-xray-page .sg-vision-explainer c
         <article class="sg-ao-param"><div class="sg-ao-param-title"><strong>VLESS Reality TCP</strong><span>RAW / TCP · REALITY</span></div><label><span>TCP-порт</span><input name="port" type="number" min="1" max="65535" value="{{ xray_channels.settings.reality_tcp_port }}"></label><div class="sg-ao-flow"><span>Flow</span><strong>xtls-rprx-vision</strong><small>Всегда включён</small></div><div class="sg-ao-flow"><span>Path</span><strong>Не используется</strong></div></article>
         <article class="sg-ao-param"><div class="sg-ao-param-title"><strong>VLESS XHTTP Reality</strong><span>XHTTP / TCP · REALITY · XTLS VISION</span></div><label><span>TCP-порт</span><input name="xhttp_reality_port" type="number" min="1" max="65535" value="{{ xray_channels.settings.xhttp_reality_port }}"></label><label><span>Public Path</span><input name="xhttp_path" value="{{ xray_channels.settings.xhttp_reality_path }}"></label><input type="hidden" name="xhttp_reality_mode" value="stream-one"><div class="sg-ao-flow is-success"><span>Vision / modes</span><strong>xtls-rprx-vision</strong><small>server auto · client stream-one</small></div></article>
         <article class="sg-ao-param {{ 'is-locked' if not xray_channels.https_ready }}"><div class="sg-ao-param-title"><strong>VLESS XHTTP TLS</strong><span>XHTTP / TCP · TLS · XTLS VISION</span></div><label><span>TCP-порт</span><input name="transport_port" type="number" min="1" max="65535" value="{{ xray_channels.settings.xhttp_tls_port }}"></label><label><span>Public Path</span><input name="xhttp_tls_path" value="{{ xray_channels.settings.xhttp_tls_path }}"></label><label><span>Client mode</span><select name="xhttp_mode">{% for mode in ['auto','stream-one','stream-up','packet-up'] %}<option value="{{ mode }}" {% if xray_channels.settings.xhttp_tls_mode == mode %}selected{% endif %}>{{ mode }}</option>{% endfor %}</select></label>{% if not xray_channels.https_ready %}<div class="sg-ao-param-lock-note"><p><strong>Канал пока недоступен</strong>Нужны домен, HTTPS и действующий TLS-сертификат. Параметры сохранены и станут активны автоматически.</p><a class="button secondary small" href="{{ url_for('security_page') }}#panel-exposure">Перейти в Security</a></div>{% endif %}</article>
+        <article class="sg-ao-param sg-xmux-card" data-xmux-card>
+          <div class="sg-ao-param-title"><strong>XMUX для XHTTP</strong><span>Общие клиентские параметры XHTTP Reality и XHTTP TLS</span></div>
+          <label><span>Профиль XMUX</span><select name="xmux_mode" data-xmux-mode>
+            <option value="auto" {% if xmux.settings.xmux_mode == 'auto' %}selected{% endif %}>Стандартный</option>
+            <option value="reduced" {% if xmux.settings.xmux_mode == 'reduced' %}selected{% endif %}>Для РФ — уменьшенный</option>
+            <option value="expert" {% if xmux.settings.xmux_mode == 'expert' %}selected{% endif %}>Ручной JSON</option>
+          </select></label>
+          <div class="sg-xmux-presets">
+            <div class="sg-xmux-preset" data-xmux-preview="auto"><strong>Стандартный</strong><code>maxConnections 2-4 · reuse 300-600 · requests 1000-2000 · lifetime 1200-2400 · keepalive 600</code><small>Основной профиль SG-Panel.</small></div>
+            <div class="sg-xmux-preset" data-xmux-preview="reduced"><strong>Для РФ — уменьшенный</strong><code>maxConcurrency 0 · maxConnections 6 · reuse 0 · requests 600-900 · lifetime 1800-3000 · keepalive 0</code><small>Меньше одновременно создаваемых соединений.</small></div>
+          </div>
+          <label class="sg-xmux-manual" data-xmux-manual><span>Client Extra · ручной JSON</span><textarea name="xhttp_extra_client_json" spellcheck="false">{{ xmux.settings.xhttp_extra_client_json }}</textarea></label>
+          <p class="sg-xmux-note"><b>Применяется только на клиентской стороне.</b> Нулевой <code>maxConcurrency</code> означает, что управление идёт через <code>maxConnections</code>. Положительные значения обоих параметров одновременно блокируются.</p>
+        </article>
         {% set hy_primary = hysteria_inbounds[0] %}
         <article class="sg-ao-param sg-hy-card {{ 'is-locked' if not xray_channels.https_ready }}" data-hysteria-salamander-card data-inbound-id="1">
           <div class="sg-ao-param-title"><strong>Hysteria 2</strong><span>QUIC / UDP · TLS</span></div>
@@ -305,6 +329,19 @@ html[data-resolved-theme="light"] .sg-always-on-xray-page .sg-vision-explainer c
 <script>
 (() => {
   const form = document.querySelector('form[data-validated-form]');
+  const xmuxCard = form?.querySelector('[data-xmux-card]');
+  const xmuxMode = xmuxCard?.querySelector('[data-xmux-mode]');
+  const xmuxManual = xmuxCard?.querySelector('[data-xmux-manual]');
+  const syncXmux = () => {
+    if (!xmuxMode || !xmuxCard) return;
+    xmuxCard.querySelectorAll('[data-xmux-preview]').forEach(item => {
+      item.classList.toggle('is-selected', item.dataset.xmuxPreview === xmuxMode.value);
+    });
+    if (xmuxManual) xmuxManual.hidden = xmuxMode.value !== 'expert';
+  };
+  xmuxMode?.addEventListener('change', syncXmux);
+  syncXmux();
+
   const card = form?.querySelector('[data-hysteria-salamander-card]');
   if (!form || !card) return;
   const modeInputs = [...card.querySelectorAll('input[name="hysteria_instance_1_obfs_mode"]')];

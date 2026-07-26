@@ -1,0 +1,54 @@
+SG-Panel Preview 9 · FIX40 · UI23 Repair4
+
+BASE
+- Exact Repair3 source that previously passed GitHub Actions.
+- Application version remains 0.10.0-rc70.
+- Release label remains Preview 9 · FIX40 · UI23.
+
+CHANGE
+- XMUX is visible directly in Xray Server.
+- One XMUX setting applies to both Always-On XHTTP channels:
+  VLESS XHTTP Reality and VLESS XHTTP TLS.
+- Expert page no longer hides XMUX because of the legacy inbound_profile value.
+
+STANDARD PRESET
+- maxConnections: 2-4
+- cMaxReuseTimes: 300-600
+- hMaxRequestTimes: 1000-2000
+- hMaxReusableSecs: 1200-2400
+- hKeepAlivePeriod: 600
+
+RUSSIA REDUCED PRESET
+- maxConcurrency: 0
+- maxConnections: 6
+- cMaxReuseTimes: 0
+- hMaxRequestTimes: 600-900
+- hMaxReusableSecs: 1800-3000
+- hKeepAlivePeriod: 0
+
+VALIDATION
+- XMUX is emitted only in client-side XHTTP Extra.
+- maxConcurrency=0 may coexist with positive maxConnections.
+- Positive maxConcurrency and positive maxConnections are blocked together.
+- Manual Client Extra JSON remains available.
+- Existing non-XMUX Client Extra fields are preserved.
+- Full candidate validation and xray run -test gate remain unchanged.
+
+FILES CHANGED
+- xpanel/service.py
+- xpanel/web.py
+- xpanel/templates/settings.html
+- xpanel/templates/advanced.html
+- tests/test_preview9_fix40_xmux_visible_repair4.py
+- CHANGELOG.md
+- REPAIR4-NOTES.md
+
+LOCAL CHECKS
+- 160 pytest tests passed.
+- 38 Jinja templates parsed.
+- Python compileall passed.
+- Bash syntax passed.
+
+NOT YET CLAIMED
+- GitHub Actions for Repair4 must still pass after publication.
+- Real XHTTP client acceptance with each preset must still be performed.

@@ -68,15 +68,28 @@ ALLOWED_OUTBOUND_NETWORKS = {"raw", "xhttp"}
 ALLOWED_OUTBOUND_SECURITY = {"reality", "tls"}
 ALLOWED_XHTTP_MODES = {"auto", "packet-up", "stream-up", "stream-one"}
 ALLOWED_XMUX_MODES = {"auto", "reduced", "expert"}
-# Community-requested conservative XMUX policy. It intentionally uses
-# maxConnections and never maxConcurrency because Xray treats them as
-# mutually exclusive controls. Values remain hidden from ordinary UI.
-XMUX_REDUCED_PRESET: dict[str, object] = {
-    "maxConnections": "2-6",
+# Visible client-side XMUX presets used by both Always-On XHTTP channels.
+# Internal mode names stay unchanged for SQLite compatibility:
+#   auto    -> standard preset
+#   reduced -> Russia-oriented reduced-connection preset
+#   expert  -> manually supplied Client Extra JSON
+XMUX_STANDARD_PRESET: dict[str, object] = {
+    "maxConnections": "2-4",
     "cMaxReuseTimes": "300-600",
     "hMaxRequestTimes": "1000-2000",
     "hMaxReusableSecs": "1200-2400",
+    "hKeepAlivePeriod": 600,
 }
+XMUX_RUSSIA_PRESET: dict[str, object] = {
+    "maxConcurrency": 0,
+    "maxConnections": "6",
+    "cMaxReuseTimes": 0,
+    "hMaxRequestTimes": "600-900",
+    "hMaxReusableSecs": "1800-3000",
+    "hKeepAlivePeriod": 0,
+}
+# Backward-compatible name retained for diagnostics and older tests.
+XMUX_REDUCED_PRESET = XMUX_RUSSIA_PRESET
 RUSSIA_KIT_PROFILE = "russia_kit"
 RUSSIA_KIT_XHTTP_REALITY_PATH = "/sg-rf-reality"
 RUSSIA_KIT_XHTTP_TLS_PATH = "/sg-rf-xhttp"
@@ -5945,8 +5958,9 @@ def get_russia_kit_diagnostics() -> dict[str, object]:
         add(
             "xmux",
             "XMUX",
-            xmux == XMUX_REDUCED_PRESET and "maxConcurrency" not in (xmux or {}),
-            "Сниженное число соединений; конфликтующий maxConcurrency отсутствует.",
+            xmux == XMUX_RUSSIA_PRESET
+            and int((xmux or {}).get("maxConcurrency") or 0) == 0,
+            "Профиль РФ: шесть соединений; maxConcurrency=0 отключён.",
         )
     except (XPanelError, ValueError, OSError, KeyError, TypeError) as exc:
         add("config", "Итоговая конфигурация", False, str(exc))
@@ -7396,15 +7410,41 @@ def _json_object_text(value: object, *, label: str) -> tuple[dict[str, object], 
     return parsed, json.dumps(parsed, ensure_ascii=False, indent=2) + "\n"
 
 
+def _xmux_limit_is_positive(value: object) -> bool:
+    """Return whether an XMUX range has a positive effective upper bound.
+
+    Xray permits the disabled value ``0`` to be present next to the selected
+    positive controller.  It rejects only the case where both
+    ``maxConnections`` and ``maxConcurrency`` have positive limits.
+    """
+    if value is None or isinstance(value, bool):
+        return bool(value)
+    if isinstance(value, (int, float)):
+        return value > 0
+    text = str(value).strip()
+    if not text:
+        return False
+    try:
+        parts = [int(part.strip()) for part in text.split("-", 1)]
+    except ValueError:
+        # Leave exact range-format validation to xray run -test, but remain
+        # conservative for the mutually exclusive control check.
+        return True
+    return max(parts) > 0
+
+
 def _validate_xmux_conflicts(value: object, *, label: str, path: str = "$") -> None:
-    """Reject every XMUX object that defines both mutually exclusive controls."""
+    """Reject XMUX only when both mutually exclusive limits are positive."""
     if isinstance(value, dict):
         xmux = value.get("xmux")
         if isinstance(xmux, dict):
-            if "maxConnections" in xmux and "maxConcurrency" in xmux:
+            if (
+                _xmux_limit_is_positive(xmux.get("maxConnections"))
+                and _xmux_limit_is_positive(xmux.get("maxConcurrency"))
+            ):
                 raise ValueError(
-                    f"{label}: XMUX {path}.xmux не может одновременно содержать "
-                    "maxConnections и maxConcurrency"
+                    f"{label}: XMUX {path}.xmux не может одновременно задавать "
+                    "положительные maxConnections и maxConcurrency"
                 )
         for key, nested in value.items():
             _validate_xmux_conflicts(nested, label=label, path=f"{path}.{key}")
@@ -7704,6 +7744,39 @@ def update_transport_expert_settings(
         )
     return get_transport_expert_settings()
 
+
+def update_xmux_settings(
+    *, xmux_mode: object, xhttp_extra_client_json: object | None = None
+) -> sqlite3.Row:
+    """Update the visible XMUX choice without overwriting unrelated Expert data."""
+    mode = str(xmux_mode or "auto").strip().lower()
+    if mode not in ALLOWED_XMUX_MODES:
+        raise ValueError("XMUX: разрешены стандартный, для РФ и ручной JSON")
+    current = get_transport_expert_settings()
+    source = (
+        current["xhttp_extra_client_json"]
+        if xhttp_extra_client_json is None
+        else xhttp_extra_client_json
+    )
+    parsed, normalised = _json_object_text(source, label="XHTTP Client Extra")
+    _validate_xmux_conflicts(parsed, label="XHTTP Client Extra")
+    if mode == "expert" and not isinstance(parsed.get("xmux"), dict):
+        raise ValueError("XMUX: в ручном JSON нужен объект xmux")
+    with connect() as con:
+        con.execute(
+            """
+            UPDATE transport_expert_settings
+            SET xmux_mode=?, xhttp_extra_client_json=?,
+                last_validation_state='ok',
+                last_validation_message='XMUX проверен',
+                last_validation_at=CURRENT_TIMESTAMP, updated_at=CURRENT_TIMESTAMP
+            WHERE id=1
+            """,
+            (mode, normalised),
+        )
+    return get_transport_expert_settings()
+
+
 def _profile_expert_status(profile: str, expert: sqlite3.Row) -> dict[str, dict[str, str]]:
     is_xhttp = profile in {"xhttp_tls", "xhttp_reality", "xhttp_hysteria_tls", RUSSIA_KIT_PROFILE}
     is_tls = profile in CERTIFICATE_INBOUND_PROFILES
@@ -7757,13 +7830,15 @@ def get_transport_expert_overview() -> dict[str, object]:
     }
     xmux_mode = str(expert["xmux_mode"] or "auto")
     xmux_labels = {
-        "auto": "Автоматически",
-        "reduced": "Сниженное число соединений",
-        "expert": "Эксперт",
+        "auto": "Стандартный",
+        "reduced": "Для РФ — уменьшенный",
+        "expert": "Ручной JSON",
     }
     tls_applicable = profile in CERTIFICATE_INBOUND_PROFILES
     ech_applicable = profile in HYSTERIA_ACTIVE_PROFILES
-    xhttp_applicable = profile in {"xhttp_tls", "xhttp_reality", "xhttp_hysteria_tls", RUSSIA_KIT_PROFILE}
+    # Always-On UI23 always has XHTTP Reality, regardless of the legacy
+    # inbound_profile value kept for migration compatibility.
+    xhttp_applicable = True
     verify_mode = str(expert["tls_verify_name_mode"] or "auto")
     verify_override = str(expert["tls_verify_name"] or "").strip()
     default_verify_name = (
@@ -7826,8 +7901,14 @@ def get_transport_expert_overview() -> dict[str, object]:
             {"xmux": {"maxConnections": 2}},
             ensure_ascii=False, indent=2,
         ),
+        "xmux_standard_preset": json.dumps(
+            {"xmux": XMUX_STANDARD_PRESET}, ensure_ascii=False, indent=2
+        ),
+        "xmux_russia_preset": json.dumps(
+            {"xmux": XMUX_RUSSIA_PRESET}, ensure_ascii=False, indent=2
+        ),
         "xmux_reduced_preset": json.dumps(
-            {"xmux": XMUX_REDUCED_PRESET}, ensure_ascii=False, indent=2
+            {"xmux": XMUX_RUSSIA_PRESET}, ensure_ascii=False, indent=2
         ),
         "finalmask_example": json.dumps(
             {
@@ -9728,8 +9809,11 @@ def _effective_xhttp_extra(
         raw = parsed if isinstance(parsed, dict) else {}
         if isinstance(raw.get("xmux"), dict):
             result["xmux"] = _copy_json_object(raw["xmux"])
-    elif mode == "reduced" and side == "client":
-        result["xmux"] = _copy_json_object(XMUX_REDUCED_PRESET)
+    elif side == "client":
+        if mode == "reduced":
+            result["xmux"] = _copy_json_object(XMUX_RUSSIA_PRESET)
+        else:
+            result["xmux"] = _copy_json_object(XMUX_STANDARD_PRESET)
     _validate_xmux_conflicts(result, label=f"XHTTP {side.title()} Extra")
     return result
 

@@ -26,8 +26,8 @@
       {% if ctx.xhttp_applicable %}
       <div class="ui-field-grid expert-mode-grid">
         <label><span>XMUX</span><select name="xmux_mode">
-          <option value="auto" {% if s.xmux_mode == 'auto' %}selected{% endif %}>Автоматически — Xray-core</option>
-          <option value="reduced" {% if s.xmux_mode == 'reduced' %}selected{% endif %}>Сниженное число соединений</option>
+          <option value="auto" {% if s.xmux_mode == 'auto' %}selected{% endif %}>Стандартный</option>
+          <option value="reduced" {% if s.xmux_mode == 'reduced' %}selected{% endif %}>Для РФ — уменьшенный</option>
           <option value="expert" {% if s.xmux_mode == 'expert' %}selected{% endif %}>Ручной JSON</option>
         </select></label>
         <label><span>XHTTP mode</span><select name="xhttp_mode">
@@ -42,8 +42,9 @@
           <label><span>Server Extra · JSON</span><textarea name="xhttp_extra_server_json" rows="9" spellcheck="false">{{ s.xhttp_extra_server_json }}</textarea></label>
           <label><span>Client Extra · JSON</span><textarea name="xhttp_extra_client_json" rows="9" spellcheck="false">{{ s.xhttp_extra_client_json }}</textarea></label>
         </div>
-        <div class="ui-warning-note"><span>!</span><p><code>maxConnections</code> и <code>maxConcurrency</code> нельзя задавать одновременно.</p></div>
-        <details class="expert-example"><summary>Пресет «Сниженное число соединений»</summary><pre>{{ expert.xmux_reduced_preset }}</pre></details>
+        <div class="ui-warning-note"><span>!</span><p>Положительные <code>maxConnections</code> и <code>maxConcurrency</code> нельзя задавать одновременно. Нулевое значение отключает соответствующий ограничитель.</p></div>
+        <details class="expert-example"><summary>Стандартный пресет</summary><pre>{{ expert.xmux_standard_preset }}</pre></details>
+        <details class="expert-example"><summary>Пресет «Для РФ — уменьшенный»</summary><pre>{{ expert.xmux_russia_preset }}</pre></details>
       </details>
       {% else %}
       <div class="ui-info-note"><span>i</span><p>Текущая схема не использует XHTTP. Поэтому XHTTP mode, XMUX и Extra здесь не показываются и не дублируют Xray Server.</p></div>

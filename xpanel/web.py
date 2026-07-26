@@ -451,6 +451,7 @@ from .service import (
     update_hysteria_obfuscation,
     update_xray_channels_settings,
     update_transport_expert_settings,
+    update_xmux_settings,
     update_user,
     update_device,
     delete_device,
@@ -2568,6 +2569,7 @@ def create_app(test_config: dict | None = None) -> Flask:
             russia_kit=get_russia_kit_overview(),
             xray_encryption=controller_xray_encryption_status(),
             xray_channels=get_xray_channels_overview(),
+            xmux=get_transport_expert_overview(),
         )
 
     @app.get("/expert/inbound")
@@ -2943,6 +2945,15 @@ def create_app(test_config: dict | None = None) -> Flask:
             def mutator():
                 server = update_server_settings(**values)
                 channels = update_xray_channels_settings(request.form)
+                update_xmux_settings(
+                    xmux_mode=request.form.get(
+                        "xmux_mode", get_transport_expert_overview()["settings"]["xmux_mode"]
+                    ),
+                    xhttp_extra_client_json=request.form.get(
+                        "xhttp_extra_client_json",
+                        get_transport_expert_overview()["settings"]["xhttp_extra_client_json"],
+                    ),
+                )
                 update_hysteria_inbounds(
                     list(requested_rows.values()),
                     primary_listen=str(before_rows[1].get("listen") or "0.0.0.0"),

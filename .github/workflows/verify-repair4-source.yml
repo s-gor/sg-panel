@@ -1,0 +1,52 @@
+name: Verify Repair4 source artifact
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "xpanel/**"
+      - "tests/**"
+      - "CHANGELOG.md"
+      - "REPAIR4-NOTES.md"
+      - "artifacts/UI23-REPAIR4/**"
+      - ".github/workflows/verify-repair4-source.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "xpanel/**"
+      - "tests/**"
+      - "CHANGELOG.md"
+      - "REPAIR4-NOTES.md"
+      - "artifacts/UI23-REPAIR4/**"
+      - ".github/workflows/verify-repair4-source.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify SHA-256 and ZIP integrity
+        working-directory: artifacts/UI23-REPAIR4
+        run: |
+          sha256sum -c SG-PANEL-FIX40-UI23-REPAIR4-SHA256.txt
+          unzip -tq SG-PANEL-FIX40-UI23-REPAIR4-SOURCE.zip
+
+      - name: Compare packaged source with repository files
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          tmp="$(mktemp -d)"
+          trap 'rm -rf "$tmp"' EXIT
+          unzip -q artifacts/UI23-REPAIR4/SG-PANEL-FIX40-UI23-REPAIR4-SOURCE.zip -d "$tmp/source"
+          while IFS= read -r -d '' file; do
+            rel="${file#"$tmp/source/"}"
+            test -f "$rel"
+            cmp -s "$file" "$rel"
+          done < <(find "$tmp/source" -type f -print0)
+          echo "Repair4 source artifact matches the repository source."
