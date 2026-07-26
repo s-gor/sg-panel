@@ -1,0 +1,58 @@
+name: Verify Repair4 installers
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "artifacts/UI23-REPAIR4/**"
+      - ".github/workflows/verify-repair4-installers.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "artifacts/UI23-REPAIR4/**"
+      - ".github/workflows/verify-repair4-installers.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Verify SHA-256 and source ZIP
+        working-directory: artifacts/UI23-REPAIR4
+        run: |
+          sha256sum -c SG-PANEL-FIX40-UI23-REPAIR4-SHA256.txt
+          unzip -tq SG-PANEL-FIX40-UI23-REPAIR4-SOURCE.zip
+
+      - name: Verify updater and full installer
+        working-directory: artifacts/UI23-REPAIR4
+        run: |
+          chmod +x SG-PANEL-FIX40-UI23-REPAIR4-XMUX-UI-FIX1.run
+          chmod +x SG-PANEL-FIX40-FULL-UI23-REPAIR4-XMUX-UI-FIX1.run
+          ./SG-PANEL-FIX40-UI23-REPAIR4-XMUX-UI-FIX1.run --verify-only
+          ./SG-PANEL-FIX40-FULL-UI23-REPAIR4-XMUX-UI-FIX1.run --verify-only
+
+      - name: Compare embedded payloads
+        working-directory: artifacts/UI23-REPAIR4
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          extract_payload() {
+            local run_file="$1"
+            local output="$2"
+            local line
+            line="$(awk '$0 == "__SG_PANEL_ARCHIVE_BELOW__" {print NR + 1; exit}' "$run_file")"
+            test -n "$line"
+            tail -n +"$line" "$run_file" > "$output"
+          }
+          extract_payload SG-PANEL-FIX40-UI23-REPAIR4-XMUX-UI-FIX1.run updater-payload.zip
+          extract_payload SG-PANEL-FIX40-FULL-UI23-REPAIR4-XMUX-UI-FIX1.run full-payload.zip
+          cmp -s updater-payload.zip SG-PANEL-FIX40-UI23-REPAIR4-SOURCE.zip
+          cmp -s full-payload.zip SG-PANEL-FIX40-UI23-REPAIR4-SOURCE.zip
+          cmp -s updater-payload.zip full-payload.zip
+          echo "Updater and full installer contain the exact Repair4 source payload."

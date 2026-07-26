@@ -1,19 +1,19 @@
-# SG-Panel UI23 Repair4
+# SG-Panel UI23 Repair4 XMUX UI Fix 1
 
-This directory preserves the cumulative Repair4 source artifact.
+## Update an existing installation
 
-Current cumulative fixes include:
+Use `SG-PANEL-FIX40-UI23-REPAIR4-XMUX-UI-FIX1.run`:
 
-- visible XMUX controls for XHTTP Reality and XHTTP TLS;
-- Standard and For Russia — reduced presets;
-- manual XMUX JSON;
-- explicit current-versus-pending XMUX state;
-- repaired Xray Server validation and save gate;
-- updater compatibility with Python ZIP extraction;
-- Node.js 24-compatible GitHub Actions.
+```bash
+chmod +x SG-PANEL-FIX40-UI23-REPAIR4-XMUX-UI-FIX1.run
+sudo ./SG-PANEL-FIX40-UI23-REPAIR4-XMUX-UI-FIX1.run
+```
 
-The source archive is verified by GitHub Actions for SHA-256, ZIP integrity and
-byte-for-byte equality with the corresponding repository files.
+Run first on SG-Node, then on Controller. This is an in-place update through
+`install-or-upgrade.sh`; a clean reinstall is not required.
 
-Local result before publication: 165 tests passed and 38 Jinja templates parsed.
-Real server acceptance remains required.
+## Clean installation
+
+Use `SG-PANEL-FIX40-FULL-UI23-REPAIR4-XMUX-UI-FIX1.run` only on a new server.
+
+Both packages support `--verify-only` and contain the exact same source payload.
