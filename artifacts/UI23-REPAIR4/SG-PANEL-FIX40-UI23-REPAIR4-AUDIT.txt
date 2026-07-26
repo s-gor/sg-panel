@@ -1,67 +1,53 @@
 SG-Panel Preview 9 · FIX40 · UI23 Repair4
+XMUX UI Fix 1 cumulative audit
+Date: 2026-07-26
 
-BASE
-- Exact Repair3 source that previously passed GitHub Actions.
-- Application version remains 0.10.0-rc70.
-- Release label remains Preview 9 · FIX40 · UI23.
+CONFIRMED FIXES
+- XMUX presets are real radio-card controls, not a dropdown plus decorative cards.
+- The page explicitly shows the profile currently stored and applied.
+- A different unsaved selection is marked as pending and does not pretend to be active.
+- Manual JSON appears only for the manual profile.
+- Xray Server validation button now receives its click handler in nested action layouts.
+- The validation status element is inserted without DOMException.
+- Save remains blocked until successful candidate validation.
+- Repair4 updater accepts Python ZIP extraction without executable-bit on the migration script.
+- GitHub Actions use Node.js 24-compatible checkout/setup-python actions.
 
-CHANGE
-- XMUX is visible directly in Xray Server.
-- One XMUX setting applies to both Always-On XHTTP channels:
-  VLESS XHTTP Reality and VLESS XHTTP TLS.
-- Expert page no longer hides XMUX because of the legacy inbound_profile value.
+XMUX PRESETS UNCHANGED
+Standard:
+  maxConnections: 2-4
+  cMaxReuseTimes: 300-600
+  hMaxRequestTimes: 1000-2000
+  hMaxReusableSecs: 1200-2400
+  hKeepAlivePeriod: 600
 
-STANDARD PRESET
-- maxConnections: 2-4
-- cMaxReuseTimes: 300-600
-- hMaxRequestTimes: 1000-2000
-- hMaxReusableSecs: 1200-2400
-- hKeepAlivePeriod: 600
+For Russia — reduced:
+  maxConcurrency: 0
+  maxConnections: 6
+  cMaxReuseTimes: 0
+  hMaxRequestTimes: 600-900
+  hMaxReusableSecs: 1800-3000
+  hKeepAlivePeriod: 0
 
-RUSSIA REDUCED PRESET
-- maxConcurrency: 0
-- maxConnections: 6
-- cMaxReuseTimes: 0
-- hMaxRequestTimes: 600-900
-- hMaxReusableSecs: 1800-3000
-- hKeepAlivePeriod: 0
+LOCAL VERIFICATION
+- pytest: 165 passed
+- Jinja templates: 38 parsed
+- Python compileall: passed
+- Bash syntax for .sh files: passed
+- Repair4 source ZIP integrity: passed
+- Repair4 source ZIP SHA-256: passed
+- Packaged source ↔ repository files: byte-for-byte passed
 
-VALIDATION
-- XMUX is emitted only in client-side XHTTP Extra.
-- maxConcurrency=0 may coexist with positive maxConnections.
-- Positive maxConcurrency and positive maxConnections are blocked together.
-- Manual Client Extra JSON remains available.
-- Existing non-XMUX Client Extra fields are preserved.
-- Full candidate validation and xray run -test gate remain unchanged.
+NOT CHANGED
+- Xray protocol generation
+- XMUX numeric presets
+- Hysteria2 / Salamander
+- Routing / GeoFiles / Outbounds
+- Cluster / Cascade
+- database schema
+- installer architecture
 
-FILES CHANGED
-- xpanel/service.py
-- xpanel/web.py
-- xpanel/templates/settings.html
-- xpanel/templates/advanced.html
-- tests/test_preview9_fix40_xmux_visible_repair4.py
-- CHANGELOG.md
-- REPAIR4-NOTES.md
-
-LOCAL CHECKS
-- 160 pytest tests passed.
-- 38 Jinja templates parsed.
-- Python compileall passed.
-- Bash syntax passed.
-
-NOT YET CLAIMED
-- GitHub Actions for Repair4 must still pass after publication.
-- Real XHTTP client acceptance with each preset must still be performed.
-
-CI FIX 1
---------
-Cause of the failed artifact comparison:
-- the original Repair4 source ZIP was created before `.gitattributes` received
-  the final `*.run binary` and `*.zip binary` lines;
-- GitHub therefore compared two different `.gitattributes` files and exited 1.
-
-Correction:
-- rebuilt the source ZIP from the final repository tree, excluding `artifacts/`
-  to avoid recursive packaging;
-- upgraded actions/checkout to v6 and actions/setup-python to v6 (Node.js 24);
-- application code and XMUX behavior are unchanged.
+LIVE ACCEPTANCE STILL REQUIRED
+- Publish to GitHub main and obtain green Tests + Verify Repair4 source artifact.
+- Run updater on SG-Node and Controller.
+- Confirm current XMUX badge, pending selection, validation, save/apply and refreshed active state.

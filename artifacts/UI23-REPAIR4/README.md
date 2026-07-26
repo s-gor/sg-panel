@@ -1,12 +1,19 @@
-# SG-Panel UI23 Repair4 source artifact
+# SG-Panel UI23 Repair4
 
-This directory preserves the accepted Repair4 source snapshot with visible XMUX presets.
+This directory preserves the cumulative Repair4 source artifact.
 
-The source ZIP intentionally excludes the repository `artifacts/` directory to avoid recursive archives. GitHub Actions verifies that every file stored in the ZIP exists in the repository and matches byte-for-byte.
+Current cumulative fixes include:
 
-CI Fix 1:
+- visible XMUX controls for XHTTP Reality and XHTTP TLS;
+- Standard and For Russia — reduced presets;
+- manual XMUX JSON;
+- explicit current-versus-pending XMUX state;
+- repaired Xray Server validation and save gate;
+- updater compatibility with Python ZIP extraction;
+- Node.js 24-compatible GitHub Actions.
 
-- source ZIP regenerated after the final `.gitattributes` update;
-- `actions/checkout` upgraded to v6;
-- `actions/setup-python` upgraded to v6;
-- no SG-Panel application or XMUX runtime code changed.
+The source archive is verified by GitHub Actions for SHA-256, ZIP integrity and
+byte-for-byte equality with the corresponding repository files.
+
+Local result before publication: 165 tests passed and 38 Jinja templates parsed.
+Real server acceptance remains required.

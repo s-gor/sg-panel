@@ -217,7 +217,8 @@ preflight(){
   grep -q "SG-Panel RC70 — Latte light theme preview" "$SOURCE_DIR/xpanel/static/app.css" || { echo "в исходниках отсутствует светлая тема SG-Panel RC70" >&2; return 1; }
   grep -q "SG-Panel RC70 — Cluster completion and node-detail overflow hotfix" "$SOURCE_DIR/xpanel/static/app.css" || { echo "в исходниках отсутствует Cluster hotfix SG-Panel RC70" >&2; return 1; }
   grep -q "try_files /index.html =404" "$SOURCE_DIR/deploy/configure-http.sh" || { echo "в исходниках отсутствует безопасный 404 fallback" >&2; return 1; }
-  [[ -x "$SOURCE_DIR/deploy/migrate-placeholder-404.sh" ]] || { echo "в исходниках отсутствует миграция 404 fallback" >&2; return 1; }
+  [[ -f "$SOURCE_DIR/deploy/migrate-placeholder-404.sh" ]] || { echo "в исходниках отсутствует миграция 404 fallback" >&2; return 1; }
+  bash -n "$SOURCE_DIR/deploy/migrate-placeholder-404.sh" || { echo "миграция 404 fallback повреждена" >&2; return 1; }
   grep -q "$EXPECTED_UI_REVISION" "$SOURCE_DIR/xpanel/templates/base.html" || { echo "в шаблоне отсутствует ревизия CSS SG-Panel RC70" >&2; return 1; }
   [[ -f "$SOURCE_DIR/xpanel/static/fix40-cascade-steps-ui20.css" ]] || { echo "в исходниках отсутствует Cascade Steps UI20" >&2; return 1; }
   grep -Fq "guided three-step Cascade" "$SOURCE_DIR/xpanel/static/fix40-cascade-steps-ui20.css" || { echo "CSS Cascade Steps UI20 повреждён" >&2; return 1; }

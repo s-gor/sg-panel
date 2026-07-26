@@ -376,18 +376,17 @@
       const syncButton = validationToolbar.querySelector('[data-sync-json]');
       validationToolbar.insertBefore(validateButton, syncButton || null);
       if (editorStatus) editorStatus.insertAdjacentElement('afterend', status);
-      else if (actionWrap) actionWrap.parentNode.insertBefore(status, actionWrap);
-      else form.insertBefore(status, saveButton);
-    } else if (actionWrap) {
-      actionWrap.insertBefore(validateButton, saveButton);
-      actionWrap.parentNode.insertBefore(status, actionWrap);
+      else if (actionWrap) actionWrap.insertAdjacentElement('beforebegin', status);
+      else saveButton.insertAdjacentElement('beforebegin', status);
     } else {
-      const parent = saveButton.parentNode;
-      parent.insertBefore(validateButton, saveButton);
-      if (parent === form) {
+      const buttonParent = saveButton.parentElement;
+      if (!buttonParent) continue;
+      buttonParent.insertBefore(validateButton, saveButton);
+      const statusAnchor = actionWrap || buttonParent;
+      if (statusAnchor === form) {
         form.insertBefore(status, validateButton);
       } else {
-        form.insertBefore(status, parent);
+        statusAnchor.insertAdjacentElement('beforebegin', status);
       }
     }
 
