@@ -52,3 +52,16 @@ LOCAL CHECKS
 NOT YET CLAIMED
 - GitHub Actions for Repair4 must still pass after publication.
 - Real XHTTP client acceptance with each preset must still be performed.
+
+CI FIX 1
+--------
+Cause of the failed artifact comparison:
+- the original Repair4 source ZIP was created before `.gitattributes` received
+  the final `*.run binary` and `*.zip binary` lines;
+- GitHub therefore compared two different `.gitattributes` files and exited 1.
+
+Correction:
+- rebuilt the source ZIP from the final repository tree, excluding `artifacts/`
+  to avoid recursive packaging;
+- upgraded actions/checkout to v6 and actions/setup-python to v6 (Node.js 24);
+- application code and XMUX behavior are unchanged.

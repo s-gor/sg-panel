@@ -8,6 +8,10 @@ on:
       - "tests/**"
       - "CHANGELOG.md"
       - "REPAIR4-NOTES.md"
+      - "REPAIR4-CI-FIX1-NOTES.md"
+      - ".gitattributes"
+      - ".github/workflows/tests.yml"
+      - ".github/workflows/verify-artifacts.yml"
       - "artifacts/UI23-REPAIR4/**"
       - ".github/workflows/verify-repair4-source.yml"
   pull_request:
@@ -17,6 +21,10 @@ on:
       - "tests/**"
       - "CHANGELOG.md"
       - "REPAIR4-NOTES.md"
+      - "REPAIR4-CI-FIX1-NOTES.md"
+      - ".gitattributes"
+      - ".github/workflows/tests.yml"
+      - ".github/workflows/verify-artifacts.yml"
       - "artifacts/UI23-REPAIR4/**"
       - ".github/workflows/verify-repair4-source.yml"
   workflow_dispatch:
@@ -29,7 +37,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Verify SHA-256 and ZIP integrity
         working-directory: artifacts/UI23-REPAIR4
@@ -44,9 +52,19 @@ jobs:
           tmp="$(mktemp -d)"
           trap 'rm -rf "$tmp"' EXIT
           unzip -q artifacts/UI23-REPAIR4/SG-PANEL-FIX40-UI23-REPAIR4-SOURCE.zip -d "$tmp/source"
+          failed=0
           while IFS= read -r -d '' file; do
             rel="${file#"$tmp/source/"}"
-            test -f "$rel"
-            cmp -s "$file" "$rel"
+            if [[ ! -f "$rel" ]]; then
+              echo "Missing repository file: $rel"
+              failed=1
+              continue
+            fi
+            if ! cmp -s "$file" "$rel"; then
+              echo "Content mismatch: $rel"
+              sha256sum "$file" "$rel"
+              failed=1
+            fi
           done < <(find "$tmp/source" -type f -print0)
+          test "$failed" -eq 0
           echo "Repair4 source artifact matches the repository source."
