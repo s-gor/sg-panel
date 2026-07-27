@@ -13,8 +13,9 @@ def read(relative: str) -> str:
 def test_routing_ui_is_server_scoped_and_has_no_synthetic_vpn_target() -> None:
     template = read("xpanel/templates/routing.html")
     assert "{% block section %}ROUTING{% endblock %}" in template
-    assert "конкретный реальный Outbound" in template
-    assert "скрытого перехода на Direct нет" in template
+    assert "реально существующие Outbounds" in template
+    assert "полного Xray candidate" in template
+    assert "Базовая схема" in template
     assert "routing_outbound_options" in read("xpanel/web.py")
     assert "generic or synthetic \"VPN\"" in read("xpanel/service.py")
     assert "Direct / VPN / Block" not in template

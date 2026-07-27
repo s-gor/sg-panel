@@ -47,14 +47,14 @@ def test_routing_is_one_readable_workspace_and_geofiles_is_separate() -> None:
     geofiles_page = read("xpanel/templates/geofiles.html")
     css = read("xpanel/static/fix40-global-jade-routing-vision-hotfix4.css")
     assert 'data-r096-tab="' not in routing
-    assert "Весь остальной трафик" in routing
+    assert "Выбранная конфигурация" in routing
     assert "Пользовательские правила" in routing
-    assert "Только включённый реальный Outbound" in routing
+    assert "Основные правила" in routing
+    assert "Серверная маршрутизация SG-Panel" in routing
     assert '_geofiles_panel_fix39.html' not in routing
     assert "{% include '_geofiles_panel_fix39.html' %}" in geofiles_page
     assert "body.routing-fix40-simple .section-tabs { display: none" in css
     for obsolete in (
-        "Выбранная конфигурация",
         "Базовые сценарии SG Client",
         "Основные правила и выходы",
         "Создать готовое правило",

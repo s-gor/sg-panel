@@ -1,0 +1,224 @@
+/* SG-Panel Preview 9 · FIX40 · Global Buttons Preview 2
+   Final cascade override: primary/secondary/ghost/danger/warning/toggle buttons
+   all use the exact same material as the active System / Resources button. */
+
+/*
+ * The repeated body class is intentional. Several historical hotfixes contain
+ * equally specific `button.button.primary` rules with !important. This final,
+ * last-loaded layer must outrank them without changing any templates or logic.
+ */
+html[data-resolved-theme="dark"] body.preview-9-rc6-typography.preview-9-rc6-typography :is(
+  button.button,
+  a.button,
+  input.button,
+  .login-submit,
+  .section-tabs a,
+  .nested-tabs a,
+  .client-action:not(.more),
+  .r096-primary-button,
+  .r096-secondary-button,
+  .r096-danger-button,
+  .r096-header-button,
+  .routing-unified-footer .validation-button,
+  .r096-rule-tabs button,
+  .r096-choice-card > span,
+  .r096-segments label > span
+) {
+  color: #fff !important;
+  -webkit-text-fill-color: #fff !important;
+  border: 1px solid #7892aa !important;
+  border-color: #7892aa !important;
+  border-radius: 10px !important;
+  background: #58738d !important;
+  background-color: #58738d !important;
+  background-image: none !important;
+  box-shadow: 0 6px 16px rgba(5, 12, 20, .30) !important;
+  font-family: inherit !important;
+  font-weight: 800 !important;
+  line-height: 1.2 !important;
+  text-align: center !important;
+  text-decoration: none !important;
+  text-shadow: none !important;
+}
+
+html[data-resolved-theme="light"] body.preview-9-rc6-typography.preview-9-rc6-typography :is(
+  button.button,
+  a.button,
+  input.button,
+  .login-submit,
+  .section-tabs a,
+  .nested-tabs a,
+  .client-action:not(.more),
+  .r096-primary-button,
+  .r096-secondary-button,
+  .r096-danger-button,
+  .r096-header-button,
+  .routing-unified-footer .validation-button,
+  .r096-rule-tabs button,
+  .r096-choice-card > span,
+  .r096-segments label > span
+) {
+  color: #fffdf7 !important;
+  -webkit-text-fill-color: #fffdf7 !important;
+  border: 1px solid #b88a45 !important;
+  border-color: #b88a45 !important;
+  border-radius: 10px !important;
+  background: linear-gradient(180deg, #4f7764 0%, #3e6050 100%) !important;
+  background-color: #3e6050 !important;
+  background-image: linear-gradient(180deg, #4f7764 0%, #3e6050 100%) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.60), 0 3px 14px rgba(43,52,46,.24) !important;
+  font-family: inherit !important;
+  font-weight: 800 !important;
+  line-height: 1.2 !important;
+  text-align: center !important;
+  text-decoration: none !important;
+  text-shadow: 0 1px 1px rgba(24,48,38,.24) !important;
+}
+
+/* Primary, secondary, ghost, warning and danger labels inherit one colour. */
+body.preview-9-rc6-typography.preview-9-rc6-typography :is(
+  button.button,
+  a.button,
+  input.button,
+  .login-submit,
+  .section-tabs a,
+  .nested-tabs a,
+  .client-action:not(.more),
+  .r096-primary-button,
+  .r096-secondary-button,
+  .r096-danger-button,
+  .r096-header-button,
+  .routing-unified-footer .validation-button,
+  .r096-rule-tabs button,
+  .r096-choice-card > span,
+  .r096-segments label > span
+) :is(span,strong,b,em,small) {
+  color: inherit !important;
+  -webkit-text-fill-color: currentColor !important;
+  font-weight: inherit !important;
+  text-shadow: inherit !important;
+}
+
+html[data-resolved-theme="dark"] body.preview-9-rc6-typography.preview-9-rc6-typography :is(
+  button.button,
+  a.button,
+  input.button,
+  .login-submit,
+  .section-tabs a,
+  .nested-tabs a,
+  .client-action:not(.more),
+  .r096-primary-button,
+  .r096-secondary-button,
+  .r096-danger-button,
+  .r096-header-button,
+  .routing-unified-footer .validation-button,
+  .r096-rule-tabs button,
+  .r096-choice-card > span,
+  .r096-segments label > span
+):not(:disabled):not([aria-disabled="true"]):hover {
+  color: #fff !important;
+  -webkit-text-fill-color: #fff !important;
+  border-color: #8aa4bc !important;
+  background: #637f9b !important;
+  background-color: #637f9b !important;
+  background-image: none !important;
+  box-shadow: 0 8px 20px rgba(5, 12, 20, .34) !important;
+  transform: translateY(-1px) !important;
+}
+
+html[data-resolved-theme="light"] body.preview-9-rc6-typography.preview-9-rc6-typography :is(
+  button.button,
+  a.button,
+  input.button,
+  .login-submit,
+  .section-tabs a,
+  .nested-tabs a,
+  .client-action:not(.more),
+  .r096-primary-button,
+  .r096-secondary-button,
+  .r096-danger-button,
+  .r096-header-button,
+  .routing-unified-footer .validation-button,
+  .r096-rule-tabs button,
+  .r096-choice-card > span,
+  .r096-segments label > span
+):not(:disabled):not([aria-disabled="true"]):hover {
+  color: #fffdf7 !important;
+  -webkit-text-fill-color: #fffdf7 !important;
+  border-color: #c59b5b !important;
+  background: linear-gradient(180deg, #5b866f 0%, #496c5a 100%) !important;
+  background-color: #496c5a !important;
+  background-image: linear-gradient(180deg, #5b866f 0%, #496c5a 100%) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.64), 0 5px 16px rgba(43,52,46,.27) !important;
+  transform: translateY(-1px) !important;
+}
+
+html[data-resolved-theme="dark"] body.preview-9-rc6-typography.preview-9-rc6-typography :is(
+  button.button,
+  a.button,
+  input.button,
+  .login-submit,
+  .section-tabs a,
+  .nested-tabs a,
+  .client-action:not(.more),
+  .r096-primary-button,
+  .r096-secondary-button,
+  .r096-danger-button,
+  .r096-header-button,
+  .routing-unified-footer .validation-button,
+  .r096-rule-tabs button
+):not(:disabled):active {
+  border-color: #7892aa !important;
+  background: #4b6680 !important;
+  background-color: #4b6680 !important;
+  background-image: none !important;
+  transform: translateY(0) !important;
+}
+
+html[data-resolved-theme="light"] body.preview-9-rc6-typography.preview-9-rc6-typography :is(
+  button.button,
+  a.button,
+  input.button,
+  .login-submit,
+  .section-tabs a,
+  .nested-tabs a,
+  .client-action:not(.more),
+  .r096-primary-button,
+  .r096-secondary-button,
+  .r096-danger-button,
+  .r096-header-button,
+  .routing-unified-footer .validation-button,
+  .r096-rule-tabs button
+):not(:disabled):active {
+  border-color: #b88a45 !important;
+  background: linear-gradient(180deg, #466b59 0%, #365446 100%) !important;
+  background-color: #365446 !important;
+  background-image: linear-gradient(180deg, #466b59 0%, #365446 100%) !important;
+  transform: translateY(0) !important;
+}
+
+/* Disabled buttons keep the same material and differ only by opacity. */
+body.preview-9-rc6-typography.preview-9-rc6-typography :is(
+  button.button,
+  input.button,
+  .login-submit,
+  .client-action:not(.more),
+  .r096-primary-button,
+  .r096-secondary-button,
+  .r096-danger-button,
+  .r096-header-button,
+  .routing-unified-footer .validation-button,
+  .r096-rule-tabs button
+):disabled,
+body.preview-9-rc6-typography.preview-9-rc6-typography :is(
+  a.button,
+  .section-tabs a,
+  .nested-tabs a,
+  .client-action:not(.more)
+)[aria-disabled="true"] {
+  opacity: .42 !important;
+  filter: saturate(.58) !important;
+  cursor: not-allowed !important;
+  transform: none !important;
+  box-shadow: none !important;
+}

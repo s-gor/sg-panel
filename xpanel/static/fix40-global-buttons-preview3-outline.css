@@ -1,0 +1,305 @@
+/* SG-Panel Preview 9 · FIX40 · Global Buttons Preview 3 Outline
+   One calm system for both themes:
+   - ordinary buttons are transparent/outlined;
+   - hover gives a light tint;
+   - pressed and selected controls receive the accent fill;
+   - all typography, radius and borders stay consistent. */
+
+body.preview-9-rc6-typography {
+  --sg-outline-radius: 10px;
+  --sg-outline-weight: 800;
+}
+
+/* Base material: every ordinary textual button is outlined and transparent. */
+html[data-resolved-theme="dark"] body.preview-9-rc6-typography.preview-9-rc6-typography.preview-9-rc6-typography :is(
+  button.button,
+  a.button,
+  input.button,
+  .login-submit,
+  .section-tabs a,
+  .nested-tabs a,
+  .client-action:not(.more),
+  .r096-primary-button,
+  .r096-secondary-button,
+  .r096-danger-button,
+  .r096-header-button,
+  .routing-unified-footer .validation-button,
+  .r096-rule-tabs button,
+  .r096-choice-card > span,
+  .r096-segments label > span
+) {
+  color: #dce7f1 !important;
+  -webkit-text-fill-color: #dce7f1 !important;
+  border: 1px solid #58738d !important;
+  border-color: #58738d !important;
+  border-radius: var(--sg-outline-radius) !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+  font-family: inherit !important;
+  font-weight: var(--sg-outline-weight) !important;
+  line-height: 1.2 !important;
+  text-align: center !important;
+  text-decoration: none !important;
+  text-shadow: none !important;
+}
+
+html[data-resolved-theme="light"] body.preview-9-rc6-typography.preview-9-rc6-typography.preview-9-rc6-typography :is(
+  button.button,
+  a.button,
+  input.button,
+  .login-submit,
+  .section-tabs a,
+  .nested-tabs a,
+  .client-action:not(.more),
+  .r096-primary-button,
+  .r096-secondary-button,
+  .r096-danger-button,
+  .r096-header-button,
+  .routing-unified-footer .validation-button,
+  .r096-rule-tabs button,
+  .r096-choice-card > span,
+  .r096-segments label > span
+) {
+  color: #385045 !important;
+  -webkit-text-fill-color: #385045 !important;
+  border: 1px solid #789184 !important;
+  border-color: #789184 !important;
+  border-radius: var(--sg-outline-radius) !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+  font-family: inherit !important;
+  font-weight: var(--sg-outline-weight) !important;
+  line-height: 1.2 !important;
+  text-align: center !important;
+  text-decoration: none !important;
+  text-shadow: none !important;
+}
+
+/* Nested labels inherit the same type and colour. */
+body.preview-9-rc6-typography :is(
+  button.button,
+  a.button,
+  input.button,
+  .login-submit,
+  .section-tabs a,
+  .nested-tabs a,
+  .client-action:not(.more),
+  .r096-primary-button,
+  .r096-secondary-button,
+  .r096-danger-button,
+  .r096-header-button,
+  .routing-unified-footer .validation-button,
+  .r096-rule-tabs button,
+  .r096-choice-card > span,
+  .r096-segments label > span
+) :is(span,strong,b,em,small) {
+  color: inherit !important;
+  -webkit-text-fill-color: currentColor !important;
+  font-weight: inherit !important;
+  text-shadow: none !important;
+}
+
+/* Hover remains calm and translucent. */
+html[data-resolved-theme="dark"] body.preview-9-rc6-typography.preview-9-rc6-typography.preview-9-rc6-typography :is(
+  button.button,
+  a.button,
+  input.button,
+  .login-submit,
+  .section-tabs a,
+  .nested-tabs a,
+  .client-action:not(.more),
+  .r096-primary-button,
+  .r096-secondary-button,
+  .r096-danger-button,
+  .r096-header-button,
+  .routing-unified-footer .validation-button,
+  .r096-rule-tabs button,
+  .r096-choice-card > span,
+  .r096-segments label > span
+):not(:disabled):not([aria-disabled="true"]):hover {
+  color: #f4f8fb !important;
+  -webkit-text-fill-color: #f4f8fb !important;
+  border-color: #7892aa !important;
+  background: rgba(88, 115, 141, .18) !important;
+  background-color: rgba(88, 115, 141, .18) !important;
+  background-image: none !important;
+  box-shadow: none !important;
+  transform: translateY(-1px) !important;
+}
+
+html[data-resolved-theme="light"] body.preview-9-rc6-typography.preview-9-rc6-typography.preview-9-rc6-typography :is(
+  button.button,
+  a.button,
+  input.button,
+  .login-submit,
+  .section-tabs a,
+  .nested-tabs a,
+  .client-action:not(.more),
+  .r096-primary-button,
+  .r096-secondary-button,
+  .r096-danger-button,
+  .r096-header-button,
+  .routing-unified-footer .validation-button,
+  .r096-rule-tabs button,
+  .r096-choice-card > span,
+  .r096-segments label > span
+):not(:disabled):not([aria-disabled="true"]):hover {
+  color: #2f483c !important;
+  -webkit-text-fill-color: #2f483c !important;
+  border-color: #587568 !important;
+  background: rgba(79, 119, 100, .11) !important;
+  background-color: rgba(79, 119, 100, .11) !important;
+  background-image: none !important;
+  box-shadow: none !important;
+  transform: translateY(-1px) !important;
+}
+
+/* Selected/active controls carry the accent fill. */
+html[data-resolved-theme="dark"] body.preview-9-rc6-typography.preview-9-rc6-typography.preview-9-rc6-typography :is(
+  .section-tabs a.active,
+  .nested-tabs a.active,
+  .button.active,
+  .button[aria-pressed="true"],
+  .client-action.active,
+  .r096-rule-tabs button.active,
+  .r096-rule-tabs button[aria-selected="true"],
+  .r096-choice-card > input:checked + span,
+  .r096-segments label > input:checked + span
+) {
+  color: #fff !important;
+  -webkit-text-fill-color: #fff !important;
+  border-color: #7892aa !important;
+  background: #58738d !important;
+  background-color: #58738d !important;
+  background-image: none !important;
+  box-shadow: 0 5px 14px rgba(5, 12, 20, .24) !important;
+  text-shadow: none !important;
+}
+
+html[data-resolved-theme="light"] body.preview-9-rc6-typography.preview-9-rc6-typography.preview-9-rc6-typography :is(
+  .section-tabs a.active,
+  .nested-tabs a.active,
+  .button.active,
+  .button[aria-pressed="true"],
+  .client-action.active,
+  .r096-rule-tabs button.active,
+  .r096-rule-tabs button[aria-selected="true"],
+  .r096-choice-card > input:checked + span,
+  .r096-segments label > input:checked + span
+) {
+  color: #fffdf7 !important;
+  -webkit-text-fill-color: #fffdf7 !important;
+  border-color: #365446 !important;
+  background: #4f7764 !important;
+  background-color: #4f7764 !important;
+  background-image: none !important;
+  box-shadow: 0 5px 14px rgba(43, 69, 56, .18) !important;
+  text-shadow: none !important;
+}
+
+/* A physical click briefly uses the same accent material. */
+html[data-resolved-theme="dark"] body.preview-9-rc6-typography.preview-9-rc6-typography.preview-9-rc6-typography :is(
+  button.button,
+  a.button,
+  input.button,
+  .login-submit,
+  .client-action:not(.more),
+  .r096-primary-button,
+  .r096-secondary-button,
+  .r096-danger-button,
+  .r096-header-button,
+  .routing-unified-footer .validation-button,
+  .r096-rule-tabs button
+):not(:disabled):active {
+  color: #fff !important;
+  -webkit-text-fill-color: #fff !important;
+  border-color: #7892aa !important;
+  background: #58738d !important;
+  background-color: #58738d !important;
+  background-image: none !important;
+  transform: translateY(0) !important;
+}
+
+html[data-resolved-theme="light"] body.preview-9-rc6-typography.preview-9-rc6-typography.preview-9-rc6-typography :is(
+  button.button,
+  a.button,
+  input.button,
+  .login-submit,
+  .client-action:not(.more),
+  .r096-primary-button,
+  .r096-secondary-button,
+  .r096-danger-button,
+  .r096-header-button,
+  .routing-unified-footer .validation-button,
+  .r096-rule-tabs button
+):not(:disabled):active {
+  color: #fffdf7 !important;
+  -webkit-text-fill-color: #fffdf7 !important;
+  border-color: #365446 !important;
+  background: #4f7764 !important;
+  background-color: #4f7764 !important;
+  background-image: none !important;
+  transform: translateY(0) !important;
+}
+
+/* Routing option groups must never be filled unless checked. */
+html[data-resolved-theme="dark"] body.routing-unified-preview1.preview-9-rc6-typography.preview-9-rc6-typography.preview-9-rc6-typography :is(
+  .r096-choice-card > input:not(:checked) + span,
+  .r096-segments label > input:not(:checked) + span
+) {
+  color: #dce7f1 !important;
+  -webkit-text-fill-color: #dce7f1 !important;
+  border-color: #58738d !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+}
+
+html[data-resolved-theme="light"] body.routing-unified-preview1.preview-9-rc6-typography.preview-9-rc6-typography.preview-9-rc6-typography :is(
+  .r096-choice-card > input:not(:checked) + span,
+  .r096-segments label > input:not(:checked) + span
+) {
+  color: #385045 !important;
+  -webkit-text-fill-color: #385045 !important;
+  border-color: #789184 !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+}
+
+/* Disabled choices remain visible but clearly unavailable. */
+body.preview-9-rc6-typography :is(
+  button.button,
+  input.button,
+  .login-submit,
+  .client-action:not(.more),
+  .r096-primary-button,
+  .r096-secondary-button,
+  .r096-danger-button,
+  .r096-header-button,
+  .routing-unified-footer .validation-button,
+  .r096-rule-tabs button
+):disabled,
+body.preview-9-rc6-typography :is(
+  a.button,
+  .section-tabs a,
+  .nested-tabs a,
+  .client-action:not(.more)
+)[aria-disabled="true"],
+body.routing-unified-preview1 .r096-choice-card > input:disabled + span,
+body.routing-unified-preview1 .r096-segments label > input:disabled + span {
+  opacity: .42 !important;
+  filter: saturate(.35) !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+  cursor: not-allowed !important;
+  transform: none !important;
+}

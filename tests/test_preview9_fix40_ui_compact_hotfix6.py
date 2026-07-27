@@ -40,8 +40,9 @@ def test_routing_cleanup_is_preserved() -> None:
     assert '<nav class="r096-tabs routing-simple-tabs"' not in routing
     assert '<section class="routing-status-strip"' not in routing
     assert '<footer class="routing-simple-footer"' not in routing
-    assert "Весь остальной трафик" in routing
+    assert "Выбранная конфигурация" in routing
     assert "Пользовательские правила" in routing
+    assert "Базовая схема" in routing
 
 def test_installer_checks_final_hotfix6_css() -> None:
     for rel in ("install.sh", "install-or-upgrade.sh", "deploy/ec2-first-install.sh"):

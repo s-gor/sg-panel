@@ -318,6 +318,7 @@ from .service import (
     add_device,
     apply_config,
     apply_geofiles_source,
+    apply_unified_routing,
     config_json_document,
     controller_xray_encryption_status,
     dns_json_document,
@@ -395,6 +396,7 @@ from .service import (
     routing_outbound_options,
     routing_outbound_map,
     routing_rules_overview,
+    unified_routing_overview,
     list_users,
     list_hysteria_inbounds,
     list_xhttp_inbounds,
@@ -4071,6 +4073,7 @@ def create_app(test_config: dict | None = None) -> Flask:
             "routing.html",
             settings=get_routing_settings(),
             rules=routing_rules_overview(),
+            unified=unified_routing_overview(),
             outbound_tags=[str(item["tag"]) for item in outbound_options],
             outbound_options=outbound_options,
             outbound_by_tag=outbound_by_tag,
@@ -4083,6 +4086,49 @@ def create_app(test_config: dict | None = None) -> Flask:
             server_identity=get_instance_identity(),
             routing_nodes=routing_nodes,
         )
+
+    def unified_routing_form_values() -> dict[str, object]:
+        return {
+            "preset": request.form.get("preset", "custom"),
+            "local_action": request.form.get("local_action", "direct"),
+            "russia_scope": request.form.get("russia_scope", "none"),
+            "russia_action": request.form.get("russia_action", "direct"),
+            "blocked_action": request.form.get("blocked_action", "direct"),
+            "ads_action": request.form.get("ads_action", "direct"),
+            "default_action": request.form.get("default_action", "direct"),
+            "custom_direct_domains": request.form.get("custom_direct_domains", ""),
+            "custom_direct_ips": request.form.get("custom_direct_ips", ""),
+            "custom_warp_domains": request.form.get("custom_warp_domains", ""),
+            "custom_warp_ips": request.form.get("custom_warp_ips", ""),
+            "custom_block_domains": request.form.get("custom_block_domains", ""),
+            "custom_block_ips": request.form.get("custom_block_ips", ""),
+            "domain_strategy": request.form.get("domain_strategy", "AsIs"),
+            "sniffing_enabled": "sniffing_enabled" in request.form,
+            "sniffing_route_only": "sniffing_route_only" in request.form,
+            "sniff_http": "sniff_http" in request.form,
+            "sniff_tls": "sniff_tls" in request.form,
+            "sniff_quic": "sniff_quic" in request.form,
+        }
+
+    @app.post("/routing/unified")
+    @login_required
+    def routing_unified_save():
+        scope = "routing:unified"
+        try:
+            values = unified_routing_form_values()
+            if _is_validation_action():
+                return _validation_response(
+                    scope, lambda: apply_unified_routing(**values),
+                    message="Единая схема Routing и итоговый config.json проверены.",
+                )
+            _require_validation_token(scope, _draft_payload())
+            result = apply_unified_routing(**values)
+            apply_saved_change(
+                f"Routing применён: {result['title']} · {result['managed_rules']} управляемых правил"
+            )
+        except (ValueError, XPanelError) as exc:
+            flash(str(exc), "error")
+        return redirect(url_for("routing_page"))
 
     def routing_settings_form_values() -> dict[str, object]:
         return {

@@ -4118,6 +4118,412 @@ def routing_rules_overview() -> list[dict[str, object]]:
     return result
 
 
+
+
+UNIFIED_ROUTING_MANAGED_BY = "sg-unified-routing"
+UNIFIED_ROUTING_META_KEY = "unifiedRouting"
+UNIFIED_ROUTING_RULES = {
+    "custom-direct": ("Пользовательские значения · Direct", 10),
+    "custom-warp": ("Пользовательские значения · WARP", 20),
+    "custom-block": ("Пользовательские значения · Block", 30),
+    "local": ("Локальная сеть", 100),
+    "russia": ("Российская маршрутизация", 200),
+    "blocked": ("Заблокированные ресурсы", 300),
+    "ads": ("Реклама и трекеры", 400),
+}
+UNIFIED_ROUTING_PRESET_DEFAULTS: dict[str, dict[str, str]] = {
+    "direct": {
+        "local_action": "direct",
+        "russia_scope": "none",
+        "russia_action": "direct",
+        "blocked_action": "direct",
+        "ads_action": "direct",
+        "default_action": "direct",
+    },
+    "ads_block": {
+        "local_action": "direct",
+        "russia_scope": "none",
+        "russia_action": "direct",
+        "blocked_action": "direct",
+        "ads_action": "blocked",
+        "default_action": "direct",
+    },
+    "blocked_warp": {
+        "local_action": "direct",
+        "russia_scope": "none",
+        "russia_action": "direct",
+        "blocked_action": "warp",
+        "ads_action": "direct",
+        "default_action": "direct",
+    },
+    "all_warp": {
+        "local_action": "direct",
+        "russia_scope": "none",
+        "russia_action": "direct",
+        "blocked_action": "direct",
+        "ads_action": "direct",
+        "default_action": "warp",
+    },
+}
+UNIFIED_ROUTING_PRESET_TITLES = {
+    "direct": "Обычный доступ · всё Direct",
+    "ads_block": "Блокировка рекламы и трекеров",
+    "blocked_warp": "Заблокированные ресурсы через WARP",
+    "all_warp": "Весь интернет через WARP",
+    "custom": "Пользовательская схема",
+}
+UNIFIED_LOCAL_IPS = (
+    "127.0.0.0/8",
+    "10.0.0.0/8",
+    "172.16.0.0/12",
+    "192.168.0.0/16",
+    "169.254.0.0/16",
+    "::1/128",
+    "fc00::/7",
+    "fe80::/10",
+)
+UNIFIED_BLOCKED_GEOSITE_CANDIDATES = (
+    "refilter",
+    "antifilter-community",
+    "antifilter-download-community",
+    "ru-blocked",
+    "russia-blocked",
+    "category-blocked",
+    "blocked",
+    "geoblock",
+)
+UNIFIED_ADS_GEOSITE_CANDIDATES = (
+    "category-ads-all",
+    "category-ads",
+    "ads",
+    "adblock",
+)
+
+
+def _unified_routing_default_model() -> dict[str, object]:
+    return {
+        "preset": "direct",
+        **UNIFIED_ROUTING_PRESET_DEFAULTS["direct"],
+        "custom_direct_domains": [],
+        "custom_direct_ips": [],
+        "custom_warp_domains": [],
+        "custom_warp_ips": [],
+        "custom_block_domains": [],
+        "custom_block_ips": [],
+        "updated_at": "",
+    }
+
+
+def _routing_extra_with_metadata() -> dict[str, object]:
+    settings = get_routing_settings()
+    return _json_object(settings["extra_json"])
+
+
+def get_unified_routing_model() -> dict[str, object]:
+    result = _unified_routing_default_model()
+    settings = get_routing_settings()
+    extra = _routing_extra_with_metadata()
+    meta = extra.get("_sgPanel")
+    saved = meta.get(UNIFIED_ROUTING_META_KEY) if isinstance(meta, dict) else None
+    if not isinstance(saved, dict):
+        current_rules = list_routing_rules()
+        result["default_action"] = str(settings["default_outbound_tag"] or "direct")
+        result["preset"] = (
+            "direct"
+            if result["default_action"] == "direct" and not current_rules
+            else "custom"
+        )
+        return result
+    for key in result:
+        if key in saved:
+            result[key] = saved[key]
+    for key in (
+        "custom_direct_domains", "custom_direct_ips",
+        "custom_warp_domains", "custom_warp_ips",
+        "custom_block_domains", "custom_block_ips",
+    ):
+        value = result.get(key, [])
+        if isinstance(value, str):
+            result[key] = split_values(value)
+        elif isinstance(value, list):
+            result[key] = [str(item) for item in value if str(item).strip()]
+        else:
+            result[key] = []
+    return result
+
+
+def _unified_action_options() -> list[dict[str, object]]:
+    return routing_outbound_options(enabled_only=True)
+
+
+def unified_routing_overview() -> dict[str, object]:
+    model = get_unified_routing_model()
+    rules = routing_rules_overview()
+    managed = [
+        item for item in rules
+        if str(item.get("managed_by") or "") == UNIFIED_ROUTING_MANAGED_BY
+    ]
+    manual = [
+        item for item in rules
+        if str(item.get("managed_by") or "") != UNIFIED_ROUTING_MANAGED_BY
+    ]
+    geofiles = get_geofiles_overview()
+    analysis = geofiles.get("active_analysis", {})
+    geosite_categories = list(analysis.get("geosite_categories", [])) if isinstance(analysis, dict) else []
+    geoip_categories = list(analysis.get("geoip_categories", [])) if isinstance(analysis, dict) else []
+    return {
+        "model": model,
+        "title": UNIFIED_ROUTING_PRESET_TITLES.get(
+            str(model.get("preset") or "custom"), "Пользовательская схема"
+        ),
+        "managed_rules": managed,
+        "manual_rules": manual,
+        "all_rules": rules,
+        "geosite_count": len(geosite_categories),
+        "geoip_count": len(geoip_categories),
+        "geosite_categories": geosite_categories,
+        "geoip_categories": geoip_categories,
+        "action_options": _unified_action_options(),
+        "updated_at": str(model.get("updated_at") or ""),
+    }
+
+
+def _normalise_unified_routing_values(**values: object) -> dict[str, object]:
+    preset = str(values.get("preset") or "custom").strip()
+    if preset not in {*UNIFIED_ROUTING_PRESET_DEFAULTS, "custom"}:
+        raise ValueError("неизвестная базовая схема Routing")
+
+    available_options = _unified_action_options()
+    available_tags = {str(item["tag"]) for item in available_options}
+    default_eligible = {
+        str(item["tag"]) for item in available_options
+        if bool(item.get("default_eligible"))
+    }
+
+    selected: dict[str, str] = {}
+    preset_defaults = UNIFIED_ROUTING_PRESET_DEFAULTS.get(preset)
+    for key in (
+        "local_action", "russia_scope", "russia_action",
+        "blocked_action", "ads_action", "default_action",
+    ):
+        if preset_defaults is not None:
+            selected[key] = str(preset_defaults.get(key, "direct")).strip()
+        else:
+            selected[key] = str(values.get(key) or "direct").strip()
+
+    if selected["russia_scope"] not in {"none", "tld", "sites_ip"}:
+        raise ValueError("неизвестный набор российской маршрутизации")
+    for key in ("local_action", "russia_action", "blocked_action", "ads_action"):
+        if selected[key] not in available_tags:
+            raise ValueError(f"маршрут {selected[key]} отсутствует или отключён")
+    if selected["local_action"] not in {"direct", "blocked"}:
+        raise ValueError("локальная сеть может использовать только Direct или Block")
+    if selected["default_action"] not in default_eligible:
+        raise ValueError("финальный маршрут отсутствует, отключён или является Block")
+
+    def values_list(name: str, *, domains: bool) -> list[str]:
+        raw = values.get(name, "")
+        if isinstance(raw, list):
+            raw = "\n".join(str(item) for item in raw)
+        cleaned = validate_domains(str(raw)) if domains else validate_ips(str(raw))
+        return split_values(cleaned)
+
+    result: dict[str, object] = {
+        "preset": preset,
+        **selected,
+        "custom_direct_domains": values_list("custom_direct_domains", domains=True),
+        "custom_direct_ips": values_list("custom_direct_ips", domains=False),
+        "custom_warp_domains": values_list("custom_warp_domains", domains=True),
+        "custom_warp_ips": values_list("custom_warp_ips", domains=False),
+        "custom_block_domains": values_list("custom_block_domains", domains=True),
+        "custom_block_ips": values_list("custom_block_ips", domains=False),
+        "updated_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
+    }
+    if (result["custom_warp_domains"] or result["custom_warp_ips"]) and WARP_TAG not in available_tags:
+        raise ValueError("для пользовательских правил WARP сначала включите WARP в Outbounds")
+    return result
+
+
+def _select_unified_category(
+    categories: list[str], preferred: tuple[str, ...]
+) -> str:
+    available = {str(item).lower(): str(item) for item in categories}
+    for name in preferred:
+        if name.lower() in available:
+            return available[name.lower()]
+    return ""
+
+
+def _unified_rule_specs(model: dict[str, object]) -> list[dict[str, object]]:
+    geofiles = get_geofiles_overview()
+    analysis = geofiles.get("active_analysis", {})
+    geosite_categories = list(analysis.get("geosite_categories", [])) if isinstance(analysis, dict) else []
+    geoip_categories = list(analysis.get("geoip_categories", [])) if isinstance(analysis, dict) else []
+    geosite_set = {str(item).lower() for item in geosite_categories}
+    geoip_set = {str(item).lower() for item in geoip_categories}
+    specs: list[dict[str, object]] = []
+
+    def add(role: str, tag: str, *, domains: list[str] | tuple[str, ...] = (), ips: list[str] | tuple[str, ...] = ()) -> None:
+        clean_domains = [str(item) for item in domains if str(item)]
+        clean_ips = [str(item) for item in ips if str(item)]
+        if not clean_domains and not clean_ips:
+            return
+        name, priority = UNIFIED_ROUTING_RULES[role]
+        specs.append({
+            "role": role,
+            "name": name,
+            "priority": priority,
+            "outbound_tag": tag,
+            "domains": clean_domains,
+            "ips": clean_ips,
+        })
+
+    add(
+        "custom-direct", "direct",
+        domains=list(model.get("custom_direct_domains", [])),
+        ips=list(model.get("custom_direct_ips", [])),
+    )
+    add(
+        "custom-warp", WARP_TAG,
+        domains=list(model.get("custom_warp_domains", [])),
+        ips=list(model.get("custom_warp_ips", [])),
+    )
+    add(
+        "custom-block", "blocked",
+        domains=list(model.get("custom_block_domains", [])),
+        ips=list(model.get("custom_block_ips", [])),
+    )
+
+    add("local", str(model["local_action"]), ips=UNIFIED_LOCAL_IPS)
+
+    russia_scope = str(model["russia_scope"])
+    if russia_scope == "tld":
+        if "tld-ru" not in geosite_set:
+            raise XPanelError("GeoFiles не содержат обязательную категорию geosite:tld-ru")
+        add("russia", str(model["russia_action"]), domains=["geosite:tld-ru"])
+    elif russia_scope == "sites_ip":
+        missing: list[str] = []
+        if "category-ru" not in geosite_set:
+            missing.append("geosite:category-ru")
+        if "ru" not in geoip_set:
+            missing.append("geoip:ru")
+        if missing:
+            raise XPanelError("GeoFiles не содержат категории: " + ", ".join(missing))
+        add(
+            "russia", str(model["russia_action"]),
+            domains=["geosite:category-ru"], ips=["geoip:ru"],
+        )
+
+    blocked_action = str(model["blocked_action"])
+    blocked_category = _select_unified_category(
+        geosite_categories, UNIFIED_BLOCKED_GEOSITE_CANDIDATES
+    )
+    if blocked_action != str(model["default_action"]):
+        if not blocked_category:
+            raise XPanelError(
+                "В активном geosite.dat не найдена категория заблокированных ресурсов"
+            )
+        add("blocked", blocked_action, domains=[f"geosite:{blocked_category}"])
+
+    ads_action = str(model["ads_action"])
+    ads_category = _select_unified_category(
+        geosite_categories, UNIFIED_ADS_GEOSITE_CANDIDATES
+    )
+    if ads_action != str(model["default_action"]):
+        if not ads_category:
+            raise XPanelError(
+                "В активном geosite.dat не найдена категория рекламы и трекеров"
+            )
+        add("ads", ads_action, domains=[f"geosite:{ads_category}"])
+    return specs
+
+
+def apply_unified_routing(**values: object) -> dict[str, object]:
+    model = _normalise_unified_routing_values(**values)
+    specs = _unified_rule_specs(model)
+    settings = get_routing_settings()
+    domain_strategy = str(values.get("domain_strategy") or settings["domain_strategy"])
+    if domain_strategy not in ALLOWED_DOMAIN_STRATEGIES:
+        raise ValueError("некорректная domainStrategy")
+    sniffing_enabled = bool(values.get("sniffing_enabled", settings["sniffing_enabled"]))
+    sniff_http = bool(values.get("sniff_http", settings["sniff_http"]))
+    sniff_tls = bool(values.get("sniff_tls", settings["sniff_tls"]))
+    sniff_quic = bool(values.get("sniff_quic", settings["sniff_quic"]))
+    if sniffing_enabled and not any((sniff_http, sniff_tls, sniff_quic)):
+        raise ValueError("при включённом sniffing выберите хотя бы HTTP, TLS или QUIC")
+    extra = _routing_extra_with_metadata()
+    meta = extra.get("_sgPanel")
+    if not isinstance(meta, dict):
+        meta = {}
+    meta[UNIFIED_ROUTING_META_KEY] = model
+    extra["_sgPanel"] = meta
+
+    existing_manual_names: set[str] = set()
+    with connect() as con:
+        for row in con.execute(
+            "SELECT name,managed_by FROM routing_rules"
+        ).fetchall():
+            if str(row["managed_by"] or "") != UNIFIED_ROUTING_MANAGED_BY:
+                existing_manual_names.add(str(row["name"]).casefold())
+    conflicts = [
+        spec["name"] for spec in specs
+        if str(spec["name"]).casefold() in existing_manual_names
+    ]
+    if conflicts:
+        raise XPanelError(
+            "Переименуйте пользовательские правила, занявшие служебные имена: "
+            + ", ".join(str(item) for item in conflicts)
+        )
+
+    with connect() as con:
+        con.execute("BEGIN IMMEDIATE")
+        try:
+            con.execute(
+                """
+                UPDATE routing_settings SET domain_strategy=?, default_outbound_tag=?,
+                    sniffing_enabled=?, sniffing_route_only=?, sniff_http=?, sniff_tls=?,
+                    sniff_quic=?, extra_json=?, updated_at=CURRENT_TIMESTAMP WHERE id=1
+                """,
+                (
+                    domain_strategy,
+                    str(model["default_action"]),
+                    int(sniffing_enabled),
+                    int(bool(values.get("sniffing_route_only", settings["sniffing_route_only"]))),
+                    int(sniff_http),
+                    int(sniff_tls),
+                    int(sniff_quic),
+                    json.dumps(extra, ensure_ascii=False, separators=(",", ":")),
+                ),
+            )
+            con.execute(
+                "DELETE FROM routing_rules WHERE managed_by=?",
+                (UNIFIED_ROUTING_MANAGED_BY,),
+            )
+            for spec in specs:
+                con.execute(
+                    """
+                    INSERT INTO routing_rules
+                        (name,priority,enabled,outbound_tag,target_type,domains,ips,ports,
+                         network,protocols,inbound_tags,users,config_json,managed_by,managed_role)
+                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                    """,
+                    (
+                        spec["name"], spec["priority"], 1, spec["outbound_tag"], "outbound",
+                        "\n".join(spec["domains"]), "\n".join(spec["ips"]), "", "", "", "", "",
+                        "", UNIFIED_ROUTING_MANAGED_BY, spec["role"],
+                    ),
+                )
+            con.commit()
+        except Exception:
+            con.rollback()
+            raise
+    return {
+        "preset": model["preset"],
+        "title": UNIFIED_ROUTING_PRESET_TITLES.get(str(model["preset"]), "Пользовательская схема"),
+        "managed_rules": len(specs),
+        "default_outbound_tag": model["default_action"],
+    }
+
 def find_outbound(outbound_id: int) -> sqlite3.Row:
     init_db()
     with connect() as con:

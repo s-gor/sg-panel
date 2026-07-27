@@ -1,0 +1,219 @@
+/* SG-Panel Preview 9 · FIX40 · Global Buttons Preview 1
+   One shared material for textual buttons across every page.
+   Reference: the active System / Resources section button. */
+
+body.preview-9-rc6-typography {
+  --sg-button-radius: 10px;
+  --sg-button-font-weight: 800;
+  --sg-button-dark-bg: #58738d;
+  --sg-button-dark-hover: #637f9b;
+  --sg-button-dark-pressed: #4b6680;
+  --sg-button-dark-border: #7892aa;
+  --sg-button-dark-border-hover: #8aa4bc;
+  --sg-button-dark-shadow: 0 6px 16px rgba(5, 12, 20, .30);
+  --sg-button-light-bg: linear-gradient(180deg, #4f7764 0%, #3e6050 100%);
+  --sg-button-light-hover: linear-gradient(180deg, #5b866f 0%, #496c5a 100%);
+  --sg-button-light-pressed: linear-gradient(180deg, #466b59 0%, #365446 100%);
+  --sg-button-light-border: #b88a45;
+  --sg-button-light-border-hover: #c59b5b;
+  --sg-button-light-shadow: inset 0 1px 0 rgba(255,255,255,.60), 0 3px 14px rgba(43,52,46,.24);
+}
+
+/* All ordinary textual action buttons and page tabs use one box, border and type. */
+html[data-resolved-theme="dark"] body.preview-9-rc6-typography :is(
+  .button,
+  .login-submit,
+  .section-tabs a,
+  .nested-tabs a,
+  .client-action:not(.more),
+  .r096-primary-button,
+  .r096-secondary-button,
+  .r096-danger-button,
+  .routing-unified-footer .validation-button,
+  .r096-rule-tabs button,
+  .r096-choice-card > span,
+  .r096-segments label > span
+) {
+  color: #fff !important;
+  -webkit-text-fill-color: #fff !important;
+  border: 1px solid var(--sg-button-dark-border) !important;
+  border-radius: var(--sg-button-radius) !important;
+  background: var(--sg-button-dark-bg) !important;
+  box-shadow: var(--sg-button-dark-shadow) !important;
+  font-family: inherit !important;
+  font-weight: var(--sg-button-font-weight) !important;
+  line-height: 1.2 !important;
+  text-align: center !important;
+  text-decoration: none !important;
+  text-shadow: none !important;
+}
+
+html[data-resolved-theme="light"] body.preview-9-rc6-typography :is(
+  .button,
+  .login-submit,
+  .section-tabs a,
+  .nested-tabs a,
+  .client-action:not(.more),
+  .r096-primary-button,
+  .r096-secondary-button,
+  .r096-danger-button,
+  .routing-unified-footer .validation-button,
+  .r096-rule-tabs button,
+  .r096-choice-card > span,
+  .r096-segments label > span
+) {
+  color: #fffdf7 !important;
+  -webkit-text-fill-color: #fffdf7 !important;
+  border: 1px solid var(--sg-button-light-border) !important;
+  border-radius: var(--sg-button-radius) !important;
+  background: var(--sg-button-light-bg) !important;
+  box-shadow: var(--sg-button-light-shadow) !important;
+  font-family: inherit !important;
+  font-weight: var(--sg-button-font-weight) !important;
+  line-height: 1.2 !important;
+  text-align: center !important;
+  text-decoration: none !important;
+  text-shadow: 0 1px 1px rgba(24,48,38,.24) !important;
+}
+
+/* Labels inside compound buttons inherit the same button typography. */
+body.preview-9-rc6-typography :is(
+  .button,
+  .section-tabs a,
+  .nested-tabs a,
+  .client-action:not(.more),
+  .r096-primary-button,
+  .r096-secondary-button,
+  .r096-danger-button,
+  .routing-unified-footer .validation-button,
+  .r096-rule-tabs button,
+  .r096-choice-card > span,
+  .r096-segments label > span
+) :is(span,strong,b,em) {
+  color: inherit !important;
+  -webkit-text-fill-color: currentColor !important;
+  font-weight: inherit !important;
+}
+
+/* Hover and keyboard focus remain uniform. */
+html[data-resolved-theme="dark"] body.preview-9-rc6-typography :is(
+  .button,
+  .login-submit,
+  .section-tabs a,
+  .nested-tabs a,
+  .client-action:not(.more),
+  .r096-primary-button,
+  .r096-secondary-button,
+  .r096-danger-button,
+  .routing-unified-footer .validation-button,
+  .r096-rule-tabs button,
+  .r096-choice-card > span,
+  .r096-segments label > span
+):not(:disabled):not([aria-disabled="true"]):hover {
+  color: #fff !important;
+  -webkit-text-fill-color: #fff !important;
+  border-color: var(--sg-button-dark-border-hover) !important;
+  background: var(--sg-button-dark-hover) !important;
+  transform: translateY(-1px);
+}
+
+html[data-resolved-theme="light"] body.preview-9-rc6-typography :is(
+  .button,
+  .login-submit,
+  .section-tabs a,
+  .nested-tabs a,
+  .client-action:not(.more),
+  .r096-primary-button,
+  .r096-secondary-button,
+  .r096-danger-button,
+  .routing-unified-footer .validation-button,
+  .r096-rule-tabs button,
+  .r096-choice-card > span,
+  .r096-segments label > span
+):not(:disabled):not([aria-disabled="true"]):hover {
+  color: #fffdf7 !important;
+  -webkit-text-fill-color: #fffdf7 !important;
+  border-color: var(--sg-button-light-border-hover) !important;
+  background: var(--sg-button-light-hover) !important;
+  transform: translateY(-1px);
+}
+
+body.preview-9-rc6-typography :is(
+  .button,
+  .login-submit,
+  .section-tabs a,
+  .nested-tabs a,
+  .client-action:not(.more),
+  .r096-primary-button,
+  .r096-secondary-button,
+  .r096-danger-button,
+  .routing-unified-footer .validation-button,
+  .r096-rule-tabs button
+):focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--sg-button-dark-border) 58%, transparent) !important;
+  outline-offset: 2px !important;
+}
+
+/* Selected controls stay in the same material; only an inset ring marks selection. */
+html[data-resolved-theme="dark"] body.preview-9-rc6-typography :is(
+  .section-tabs a.active,
+  .nested-tabs a.active,
+  .r096-rule-tabs button.active,
+  .r096-choice-card > input:checked + span,
+  .r096-segments label > input:checked + span
+) {
+  color: #fff !important;
+  -webkit-text-fill-color: #fff !important;
+  border-color: #96aec4 !important;
+  background: var(--sg-button-dark-bg) !important;
+  box-shadow: var(--sg-button-dark-shadow), inset 0 0 0 1px rgba(255,255,255,.18) !important;
+}
+
+html[data-resolved-theme="light"] body.preview-9-rc6-typography :is(
+  .section-tabs a.active,
+  .nested-tabs a.active,
+  .r096-rule-tabs button.active,
+  .r096-choice-card > input:checked + span,
+  .r096-segments label > input:checked + span
+) {
+  color: #fffdf7 !important;
+  -webkit-text-fill-color: #fffdf7 !important;
+  border-color: #d0a969 !important;
+  background: var(--sg-button-light-bg) !important;
+  box-shadow: var(--sg-button-light-shadow), inset 0 0 0 1px rgba(255,255,255,.20) !important;
+}
+
+/* Disabled controls use the same surface without introducing another colour family. */
+body.preview-9-rc6-typography :is(
+  .button,
+  .login-submit,
+  .client-action:not(.more),
+  .r096-primary-button,
+  .r096-secondary-button,
+  .r096-danger-button,
+  .routing-unified-footer .validation-button,
+  .r096-rule-tabs button
+):disabled,
+body.preview-9-rc6-typography :is(
+  .r096-choice-card > input:disabled + span,
+  .r096-segments label > input:disabled + span
+) {
+  opacity: .42 !important;
+  filter: saturate(.58) !important;
+  cursor: not-allowed !important;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+/* Preserve compact geometry where a small button is required, but keep the same material and type. */
+body.preview-9-rc6-typography .button.small,
+body.preview-9-rc6-typography .client-action:not(.more) {
+  font-size: 11px !important;
+  font-weight: var(--sg-button-font-weight) !important;
+}
+
+body.preview-9-rc6-typography .button:not(.small),
+body.preview-9-rc6-typography :is(.section-tabs a,.nested-tabs a,.r096-primary-button,.r096-secondary-button,.r096-danger-button,.routing-unified-footer .validation-button,.r096-rule-tabs button) {
+  font-size: 12px !important;
+  font-weight: var(--sg-button-font-weight) !important;
+}

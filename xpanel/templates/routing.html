@@ -1,8 +1,8 @@
 {% extends "base.html" %}
 {% block title %}Routing — SG-Panel{% endblock %}
 {% block section %}ROUTING{% endblock %}
-{% block heading %}Routing{% endblock %}
-{% block subtitle %}Каждое правило выбирает конкретный реальный Outbound; скрытого перехода на Direct нет; GeoFiles проверяются связанной парой{% endblock %}
+{% block heading %}Маршрутизация{% endblock %}
+{% block subtitle %}Единая схема правил для Controller: базовые сценарии, реальные Outbounds, GeoFiles и обязательная проверка полного Xray candidate{% endblock %}
 {% block page_actions %}
 <div class="routing-simple-head-actions">
   <a class="button secondary" href="{{ url_for('outbounds_page') }}">Outbounds</a>
@@ -11,76 +11,289 @@
 </div>
 {% endblock %}
 {% block content %}
-<script>document.body.classList.add('page-routing','ui-standard-page','latte-compact-page','routing-fix40-simple');</script>
-{% set default_route = outbound_by_tag.get(settings.default_outbound_tag) %}
-<section class="r096-page routing-simple-page routing-clean-workspace">
-    <section class="routing-simple-card routing-default-card">
-      <header>
-        <div><h2>Весь остальной трафик</h2><p>Этот маршрут применяется после всех пользовательских правил.</p></div>
-        <span class="routing-safety-note">Только включённый реальный Outbound</span>
-      </header>
-      <form method="post" action="{{ url_for('routing_settings_save') }}" class="routing-default-form" data-validated-form>
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <input type="hidden" name="domain_strategy" value="{{ settings.domain_strategy }}">
-        {% if settings.sniffing_enabled %}<input type="hidden" name="sniffing_enabled" value="1">{% endif %}
-        {% if settings.sniffing_route_only %}<input type="hidden" name="sniffing_route_only" value="1">{% endif %}
-        {% if settings.sniff_http %}<input type="hidden" name="sniff_http" value="1">{% endif %}
-        {% if settings.sniff_tls %}<input type="hidden" name="sniff_tls" value="1">{% endif %}
-        {% if settings.sniff_quic %}<input type="hidden" name="sniff_quic" value="1">{% endif %}
-        <label><span>Маршрут по умолчанию</span><select name="default_outbound_tag">{% for outbound in outbound_options %}{% if outbound.default_eligible %}<option value="{{ outbound.tag }}" {% if settings.default_outbound_tag == outbound.tag %}selected{% endif %}>{{ outbound.label }} · {{ outbound.type_label }}</option>{% endif %}{% endfor %}</select></label>
-        <div class="ui-actions"><button class="button primary" type="submit">Применить маршрут</button></div>
-      </form>
-    </section>
+<script>document.body.classList.add('page-routing','routing-fix37-page','routing-unified-preview1','ui-standard-page','latte-compact-page');</script>
+{% set smart = unified.model %}
+{% set preset = smart.get('preset', 'direct') %}
+{% set action_options = unified.action_options %}
+{% set warp_enabled = warp.enabled %}
+{% set server_name = server_identity.name or 'Controller' %}
+{% set server_address = server_identity.address or '' %}
 
-    <section class="routing-simple-card routing-rules-card">
-      <header class="routing-simple-card-head">
-        <div><h2>Пользовательские правила</h2><p>Правила выполняются сверху вниз. Первое совпадение определяет маршрут.</p></div>
-        <button class="button primary" type="button" data-open-manual-rule>+ Добавить правило</button>
+<section class="r096-page routing-unified-workspace">
+  <form id="unified-routing-form" method="post" action="{{ url_for('routing_unified_save') }}" data-validated-form data-validation-compact>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+    <article class="r096-selected-card">
+      <div class="r096-selected-head">
+        <div>
+          <h2>Выбранная конфигурация</h2>
+          <p>Схема: <strong id="unified-routing-title">{{ unified.title }}</strong></p>
+        </div>
+        <button class="r096-secondary-button" type="button" onclick="location.reload()">Обновить</button>
+      </div>
+      <div class="r096-diagnostic">
+        <strong>Сейчас применено на {{ server_name }}</strong>
+        <span id="unified-routing-state">Изменения сначала проверяются на временной копии базы и полном Xray candidate.</span>
+        <small>
+          {% if server_address %}{{ server_address }} · {% endif %}
+          GeoIP {{ unified.geoip_count }} · GeoSite {{ unified.geosite_count }} ·
+          {{ unified.all_rules|length }} активных записей Routing
+        </small>
+      </div>
+    </article>
+
+    <details class="r096-user-rules">
+      <summary>
+        <span>
+          <strong>Пользовательские правила</strong>
+          <small>Свои домены и IP/подсети. По одной записи в строке.</small>
+        </span>
+        <em>Открыть</em>
+      </summary>
+      <div class="r096-user-body">
+        <p>Для доменов поддерживаются <code>full:</code>, <code>domain:</code>, <code>regexp:</code>, <code>keyword:</code> и <code>geosite:</code>. Без префикса значение передаётся Xray как обычное доменное условие.</p>
+        <div class="r096-rule-tabs">
+          <button type="button" data-r096-rule-tab="direct" class="active">Direct</button>
+          <button type="button" data-r096-rule-tab="warp" {% if not warp_enabled %}disabled title="Сначала включите WARP в Outbounds"{% endif %}>WARP</button>
+          <button type="button" data-r096-rule-tab="block">Block</button>
+        </div>
+        <div class="r096-rule-editor" data-r096-rule-panel="direct">
+          <label><span>Домены</span><textarea name="custom_direct_domains" rows="6">{{ smart.get('custom_direct_domains', []) | join('\n') }}</textarea></label>
+          <label><span>IP и подсети</span><textarea name="custom_direct_ips" rows="6">{{ smart.get('custom_direct_ips', []) | join('\n') }}</textarea></label>
+        </div>
+        <div class="r096-rule-editor" data-r096-rule-panel="warp" hidden>
+          <label><span>Домены</span><textarea name="custom_warp_domains" rows="6" {% if not warp_enabled %}disabled{% endif %}>{{ smart.get('custom_warp_domains', []) | join('\n') }}</textarea></label>
+          <label><span>IP и подсети</span><textarea name="custom_warp_ips" rows="6" {% if not warp_enabled %}disabled{% endif %}>{{ smart.get('custom_warp_ips', []) | join('\n') }}</textarea></label>
+        </div>
+        <div class="r096-rule-editor" data-r096-rule-panel="block" hidden>
+          <label><span>Домены</span><textarea name="custom_block_domains" rows="6">{{ smart.get('custom_block_domains', []) | join('\n') }}</textarea></label>
+          <label><span>IP и подсети</span><textarea name="custom_block_ips" rows="6">{{ smart.get('custom_block_ips', []) | join('\n') }}</textarea></label>
+        </div>
+        {% if unified.manual_rules %}
+        <div class="routing-unified-manual-list">
+          <header><strong>Сохранённые отдельные правила</strong><a href="{{ url_for('routing_rule_json_new_page') }}">+ Добавить JSON-правило</a></header>
+          {% for rule in unified.manual_rules %}
+          <div>
+            <span>{{ '%02d'|format(rule.priority) }}</span>
+            <p><strong>{{ rule.name }}</strong><small>{{ rule.domains|replace('\n', ', ') if rule.domains else (rule.ips|replace('\n', ', ') if rule.ips else 'Дополнительные условия') }}</small></p>
+            <em class="route-{{ rule.route.kind }}">{{ rule.route.label }}</em>
+            <a href="{{ url_for('routing_rule_edit_page', rule_id=rule.id) }}">Изменить</a>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="routing-unified-manual-empty"><span>Отдельных ручных правил нет.</span><a href="{{ url_for('routing_rule_json_new_page') }}">Добавить JSON-правило</a></div>
+        {% endif %}
+      </div>
+    </details>
+
+    <article class="r096-card">
+      <h2>Базовая схема</h2>
+      <p>Выберите основу маршрутизации. Любое ручное изменение ниже переключает схему в пользовательский режим.</p>
+      <div class="r096-preset-grid">
+        {% for value, label in [
+          ('direct','Обычный доступ · всё Direct'),
+          ('ads_block','Блокировка рекламы и трекеров'),
+          ('blocked_warp','Заблокированные ресурсы через WARP'),
+          ('all_warp','Весь интернет через WARP'),
+          ('custom','Пользовательская схема')
+        ] %}
+        {% set needs_warp = value in ['blocked_warp','all_warp'] %}
+        <label class="r096-choice-card{% if needs_warp and not warp_enabled %} disabled{% endif %}" {% if needs_warp and not warp_enabled %}title="Сначала установите и включите WARP"{% endif %}>
+          <input type="radio" name="preset" value="{{ value }}" {% if preset == value %}checked{% endif %} {% if needs_warp and not warp_enabled %}disabled{% endif %}>
+          <span>{{ label }}</span>
+        </label>
+        {% endfor %}
+      </div>
+    </article>
+
+    {% macro action_group(name, value, allow_block=True, local_only=False) %}
+    <div class="r096-segments routing-unified-segments" data-action-group="{{ name }}">
+      {% for option in action_options %}
+        {% set tag = option.tag %}
+        {% set visible = (allow_block or tag != 'blocked') and (not local_only or tag in ['direct','blocked']) %}
+        {% if visible %}
+        <label title="{{ option.description }}">
+          <input type="radio" name="{{ name }}" value="{{ tag }}" {% if value == tag %}checked{% endif %}>
+          <span class="route-{{ option.kind }}">{{ option.label }}</span>
+        </label>
+        {% endif %}
+      {% endfor %}
+    </div>
+    {% endmacro %}
+
+    <article class="r096-card r096-main-rules">
+      <h2>Основные правила</h2>
+      <div class="r096-rule-row">
+        <div><strong>Локальная сеть</strong><small>Домашний роутер, NAS, принтеры, loopback и частные адреса</small></div>
+        {{ action_group('local_action', smart.get('local_action', 'direct'), True, True) }}
+      </div>
+      <section class="r096-russia-block">
+        <div><strong>Российская маршрутизация</strong><small>Выберите только один набор категорий.</small></div>
+        <div class="r096-segments r096-russia-scope">
+          {% set scope = smart.get('russia_scope', 'none') %}
+          <label><input type="radio" name="russia_scope" value="none" {% if scope == 'none' %}checked{% endif %}><span>Выключено</span></label>
+          <label><input type="radio" name="russia_scope" value="tld" {% if scope == 'tld' %}checked{% endif %}><span>Только доменные зоны</span></label>
+          <label><input type="radio" name="russia_scope" value="sites_ip" {% if scope == 'sites_ip' %}checked{% endif %}><span>Сайты и IP</span></label>
+        </div>
+        <div class="r096-rule-row nested">
+          <div><strong>Действие выбранного набора</strong><small id="r096-russia-syntax">Российское правило выключено</small></div>
+          {{ action_group('russia_action', smart.get('russia_action', 'direct')) }}
+        </div>
+      </section>
+      <div class="r096-rule-row">
+        <div><strong>Заблокированные ресурсы</strong><small>Категория автоматически выбирается из фактически установленных GeoFiles</small></div>
+        {{ action_group('blocked_action', smart.get('blocked_action', 'direct')) }}
+      </div>
+      <div class="r096-rule-row">
+        <div><strong>Реклама и трекеры</strong><small>Используется category-ads-all или совместимая категория текущего набора</small></div>
+        {{ action_group('ads_action', smart.get('ads_action', 'direct')) }}
+      </div>
+      <div class="r096-rule-row last">
+        <div><strong>Остальной трафик</strong><small>Финальный реальный Outbound, если ни одно правило выше не совпало</small></div>
+        {{ action_group('default_action', smart.get('default_action', settings.default_outbound_tag), False) }}
+      </div>
+    </article>
+
+    <article class="r096-warning-card">
+      <strong>Серверная маршрутизация SG-Panel</strong>
+      <span>Здесь назначаются только реально существующие Outbounds: Direct, Block, активный WARP, Cascade и включённые пользовательские выходы. GeoFiles не заменяются и пользовательские правила автоматически не удаляются.</span>
+    </article>
+
+    <article class="r096-card r096-rules-preview">
+      <header>
+        <div><h2>Фактические правила текущей схемы</h2><p>Порядок совпадений, сохранённый в базе и используемый при построении полного Xray candidate.</p></div>
+        <span class="r096-state ok">{{ unified.all_rules|length }} правил</span>
       </header>
-      {% if rules %}
-      <div class="routing-simple-rules">
-        {% for rule in rules %}
-        <article class="routing-simple-rule {{ 'is-disabled' if not rule.enabled }}">
-          <span class="routing-rule-order">{{ '%02d'|format(rule.priority) }}</span>
-          <div class="routing-rule-copy"><strong>{{ rule.name }}</strong><small>{% if rule.domains %}Домены: {{ rule.domains|replace('\n', ', ') }}{% elif rule.ips %}IP: {{ rule.ips|replace('\n', ', ') }}{% elif rule.protocols %}Протоколы: {{ rule.protocols|replace('\n', ', ') }}{% else %}Дополнительные условия{% endif %}</small></div>
-          <span class="routing-route-badge route-{{ rule.route.kind }}">{{ rule.route.label }}</span>
-          <details class="r096-rule-menu routing-rule-menu"><summary>•••</summary><div><a href="{{ url_for('routing_rule_edit_page', rule_id=rule.id) }}">Изменить</a><a href="{{ url_for('routing_rule_json_edit_page', rule_id=rule.id) }}">JSON</a><form method="post" action="{{ url_for('routing_rule_toggle', rule_id=rule.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="{{ 'toggle-disable' if rule.enabled else 'toggle-enable' }}" type="submit">{{ 'Отключить' if rule.enabled else 'Включить' }}</button></form><form method="post" action="{{ url_for('routing_rule_delete', rule_id=rule.id) }}" data-sg-confirm="Удалить правило {{ rule.name }}?" data-sg-confirm-title="Удалить правило" data-sg-confirm-button="Удалить"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="danger-text" type="submit">Удалить</button></form></div></details>
-        </article>
+      {% if unified.all_rules %}
+      <div class="r096-rule-list r096-existing-rules">
+        {% for rule in unified.all_rules %}
+        <div class="{{ '' if rule.enabled else 'disabled' }}">
+          <b>{{ '%02d' | format(rule.priority) }}</b>
+          <span>
+            <strong>{{ rule.name }}</strong>
+            <small>
+              {% if rule.managed_by == 'sg-unified-routing' %}Управляется единой схемой
+              {% elif rule.domains %}{{ rule.domains|replace('\n', ', ') }}
+              {% elif rule.ips %}{{ rule.ips|replace('\n', ', ') }}
+              {% else %}Пользовательское правило{% endif %}
+            </small>
+          </span>
+          <em class="route-{{ rule.route.kind }}">{{ rule.route.label }}</em>
+        </div>
         {% endfor %}
       </div>
       {% else %}
-      <div class="routing-simple-empty"><strong>Отдельных правил пока нет</strong><span>Весь трафик использует маршрут {{ default_route.label if default_route else settings.default_outbound_tag }}.</span></div>
+      <div class="r096-empty">Правила ещё не применялись. Выберите схему, проверьте и сохраните её.</div>
       {% endif %}
-    </section>
+    </article>
 
-    <section class="routing-simple-card routing-add-editor" id="routing-add-form" hidden>
-      <header class="routing-simple-card-head"><div><h2>Новое правило</h2><p>Укажите условия и выберите конкретный существующий Outbound.</p></div><button class="button secondary routing-add-cancel" type="button">Закрыть</button></header>
-      <form method="post" action="{{ url_for('routing_rule_add') }}" class="ui-form routing-rule-form" data-validated-form>
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="target_type" value="outbound">
-        <div class="ui-field-grid rule-main-grid"><label><span>Название</span><input name="name" required placeholder="Например, YouTube через WARP"></label><label><span>Маршрут</span><select name="outbound_tag">{% for outbound in outbound_options %}<option value="{{ outbound.tag }}">{{ outbound.label }} · {{ outbound.type_label }}</option>{% endfor %}</select></label><label><span>Порядок</span><input name="priority" type="number" min="1" max="9999" value="100" required></label></div>
-        <div class="ui-field-grid rule-conditions-grid"><label><span>Домены</span><textarea name="domains" rows="4" placeholder="domain:example.com"></textarea></label><label><span>IP / CIDR</span><textarea name="ips" rows="4" placeholder="203.0.113.0/24"></textarea></label></div>
-        <details class="manual-rule-extra"><summary>Дополнительные условия</summary><div class="ui-field-grid rule-small-grid"><label><span>Порты</span><input name="ports" placeholder="443,1000-2000"></label><label><span>Сеть</span><select name="network"><option value="">любая</option><option>tcp</option><option>udp</option><option value="tcp,udp">tcp,udp</option></select></label><label><span>Протоколы</span><input name="protocols" placeholder="http,tls,quic,bittorrent"></label></div><div class="ui-field-grid rule-tags-grid"><label><span>Теги входов</span><input name="inbound_tags" placeholder="vless-reality-in"></label><label><span>Клиенты</span><select name="users" multiple size="4">{% for user in users %}<option value="{{ user.name }}">{{ user.name }}</option>{% endfor %}</select></label></div></details>
-        <div class="ui-actions"><button class="button secondary routing-add-cancel" type="button">Отмена</button><button class="button primary" type="submit">Создать правило</button></div>
-      </form>
-    </section>
+    <article class="r096-card r096-geofiles-summary">
+      <div>
+        <h2>Наборы geosite / geoip</h2>
+        <p>{{ geofiles.active_label }} · GeoIP {{ unified.geoip_count }} · GeoSite {{ unified.geosite_count }}</p>
+        <small>{% if geofiles.active_analysis.error %}Ошибка анализа: {{ geofiles.active_analysis.error }}{% else %}Семейство: {{ geofiles.active_analysis.family }}{% endif %}</small>
+      </div>
+      <a class="r096-secondary-button" href="{{ url_for('geofiles_page') }}">Открыть GeoFiles</a>
+    </article>
 
-    <details class="routing-simple-card routing-expert-compact">
+    <article class="r096-card r096-warp-summary">
+      <div>
+        <h2>Cloudflare WARP</h2>
+        <p>{{ 'Активен' if warp.enabled else ('Настроен, но выключен' if warp.configured else 'Не настроен') }}</p>
+        <small>WARP создаётся и проверяется в Outbounds. Здесь он только назначается правилам.</small>
+      </div>
+      <a class="r096-secondary-button" href="{{ url_for('outbounds_page') }}#warp-title">Открыть Outbounds</a>
+    </article>
+
+    <details class="r096-card r096-expert-settings">
       <summary><span><strong>Экспертные настройки</strong><small>domainStrategy, Sniffing и распознавание протоколов.</small></span><em>Открыть</em></summary>
-      <form method="post" action="{{ url_for('routing_settings_save') }}" class="ui-form routing-settings-form" data-validated-form>
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="routing-unified-expert-body">
         <div class="routing-settings-grid">
-          <label><span>Выход по умолчанию</span><select name="default_outbound_tag">{% for outbound in outbound_options %}{% if outbound.default_eligible %}<option value="{{ outbound.tag }}" {% if settings.default_outbound_tag == outbound.tag %}selected{% endif %}>{{ outbound.label }} · {{ outbound.type_label }}</option>{% endif %}{% endfor %}</select></label>
           <label><span>Стратегия доменов</span><select name="domain_strategy">{% for value in ['AsIs','IPIfNonMatch','IPOnDemand'] %}<option value="{{ value }}" {% if settings.domain_strategy == value %}selected{% endif %}>{{ value }}</option>{% endfor %}</select></label>
           <label class="ui-toggle-row ui-toggle-compact"><span><strong>Sniffing</strong><small>Определять фактический протокол и домен.</small></span><input type="checkbox" name="sniffing_enabled" {% if settings.sniffing_enabled %}checked{% endif %}><span class="switch"></span></label>
           <label class="ui-toggle-row ui-toggle-compact"><span><strong>Route only</strong><small>Использовать домен только для Routing.</small></span><input type="checkbox" name="sniffing_route_only" {% if settings.sniffing_route_only %}checked{% endif %}><span class="switch"></span></label>
         </div>
         <div class="routing-protocol-row"><span>Распознавать протоколы</span><div class="checks-inline"><label class="check-chip"><input type="checkbox" name="sniff_http" {% if settings.sniff_http %}checked{% endif %}><span>HTTP</span></label><label class="check-chip"><input type="checkbox" name="sniff_tls" {% if settings.sniff_tls %}checked{% endif %}><span>TLS</span></label><label class="check-chip"><input type="checkbox" name="sniff_quic" {% if settings.sniff_quic %}checked{% endif %}><span>QUIC</span></label></div></div>
-        <div class="ui-actions"><a class="button secondary" href="{{ url_for('routing_json_page') }}">Открыть JSON</a><button class="button primary" type="submit">Сохранить настройки</button></div>
-      </form>
+        <div class="ui-actions"><a class="button secondary" href="{{ url_for('routing_json_page') }}">Открыть полный JSON</a></div>
+      </div>
     </details>
 
+    <footer class="r096-footer routing-unified-footer">
+      <span id="unified-routing-footer-message">Выберите схему и выполните проверку полного candidate.</span>
+      <div class="ui-actions">
+        <button class="r096-primary-button" type="submit">Сохранить и применить</button>
+      </div>
+    </footer>
+  </form>
 </section>
+{% endblock %}
+{% block scripts %}
+{{ super() }}
 <script>
-(() => { const editor=document.getElementById('routing-add-form'); const buttons=document.querySelectorAll('[data-open-manual-rule]'); const close=document.querySelectorAll('.routing-add-cancel'); const setOpen=open=>{if(!editor)return;editor.hidden=!open;if(open)editor.scrollIntoView({behavior:'smooth',block:'start'});};buttons.forEach(b=>b.addEventListener('click',()=>setOpen(true)));close.forEach(b=>b.addEventListener('click',()=>setOpen(false)));})();
+(() => {
+  const form = document.getElementById('unified-routing-form');
+  if (!form) return;
+  const ruleButtons = [...document.querySelectorAll('[data-r096-rule-tab]')];
+  const rulePanels = [...document.querySelectorAll('[data-r096-rule-panel]')];
+  ruleButtons.forEach(button => button.addEventListener('click', () => {
+    if (button.disabled) return;
+    const name = button.dataset.r096RuleTab;
+    ruleButtons.forEach(item => item.classList.toggle('active', item === button));
+    rulePanels.forEach(panel => panel.hidden = panel.dataset.r096RulePanel !== name);
+  }));
+
+  const titles = {
+    direct: 'Обычный доступ · всё Direct',
+    ads_block: 'Блокировка рекламы и трекеров',
+    blocked_warp: 'Заблокированные ресурсы через WARP',
+    all_warp: 'Весь интернет через WARP',
+    custom: 'Пользовательская схема'
+  };
+  const presetDefaults = {
+    direct: {local_action:'direct',russia_scope:'none',russia_action:'direct',blocked_action:'direct',ads_action:'direct',default_action:'direct'},
+    ads_block: {local_action:'direct',russia_scope:'none',russia_action:'direct',blocked_action:'direct',ads_action:'blocked',default_action:'direct'},
+    blocked_warp: {local_action:'direct',russia_scope:'none',russia_action:'direct',blocked_action:'warp',ads_action:'direct',default_action:'direct'},
+    all_warp: {local_action:'direct',russia_scope:'none',russia_action:'direct',blocked_action:'direct',ads_action:'direct',default_action:'warp'}
+  };
+  let applyingPreset = false;
+  const setValue = (name, value) => {
+    const input = form.querySelector(`input[name="${name}"][value="${CSS.escape(value)}"]`);
+    if (input && !input.disabled) input.checked = true;
+  };
+  const title = document.getElementById('unified-routing-title');
+  const state = document.getElementById('unified-routing-state');
+  const footerMessage = document.getElementById('unified-routing-footer-message');
+  const markChanged = () => {
+    if (state) state.textContent = 'Есть изменения, которые ещё не проверены и не применены.';
+    if (footerMessage) footerMessage.textContent = 'Данные изменены. Сначала выполните проверку полного candidate.';
+  };
+  form.querySelectorAll('input[name="preset"]').forEach(input => input.addEventListener('change', () => {
+    const values = presetDefaults[input.value];
+    if (values) {
+      applyingPreset = true;
+      Object.entries(values).forEach(([name, value]) => setValue(name, value));
+      applyingPreset = false;
+    }
+    if (title) title.textContent = titles[input.value] || titles.custom;
+    syncRussia();
+    markChanged();
+  }));
+  form.querySelectorAll('.r096-main-rules input, .r096-user-body textarea').forEach(input => input.addEventListener('change', () => {
+    if (!applyingPreset) {
+      const custom = form.querySelector('input[name="preset"][value="custom"]');
+      if (custom) custom.checked = true;
+      if (title) title.textContent = titles.custom;
+    }
+    markChanged();
+  }));
+  const syntax = document.getElementById('r096-russia-syntax');
+  const syncRussia = () => {
+    const scope = form.querySelector('input[name="russia_scope"]:checked')?.value || 'none';
+    if (syntax) syntax.textContent = scope === 'tld' ? 'Создаётся: geosite:tld-ru' : scope === 'sites_ip' ? 'Создаются: geosite:category-ru и geoip:ru' : 'Российское правило выключено';
+  };
+  form.querySelectorAll('input[name="russia_scope"]').forEach(input => input.addEventListener('change', syncRussia));
+  syncRussia();
+})();
 </script>
 {% endblock %}

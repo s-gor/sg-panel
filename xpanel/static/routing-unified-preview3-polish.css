@@ -1,0 +1,80 @@
+/* SG-Panel UI23 Repair4 · Routing Gateway Preview 3 Polish
+   Softer choice states, neutral navigation and compact validation status. */
+
+html[data-theme="graphite"] body.routing-unified-preview1,
+html[data-resolved-theme="dark"] body.routing-unified-preview1 {
+  --rup2-selected-bg: linear-gradient(180deg, #36536f 0%, #2b435c 100%);
+  --rup2-selected-hover: linear-gradient(180deg, #3d5d7b 0%, #304b66 100%);
+  --rup2-selected-border: #587895;
+  --rup2-selected-shadow: 0 5px 14px rgba(8, 20, 34, .22), inset 0 1px 0 rgba(255,255,255,.08);
+  --rup2-focus: rgba(103, 145, 181, .35);
+}
+
+html[data-theme="light"] body.routing-unified-preview1,
+html[data-resolved-theme="light"] body.routing-unified-preview1 {
+  --rup2-selected-bg: linear-gradient(180deg, #718f82 0%, #627e72 100%);
+  --rup2-selected-hover: linear-gradient(180deg, #789789 0%, #698579 100%);
+  --rup2-selected-border: #587568;
+  --rup2-selected-shadow: 0 5px 14px rgba(50, 72, 61, .15), inset 0 1px 0 rgba(255,255,255,.20);
+  --rup2-focus: rgba(76, 105, 91, .26);
+}
+
+/* Route names are labels, not warning lights. */
+body.routing-unified-preview1 .routing-unified-segments label > input:not(:checked) + span.route-direct,
+body.routing-unified-preview1 .routing-unified-segments label > input:not(:checked) + span.route-warp,
+body.routing-unified-preview1 .routing-unified-segments label > input:not(:checked) + span.route-block,
+body.routing-unified-preview1 .routing-unified-segments label > input:not(:checked) + span.route-blocked,
+body.routing-unified-preview1 .routing-unified-segments label > input:not(:checked) + span.route-cascade,
+body.routing-unified-preview1 .routing-unified-segments label > input:not(:checked) + span.route-custom,
+body.routing-unified-preview1 .routing-unified-segments label > input:not(:checked) + span.route-vless {
+  color: var(--rup2-option-text) !important;
+}
+
+/* Navigation buttons never impersonate a successful/apply action. */
+body.routing-unified-preview1 .r096-geofiles-summary .r096-secondary-button,
+body.routing-unified-preview1 .r096-warp-summary .r096-secondary-button {
+  box-shadow: none !important;
+}
+
+/* Keep the footer low and show only compact state feedback. */
+body.routing-unified-preview1 .routing-unified-footer {
+  min-height: 54px !important;
+  padding-block: 8px !important;
+}
+body.routing-unified-preview1 .routing-unified-footer .validation-gate.is-compact {
+  display: inline-flex !important;
+  width: auto !important;
+  max-width: min(520px, 48vw) !important;
+  min-height: 34px !important;
+  align-items: center !important;
+  gap: 8px !important;
+  margin: 0 !important;
+  padding: 6px 10px !important;
+  border-radius: 9px !important;
+  box-shadow: none !important;
+}
+body.routing-unified-preview1 .routing-unified-footer .validation-gate.is-compact[hidden] {
+  display: none !important;
+}
+body.routing-unified-preview1 .routing-unified-footer .validation-gate.is-compact .validation-gate-mark,
+body.routing-unified-preview1 .routing-unified-footer .validation-gate.is-compact .validation-gate-spinner {
+  width: 20px !important;
+  height: 20px !important;
+  flex-basis: 20px !important;
+  font-size: 11px !important;
+}
+body.routing-unified-preview1 .routing-unified-footer .validation-gate.is-compact strong {
+  font-size: 10.5px !important;
+  line-height: 1.25 !important;
+}
+body.routing-unified-preview1 .routing-unified-footer .validation-gate.is-compact small {
+  margin-top: 2px !important;
+  font-size: 9.5px !important;
+  line-height: 1.25 !important;
+}
+
+@media (max-width: 760px) {
+  body.routing-unified-preview1 .routing-unified-footer .validation-gate.is-compact {
+    max-width: 100% !important;
+  }
+}

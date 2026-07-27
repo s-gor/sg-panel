@@ -1,0 +1,166 @@
+/* SG-Panel UI23 Repair4 · Routing Gateway Preview 2 Buttons
+   Visual-only correction: make every Routing choice visible in every UI23 theme. */
+
+html[data-theme="graphite"] body.routing-unified-preview1,
+html[data-resolved-theme="dark"] body.routing-unified-preview1 {
+  --rup2-option-bg: linear-gradient(180deg, #1a2b42 0%, #142237 100%);
+  --rup2-option-hover: linear-gradient(180deg, #213751 0%, #192b43 100%);
+  --rup2-option-border: #35516e;
+  --rup2-option-text: #f1f6fb;
+  --rup2-selected-bg: linear-gradient(180deg, #4f8fc8 0%, #316b9f 100%);
+  --rup2-selected-hover: linear-gradient(180deg, #5b9bd3 0%, #3977ad 100%);
+  --rup2-selected-border: #79bdf2;
+  --rup2-selected-text: #ffffff;
+  --rup2-selected-shadow: 0 8px 22px rgba(26, 105, 170, .28), inset 0 1px 0 rgba(255,255,255,.14);
+  --rup2-focus: rgba(104, 185, 244, .45);
+  --rup2-disabled-bg: linear-gradient(180deg, #141f2f 0%, #111a28 100%);
+  --rup2-disabled-border: #293b51;
+  --rup2-disabled-text: #66778c;
+}
+
+html[data-theme="light"] body.routing-unified-preview1,
+html[data-resolved-theme="light"] body.routing-unified-preview1 {
+  --rup2-option-bg: linear-gradient(180deg, #fffaf1 0%, #eee0ca 100%);
+  --rup2-option-hover: linear-gradient(180deg, #fffdf8 0%, #f4e8d6 100%);
+  --rup2-option-border: #a8aa9d;
+  --rup2-option-text: #56645d;
+  --rup2-selected-bg: linear-gradient(180deg, #6ca48b 0%, #4f806a 100%);
+  --rup2-selected-hover: linear-gradient(180deg, #78af97 0%, #588a73 100%);
+  --rup2-selected-border: #3f725d;
+  --rup2-selected-text: #ffffff;
+  --rup2-selected-shadow: 0 10px 20px rgba(63, 101, 82, .22), inset 0 1px 0 rgba(255,255,255,.28);
+  --rup2-focus: rgba(69, 111, 92, .34);
+  --rup2-disabled-bg: linear-gradient(180deg, #eeeae2 0%, #e4ded3 100%);
+  --rup2-disabled-border: #c1c0b7;
+  --rup2-disabled-text: #9a9d97;
+}
+
+/* Real button surfaces. Loaded last and intentionally stronger than global FIX40 rules. */
+body.routing-unified-preview1 .r096-preset-grid {
+  gap: 10px !important;
+}
+
+body.routing-unified-preview1 .r096-segments,
+body.routing-unified-preview1 .routing-unified-segments {
+  gap: 8px !important;
+}
+
+body.routing-unified-preview1 .r096-choice-card,
+body.routing-unified-preview1 .r096-segments label {
+  min-width: 0 !important;
+  opacity: 1;
+}
+
+body.routing-unified-preview1 .r096-choice-card > span,
+body.routing-unified-preview1 .r096-segments label > span {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-height: 48px !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  border: 1px solid var(--rup2-option-border) !important;
+  border-radius: 10px !important;
+  background: var(--rup2-option-bg) !important;
+  color: var(--rup2-option-text) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.04) !important;
+  padding: 9px 12px !important;
+  font-size: 12px !important;
+  font-weight: 780 !important;
+  line-height: 1.25 !important;
+  text-align: center !important;
+  opacity: 1 !important;
+  cursor: pointer !important;
+  transition: border-color .15s ease, background .15s ease, box-shadow .15s ease, transform .15s ease !important;
+}
+
+body.routing-unified-preview1 .r096-choice-card:hover > span,
+body.routing-unified-preview1 .r096-segments label:hover > span {
+  border-color: color-mix(in srgb, var(--rup2-selected-border) 72%, var(--rup2-option-border)) !important;
+  background: var(--rup2-option-hover) !important;
+  transform: translateY(-1px);
+}
+
+body.routing-unified-preview1 .r096-choice-card > input:checked + span,
+body.routing-unified-preview1 .r096-segments label > input:checked + span {
+  border: 1px solid var(--rup2-selected-border) !important;
+  background: var(--rup2-selected-bg) !important;
+  color: var(--rup2-selected-text) !important;
+  box-shadow: var(--rup2-selected-shadow) !important;
+  opacity: 1 !important;
+}
+
+body.routing-unified-preview1 .r096-choice-card:hover > input:checked + span,
+body.routing-unified-preview1 .r096-segments label:hover > input:checked + span {
+  background: var(--rup2-selected-hover) !important;
+}
+
+body.routing-unified-preview1 .r096-choice-card > input:focus-visible + span,
+body.routing-unified-preview1 .r096-segments label > input:focus-visible + span {
+  outline: 3px solid var(--rup2-focus) !important;
+  outline-offset: 2px !important;
+}
+
+/* Route colours remain informative only while the option is not selected. */
+body.routing-unified-preview1 .routing-unified-segments label > input:not(:checked) + span.route-direct {
+  color: #55cfa0 !important;
+}
+body.routing-unified-preview1 .routing-unified-segments label > input:not(:checked) + span.route-warp {
+  color: #65c2ff !important;
+}
+body.routing-unified-preview1 .routing-unified-segments label > input:not(:checked) + span.route-block,
+body.routing-unified-preview1 .routing-unified-segments label > input:not(:checked) + span.route-blocked {
+  color: #f09aae !important;
+}
+body.routing-unified-preview1 .routing-unified-segments label > input:not(:checked) + span.route-cascade {
+  color: #c1a8ff !important;
+}
+body.routing-unified-preview1 .routing-unified-segments label > input:not(:checked) + span.route-custom,
+body.routing-unified-preview1 .routing-unified-segments label > input:not(:checked) + span.route-vless {
+  color: #e8c778 !important;
+}
+body.routing-unified-preview1 .routing-unified-segments label > input:checked + span[class*="route-"] {
+  color: var(--rup2-selected-text) !important;
+}
+
+/* Disabled choices stay visible, but clearly unavailable. */
+body.routing-unified-preview1 .r096-choice-card.disabled,
+body.routing-unified-preview1 .r096-segments label:has(input:disabled) {
+  opacity: 1 !important;
+  cursor: not-allowed !important;
+}
+body.routing-unified-preview1 .r096-choice-card.disabled > span,
+body.routing-unified-preview1 .r096-choice-card > input:disabled + span,
+body.routing-unified-preview1 .r096-segments label > input:disabled + span {
+  border-color: var(--rup2-disabled-border) !important;
+  background: var(--rup2-disabled-bg) !important;
+  color: var(--rup2-disabled-text) !important;
+  box-shadow: none !important;
+  opacity: 1 !important;
+  cursor: not-allowed !important;
+  transform: none !important;
+}
+
+/* Compact but readable grids at every width. */
+body.routing-unified-preview1 .r096-russia-scope > label > span {
+  min-height: 46px !important;
+}
+body.routing-unified-preview1 .r096-rule-row .routing-unified-segments > label > span {
+  min-height: 44px !important;
+}
+
+@media (max-width: 980px) {
+  body.routing-unified-preview1 .r096-preset-grid {
+    grid-template-columns: 1fr !important;
+  }
+  body.routing-unified-preview1 .routing-unified-segments {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 620px) {
+  body.routing-unified-preview1 .routing-unified-segments,
+  body.routing-unified-preview1 .r096-russia-scope {
+    grid-template-columns: 1fr !important;
+  }
+}

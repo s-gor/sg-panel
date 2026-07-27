@@ -28,6 +28,7 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='global-layout-buttons.css') }}?v={{ xpanel_version }}-sg070-preview9-fix39-routing-geofiles">
   {% if request.endpoint == 'settings_page' %}<link rel="stylesheet" href="{{ url_for('static', filename='xray-server-card-fix.css') }}?v={{ xpanel_version }}-sg070-preview9-fix39-routing-geofiles">{% endif %}
   {% if request.endpoint in ['routing_page', 'geofiles_page'] %}<link rel="stylesheet" href="{{ url_for('static', filename='routing-sgclient096-fix39.css') }}?v={{ xpanel_version }}-sg070-preview9-fix39-routing-geofiles">{% endif %}
+  {% if request.endpoint == 'routing_page' %}<link rel="stylesheet" href="{{ url_for('static', filename='routing-unified-preview1.css') }}?v={{ xpanel_version }}-ui23-repair4-routing-preview1">{% endif %}
   <link rel="stylesheet" href="{{ url_for('static', filename='fix35-full-recovery.css') }}?v={{ xpanel_version }}-sg070-preview9-fix39-routing-geofiles">
   <link rel="stylesheet" href="{{ url_for('static', filename='fix40-ui-repair.css') }}?v={{ xpanel_version }}-{{ xpanel_build|lower }}-clients-dns-sidebar">
   {% if request.endpoint == 'users_page' %}<link rel="stylesheet" href="{{ url_for('static', filename='fix40-clients-layout-hotfix3.css') }}?v={{ xpanel_version }}-{{ xpanel_build|lower }}-clients-layout-hotfix3">{% endif %}
@@ -45,6 +46,11 @@
   {% if request.endpoint == 'nodes_page' or (request.endpoint or '').startswith('node_') %}<link rel="stylesheet" href="{{ url_for('static', filename='fix40-cluster-restore-ui21.css') }}?v={{ xpanel_version }}-{{ xpanel_build|lower }}-cluster-restore-ui21">{% endif %}
   {% if request.endpoint == 'node_detail_page' %}<link rel="stylesheet" href="{{ url_for('static', filename='fix40-node-detail-polish-ui22.css') }}?v={{ xpanel_version }}-{{ xpanel_build|lower }}-node-detail-polish-ui22">{% endif %}
   {% if request.endpoint == 'cascade_page' %}<link rel="stylesheet" href="{{ url_for('static', filename='fix40-cascade-steps-ui20.css') }}?v={{ xpanel_version }}-{{ xpanel_build|lower }}-cascade-steps-ui20">{% endif %}
+  {% if request.endpoint == 'routing_page' %}<link rel="stylesheet" href="{{ url_for('static', filename='routing-unified-preview2-buttons.css') }}?v={{ xpanel_version }}-ui23-repair4-routing-preview2-buttons">{% endif %}
+  {% if request.endpoint == 'routing_page' %}<link rel="stylesheet" href="{{ url_for('static', filename='routing-unified-preview3-polish.css') }}?v={{ xpanel_version }}-ui23-repair4-routing-preview3-polish">{% endif %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='fix40-global-buttons-preview1.css') }}?v={{ xpanel_version }}-ui23-repair4-global-buttons-preview1">
+  <link rel="stylesheet" href="{{ url_for('static', filename='fix40-global-buttons-preview2.css') }}?v={{ xpanel_version }}-ui23-repair4-global-buttons-preview2">
+  <link rel="stylesheet" href="{{ url_for('static', filename='fix40-global-buttons-preview3-outline.css') }}?v={{ xpanel_version }}-ui23-repair4-global-buttons-preview3-outline">
 </head>
 <body class="app-body ui-v097-standard rc20-awg-shell preview-2-awg-graphite preview-3-sidebar-polish preview-5-awg-clients-cascade preview-6-awg-clients-cascade-scale preview-7-awg-exact preview-9-rc6-typography {% if request.endpoint == 'cascade_page' %}sg-awg-cascade-rc6{% endif %} {% if request.endpoint == 'users_page' %}awg-clients-page{% endif %} {% if request.endpoint == 'nodes_page' %}awg-cluster-page{% endif %}">
 {% from "_country_flag.html" import country_flag %}
@@ -366,10 +372,17 @@
     validateButton.dataset.validateButton = '1';
 
     const status = document.createElement('div');
-    status.className = 'validation-gate is-pending';
+    const compactValidation = form.hasAttribute('data-validation-compact');
+    let successTimer = null;
+    status.className = compactValidation ? 'validation-gate is-idle is-compact' : 'validation-gate is-pending';
     status.setAttribute('role', 'status');
     status.setAttribute('aria-live', 'polite');
-    status.innerHTML = '<span class="validation-gate-mark">?</span><div><strong>Требуется проверка</strong><small>Сохранение станет доступно после успешной проверки JSON, модели и итогового config.json.</small></div>';
+    if (compactValidation) {
+      status.hidden = true;
+      status.innerHTML = '<span class="validation-gate-mark">•</span><div><strong>Конфигурация не изменена</strong></div>';
+    } else {
+      status.innerHTML = '<span class="validation-gate-mark">?</span><div><strong>Требуется проверка</strong><small>Сохранение станет доступно после успешной проверки JSON, модели и итогового config.json.</small></div>';
+    }
 
     const actionWrap = saveButton.closest('.ui-actions, .actions, .ob-form-footer, .json-editor-actions');
     if (validationToolbar) {
@@ -390,11 +403,22 @@
       }
     }
 
+    const showStatus = (className, html, autoHide = false) => {
+      if (successTimer) { window.clearTimeout(successTimer); successTimer = null; }
+      status.hidden = false;
+      status.className = 'validation-gate ' + className + (compactValidation ? ' is-compact' : '');
+      status.innerHTML = html;
+      if (compactValidation && autoHide) {
+        successTimer = window.setTimeout(() => { status.hidden = true; }, 2600);
+      }
+    };
+
     const setPending = () => {
       token.value = '';
       saveButton.disabled = true;
-      status.className = 'validation-gate is-pending';
-      status.innerHTML = '<span class="validation-gate-mark">?</span><div><strong>Данные изменены</strong><small>Выполните проверку ещё раз перед сохранением.</small></div>';
+      showStatus('is-pending', compactValidation
+        ? '<span class="validation-gate-mark">?</span><div><strong>Есть непроверенные изменения</strong></div>'
+        : '<span class="validation-gate-mark">?</span><div><strong>Данные изменены</strong><small>Выполните проверку ещё раз перед сохранением.</small></div>');
     };
 
     form.addEventListener('input', (event) => {
@@ -412,8 +436,9 @@
       saveButton.disabled = true;
       const oldText = validateButton.textContent;
       validateButton.textContent = 'Проверяю…';
-      status.className = 'validation-gate is-running';
-      status.innerHTML = '<span class="validation-gate-spinner"></span><div><strong>Проверка выполняется</strong><small>Рабочая база не изменяется. Используется временная копия SQLite.</small></div>';
+      showStatus('is-running', compactValidation
+        ? '<span class="validation-gate-spinner"></span><div><strong>Проверяю конфигурацию…</strong></div>'
+        : '<span class="validation-gate-spinner"></span><div><strong>Проверка выполняется</strong><small>Рабочая база не изменяется. Используется временная копия SQLite.</small></div>');
       try {
         const data = new FormData(form);
         data.set('action', 'validate');
@@ -431,14 +456,14 @@
         token.value = body.token || '';
         if (!token.value) throw new Error('Сервер не выдал подтверждение проверки');
         saveButton.disabled = false;
-        status.className = 'validation-gate is-success';
         const detail = body.detail && body.detail !== 'xray run -test: OK' ? body.detail : 'xray run -test: OK';
-        status.innerHTML = '<span class="validation-gate-mark">✓</span><div><strong>' + escapeHtml(body.message || 'Проверка пройдена') + '</strong><small>' + escapeHtml(detail) + '</small></div>';
+        showStatus('is-success', compactValidation
+          ? '<span class="validation-gate-mark">✓</span><div><strong>Проверка пройдена</strong></div>'
+          : '<span class="validation-gate-mark">✓</span><div><strong>' + escapeHtml(body.message || 'Проверка пройдена') + '</strong><small>' + escapeHtml(detail) + '</small></div>', compactValidation);
       } catch (error) {
         token.value = '';
         saveButton.disabled = true;
-        status.className = 'validation-gate is-error';
-        status.innerHTML = '<span class="validation-gate-mark">!</span><div><strong>Проверка не пройдена</strong><small>' + escapeHtml(error.message || String(error)) + '</small></div>';
+        showStatus('is-error', '<span class="validation-gate-mark">!</span><div><strong>Проверка не пройдена</strong><small>' + escapeHtml(error.message || String(error)) + '</small></div>');
       } finally {
         validateButton.disabled = false;
         validateButton.textContent = oldText;
@@ -448,8 +473,7 @@
     form.addEventListener('submit', (event) => {
       if (!token.value) {
         event.preventDefault();
-        status.className = 'validation-gate is-error';
-        status.innerHTML = '<span class="validation-gate-mark">!</span><div><strong>Сохранение заблокировано</strong><small>Сначала нажмите «Проверить конфигурацию».</small></div>';
+        showStatus('is-error', '<span class="validation-gate-mark">!</span><div><strong>Сохранение заблокировано</strong><small>Сначала нажмите «Проверить конфигурацию».</small></div>');
         status.scrollIntoView({behavior: 'smooth', block: 'center'});
       }
     });

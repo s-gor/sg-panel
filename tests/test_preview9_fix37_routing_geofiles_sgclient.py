@@ -15,9 +15,10 @@ def test_routing_and_geofiles_keep_sgclient096_contract_without_duplicate_tabs()
     panel = read("xpanel/templates/_geofiles_panel_fix39.html")
     css = read("xpanel/static/fix40-global-jade-routing-vision-hotfix4.css")
     for marker in (
-        "Весь остальной трафик",
+        "Выбранная конфигурация",
         "Пользовательские правила",
-        "Только включённый реальный Outbound",
+        "Базовая схема",
+        "Фактические правила текущей схемы",
     ):
         assert marker in routing
     assert 'data-r096-tab="' not in routing

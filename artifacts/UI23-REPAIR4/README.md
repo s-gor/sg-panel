@@ -1,27 +1,30 @@
-# SG-Panel UI23 Repair4 — Xray Radio Fix 1
+# SG-Panel UI23 Repair4 — current package
 
-Current cumulative Repair4 package.
+Current cumulative UI: **Global Buttons Preview 3 Outline**.
 
-## Update an existing SG-Panel or SG-Node
-
-```bash
-curl -fL https://raw.githubusercontent.com/s-gor/sg-panel/main/artifacts/UI23-REPAIR4/SG-PANEL-FIX40-UI23-REPAIR4-XRAY-RADIO-FIX1.run -o SG-PANEL-FIX40-UI23-REPAIR4-XRAY-RADIO-FIX1.run
-chmod +x SG-PANEL-FIX40-UI23-REPAIR4-XRAY-RADIO-FIX1.run
-sudo ./SG-PANEL-FIX40-UI23-REPAIR4-XRAY-RADIO-FIX1.run
-```
-
-Run first on SG-Node, then on Controller.
-
-## Clean installation on a new Ubuntu EC2
+## Update an existing Controller or SG-Node
 
 ```bash
-curl -fL https://raw.githubusercontent.com/s-gor/sg-panel/main/artifacts/UI23-REPAIR4/SG-PANEL-FIX40-FULL-UI23-REPAIR4-XRAY-RADIO-FIX1.run -o SG-PANEL-FIX40-FULL-UI23-REPAIR4-XRAY-RADIO-FIX1.run
-chmod +x SG-PANEL-FIX40-FULL-UI23-REPAIR4-XRAY-RADIO-FIX1.run
-sudo ./SG-PANEL-FIX40-FULL-UI23-REPAIR4-XRAY-RADIO-FIX1.run
+curl -fL https://raw.githubusercontent.com/s-gor/sg-panel/main/artifacts/UI23-REPAIR4/SG-PANEL-FIX40-UI23-REPAIR4-GLOBAL-BUTTONS-PREVIEW3-OUTLINE.run -o SG-PANEL-FIX40-UI23-REPAIR4-GLOBAL-BUTTONS-PREVIEW3-OUTLINE.run
+chmod +x SG-PANEL-FIX40-UI23-REPAIR4-GLOBAL-BUTTONS-PREVIEW3-OUTLINE.run
+sudo ./SG-PANEL-FIX40-UI23-REPAIR4-GLOBAL-BUTTONS-PREVIEW3-OUTLINE.run
 ```
 
-## What changed
+Update SG-Node first, then Controller.
 
-All radio controls on Xray Server now use compact circular indicators. The inherited tall rectangular input frames were removed page-wide. XMUX and Salamander logic and values were not changed.
+## Clean installation
 
-Both `.run` files contain the exact same `SG-PANEL-FIX40-UI23-REPAIR4-SOURCE.zip` payload and support `--verify-only`.
+```bash
+curl -fL https://raw.githubusercontent.com/s-gor/sg-panel/main/artifacts/UI23-REPAIR4/SG-PANEL-FIX40-FULL-UI23-REPAIR4-GLOBAL-BUTTONS-PREVIEW3-OUTLINE.run -o SG-PANEL-FIX40-FULL-UI23-REPAIR4-GLOBAL-BUTTONS-PREVIEW3-OUTLINE.run
+chmod +x SG-PANEL-FIX40-FULL-UI23-REPAIR4-GLOBAL-BUTTONS-PREVIEW3-OUTLINE.run
+sudo ./SG-PANEL-FIX40-FULL-UI23-REPAIR4-GLOBAL-BUTTONS-PREVIEW3-OUTLINE.run
+```
+
+## Full removal
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/s-gor/sg-panel/main/FULL-UNINSTALL-SG-PANEL.sh -o /tmp/FULL-UNINSTALL-SG-PANEL.sh
+sudo bash /tmp/FULL-UNINSTALL-SG-PANEL.sh
+```
+
+Both `.run` packages contain the exact same `SG-PANEL-FIX40-UI23-REPAIR4-GLOBAL-BUTTONS-PREVIEW3-OUTLINE-SOURCE.zip` payload and support `--verify-only`.
