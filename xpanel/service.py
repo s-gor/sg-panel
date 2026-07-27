@@ -4160,8 +4160,8 @@ UNIFIED_ROUTING_PRESET_DEFAULTS: dict[str, dict[str, str]] = {
         "local_action": "direct",
         "russia_scope": "none",
         "russia_action": "direct",
-        "blocked_action": "direct",
-        "ads_action": "direct",
+        "blocked_action": "blocked",
+        "ads_action": "blocked",
         "default_action": "warp",
     },
 }
@@ -4271,6 +4271,30 @@ def unified_routing_overview() -> dict[str, object]:
     analysis = geofiles.get("active_analysis", {})
     geosite_categories = list(analysis.get("geosite_categories", [])) if isinstance(analysis, dict) else []
     geoip_categories = list(analysis.get("geoip_categories", [])) if isinstance(analysis, dict) else []
+    blocked_category = _select_unified_category(
+        geosite_categories, UNIFIED_BLOCKED_GEOSITE_CANDIDATES
+    )
+    ads_category = _select_unified_category(
+        geosite_categories, UNIFIED_ADS_GEOSITE_CANDIDATES
+    )
+    warp_actions = {
+        str(model.get(key) or "")
+        for key in ("local_action", "russia_action", "blocked_action", "ads_action", "default_action")
+    }
+    custom_warp = bool(model.get("custom_warp_domains") or model.get("custom_warp_ips"))
+    if str(model.get("default_action") or "direct") == WARP_TAG:
+        warp_usage = "all"
+        warp_usage_label = "Весь остальной интернет выходит через WARP"
+    elif WARP_TAG in warp_actions or custom_warp:
+        warp_usage = "rules"
+        warp_usage_label = "WARP используется отдельными правилами"
+    else:
+        warp_usage = "none"
+        warp_usage_label = "Текущая схема WARP не использует"
+    try:
+        _specs, current_warnings = _unified_rule_plan(model)
+    except (ValueError, XPanelError):
+        current_warnings = []
     return {
         "model": model,
         "title": UNIFIED_ROUTING_PRESET_TITLES.get(
@@ -4283,6 +4307,11 @@ def unified_routing_overview() -> dict[str, object]:
         "geoip_count": len(geoip_categories),
         "geosite_categories": geosite_categories,
         "geoip_categories": geoip_categories,
+        "blocked_category": blocked_category,
+        "ads_category": ads_category,
+        "warp_usage": warp_usage,
+        "warp_usage_label": warp_usage_label,
+        "current_warnings": current_warnings,
         "action_options": _unified_action_options(),
         "updated_at": str(model.get("updated_at") or ""),
     }
@@ -4354,7 +4383,16 @@ def _select_unified_category(
     return ""
 
 
-def _unified_rule_specs(model: dict[str, object]) -> list[dict[str, object]]:
+def _unified_rule_plan(
+    model: dict[str, object],
+) -> tuple[list[dict[str, object]], list[str]]:
+    """Build managed rules and non-fatal compatibility warnings.
+
+    Category-specific presets still fail when their essential category is missing.
+    The broad ``all_warp`` preset is different: its purpose is the final WARP
+    outbound, so optional Block/Ads rules are omitted when the active GeoFiles do
+    not provide those categories. The default WARP route remains valid.
+    """
     geofiles = get_geofiles_overview()
     analysis = geofiles.get("active_analysis", {})
     geosite_categories = list(analysis.get("geosite_categories", [])) if isinstance(analysis, dict) else []
@@ -4362,6 +4400,7 @@ def _unified_rule_specs(model: dict[str, object]) -> list[dict[str, object]]:
     geosite_set = {str(item).lower() for item in geosite_categories}
     geoip_set = {str(item).lower() for item in geoip_categories}
     specs: list[dict[str, object]] = []
+    warnings: list[str] = []
 
     def add(role: str, tag: str, *, domains: list[str] | tuple[str, ...] = (), ips: list[str] | tuple[str, ...] = ()) -> None:
         clean_domains = [str(item) for item in domains if str(item)]
@@ -4414,33 +4453,52 @@ def _unified_rule_specs(model: dict[str, object]) -> list[dict[str, object]]:
             domains=["geosite:category-ru"], ips=["geoip:ru"],
         )
 
+    preset = str(model.get("preset") or "custom")
+    allow_optional_category_skip = preset == "all_warp"
+
     blocked_action = str(model["blocked_action"])
     blocked_category = _select_unified_category(
         geosite_categories, UNIFIED_BLOCKED_GEOSITE_CANDIDATES
     )
     if blocked_action != str(model["default_action"]):
-        if not blocked_category:
+        if blocked_category:
+            add("blocked", blocked_action, domains=[f"geosite:{blocked_category}"])
+        elif allow_optional_category_skip:
+            warnings.append(
+                "Категория заблокированных ресурсов отсутствует: отдельное правило Block пропущено, "
+                "остальной трафик продолжит выходить через WARP"
+            )
+        else:
             raise XPanelError(
                 "В активном geosite.dat не найдена категория заблокированных ресурсов"
             )
-        add("blocked", blocked_action, domains=[f"geosite:{blocked_category}"])
 
     ads_action = str(model["ads_action"])
     ads_category = _select_unified_category(
         geosite_categories, UNIFIED_ADS_GEOSITE_CANDIDATES
     )
     if ads_action != str(model["default_action"]):
-        if not ads_category:
+        if ads_category:
+            add("ads", ads_action, domains=[f"geosite:{ads_category}"])
+        elif allow_optional_category_skip:
+            warnings.append(
+                "Категория рекламы и трекеров отсутствует: отдельное правило Block пропущено, "
+                "остальной трафик продолжит выходить через WARP"
+            )
+        else:
             raise XPanelError(
                 "В активном geosite.dat не найдена категория рекламы и трекеров"
             )
-        add("ads", ads_action, domains=[f"geosite:{ads_category}"])
-    return specs
+    return specs, warnings
+
+
+def _unified_rule_specs(model: dict[str, object]) -> list[dict[str, object]]:
+    return _unified_rule_plan(model)[0]
 
 
 def apply_unified_routing(**values: object) -> dict[str, object]:
     model = _normalise_unified_routing_values(**values)
-    specs = _unified_rule_specs(model)
+    specs, warnings = _unified_rule_plan(model)
     settings = get_routing_settings()
     domain_strategy = str(values.get("domain_strategy") or settings["domain_strategy"])
     if domain_strategy not in ALLOWED_DOMAIN_STRATEGIES:
@@ -4522,6 +4580,7 @@ def apply_unified_routing(**values: object) -> dict[str, object]:
         "title": UNIFIED_ROUTING_PRESET_TITLES.get(str(model["preset"]), "Пользовательская схема"),
         "managed_rules": len(specs),
         "default_outbound_tag": model["default_action"],
+        "warnings": warnings,
     }
 
 def find_outbound(outbound_id: int) -> sqlite3.Row:

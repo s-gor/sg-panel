@@ -18,11 +18,11 @@ def test_ui21_identity_and_stylesheet_are_cumulative():
     assert ".cluster-restore-onboarding" in css
 
 
-def test_cluster_returns_to_compact_rows_and_collapsed_onboarding():
+def test_cluster_returns_to_compact_rows_and_always_open_onboarding():
     template = text("xpanel/templates/nodes.html")
     assert "compact-node-row" in template
     assert "cluster-controller-card" in template
-    assert '<details class="ui-card cluster-onboarding cluster-restore-onboarding"' in template
+    assert '<section class="ui-card cluster-onboarding cluster-restore-onboarding"' in template
     assert "+ Добавить SG-Node" in template
     assert "cluster-stage4-server-grid" not in template
     assert "cluster-stage4-server-card" not in template

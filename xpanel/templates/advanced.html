@@ -36,15 +36,17 @@
           {% endfor %}
         </select></label>
       </div>
-      <details class="expert-example">
-        <summary>Ручной JSON XHTTP и XMUX</summary>
+      <div class="expert-xmux-presets" aria-label="Готовые пресеты XMUX">
+        <article><p class="panel-kicker">ГОТОВЫЙ ПРОФИЛЬ</p><h3>Стандартный пресет</h3><p>Основной вариант для обычной сети.</p><pre>{{ expert.xmux_standard_preset }}</pre></article>
+        <article><p class="panel-kicker">ГОТОВЫЙ ПРОФИЛЬ</p><h3>Пресет «Для РФ — уменьшенный»</h3><p>Меньше одновременно создаваемых соединений.</p><pre>{{ expert.xmux_russia_preset }}</pre></article>
+      </div>
+      <details class="expert-example expert-xmux-manual-block">
+        <summary>Ручной XHTTP / XMUX JSON</summary>
         <div class="expert-json-grid">
           <label><span>Server Extra · JSON</span><textarea name="xhttp_extra_server_json" rows="9" spellcheck="false">{{ s.xhttp_extra_server_json }}</textarea></label>
           <label><span>Client Extra · JSON</span><textarea name="xhttp_extra_client_json" rows="9" spellcheck="false">{{ s.xhttp_extra_client_json }}</textarea></label>
         </div>
         <div class="ui-warning-note"><span>!</span><p>Положительные <code>maxConnections</code> и <code>maxConcurrency</code> нельзя задавать одновременно. Нулевое значение отключает соответствующий ограничитель.</p></div>
-        <details class="expert-example"><summary>Стандартный пресет</summary><pre>{{ expert.xmux_standard_preset }}</pre></details>
-        <details class="expert-example"><summary>Пресет «Для РФ — уменьшенный»</summary><pre>{{ expert.xmux_russia_preset }}</pre></details>
       </details>
       {% else %}
       <div class="ui-info-note"><span>i</span><p>Текущая схема не использует XHTTP. Поэтому XHTTP mode, XMUX и Extra здесь не показываются и не дублируют Xray Server.</p></div>
@@ -110,6 +112,59 @@
 
     <div class="ui-actions expert-save-actions"><button class="button primary" type="submit">Проверить и применить параметры</button></div>
   </form>
+
+
+  <section class="ui-card expert-card expert-dns-card" id="dns-expert">
+    <header class="ui-card-heading ui-card-heading-row">
+      <div><p class="panel-kicker">EXPERT DNS</p><h2>Hosts, условия и полный DNS JSON</h2><p>Технические параметры вынесены с основной страницы DNS. Все изменения по-прежнему проходят проверку полного config.json.</p></div>
+      <a class="button secondary" href="{{ url_for('dns_page') }}">Обычный DNS</a>
+    </header>
+    <div class="expert-dns-body">
+      <form method="post" action="{{ url_for('dns_settings_save') }}" class="ui-form expert-dns-settings" data-validated-form>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="return_to" value="expert">
+        <h3>Глобальные параметры</h3>
+        <label class="ui-toggle-row"><span><strong>Включить встроенный DNS</strong><small>Добавить раздел dns в итоговый Xray config.</small></span><input type="checkbox" name="enabled" {% if dns_settings.enabled %}checked{% endif %}><span class="switch"></span></label>
+        <label><span>Стратегия запросов</span><select name="query_strategy">{% for value in ['UseIP','UseIPv4','UseIPv6','UseSystem'] %}<option value="{{ value }}" {% if dns_settings.query_strategy == value %}selected{% endif %}>{{ value }}</option>{% endfor %}</select></label>
+        <div class="expert-dns-toggle-grid">
+          <label class="ui-toggle-row"><span><strong>System hosts</strong><small>/etc/hosts</small></span><input type="checkbox" name="use_system_hosts" {% if dns_settings.use_system_hosts %}checked{% endif %}><span class="switch"></span></label>
+          <label class="ui-toggle-row"><span><strong>Параллельные запросы</strong><small>Подходящие upstream одновременно</small></span><input type="checkbox" name="enable_parallel_query" {% if dns_settings.enable_parallel_query %}checked{% endif %}><span class="switch"></span></label>
+          <label class="ui-toggle-row"><span><strong>Отключить кэш</strong><small>Без внутреннего кэша Xray</small></span><input type="checkbox" name="disable_cache" {% if dns_settings.disable_cache %}checked{% endif %}><span class="switch"></span></label>
+          <label class="ui-toggle-row"><span><strong>Отключить fallback</strong><small>Только совпавшие серверы</small></span><input type="checkbox" name="disable_fallback" {% if dns_settings.disable_fallback %}checked{% endif %}><span class="switch"></span></label>
+          <label class="ui-toggle-row"><span><strong>Fallback при совпадении</strong><small>Не добавлять fallback при domains</small></span><input type="checkbox" name="disable_fallback_if_match" {% if dns_settings.disable_fallback_if_match %}checked{% endif %}><span class="switch"></span></label>
+        </div>
+        <div class="ui-actions"><button class="button primary" type="submit">Проверить и применить DNS</button></div>
+      </form>
+
+      <form method="post" action="{{ url_for('dns_server_add') }}" class="ui-form expert-dns-add" data-validated-form>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="return_to" value="expert">
+        <h3>Добавить сервер со специальными условиями</h3>
+        <div class="ui-field-grid dns-name-grid"><label><span>Название</span><input name="name" required placeholder="Cloudflare DoH"></label><label><span>Приоритет</span><input name="priority" type="number" min="1" max="9999" value="100" required></label></div>
+        <label><span>Адрес</span><input name="address" required placeholder="https+local://1.1.1.1/dns-query"></label>
+        <div class="ui-field-grid"><label><span>Стратегия</span><select name="query_strategy"><option value="">Наследовать общую</option>{% for value in ['UseIP','UseIPv4','UseIPv6','UseSystem'] %}<option value="{{ value }}">{{ value }}</option>{% endfor %}</select></label><label><span>Тайм-аут, мс</span><input name="timeout_ms" type="number" min="100" max="60000" value="4000"></label></div>
+        <label><span>Domains</span><textarea name="domains" rows="3" placeholder="geosite:google&#10;domain:example.com"></textarea></label>
+        <div class="ui-field-grid"><label><span>Ожидаемые IP</span><textarea name="expected_ips" rows="2" placeholder="geoip:fr"></textarea></label><label><span>Нежелательные IP</span><textarea name="unexpected_ips" rows="2" placeholder="geoip:private"></textarea></label></div>
+        <div class="dns-check-row"><label><input type="checkbox" name="skip_fallback"><span>Skip fallback</span></label><label><input type="checkbox" name="final_query"><span>Final query</span></label></div>
+        <div class="ui-actions"><button class="button primary" type="submit">Проверить и добавить</button></div>
+      </form>
+
+      <section class="expert-dns-existing">
+        <h3>Настроенные серверы</h3>
+        <div class="expert-dns-server-links">{% for server in dns_servers %}<a href="{{ url_for('dns_server_edit_page', server_id=server.id, return_to='expert') }}"><strong>{{ server.name }}</strong><span>Приоритет {{ server.priority }} · {{ 'активен' if server.enabled else 'отключён' }}</span></a>{% else %}<p>Серверов пока нет.</p>{% endfor %}</div>
+      </section>
+
+      <section class="expert-dns-hosts">
+        <h3>Статические Hosts</h3>
+        <form method="post" action="{{ url_for('dns_host_add') }}" class="ui-form" data-validated-form><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="return_to" value="expert"><div class="ui-field-grid"><label><span>Домен</span><input name="domain" required placeholder="server.local"></label><label><span>IP или домен</span><input name="addresses" required placeholder="192.168.1.200"></label></div><div class="ui-actions"><button class="button primary" type="submit">Добавить Hosts-запись</button></div></form>
+        {% if dns_hosts %}<div class="expert-dns-host-list">{% for host in dns_hosts %}<article><form method="post" action="{{ url_for('dns_host_edit', host_id=host.id) }}" data-validated-form><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="return_to" value="expert"><input name="domain" value="{{ host.domain }}" required><input name="addresses" value="{{ host.addresses|replace('\n', ', ') }}" required><button class="button ghost small" type="submit">Сохранить</button></form><div class="row-actions"><span class="pill {{ 'enabled' if host.enabled else 'disabled' }}"><i></i>{{ 'Активна' if host.enabled else 'Отключена' }}</span><form method="post" action="{{ url_for('dns_host_toggle', host_id=host.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="return_to" value="expert"><button class="button small {{ 'toggle-disable' if host.enabled else 'toggle-enable' }}" type="submit">{{ 'Отключить' if host.enabled else 'Включить' }}</button></form><form method="post" action="{{ url_for('dns_host_delete', host_id=host.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="return_to" value="expert"><button class="button danger small" type="submit">Удалить</button></form></div></article>{% endfor %}</div>{% endif %}
+      </section>
+
+      <section class="expert-dns-json">
+        <div><h3>Предпросмотр DNS JSON</h3><p>Фрагмент, который войдёт в конфигурацию Xray.</p></div>
+        <pre>{{ dns_preview }}</pre>
+        <div class="ui-actions"><a class="button secondary" href="{{ url_for('dns_json_page', return_to='expert') }}">{ } Открыть полный DNS JSON</a><form method="post" action="{{ url_for('dns_test') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="return_to" value="expert"><input name="domain" value="example.com" aria-label="Домен для теста"><button class="button secondary" type="submit">Проверить DNS</button></form></div>
+      </section>
+    </div>
+  </section>
 
   <details class="ui-card expert-card" id="configurations">
     <summary><span><b>Итоговые конфигурации</b><small>То, что реально получает Xray, Nginx и выбранный клиент</small></span><em>Открыть</em></summary>
@@ -177,6 +232,13 @@
 <script>
 (() => {
   const csrf = {{ csrf_token()|tojson }};
+  const expertTabs = [...document.querySelectorAll('[data-expert-tab]')];
+  const syncExpertTabs = () => {
+    const active = location.hash === '#dns-expert' ? 'dns' : 'transport';
+    expertTabs.forEach((link) => link.classList.toggle('active', link.dataset.expertTab === active));
+  };
+  syncExpertTabs();
+  window.addEventListener('hashchange', syncExpertTabs);
   const showResult = (node, text, ok) => {
     if (!node) return;
     node.textContent = text;

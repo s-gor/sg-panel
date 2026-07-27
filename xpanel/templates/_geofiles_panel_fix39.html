@@ -14,14 +14,16 @@
       <span class="pill {{ 'enabled' if geofiles.geoip.installed and geofiles.geosite.installed and not geofiles.active_analysis.error else 'warning' }}"><i></i>{{ 'ГОТОВЫ' if geofiles.geoip.installed and geofiles.geosite.installed and not geofiles.active_analysis.error else 'ТРЕБУЕТСЯ ПРОВЕРКА' }}</span>
     </header>
     <div class="geofiles-active-grid">
-      <article><span>Текущий источник</span><strong>{{ geofiles.active_label }}</strong><small>Семейство: {{ geofiles.active_analysis.family }}</small><small>Generation: {{ geofiles.settings.active_generation or 'legacy / не создана' }}</small></article>
-      <article><span>geoip.dat</span><strong>{{ format_bytes(geofiles.geoip.size) if geofiles.geoip.installed else 'Не найден' }}</strong><code title="{{ geofiles.geoip.sha256 }}">{{ geofiles.geoip.sha256 or 'SHA-256 отсутствует' }}</code><small>{{ geofiles.geoip.path }}</small><small>Категорий: {{ geofiles.active_analysis.geoip_categories|length }}</small></article>
-      <article><span>geosite.dat</span><strong>{{ format_bytes(geofiles.geosite.size) if geofiles.geosite.installed else 'Не найден' }}</strong><code title="{{ geofiles.geosite.sha256 }}">{{ geofiles.geosite.sha256 or 'SHA-256 отсутствует' }}</code><small>{{ geofiles.geosite.path }}</small><small>Категорий: {{ geofiles.active_analysis.geosite_categories|length }}</small></article>
-      <article><span>Последняя проверка</span><strong>{{ 'Пройдена' if geofiles.settings.last_check_state == 'ok' else ('Применение заблокировано' if geofiles.settings.last_check_state == 'blocked' else ('Ошибка' if geofiles.settings.last_check_state == 'error' else 'Не выполнялась')) }}</strong><small>{{ geofiles.settings.last_check_message or 'Новый источник ещё не проверялся' }}</small><small>{{ geofiles.settings.last_checked_at or '' }}</small></article>
+      <div class="geofiles-active-stack">
+        <article class="geofiles-active-card is-source"><span>Текущий источник</span><strong>{{ geofiles.active_label }}</strong><small>Семейство: {{ geofiles.active_analysis.family }}</small><small>Generation: {{ geofiles.settings.active_generation or 'legacy / не создана' }}</small></article>
+        <article class="geofiles-active-card is-check"><span>Последняя проверка</span><strong>{{ 'Пройдена' if geofiles.settings.last_check_state == 'ok' else ('Применение заблокировано' if geofiles.settings.last_check_state == 'blocked' else ('Ошибка' if geofiles.settings.last_check_state == 'error' else 'Не выполнялась')) }}</strong><small>{{ geofiles.settings.last_check_message or 'Новый источник ещё не проверялся' }}</small><small>{{ geofiles.settings.last_checked_at or '' }}</small></article>
+      </div>
+      <article class="geofiles-active-card is-file"><span>geoip.dat</span><strong>{{ format_bytes(geofiles.geoip.size) if geofiles.geoip.installed else 'Не найден' }}</strong><code title="{{ geofiles.geoip.sha256 }}">{{ geofiles.geoip.sha256 or 'SHA-256 отсутствует' }}</code><small>{{ geofiles.geoip.path }}</small><small>Категорий: {{ geofiles.active_analysis.geoip_categories|length }}</small></article>
+      <article class="geofiles-active-card is-file"><span>geosite.dat</span><strong>{{ format_bytes(geofiles.geosite.size) if geofiles.geosite.installed else 'Не найден' }}</strong><code title="{{ geofiles.geosite.sha256 }}">{{ geofiles.geosite.sha256 or 'SHA-256 отсутствует' }}</code><small>{{ geofiles.geosite.path }}</small><small>Категорий: {{ geofiles.active_analysis.geosite_categories|length }}</small></article>
     </div>
     {% if geofiles.active_analysis.error %}<div class="ui-info-note danger"><span>!</span><p>{{ geofiles.active_analysis.error }}</p></div>{% endif %}
     {% if geofiles.active_analysis.geoip_categories or geofiles.active_analysis.geosite_categories %}
-    <details class="expert-example"><summary>Показать реальные категории установленной пары</summary>
+    <details class="expert-example geofiles-categories-details"><summary>Показать реальные категории установленной пары</summary>
       <p><strong>GeoIP ({{ geofiles.active_analysis.geoip_categories|length }}):</strong> {{ geofiles.active_analysis.geoip_categories|join(', ') }}</p>
       <p><strong>GeoSite ({{ geofiles.active_analysis.geosite_categories|length }}):</strong> {{ geofiles.active_analysis.geosite_categories|join(', ') }}</p>
     </details>

@@ -75,18 +75,17 @@
       {% endfor %}
     </div>
     {% else %}
-    <section class="ui-card cluster-restore-empty">
-      <div><strong>SG-Node пока нет</strong><span>Добавьте сервер — после этого появится одна готовая команда подключения.</span></div>
-      <button class="button primary" type="button" data-open-node-onboarding>+ Добавить SG-Node</button>
-    </section>
+    <div class="cluster-restore-empty-note" role="status">
+      <strong>SG-Node пока нет</strong>
+      <span>Добавьте сервер — после этого появится одна готовая команда подключения.</span>
+    </div>
     {% endif %}
   </section>
 
-  <details class="ui-card cluster-onboarding cluster-restore-onboarding" id="cluster-add-node">
-    <summary>
+  <section class="ui-card cluster-onboarding cluster-restore-onboarding" id="cluster-add-node">
+    <header class="cluster-restore-onboarding-head">
       <span><b>Добавить SG-Node</b><small>Имя сервера → одна команда → автоматический статус «В сети»</small></span>
-      <em>Открыть</em>
-    </summary>
+    </header>
     <div class="cluster-restore-onboarding-body">
       <div class="cluster-restore-onboarding-copy">
         <p class="panel-kicker">ОДИН ПОНЯТНЫЙ ШАГ</p>
@@ -103,7 +102,7 @@
         <button class="button primary" type="submit">Создать и получить команду</button>
       </form>
     </div>
-  </details>
+  </section>
 
   <div class="compatibility-markers" hidden>
     SG-Panel Cluster Подключение SG-Node Одна команда сама определит
@@ -117,7 +116,6 @@
   document.querySelectorAll('[data-open-node-onboarding]').forEach((button) => {
     button.addEventListener('click', () => {
       if (!onboarding) return;
-      onboarding.open = true;
       onboarding.scrollIntoView({behavior:'smooth', block:'start'});
       window.setTimeout(() => onboarding.querySelector('input[name="name"]')?.focus(), 420);
     });

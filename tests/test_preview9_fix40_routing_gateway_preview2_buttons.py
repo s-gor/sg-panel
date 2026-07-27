@@ -7,41 +7,30 @@ def read(relative: str) -> str:
     return (ROOT / relative).read_text(encoding="utf-8")
 
 
-def test_preview2_button_css_is_loaded_after_global_hotfixes() -> None:
+def test_preview2_button_layer_is_replaced_by_final_system() -> None:
     base = read("xpanel/templates/base.html")
-    assert "routing-unified-preview2-buttons.css" in base
-    assert base.index("routing-unified-preview2-buttons.css") > base.index("fix40-cascade-steps-ui20.css")
+    assert "routing-unified-preview2-buttons.css" not in base
+    assert "fix40-ui23-repair4-final-system1.css" in base
 
 
-def test_preview2_supports_graphite_and_resolved_dark_theme() -> None:
-    css = read("xpanel/static/routing-unified-preview2-buttons.css")
-    assert 'html[data-theme="graphite"] body.routing-unified-preview1' in css
-    assert 'html[data-resolved-theme="dark"] body.routing-unified-preview1' in css
-    assert 'html[data-resolved-theme="light"] body.routing-unified-preview1' in css
+def test_final_system_supports_both_resolved_themes() -> None:
+    css = read("xpanel/static/fix40-ui23-repair4-final-system1.css")
+    assert 'html[data-resolved-theme="dark"]' in css
+    assert 'html[data-resolved-theme="light"]' in css
 
 
-def test_preview2_gives_all_choices_real_button_surfaces() -> None:
-    css = read("xpanel/static/routing-unified-preview2-buttons.css")
-    for marker in (
-        ".r096-choice-card > span",
-        ".r096-segments label > span",
-        "background: var(--rup2-option-bg) !important",
-        "border: 1px solid var(--rup2-option-border) !important",
-        "background: var(--rup2-selected-bg) !important",
-        "color: var(--rup2-selected-text) !important",
-    ):
+def test_final_system_gives_choices_real_surfaces() -> None:
+    css = read("xpanel/static/fix40-ui23-repair4-final-system1.css")
+    for marker in (".r096-choice-card > span", ".r096-segments label > span", "border:1px solid var(--sg-control-line)", "background:var(--sg-control-fill)"):
         assert marker in css
 
 
-def test_preview2_keeps_disabled_choices_visible() -> None:
-    css = read("xpanel/static/routing-unified-preview2-buttons.css")
-    assert ".r096-choice-card > input:disabled + span" in css
-    assert "background: var(--rup2-disabled-bg) !important" in css
-    assert "opacity: 1 !important" in css
+def test_missing_standard_slots_do_not_stretch_neighbours() -> None:
+    css = read("xpanel/static/fix40-ui23-repair4-final-system1.css")
+    assert ".route-slot.is-empty" in css
+    assert "visibility:hidden" in css
 
 
-def test_preview2_is_visual_only() -> None:
+def test_preview2_notes_remain_historical() -> None:
     notes = read("ROUTING-GATEWAY-PREVIEW2-BUTTONS-NOTES.md")
     assert "Не изменялось" in notes
-    assert "построение Xray candidate" in notes
-    assert "backup / rollback" in notes

@@ -1,0 +1,121 @@
+/* SG-Panel UI23 Repair4 · Remaining UI Fix 1
+   Scoped only to Outbounds, DNS, Security, Updates and XMUX areas. */
+
+/* Outbounds: clear hierarchy and compact WARP. */
+body.outbounds-page .ob-page { display:grid; gap:16px; }
+body.outbounds-page :is(.ob-system-panel,.warp-panel,.ob-user-outputs-panel) { margin:0; border-radius:var(--radius-card,16px); }
+body.outbounds-page :is(.ob-section-heading,.warp-heading,.ob-user-outputs-heading) h2 { margin-bottom:4px; }
+body.outbounds-page .warp-panel { padding:20px; }
+body.outbounds-page .warp-heading { align-items:flex-start; padding:0 0 14px; border:0; }
+body.outbounds-page .warp-title-line { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+body.outbounds-page .warp-title-line h2 { margin:0; }
+body.outbounds-page .warp-status { position:static; min-height:30px; padding:5px 10px; }
+body.outbounds-page .warp-summary-grid { grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr); gap:10px; }
+body.outbounds-page .warp-summary-grid article { min-height:0; padding:13px 15px; border-radius:12px; }
+body.outbounds-page .warp-actions { display:flex; align-items:center; gap:9px; flex-wrap:wrap; margin-top:12px; }
+body.outbounds-page .warp-actions form { margin:0; }
+body.outbounds-page .warp-more-actions { position:relative; }
+body.outbounds-page .warp-more-actions > summary,
+body.outbounds-page .ob-technical-details > summary { color:var(--muted); font-size:12px; font-weight:750; cursor:pointer; list-style:none; }
+body.outbounds-page .warp-more-actions > summary::-webkit-details-marker,
+body.outbounds-page .ob-technical-details > summary::-webkit-details-marker { display:none; }
+body.outbounds-page .warp-more-actions[open] { display:flex; align-items:center; gap:8px; }
+body.outbounds-page .ob-technical-details { margin-top:3px; }
+body.outbounds-page .ob-technical-details code { display:block; margin-top:5px; color:var(--muted); font-size:12px; }
+body.outbounds-page .ob-system-meta { min-width:160px; }
+body.outbounds-page .ob-user-output-empty { min-height:72px; padding:15px 18px; border:0; background:transparent; }
+body.outbounds-page .ob-user-output-empty p { max-width:720px; }
+
+/* DNS: simple main screen. */
+body.dns-simple-page .dns-simple-layout { gap:16px; }
+body.dns-simple-page .dns-simple-top { display:grid; grid-template-columns:minmax(0,.85fr) minmax(0,1.15fr); gap:16px; }
+body.dns-simple-page :is(.dns-current-card,.dns-basic-add-card) { min-width:0; }
+body.dns-simple-page .dns-simple-settings { padding-top:0; }
+body.dns-simple-page .dns-server-table th:nth-child(1) { width:52%!important; }
+body.dns-simple-page .dns-server-table th:nth-child(2) { width:18%!important; }
+body.dns-simple-page .dns-server-table th:nth-child(3) { width:30%!important; min-width:300px!important; }
+body.dns-simple-page .dns-server-table :is(th,td) { font-size:15px!important; }
+body.dns-simple-page .dns-server-identity strong { font-size:16px!important; }
+body.dns-simple-page .dns-server-identity small { margin-top:5px; font-size:14px!important; }
+body.dns-simple-page .dns-priority-note { display:inline-flex; min-width:54px; justify-content:center; font-size:14px!important; }
+body.dns-simple-page .dns-expert-pointer { display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:12px; }
+body.dns-simple-page .dns-expert-pointer p { margin:0; }
+
+/* Expert DNS. */
+body.advanced-settings-page .expert-dns-card { scroll-margin-top:24px; }
+body.advanced-settings-page .expert-dns-body { display:grid; gap:16px; padding:0 20px 20px; }
+body.advanced-settings-page :is(.expert-dns-settings,.expert-dns-add,.expert-dns-existing,.expert-dns-hosts,.expert-dns-json) { padding:18px; border:1px solid var(--line); border-radius:12px; background:color-mix(in srgb,var(--panel-2) 82%,transparent); }
+body.advanced-settings-page .expert-dns-body h3 { margin:0 0 12px; font-size:18px; }
+body.advanced-settings-page .expert-dns-toggle-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:9px; }
+body.advanced-settings-page .expert-dns-server-links { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+body.advanced-settings-page .expert-dns-server-links a { display:grid; gap:4px; padding:12px 14px; border:1px solid var(--line); border-radius:10px; color:var(--text); text-decoration:none; }
+body.advanced-settings-page .expert-dns-server-links span { color:var(--muted); font-size:13px; }
+body.advanced-settings-page .expert-dns-host-list { display:grid; gap:8px; margin-top:12px; }
+body.advanced-settings-page .expert-dns-host-list article { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:10px; align-items:center; padding:11px; border:1px solid var(--line); border-radius:10px; }
+body.advanced-settings-page .expert-dns-host-list article > form { display:grid; grid-template-columns:minmax(140px,.7fr) minmax(0,1.3fr) auto; gap:8px; }
+body.advanced-settings-page .expert-dns-json pre { max-height:300px; overflow:auto; padding:14px; border-radius:10px; background:#142019; font-size:13px; line-height:1.55; }
+body.advanced-settings-page .expert-dns-json .ui-actions form { display:flex; gap:8px; }
+
+/* Security: centered 50/50 history, no black inner scrollbars, readable data. */
+body.security-page .security-history-grid { grid-template-columns:repeat(2,minmax(0,1fr))!important; gap:16px!important; max-width:1500px; margin-inline:auto; align-items:stretch; }
+body.security-page .security-history-card { height:100%; min-width:0; }
+body.security-page .security-history-table-shell { margin:0; border:0; border-radius:0; background:transparent; box-shadow:none; }
+body.security-page .security-history-scroll { max-height:none!important; overflow:visible!important; scrollbar-width:thin; }
+body.security-page .security-history-scroll table { width:100%; table-layout:fixed; }
+body.security-page .security-history-card table :is(th,td) { font-size:15px!important; }
+body.security-page .security-history-card .table-note { margin-top:5px; font-size:13.5px!important; }
+body.security-page .security-history-card time { white-space:nowrap; }
+body.security-page .security-login-table :is(th,td):nth-child(1) { width:44%; }
+body.security-page .security-login-table :is(th,td):nth-child(2) { width:28%; }
+body.security-page .security-login-table :is(th,td):nth-child(3) { width:28%; }
+body.security-page .security-audit-table :is(th,td):nth-child(1) { width:31%; }
+body.security-page .security-audit-table :is(th,td):nth-child(2) { width:37%; }
+body.security-page .security-audit-table :is(th,td):nth-child(3) { width:18%; }
+body.security-page .security-audit-table :is(th,td):nth-child(4) { width:14%; }
+body.security-page .section-tabs a:not(.active) { color:var(--text)!important; background:var(--panel)!important; border-color:var(--line)!important; box-shadow:var(--shadow-sm)!important; }
+body.security-page .section-tabs a.active { color:#fff!important; background:linear-gradient(180deg,var(--accent),color-mix(in srgb,var(--accent) 78%,#203b31))!important; }
+
+/* Updates: only local readability. */
+body.updates-page .xray-channel-card > p,
+body.updates-page .xray-version-result { font-size:15px!important; line-height:1.55; }
+body.updates-page .xray-channel-card > small { font-size:13.5px!important; }
+body.updates-page .xray-update-guards { gap:9px; }
+body.updates-page .xray-update-guards span { padding:9px 13px; font-size:14px!important; font-weight:720; }
+body.updates-page .update-safety-flow span { width:30px; height:30px; font-size:14px; }
+body.updates-page .update-safety-flow strong { font-size:15px!important; }
+body.updates-page .update-safety-flow small { font-size:13.5px!important; line-height:1.5; }
+body.updates-page .update-progress-card .ui-card-heading p { font-size:15px!important; line-height:1.55; }
+body.updates-page .update-live-line strong { font-size:14.5px!important; }
+body.updates-page .update-live-line small { font-size:13px!important; }
+body.updates-page .update-log { font-size:13.5px!important; line-height:1.6!important; }
+
+/* XMUX: ready presets visible first, manual settings lower and lighter. */
+body.server-settings-page .sg-xmux-ready-presets { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; padding:0; border:0; }
+body.server-settings-page .sg-xmux-ready-presets legend { grid-column:1/-1; }
+body.server-settings-page .sg-xmux-preset { border-color:color-mix(in srgb,var(--line) 70%,transparent)!important; border-radius:12px!important; box-shadow:none!important; }
+body.server-settings-page .sg-xmux-manual-zone { display:grid; gap:9px; margin-top:12px; padding-top:12px; border-top:1px solid var(--line); }
+body.server-settings-page .sg-xmux-expert-choice { max-width:none; }
+body.advanced-settings-page .expert-xmux-presets { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; margin:14px 0; }
+body.advanced-settings-page .expert-xmux-presets article { min-width:0; padding:14px 16px; border:1px solid color-mix(in srgb,var(--line) 72%,transparent); border-radius:12px; background:color-mix(in srgb,var(--panel-2) 72%,transparent); box-shadow:none; }
+body.advanced-settings-page .expert-xmux-presets h3 { margin:4px 0 5px; font-size:17px; }
+body.advanced-settings-page .expert-xmux-presets p:not(.panel-kicker) { margin:0 0 9px; color:var(--muted); font-size:13px; }
+body.advanced-settings-page .expert-xmux-presets pre { margin:0; max-height:210px; overflow:auto; padding:12px; border:0; border-radius:9px; font-size:13px; line-height:1.5; }
+body.advanced-settings-page .expert-xmux-manual-block { margin-top:10px; border-color:var(--line); box-shadow:none; }
+
+@media (max-width:1050px) {
+  body.dns-simple-page .dns-simple-top,
+  body.security-page .security-history-grid,
+  body.advanced-settings-page .expert-xmux-presets { grid-template-columns:1fr!important; }
+  body.advanced-settings-page .expert-dns-toggle-grid,
+  body.advanced-settings-page .expert-dns-server-links { grid-template-columns:1fr; }
+  body.advanced-settings-page .expert-dns-host-list article { grid-template-columns:1fr; }
+  body.advanced-settings-page .expert-dns-host-list article > form { grid-template-columns:1fr; }
+  body.security-page .security-history-card .security-history-scroll { overflow-x:auto!important; }
+  body.security-page .security-history-card table { min-width:680px; }
+}
+@media (max-width:760px) {
+  body.outbounds-page .warp-summary-grid,
+  body.server-settings-page .sg-xmux-ready-presets { grid-template-columns:1fr; }
+  body.dns-simple-page .dns-expert-pointer { grid-template-columns:auto 1fr; }
+  body.dns-simple-page .dns-expert-pointer .button { grid-column:1/-1; }
+}

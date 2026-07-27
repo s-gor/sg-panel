@@ -1,55 +1,33 @@
 # Текущая рабочая линия SG-Panel
 
-## SG-Panel Preview 9 · FIX40 · UI23 Repair4
+## SG-Panel Preview 9 · FIX40 · UI23 Repair4 — финальная GitHub-база 2026-07-27
 
-Накопительная база включает:
+Текущая cumulative-база включает:
 
-- UI23 и Repair4;
-- Hysteria2 Salamander FinalMask;
-- видимые профили XMUX и исправленное состояние проверки/применения;
-- Routing Gateway Preview 1–3;
-- исправление radio-индикаторов Xray Server;
-- Global Buttons Preview 1–3;
-- текущий визуальный принцип: прозрачная кнопка с единой окантовкой, цветная заливка только у выбранного/активного состояния и во время нажатия.
+- UI23 Repair4 и Hysteria2 Salamander FinalMask;
+- безопасный updater/rollback с проверкой свободного места;
+- защиту от вложенного `/opt/xpanel-mvp/xpanel-mvp`;
+- Routing UI Fix 1;
+- GeoFiles UI Fix 1;
+- компактный Cluster и постоянно открытую форму добавления SG-Node;
+- понятные входящие подключения Xray Server;
+- Direct, Block и WARP в одном разделе системных Outbounds;
+- упрощённый DNS и отдельный Expert DNS;
+- мягкие DNS-карточки без тяжёлых боковых рамок;
+- UI-правки Clients, Security, Maintenance и XMUX.
 
-## Пакеты в GitHub после публикации
+## Публикация
 
-### Обновление существующей установки
+- репозиторий: `s-gor/sg-panel`;
+- ветка: `main`;
+- без GitHub Release и без тега;
+- версия приложения остаётся `v0.10.0-rc70`;
+- SG-Node отдельно не обновляется.
 
-`artifacts/UI23-REPAIR4/SG-PANEL-FIX40-UI23-REPAIR4-GLOBAL-BUTTONS-PREVIEW3-OUTLINE.run`
+## Автоматические проверки
 
-```bash
-curl -fL https://raw.githubusercontent.com/s-gor/sg-panel/main/artifacts/UI23-REPAIR4/SG-PANEL-FIX40-UI23-REPAIR4-GLOBAL-BUTTONS-PREVIEW3-OUTLINE.run -o SG-PANEL-FIX40-UI23-REPAIR4-GLOBAL-BUTTONS-PREVIEW3-OUTLINE.run
-chmod +x SG-PANEL-FIX40-UI23-REPAIR4-GLOBAL-BUTTONS-PREVIEW3-OUTLINE.run
-sudo ./SG-PANEL-FIX40-UI23-REPAIR4-GLOBAL-BUTTONS-PREVIEW3-OUTLINE.run
-```
-
-Обновлять сначала SG-Node, затем Controller.
-
-### Чистая установка
-
-`artifacts/UI23-REPAIR4/SG-PANEL-FIX40-FULL-UI23-REPAIR4-GLOBAL-BUTTONS-PREVIEW3-OUTLINE.run`
-
-```bash
-curl -fL https://raw.githubusercontent.com/s-gor/sg-panel/main/artifacts/UI23-REPAIR4/SG-PANEL-FIX40-FULL-UI23-REPAIR4-GLOBAL-BUTTONS-PREVIEW3-OUTLINE.run -o SG-PANEL-FIX40-FULL-UI23-REPAIR4-GLOBAL-BUTTONS-PREVIEW3-OUTLINE.run
-chmod +x SG-PANEL-FIX40-FULL-UI23-REPAIR4-GLOBAL-BUTTONS-PREVIEW3-OUTLINE.run
-sudo ./SG-PANEL-FIX40-FULL-UI23-REPAIR4-GLOBAL-BUTTONS-PREVIEW3-OUTLINE.run
-```
-
-### Полное удаление
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/s-gor/sg-panel/main/FULL-UNINSTALL-SG-PANEL.sh -o /tmp/FULL-UNINSTALL-SG-PANEL.sh
-sudo bash /tmp/FULL-UNINSTALL-SG-PANEL.sh
-```
-
-## Проверки текущего SOURCE
-
-- 201 pytest-тест;
-- 38 Jinja-шаблонов;
+- 246 pytest-тестов;
+- разбор 38 Jinja-шаблонов;
 - Python compileall;
 - Bash syntax;
-- проверка обоих автономных `.run`;
-- побайтовое сравнение встроенных payload с SOURCE ZIP.
-
-До окончательного принятия нужны зелёные GitHub Actions и живая визуальная проверка обеих тем.
+- проверка финального SOURCE ZIP и публикационного пакета.

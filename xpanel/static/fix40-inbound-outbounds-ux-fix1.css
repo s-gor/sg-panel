@@ -1,0 +1,50 @@
+/* SG-Panel UI23 Repair4 · Inbound / Outbounds UX Fix 1
+   Scoped to Xray Server and Outbounds only. */
+
+body.server-settings-page .sg-ao-title-row { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+body.server-settings-page .sg-ao-title-row h2 { margin:4px 0 7px; }
+body.server-settings-page .sg-direction-pill,
+body.outbounds-page .ob-direction-pill { display:inline-flex; align-items:center; min-height:28px; padding:5px 10px; border-radius:999px; color:var(--success); background:color-mix(in srgb,var(--success) 10%,transparent); font-size:12px; font-weight:800; white-space:nowrap; }
+
+body.outbounds-page .ob-unified-system-panel .ob-section-heading { align-items:flex-start; }
+body.outbounds-page .ob-unified-system-panel .ob-system-row { position:relative; grid-template-columns:34px minmax(0,1fr) auto auto; gap:12px; }
+body.outbounds-page .ob-unified-system-panel .ob-system-icon.warp { color:var(--accent); border-color:color-mix(in srgb,var(--accent) 32%,var(--line)); background:color-mix(in srgb,var(--accent) 8%,var(--panel-2)); }
+body.outbounds-page .ob-unified-system-panel .ob-system-meta { min-width:0; }
+body.outbounds-page .ob-system-tools { justify-self:end; min-width:112px; }
+body.outbounds-page .ob-system-tools > summary { display:inline-flex; align-items:center; justify-content:center; min-height:34px; padding:6px 11px; border:1px solid var(--line); border-radius:10px; color:var(--text); background:var(--panel); font-size:12px; font-weight:760; cursor:pointer; list-style:none; box-shadow:var(--shadow-sm); }
+body.outbounds-page .ob-system-tools > summary::-webkit-details-marker { display:none; }
+body.outbounds-page .ob-system-tools[open] { grid-column:2/-1; width:100%; justify-self:stretch; }
+body.outbounds-page .ob-system-tools[open] > summary { justify-self:end; }
+body.outbounds-page .ob-system-tool-panel { margin-top:10px; padding:12px 14px; border:0; border-radius:12px; background:color-mix(in srgb,var(--panel-2) 78%,transparent); }
+body.outbounds-page .ob-system-tool-panel code { color:var(--muted); font-size:12.5px; }
+body.outbounds-page .ob-warp-tool-panel { display:grid; gap:12px; }
+body.outbounds-page .ob-warp-create-inline { display:flex; align-items:center; justify-content:space-between; gap:18px; }
+body.outbounds-page .ob-warp-create-inline p { margin:5px 0 0; color:var(--muted); font-size:13px; line-height:1.5; }
+body.outbounds-page .ob-warp-create-inline form { margin:0; flex:0 0 auto; }
+body.outbounds-page .ob-warp-inline-summary { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+body.outbounds-page .ob-warp-inline-summary > div { padding:12px 14px; border:0; border-radius:10px; background:var(--panel-3); }
+body.outbounds-page .ob-warp-inline-summary span,
+body.outbounds-page .ob-warp-inline-summary small { display:block; color:var(--muted); }
+body.outbounds-page .ob-warp-inline-summary span { font-size:12px; }
+body.outbounds-page .ob-warp-inline-summary strong { display:block; margin:4px 0; color:var(--text); font-size:15px; }
+body.outbounds-page .ob-warp-inline-summary small { font-size:12.5px; line-height:1.45; }
+body.outbounds-page .ob-warp-inline-actions { display:flex; align-items:center; gap:9px; flex-wrap:wrap; }
+body.outbounds-page .ob-warp-inline-actions form { margin:0; }
+body.outbounds-page .ob-warp-technical { padding-top:2px; }
+body.outbounds-page .ob-warp-technical > summary { color:var(--muted); font-size:12px; font-weight:760; cursor:pointer; }
+body.outbounds-page .ob-warp-technical > div { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:8px; padding:10px 12px; border-radius:10px; background:var(--panel-3); }
+body.outbounds-page .ob-warp-technical code { color:var(--muted); font-size:12px; }
+
+@media (max-width:900px) {
+  body.outbounds-page .ob-unified-system-panel .ob-system-row { grid-template-columns:34px minmax(0,1fr) auto; }
+  body.outbounds-page .ob-system-tools { grid-column:2/-1; justify-self:start; }
+  body.outbounds-page .ob-system-tools[open] { grid-column:1/-1; }
+}
+@media (max-width:700px) {
+  body.server-settings-page .sg-ao-title-row { align-items:flex-start; flex-direction:column; gap:3px; }
+  body.outbounds-page .ob-direction-pill { margin-top:8px; }
+  body.outbounds-page .ob-warp-inline-summary { grid-template-columns:1fr; }
+  body.outbounds-page .ob-warp-create-inline,
+  body.outbounds-page .ob-warp-technical > div { align-items:stretch; flex-direction:column; }
+  body.outbounds-page .ob-warp-create-inline .button { width:100%; }
+}

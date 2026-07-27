@@ -1,0 +1,37 @@
+/* SG-Panel UI23 Repair4 · Routing UI Fix 1
+   Local Routing-only corrections. No global typography or application logic changes. */
+
+/* The two status cards should read as normal panel cards, not outlined callouts. */
+body.routing-final-system1 .routing-status-card,
+body.routing-final-system1 .routing-status-card.is-current,
+body.routing-final-system1 .routing-status-card.is-selected,
+body.routing-final-system1 .routing-status-card.is-selected.is-pending {
+  border: 0 !important;
+  border-left: 0 !important;
+  outline: 0 !important;
+  border-radius: var(--radius, 16px) !important;
+  background: var(--panel) !important;
+  box-shadow: var(--shadow) !important;
+  overflow: hidden;
+}
+
+/* Local readability corrections requested for Routing. */
+body.routing-final-system1 .routing-status-facts > span { font-size: 12px !important; }
+body.routing-final-system1 .routing-current-warning { font-size: 12.5px !important; line-height: 1.5 !important; }
+body.routing-final-system1 .routing-card-heading p { font-size: 13px !important; }
+body.routing-final-system1 .routing-order-hint { font-size: 11px !important; }
+body.routing-final-system1 .r096-rule-row strong,
+body.routing-final-system1 .routing-subheading strong { font-size: 14px !important; }
+body.routing-final-system1 .r096-rule-row small,
+body.routing-final-system1 .routing-subheading small { font-size: 12.5px !important; line-height: 1.45 !important; }
+body.routing-final-system1 .routing-apply-copy span,
+body.routing-final-system1 .routing-unified-footer .validation-gate small { font-size: 12.5px !important; line-height: 1.5 !important; }
+body.routing-final-system1 .r096-warning-card strong { font-size: 13px !important; }
+body.routing-final-system1 .r096-warning-card span { font-size: 12.5px !important; line-height: 1.55 !important; }
+body.routing-final-system1 .r096-rules-preview header p { font-size: 13px !important; }
+body.routing-final-system1 .r096-state { font-size: 11px !important; }
+body.routing-final-system1 .r096-rule-list b { font-size: 12px !important; }
+body.routing-final-system1 .r096-rule-list strong { font-size: 13px !important; }
+body.routing-final-system1 .r096-rule-list small { font-size: 12px !important; line-height: 1.45 !important; }
+body.routing-final-system1 .r096-rule-list em { font-size: 11px !important; }
+body.routing-final-system1 .r096-user-rules summary small { font-size: 12.5px !important; }

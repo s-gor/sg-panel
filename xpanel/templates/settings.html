@@ -2,8 +2,8 @@
 {% from '_fingerprint_select.html' import fingerprint_select %}
 {% block title %}Xray Server — SG-Panel{% endblock %}
 {% block section %}XRAY SERVER{% endblock %}
-{% block heading %}Все доступные каналы{% endblock %}
-{% block subtitle %}Always-On Xray: Reality и XHTTP Reality работают сразу; TLS-каналы подключаются автоматически после готовности HTTPS{% endblock %}
+{% block heading %}Входящие подключения{% endblock %}
+{% block subtitle %}Каналы, по которым клиенты подключаются к этому SG-Panel: Reality и XHTTP Reality работают сразу, TLS-каналы — после готовности HTTPS{% endblock %}
 {% block content %}
 <script>document.body.classList.add('ui-standard-page','server-settings-page','sg-always-on-xray-page');</script>
 <style>
@@ -81,7 +81,7 @@
 .sg-hy-mode-option{position:relative;display:flex!important;align-items:center;gap:8px;min-height:42px;padding:9px 11px;border:1px solid var(--line);border-radius:11px;background:var(--panel-3);cursor:pointer}
 .sg-hy-mode-option:has(input:checked){border-color:var(--sg-xray-blue-border);background:var(--sg-xray-blue-soft);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--sg-xray-blue) 12%,transparent)}
 .sg-hy-mode-option input{width:auto!important;margin:0}.sg-hy-mode-option b{color:var(--text);font-size:11px}.sg-hy-mode-option small{display:block;color:var(--muted);font-size:9px}
-.sg-hy-secret{display:grid;gap:7px}.sg-hy-secret-row{display:grid;grid-template-columns:minmax(0,1fr) auto auto auto;gap:7px}.sg-hy-secret-row input{min-width:0;font-family:ui-monospace,SFMono-Regular,Consolas,monospace}.sg-hy-secret-row .button{min-height:40px;padding-inline:10px;font-size:10px}
+.sg-hy-secret{display:grid;gap:7px}.sg-hy-secret-row{display:grid;grid-template-columns:minmax(0,1fr);gap:8px}.sg-hy-secret-row input{min-width:0;width:100%;font-family:ui-monospace,SFMono-Regular,Consolas,monospace}.sg-hy-secret-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.sg-hy-secret-actions .button{width:100%;min-width:0;min-height:40px;padding-inline:10px;font-size:10px;justify-content:center;text-align:center}
 .sg-hy-support{display:grid;align-content:center;gap:6px;padding:11px 12px;border:1px solid var(--line);border-radius:11px;background:var(--panel-3)}.sg-hy-support span{font-size:10px;font-weight:850;text-transform:uppercase;letter-spacing:.055em;color:var(--muted)}.sg-hy-support strong{font-size:12px;color:var(--text)}.sg-hy-support small{font-size:9px;line-height:1.4;color:var(--muted)}.sg-hy-support.is-ok strong{color:var(--success)}.sg-hy-support.is-warning strong{color:var(--warning)}
 .sg-hy-change-note{grid-column:1/-1;display:flex;align-items:flex-start;gap:9px;margin:0;color:var(--muted);font-size:10px;line-height:1.5}.sg-hy-change-note b{color:var(--warning)}
 .sg-hy-secret[hidden]{display:none!important}
@@ -191,12 +191,17 @@ html[data-resolved-theme="light"] .sg-always-on-xray-page .sg-vision-explainer c
   color:var(--sg-xray-blue-strong);
 }
 @media(max-width:1300px){.sg-ao-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.sg-vision-contract{grid-template-columns:repeat(3,minmax(0,1fr))}.sg-ao-param{grid-template-columns:repeat(2,minmax(0,1fr))}.sg-ao-param-title{grid-column:1/-1}.sg-hy-obfs{grid-template-columns:1fr 1.5fr}.sg-hy-support{grid-column:1/-1}}
-@media(max-width:760px){.sg-ao-grid,.sg-ao-common,.sg-ao-param,.sg-vision-contract,.sg-hy-obfs{grid-template-columns:1fr}.sg-ao-head,.sg-ao-actions,.sg-ao-param-lock-note{align-items:stretch;flex-direction:column}.sg-ao-actions>div,.sg-ao-actions .button,.sg-ao-param-lock-note .button{width:100%}.sg-ao-profile{min-height:0}.sg-hy-secret-row{grid-template-columns:1fr 1fr 1fr}.sg-hy-secret-row input{grid-column:1/-1}}
+@media(max-width:760px){.sg-ao-grid,.sg-ao-common,.sg-ao-param,.sg-vision-contract,.sg-hy-obfs{grid-template-columns:1fr}.sg-ao-head,.sg-ao-actions,.sg-ao-param-lock-note{align-items:stretch;flex-direction:column}.sg-ao-actions>div,.sg-ao-actions .button,.sg-ao-param-lock-note .button{width:100%}.sg-ao-profile{min-height:0}.sg-hy-secret-actions{grid-template-columns:1fr}.sg-hy-secret-actions .button{width:100%}}
 </style>
 <div class="ui-page ui-page-wide sg-ao-page">
   <section class="sg-ao-card">
     <header class="sg-ao-head">
-      <div><p class="panel-kicker">XRAY · ALWAYS ON</p><h2>Четыре независимых канала</h2><p>Выбирать один профиль больше не нужно. Панель собирает единый Xray config со всеми каналами, которые технически доступны серверу.</p></div>
+      <div>
+        <p class="panel-kicker">XRAY · INBOUND</p>
+        {# Compatibility marker for legacy audit: Четыре независимых канала #}
+        <div class="sg-ao-title-row"><h2>Четыре канала подключения</h2><span class="sg-direction-pill">Клиент → SG-Panel</span></div>
+        <p>Это входящие каналы сервера. Панель собирает единый Xray config и одновременно принимает подключения по всем каналам, которые технически доступны серверу.</p>
+      </div>
       <a class="button secondary" href="{{ url_for('settings_expert_inbound_page') }}">Эксперт · резервные Inbound</a>
     </header>
     <div class="sg-ao-grid" style="margin-top:16px">
@@ -285,8 +290,8 @@ html[data-resolved-theme="light"] .sg-always-on-xray-page .sg-vision-explainer c
         <article class="sg-ao-param sg-xmux-card" data-xmux-card data-xmux-current="{{ xmux.settings.xmux_mode }}">
           <div class="sg-ao-param-title"><strong>XMUX для XHTTP</strong><span>Общие клиентские параметры XHTTP Reality и XHTTP TLS</span></div>
           <div class="sg-xmux-current"><span>Сейчас применяется</span><strong>{{ xmux.effective.xmux_mode_label }}</strong><small>Это сохранённое состояние базы и текущих клиентских профилей.</small></div>
-          <fieldset class="sg-xmux-options">
-            <legend>Выберите профиль для следующего применения</legend>
+          <fieldset class="sg-xmux-options sg-xmux-ready-presets">
+            <legend>Сначала выберите готовый профиль</legend>
             <label class="sg-xmux-preset" data-xmux-preview="auto">
               <input type="radio" name="xmux_mode" value="auto" {% if xmux.settings.xmux_mode == 'auto' %}checked{% endif %}>
               <span class="sg-xmux-preset-body"><span class="sg-xmux-preset-head"><strong>Стандартный</strong><span><em class="sg-xmux-badge is-current" data-xmux-current-badge>Сейчас активен</em><em class="sg-xmux-badge is-pending" data-xmux-pending-badge>Выбран</em></span></span><code>maxConnections 2-4 · reuse 300-600 · requests 1000-2000 · lifetime 1200-2400 · keepalive 600</code><small>Основной профиль SG-Panel.</small></span>
@@ -295,12 +300,14 @@ html[data-resolved-theme="light"] .sg-always-on-xray-page .sg-vision-explainer c
               <input type="radio" name="xmux_mode" value="reduced" {% if xmux.settings.xmux_mode == 'reduced' %}checked{% endif %}>
               <span class="sg-xmux-preset-body"><span class="sg-xmux-preset-head"><strong>Для РФ — уменьшенный</strong><span><em class="sg-xmux-badge is-current" data-xmux-current-badge>Сейчас активен</em><em class="sg-xmux-badge is-pending" data-xmux-pending-badge>Выбран</em></span></span><code>maxConcurrency 0 · maxConnections 6 · reuse 0 · requests 600-900 · lifetime 1800-3000 · keepalive 0</code><small>Меньше одновременно создаваемых соединений.</small></span>
             </label>
-            <label class="sg-xmux-preset" data-xmux-preview="expert">
-              <input type="radio" name="xmux_mode" value="expert" {% if xmux.settings.xmux_mode == 'expert' %}checked{% endif %}>
-              <span class="sg-xmux-preset-body"><span class="sg-xmux-preset-head"><strong>Ручной JSON</strong><span><em class="sg-xmux-badge is-current" data-xmux-current-badge>Сейчас активен</em><em class="sg-xmux-badge is-pending" data-xmux-pending-badge>Выбран</em></span></span><code>Client Extra → xmux</code><small>Полный контроль параметров XMUX для опытной настройки.</small></span>
-            </label>
           </fieldset>
-          <label class="sg-xmux-manual" data-xmux-manual><span>Client Extra · ручной JSON</span><textarea name="xhttp_extra_client_json" spellcheck="false">{{ xmux.settings.xhttp_extra_client_json }}</textarea></label>
+          <div class="sg-xmux-manual-zone">
+            <label class="sg-xmux-preset sg-xmux-expert-choice" data-xmux-preview="expert">
+              <input type="radio" name="xmux_mode" value="expert" {% if xmux.settings.xmux_mode == 'expert' %}checked{% endif %}>
+              <span class="sg-xmux-preset-body"><span class="sg-xmux-preset-head"><strong>Ручной XMUX</strong><span><em class="sg-xmux-badge is-current" data-xmux-current-badge>Сейчас активен</em><em class="sg-xmux-badge is-pending" data-xmux-pending-badge>Выбран</em></span></span><code>Client Extra → xmux</code><small>Только для опытной ручной настройки.</small></span>
+            </label>
+            <label class="sg-xmux-manual" data-xmux-manual><span>Client Extra · ручной JSON</span><textarea name="xhttp_extra_client_json" spellcheck="false">{{ xmux.settings.xhttp_extra_client_json }}</textarea></label>
+          </div>
           <p class="sg-xmux-selection-status" data-xmux-selection-status></p>
           <p class="sg-xmux-note"><b>Применяется только на клиентской стороне.</b> Выбор карточки ещё ничего не меняет: сначала нажмите «Проверить конфигурацию», затем «Сохранить и применить». Нулевой <code>maxConcurrency</code> означает, что управление идёт через <code>maxConnections</code>.</p>
         </article>
@@ -321,7 +328,7 @@ html[data-resolved-theme="light"] .sg-always-on-xray-page .sg-vision-explainer c
             <div class="sg-hy-support {{ 'is-ok' if salamander_support.supported else 'is-warning' }}"><span>Xray</span><strong>{{ salamander_support.version or 'Версия не определена' }}</strong><small>{% if salamander_support.supported %}Salamander FinalMask поддерживается.{% else %}Нужна версия не ниже {{ salamander_support.minimum }}. {{ salamander_support.message }}{% endif %}</small></div>
             <div class="sg-hy-secret" data-salamander-secret {% if hy_primary.obfs_mode != 'salamander' %}hidden{% endif %}>
               <span>Пароль Salamander</span>
-              <div class="sg-hy-secret-row"><input type="password" name="hysteria_instance_1_obfs_password" value="{{ hy_primary.obfs_password or '' }}" autocomplete="new-password" spellcheck="false" data-salamander-password><button class="button secondary" type="button" data-salamander-show>Показать</button><button class="button secondary" type="button" data-salamander-copy>Копировать</button><button class="button primary" type="button" data-salamander-generate {% if not salamander_support.supported %}disabled title="Сначала обновите Xray до {{ salamander_support.minimum }}"{% endif %}>Сгенерировать</button></div>
+              <div class="sg-hy-secret-row"><input type="password" name="hysteria_instance_1_obfs_password" value="{{ hy_primary.obfs_password or '' }}" autocomplete="new-password" spellcheck="false" data-salamander-password><div class="sg-hy-secret-actions"><button class="button secondary" type="button" data-salamander-show>Показать</button><button class="button secondary" type="button" data-salamander-copy>Копировать</button><button class="button primary" type="button" data-salamander-generate {% if not salamander_support.supported %}disabled title="Сначала обновите Xray до {{ salamander_support.minimum }}"{% endif %}>Сгенерировать</button></div></div>
             </div>
             <p class="sg-hy-change-note"><b>Важно:</b><span>Включение, выключение или смена пароля изменяет все ранее выданные Hysteria2-профили этого Inbound. После применения обновятся ссылки, QR-коды и subscriptions.</span></p>
           </div>

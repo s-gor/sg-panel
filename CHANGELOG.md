@@ -1,5 +1,20 @@
 # Changelog
 
+## UI23 Repair4 — финальная GitHub-публикация 2026-07-27
+
+- объединены Inbound/Outbounds UX, Remaining UI Fix 2, Cluster Empty Fix 1, GeoFiles UI Fix 1 и Routing UI Fix 1;
+- добавлен DNS Frame Fix 1 без изменения DNS-логики;
+- исправлен updater: защита от вложенного `xpanel-mvp`, проверка места, облегчённый backup и безопасный rollback;
+- сохранены Direct/Block/WARP runtime, Xray runtime, база данных и SG-Node runtime;
+- версия приложения не менялась, Release и тег не создавались.
+
+## UI23 Repair4 — Inbound / Outbounds UX Fix 1
+
+- Renamed Xray Server page to «Входящие подключения» and clarified client → server direction.
+- Unified Direct, Block and WARP as equal system outbounds.
+- Moved WARP management into an expandable row instead of a separate large panel.
+- No backend/runtime changes.
+
 ## Current baseline — v0.10.0-rc70 · Preview 9 · FIX40 · UI23
 
 This repository starts from the cleaned cumulative UI23 baseline.
@@ -55,3 +70,17 @@ A real external Hysteria2 + Salamander client connection still requires a separa
 - Controller does not replace the full SG-Node Xray configuration when preparing Cascade.
 
 Older experimental build notes, generated audits, manifests and package checksums were removed from the repository. Their history remains available in Git history.
+
+## UI23 Repair4 — Routing UI Fix 1 (local package)
+- Routing page heading is now `Routing`.
+- Removed the heavy outline from the two top Routing status cards and aligned their rounding with the panel theme.
+- Increased only the small explanatory text inside Routing.
+- Added a dedicated cache key; no backend or Routing/WARP logic changes.
+
+## UI23 Repair4 — Remaining UI Fix 2 (local package)
+- Completed the four partially implemented UI items from Remaining UI Fix 1.
+- Outbounds now shows user-facing Direct/Block names; technical tags stay in “Дополнительно”.
+- DNS main page hides queryStrategy, +local schemes and raw technical addresses; Expert DNS retains them.
+- Security audit never falls back to raw endpoint names.
+- XMUX preset and manual blocks no longer use framed card borders.
+- No runtime, backend, routing, WARP, Xray, Node or updater logic changes.

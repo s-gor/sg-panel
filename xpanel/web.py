@@ -1150,6 +1150,9 @@ def create_app(test_config: dict | None = None) -> Flask:
                 "detail": validation["detail"],
                 "users": validation["users"],
             }
+            result = validation.get("result")
+            if isinstance(result, dict) and result.get("warnings"):
+                body["warnings"] = [str(item) for item in result["warnings"] if str(item).strip()]
             status = 200
         except (
             ValueError, XPanelError, PermissionError, FileNotFoundError, OSError,
@@ -2321,6 +2324,11 @@ def create_app(test_config: dict | None = None) -> Flask:
                 run_checks=request.args.get("checks") == "1"
             ),
             expert_core=get_expert_core_overview(),
+            dns_settings=get_dns_settings(),
+            dns_servers=list_dns_servers(),
+            dns_hosts=list_dns_hosts(),
+            dns_preview=preview_dns_json(),
+            dns_routing=get_routing_settings(),
         )
 
     @app.post("/settings/advanced/diagnostics")
@@ -3812,6 +3820,7 @@ def create_app(test_config: dict | None = None) -> Flask:
     @app.get("/dns/json")
     @login_required
     def dns_json_page():
+        return_to_expert = request.args.get("return_to") == "expert"
         return render_template(
             "section_json.html",
             page_title="DNS JSON",
@@ -3826,8 +3835,8 @@ def create_app(test_config: dict | None = None) -> Flask:
             ),
             json_label="Объект dns",
             json_config=dns_json_document(),
-            form_action=url_for("dns_json_save"),
-            back_url=url_for("dns_page"),
+            form_action=url_for("dns_json_save", return_to="expert") if return_to_expert else url_for("dns_json_save"),
+            back_url=(url_for("settings_advanced_page") + "#dns-expert") if return_to_expert else url_for("dns_page"),
         )
 
     @app.post("/dns/json")
@@ -3848,7 +3857,7 @@ def create_app(test_config: dict | None = None) -> Flask:
                 f"DNS JSON сохранён: {result['servers']} серверов, "
                 f"{result['hosts']} hosts-записей"
             )
-            return redirect(url_for("dns_page"))
+            return _dns_redirect()
         except (ValueError, XPanelError) as exc:
             flash(str(exc), "error")
             return render_template(
@@ -3862,9 +3871,14 @@ def create_app(test_config: dict | None = None) -> Flask:
                 description="Исправьте JSON и выполните проверку заново.",
                 json_label="Объект dns",
                 json_config=source,
-                form_action=url_for("dns_json_save"),
-                back_url=url_for("dns_page"),
+                form_action=url_for("dns_json_save", return_to="expert") if request.args.get("return_to") == "expert" else url_for("dns_json_save"),
+                back_url=(url_for("settings_advanced_page") + "#dns-expert") if request.args.get("return_to") == "expert" else url_for("dns_page"),
             ), 400
+
+    def _dns_redirect():
+        if request.form.get("return_to") == "expert" or request.args.get("return_to") == "expert":
+            return redirect(url_for("settings_advanced_page") + "#dns-expert")
+        return redirect(url_for("dns_page"))
 
     def dns_settings_form_values() -> dict[str, object]:
         return {
@@ -3894,7 +3908,7 @@ def create_app(test_config: dict | None = None) -> Flask:
             apply_saved_change("Настройки DNS сохранены")
         except (ValueError, XPanelError) as exc:
             flash(str(exc), "error")
-        return redirect(url_for("dns_page"))
+        return _dns_redirect()
 
     def dns_server_form_values() -> dict:
         return {
@@ -3925,7 +3939,7 @@ def create_app(test_config: dict | None = None) -> Flask:
             apply_saved_change(f"DNS-сервер {row['name']} добавлен")
         except (ValueError, XPanelError) as exc:
             flash(str(exc), "error")
-        return redirect(url_for("dns_page"))
+        return _dns_redirect()
 
     @app.get("/dns/servers/<int:server_id>/edit")
     @login_required
@@ -3946,10 +3960,10 @@ def create_app(test_config: dict | None = None) -> Flask:
             _require_validation_token(scope, _draft_payload())
             row = update_dns_server(server_id, **values)
             apply_saved_change(f"DNS-сервер {row['name']} обновлён")
-            return redirect(url_for("dns_page"))
+            return _dns_redirect()
         except (ValueError, XPanelError) as exc:
             flash(str(exc), "error")
-            return redirect(url_for("dns_server_edit_page", server_id=server_id))
+            return redirect(url_for("dns_server_edit_page", server_id=server_id, return_to=request.form.get("return_to", "")))
 
     @app.post("/dns/servers/<int:server_id>/toggle")
     @login_required
@@ -3965,7 +3979,7 @@ def create_app(test_config: dict | None = None) -> Flask:
             )
         except XPanelError as exc:
             flash(str(exc), "error")
-        return redirect(url_for("dns_page"))
+        return _dns_redirect()
 
     @app.post("/dns/servers/<int:server_id>/delete")
     @login_required
@@ -3976,7 +3990,7 @@ def create_app(test_config: dict | None = None) -> Flask:
             apply_saved_change(f"DNS-сервер {row['name']} удалён")
         except XPanelError as exc:
             flash(str(exc), "error")
-        return redirect(url_for("dns_page"))
+        return _dns_redirect()
 
     @app.post("/dns/hosts/add")
     @login_required
@@ -3997,7 +4011,7 @@ def create_app(test_config: dict | None = None) -> Flask:
             apply_saved_change(f"Hosts-запись {row['domain']} добавлена")
         except (ValueError, XPanelError) as exc:
             flash(str(exc), "error")
-        return redirect(url_for("dns_page"))
+        return _dns_redirect()
 
     @app.post("/dns/hosts/<int:host_id>/edit")
     @login_required
@@ -4018,7 +4032,7 @@ def create_app(test_config: dict | None = None) -> Flask:
             apply_saved_change(f"Hosts-запись {row['domain']} обновлена")
         except (ValueError, XPanelError) as exc:
             flash(str(exc), "error")
-        return redirect(url_for("dns_page"))
+        return _dns_redirect()
 
     @app.post("/dns/hosts/<int:host_id>/toggle")
     @login_required
@@ -4034,7 +4048,7 @@ def create_app(test_config: dict | None = None) -> Flask:
             )
         except XPanelError as exc:
             flash(str(exc), "error")
-        return redirect(url_for("dns_page"))
+        return _dns_redirect()
 
     @app.post("/dns/hosts/<int:host_id>/delete")
     @login_required
@@ -4045,7 +4059,7 @@ def create_app(test_config: dict | None = None) -> Flask:
             apply_saved_change(f"Hosts-запись {row['domain']} удалена")
         except XPanelError as exc:
             flash(str(exc), "error")
-        return redirect(url_for("dns_page"))
+        return _dns_redirect()
 
     @app.post("/dns/test")
     @login_required
@@ -4058,7 +4072,7 @@ def create_app(test_config: dict | None = None) -> Flask:
                 flash(f"Системный DNS: {result['detail']}", "error")
         except ValueError as exc:
             flash(str(exc), "error")
-        return redirect(url_for("dns_page"))
+        return _dns_redirect()
 
     @app.get("/routing")
     @login_required
@@ -4123,8 +4137,12 @@ def create_app(test_config: dict | None = None) -> Flask:
                 )
             _require_validation_token(scope, _draft_payload())
             result = apply_unified_routing(**values)
+            warning_suffix = ""
+            if result.get("warnings"):
+                warning_suffix = f" · {len(result['warnings'])} необязательных правил пропущено"
             apply_saved_change(
                 f"Routing применён: {result['title']} · {result['managed_rules']} управляемых правил"
+                + warning_suffix
             )
         except (ValueError, XPanelError) as exc:
             flash(str(exc), "error")

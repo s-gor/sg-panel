@@ -34,7 +34,16 @@
 .cluster-restore-empty > div { display: grid; gap: 5px; }
 .cluster-restore-empty span { color: var(--muted); font-size: 11px; }
 
-.cluster-restore-onboarding { margin-top: 0; }
+.cluster-restore-onboarding { margin-top: 0; overflow: hidden; }
+.cluster-restore-onboarding-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  padding: 18px 20px 8px; border: 0; background: transparent;
+}
+.cluster-restore-onboarding-head > span { display: grid; gap: 5px; }
+.cluster-restore-onboarding-head b { color: var(--text); font-size: 14px; }
+.cluster-restore-onboarding-head small { color: var(--muted); font-size: 10.5px; line-height: 1.45; }
+.cluster-list-section .compact-section-heading { border-bottom: 0 !important; }
+.cluster-list-section .cluster-restore-empty { border: 0 !important; box-shadow: none !important; }
 .cluster-restore-onboarding-body {
   display: grid; grid-template-columns: minmax(280px, .8fr) minmax(430px, 1.2fr);
   gap: 22px; align-items: end; padding: 0 20px 20px;
@@ -42,8 +51,6 @@
 .cluster-restore-onboarding-copy h2 { margin: 3px 0 7px; font-size: 21px; }
 .cluster-restore-onboarding-copy p:last-child { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.55; }
 .cluster-restore-node-form { padding: 0; grid-template-columns: minmax(220px, 1fr) auto; }
-.cluster-restore-onboarding[open] > summary em { font-size: 0; }
-.cluster-restore-onboarding[open] > summary em::after { content: "Скрыть"; font-size: 10px; }
 
 /* Server card: one compact status block, wide address and calm resource facts. */
 .node-restore-ui21 .section-tabs { margin-bottom: 16px; }

@@ -138,3 +138,45 @@ html[data-resolved-theme="light"] body.awg-clients-page.preview-9-rc6-typography
   content: none !important;
   display: none !important;
 }
+
+/* UI23 Repair4 Final Fix 1 · Clients local visual alignment only. */
+body.clients-layout-hotfix3 :is(.clients-awg-metrics article,.clients-awg-filter-panel,.clients-awg-table-card,.clients-awg-inspector) {
+  border: 1px solid var(--line) !important;
+  background: var(--panel) !important;
+  box-shadow: var(--shadow) !important;
+}
+body.clients-layout-hotfix3 .clients-awg-metrics article > span,
+body.clients-layout-hotfix3 .clients-awg-metrics article > strong { color: var(--text) !important; }
+body.clients-layout-hotfix3 .clients-awg-metrics article > small { color: var(--muted) !important; font-size: 12.5px !important; }
+body.clients-layout-hotfix3 .clients-awg-metrics article > a { color: var(--accent) !important; font-size: 11.5px !important; }
+body.clients-layout-hotfix3 .clients-filter-field > span { font-size: 10.5px !important; }
+body.clients-layout-hotfix3 .clients-awg-filter-panel footer { font-size: 11.5px !important; }
+body.clients-layout-hotfix3 .clients-list-heading {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 16px;
+  padding: 16px 18px 14px; border-bottom: 1px solid var(--line); background: transparent;
+}
+body.clients-layout-hotfix3 .clients-list-heading > div { min-width: 0; }
+body.clients-layout-hotfix3 .clients-list-heading .panel-kicker { margin-bottom: 4px; }
+body.clients-layout-hotfix3 .clients-list-heading h2 { margin: 0 0 4px; color: var(--text); font-size: 20px; line-height: 1.2; }
+body.clients-layout-hotfix3 .clients-list-heading p:last-child { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.45; }
+body.clients-layout-hotfix3 .clients-list-heading > span {
+  display: inline-flex; align-items: center; min-height: 30px; padding: 0 10px;
+  border: 1px solid var(--line); border-radius: 999px; color: var(--muted); font-size: 10.5px; font-weight: 760;
+}
+body.clients-layout-hotfix3 .clients-awg-table th { font-size: 10.5px !important; }
+body.clients-layout-hotfix3 .clients-awg-table td { font-size: 12.5px !important; }
+body.clients-layout-hotfix3 .clients-awg-table .client-identity-cell strong { font-size: 14px !important; }
+body.clients-layout-hotfix3 .clients-awg-table .client-identity-cell small { font-size: 11px !important; }
+body.clients-layout-hotfix3 .clients-awg-table .client-server-chip b { font-size: 13px !important; }
+body.clients-layout-hotfix3 .clients-awg-table .client-server-chip small { font-size: 10.5px !important; }
+body.clients-layout-hotfix3 .clients-awg-table :is(.client-status-badge,.route-badge) { font-size: 10px !important; }
+body.clients-layout-hotfix3 .clients-row-actions .client-action { min-height: 38px !important; font-size: 10.5px !important; }
+body.clients-layout-hotfix3 .clients-awg-inspector .client-detail-name h2 { font-size: 25px !important; }
+body.clients-layout-hotfix3 .clients-awg-server-card .server-role { font-size: 10px !important; }
+body.clients-layout-hotfix3 .clients-awg-server-card strong { font-size: 15px !important; }
+body.clients-layout-hotfix3 .clients-awg-server-card small { font-size: 11px !important; }
+body.clients-layout-hotfix3 .client-devices-section > header span,
+body.clients-layout-hotfix3 .clients-awg-facts dt { font-size: 10.5px !important; }
+body.clients-layout-hotfix3 .client-devices-section > header small,
+body.clients-layout-hotfix3 .clients-awg-facts dd { font-size: 12px !important; }
+@media (max-width: 760px) { body.clients-layout-hotfix3 .clients-list-heading { flex-direction: column; } }

@@ -39,7 +39,7 @@ def test_ui8_css_forces_visible_white_labels():
 def test_routing_title_and_clients_controller_status():
     routing = text("xpanel/templates/routing.html")
     users = text("xpanel/templates/users.html")
-    assert "{% block heading %}Маршрутизация{% endblock %}" in routing
+    assert "{% block heading %}Routing{% endblock %}" in routing
     assert "Единая схема правил" in routing
     assert "network-controller-state" in users
     assert '<strong class="{{ \'text-success\'' not in users

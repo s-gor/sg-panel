@@ -10,7 +10,7 @@ on:
       - "install.sh"
       - "install-or-upgrade.sh"
       - "CURRENT-UI23-REPAIR4.md"
-      - "GLOBAL-BUTTONS-PREVIEW3-OUTLINE-NOTES.md"
+      - "FINAL-SYSTEM1-NOTES.md"
       - "artifacts/UI23-REPAIR4/**"
       - ".github/workflows/verify-current-ui23.yml"
   pull_request:
@@ -22,7 +22,7 @@ on:
       - "install.sh"
       - "install-or-upgrade.sh"
       - "CURRENT-UI23-REPAIR4.md"
-      - "GLOBAL-BUTTONS-PREVIEW3-OUTLINE-NOTES.md"
+      - "FINAL-SYSTEM1-NOTES.md"
       - "artifacts/UI23-REPAIR4/**"
       - ".github/workflows/verify-current-ui23.yml"
   workflow_dispatch:
@@ -40,16 +40,16 @@ jobs:
       - name: Verify checksums and source archive
         working-directory: artifacts/UI23-REPAIR4
         run: |
-          sha256sum -c SG-PANEL-FIX40-UI23-REPAIR4-GLOBAL-BUTTONS-PREVIEW3-OUTLINE-SHA256.txt
-          unzip -tq SG-PANEL-FIX40-UI23-REPAIR4-GLOBAL-BUTTONS-PREVIEW3-OUTLINE-SOURCE.zip
+          sha256sum -c SG-PANEL-FIX40-UI23-REPAIR4-FINAL-SYSTEM1-SHA256.txt
+          unzip -tq SG-PANEL-FIX40-UI23-REPAIR4-FINAL-SYSTEM1-SOURCE.zip
 
       - name: Verify updater and full installer
         working-directory: artifacts/UI23-REPAIR4
         run: |
-          chmod +x SG-PANEL-FIX40-UI23-REPAIR4-GLOBAL-BUTTONS-PREVIEW3-OUTLINE.run
-          chmod +x SG-PANEL-FIX40-FULL-UI23-REPAIR4-GLOBAL-BUTTONS-PREVIEW3-OUTLINE.run
-          ./SG-PANEL-FIX40-UI23-REPAIR4-GLOBAL-BUTTONS-PREVIEW3-OUTLINE.run --verify-only
-          ./SG-PANEL-FIX40-FULL-UI23-REPAIR4-GLOBAL-BUTTONS-PREVIEW3-OUTLINE.run --verify-only
+          chmod +x SG-PANEL-FIX40-UI23-REPAIR4-FINAL-SYSTEM1.run
+          chmod +x SG-PANEL-FIX40-FULL-UI23-REPAIR4-FINAL-SYSTEM1.run
+          ./SG-PANEL-FIX40-UI23-REPAIR4-FINAL-SYSTEM1.run --verify-only
+          ./SG-PANEL-FIX40-FULL-UI23-REPAIR4-FINAL-SYSTEM1.run --verify-only
 
       - name: Compare embedded payloads
         working-directory: artifacts/UI23-REPAIR4
@@ -62,10 +62,10 @@ jobs:
             test -n "$line"
             tail -n +"$line" "$run_file" > "$output"
           }
-          extract_payload SG-PANEL-FIX40-UI23-REPAIR4-GLOBAL-BUTTONS-PREVIEW3-OUTLINE.run updater-payload.zip
-          extract_payload SG-PANEL-FIX40-FULL-UI23-REPAIR4-GLOBAL-BUTTONS-PREVIEW3-OUTLINE.run full-payload.zip
-          cmp -s updater-payload.zip SG-PANEL-FIX40-UI23-REPAIR4-GLOBAL-BUTTONS-PREVIEW3-OUTLINE-SOURCE.zip
-          cmp -s full-payload.zip SG-PANEL-FIX40-UI23-REPAIR4-GLOBAL-BUTTONS-PREVIEW3-OUTLINE-SOURCE.zip
+          extract_payload SG-PANEL-FIX40-UI23-REPAIR4-FINAL-SYSTEM1.run updater-payload.zip
+          extract_payload SG-PANEL-FIX40-FULL-UI23-REPAIR4-FINAL-SYSTEM1.run full-payload.zip
+          cmp -s updater-payload.zip SG-PANEL-FIX40-UI23-REPAIR4-FINAL-SYSTEM1-SOURCE.zip
+          cmp -s full-payload.zip SG-PANEL-FIX40-UI23-REPAIR4-FINAL-SYSTEM1-SOURCE.zip
           cmp -s updater-payload.zip full-payload.zip
 
       - name: Compare archived source with repository
@@ -74,7 +74,7 @@ jobs:
           set -Eeuo pipefail
           tmp="$(mktemp -d)"
           trap 'rm -rf "$tmp"' EXIT
-          unzip -q artifacts/UI23-REPAIR4/SG-PANEL-FIX40-UI23-REPAIR4-GLOBAL-BUTTONS-PREVIEW3-OUTLINE-SOURCE.zip -d "$tmp/source"
+          unzip -q artifacts/UI23-REPAIR4/SG-PANEL-FIX40-UI23-REPAIR4-FINAL-SYSTEM1-SOURCE.zip -d "$tmp/source"
           while IFS= read -r -d '' file; do
             rel="${file#"$tmp/source/"}"
             test -f "$rel"

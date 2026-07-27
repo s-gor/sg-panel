@@ -31,7 +31,7 @@
   {% if request.endpoint == 'routing_page' %}<link rel="stylesheet" href="{{ url_for('static', filename='routing-unified-preview1.css') }}?v={{ xpanel_version }}-ui23-repair4-routing-preview1">{% endif %}
   <link rel="stylesheet" href="{{ url_for('static', filename='fix35-full-recovery.css') }}?v={{ xpanel_version }}-sg070-preview9-fix39-routing-geofiles">
   <link rel="stylesheet" href="{{ url_for('static', filename='fix40-ui-repair.css') }}?v={{ xpanel_version }}-{{ xpanel_build|lower }}-clients-dns-sidebar">
-  {% if request.endpoint == 'users_page' %}<link rel="stylesheet" href="{{ url_for('static', filename='fix40-clients-layout-hotfix3.css') }}?v={{ xpanel_version }}-{{ xpanel_build|lower }}-clients-layout-hotfix3">{% endif %}
+  {% if request.endpoint == 'users_page' %}<link rel="stylesheet" href="{{ url_for('static', filename='fix40-clients-layout-hotfix3.css') }}?v={{ xpanel_version }}-{{ xpanel_build|lower }}-clients-layout-hotfix3-final-fix2">{% endif %}
   <link rel="stylesheet" href="{{ url_for('static', filename='fix40-global-jade-routing-vision-hotfix4.css') }}?v={{ xpanel_version }}-{{ xpanel_build|lower }}-global-jade-routing-vision-hotfix4">
   <link rel="stylesheet" href="{{ url_for('static', filename='fix40-interface-cleanup-hotfix5.css') }}?v={{ xpanel_version }}-{{ xpanel_build|lower }}-interface-cleanup-hotfix5">
   <link rel="stylesheet" href="{{ url_for('static', filename='fix40-ui-compact-hotfix6.css') }}?v={{ xpanel_version }}-{{ xpanel_build|lower }}-ui-compact-hotfix6">
@@ -43,14 +43,17 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='fix40-diagnostics-log-spacing-hotfix16.css') }}?v={{ xpanel_version }}-{{ xpanel_build|lower }}-diagnostics-log-spacing-hotfix16">
   <link rel="stylesheet" href="{{ url_for('static', filename='fix40-diagnostics-log-polish-hotfix17.css') }}?v={{ xpanel_version }}-{{ xpanel_build|lower }}-diagnostics-log-polish-hotfix17">
   <link rel="stylesheet" href="{{ url_for('static', filename='fix40-node-simple-hotfix18.css') }}?v={{ xpanel_version }}-{{ xpanel_build|lower }}-node-simple-hotfix18">
-  {% if request.endpoint == 'nodes_page' or (request.endpoint or '').startswith('node_') %}<link rel="stylesheet" href="{{ url_for('static', filename='fix40-cluster-restore-ui21.css') }}?v={{ xpanel_version }}-{{ xpanel_build|lower }}-cluster-restore-ui21">{% endif %}
+  {% if request.endpoint == 'nodes_page' or (request.endpoint or '').startswith('node_') %}<link rel="stylesheet" href="{{ url_for('static', filename='fix40-cluster-restore-ui21.css') }}?v={{ xpanel_version }}-{{ xpanel_build|lower }}-cluster-restore-ui21-final-fix2">{% endif %}
+  {% if request.endpoint == 'nodes_page' %}<link rel="stylesheet" href="{{ url_for('static', filename='fix40-cluster-empty-fix1.css') }}?v={{ xpanel_version }}-{{ xpanel_build|lower }}-cluster-empty-fix1">{% endif %}
   {% if request.endpoint == 'node_detail_page' %}<link rel="stylesheet" href="{{ url_for('static', filename='fix40-node-detail-polish-ui22.css') }}?v={{ xpanel_version }}-{{ xpanel_build|lower }}-node-detail-polish-ui22">{% endif %}
   {% if request.endpoint == 'cascade_page' %}<link rel="stylesheet" href="{{ url_for('static', filename='fix40-cascade-steps-ui20.css') }}?v={{ xpanel_version }}-{{ xpanel_build|lower }}-cascade-steps-ui20">{% endif %}
-  {% if request.endpoint == 'routing_page' %}<link rel="stylesheet" href="{{ url_for('static', filename='routing-unified-preview2-buttons.css') }}?v={{ xpanel_version }}-ui23-repair4-routing-preview2-buttons">{% endif %}
-  {% if request.endpoint == 'routing_page' %}<link rel="stylesheet" href="{{ url_for('static', filename='routing-unified-preview3-polish.css') }}?v={{ xpanel_version }}-ui23-repair4-routing-preview3-polish">{% endif %}
-  <link rel="stylesheet" href="{{ url_for('static', filename='fix40-global-buttons-preview1.css') }}?v={{ xpanel_version }}-ui23-repair4-global-buttons-preview1">
-  <link rel="stylesheet" href="{{ url_for('static', filename='fix40-global-buttons-preview2.css') }}?v={{ xpanel_version }}-ui23-repair4-global-buttons-preview2">
-  <link rel="stylesheet" href="{{ url_for('static', filename='fix40-global-buttons-preview3-outline.css') }}?v={{ xpanel_version }}-ui23-repair4-global-buttons-preview3-outline">
+  <link rel="stylesheet" href="{{ url_for('static', filename='fix40-ui23-repair4-final-system1.css') }}?v={{ xpanel_version }}-ui23-repair4-final-fix2">
+  {% if request.endpoint == 'routing_page' %}<link rel="stylesheet" href="{{ url_for('static', filename='fix40-routing-ui-fix1.css') }}?v={{ xpanel_version }}-{{ xpanel_build|lower }}-routing-ui-fix1">{% endif %}
+  {% if request.endpoint == 'geofiles_page' %}<link rel="stylesheet" href="{{ url_for('static', filename='fix40-geofiles-ui-fix1.css') }}?v={{ xpanel_version }}-{{ xpanel_build|lower }}-geofiles-ui-fix1">{% endif %}
+  {% if request.endpoint in ['outbounds_page','dns_page','security_page','updates_page','settings_page','settings_advanced_page'] %}<link rel="stylesheet" href="{{ url_for('static', filename='fix40-ui-remaining-fix1.css') }}?v={{ xpanel_version }}-{{ xpanel_build|lower }}-ui-remaining-fix1">{% endif %}
+  {% if request.endpoint in ['outbounds_page','dns_page','security_page','settings_page','settings_advanced_page'] %}<link rel="stylesheet" href="{{ url_for('static', filename='fix40-ui-remaining-fix2.css') }}?v={{ xpanel_version }}-{{ xpanel_build|lower }}-ui-remaining-fix2">{% endif %}
+  {% if request.endpoint in ['settings_page','outbounds_page'] %}<link rel="stylesheet" href="{{ url_for('static', filename='fix40-inbound-outbounds-ux-fix1.css') }}?v={{ xpanel_version }}-{{ xpanel_build|lower }}-inbound-outbounds-ux-fix1">{% endif %}
+  {% if request.endpoint == 'dns_page' %}<link rel="stylesheet" href="{{ url_for('static', filename='fix40-dns-frame-fix1.css') }}?v={{ xpanel_version }}-{{ xpanel_build|lower }}-dns-frame-fix1">{% endif %}
 </head>
 <body class="app-body ui-v097-standard rc20-awg-shell preview-2-awg-graphite preview-3-sidebar-polish preview-5-awg-clients-cascade preview-6-awg-clients-cascade-scale preview-7-awg-exact preview-9-rc6-typography {% if request.endpoint == 'cascade_page' %}sg-awg-cascade-rc6{% endif %} {% if request.endpoint == 'users_page' %}awg-clients-page{% endif %} {% if request.endpoint == 'nodes_page' %}awg-cluster-page{% endif %}">
 {% from "_country_flag.html" import country_flag %}
@@ -195,8 +198,9 @@
         <a class="{% if not endpoint.startswith('subscriptions_') and endpoint != 'subscriptions_page' and not endpoint.startswith('user_subscription_') %}active{% endif %}" href="{{ url_for('users_page') }}"><span class="section-tab-label">Clients</span></a>
         <a class="{% if endpoint.startswith('subscriptions_') or endpoint == 'subscriptions_page' or endpoint.startswith('user_subscription_') %}active{% endif %}" href="{{ url_for('subscriptions_page') }}"><span class="section-tab-label">Subscriptions</span></a>
       {% elif is_expert %}
-        <a class="{% if is_advanced %}active{% endif %}" href="{{ url_for('settings_advanced_page') }}"><span class="section-tab-label">Подключения</span></a>
+        <a class="{% if is_advanced %}active{% endif %}" data-expert-tab="transport" href="{{ url_for('settings_advanced_page') }}"><span class="section-tab-label">Подключения</span></a>
         <a class="{% if is_expert_inbound %}active{% endif %}" href="{{ url_for('settings_expert_inbound_page') }}"><span class="section-tab-label">Резервные Inbound</span></a>
+        <a data-expert-tab="dns" href="{{ url_for('settings_advanced_page') }}#dns-expert"><span class="section-tab-label">DNS</span></a>
         <a class="{% if endpoint.startswith('config_') or endpoint == 'config_page' %}active{% endif %}" href="{{ url_for('config_page') }}"><span class="section-tab-label">Xray Config</span></a>
       {% elif is_security %}
         <a class="active" data-security-tab="access" href="{{ url_for('security_page') }}#panel-access"><span class="section-tab-label">Доступ к панели</span></a>
@@ -373,6 +377,10 @@
 
     const status = document.createElement('div');
     const compactValidation = form.hasAttribute('data-validation-compact');
+    const currentTitle = (form.dataset.validationCurrentTitle || '').trim();
+    const currentSuffix = currentTitle
+      ? ' Продолжает работать: «' + currentTitle + '».'
+      : '';
     let successTimer = null;
     status.className = compactValidation ? 'validation-gate is-idle is-compact' : 'validation-gate is-pending';
     status.setAttribute('role', 'status');
@@ -418,7 +426,7 @@
       saveButton.disabled = true;
       showStatus('is-pending', compactValidation
         ? '<span class="validation-gate-mark">?</span><div><strong>Есть непроверенные изменения</strong></div>'
-        : '<span class="validation-gate-mark">?</span><div><strong>Данные изменены</strong><small>Выполните проверку ещё раз перед сохранением.</small></div>');
+        : '<span class="validation-gate-mark">?</span><div><strong>Выбранные изменения ещё не применены</strong><small>Выполните проверку перед сохранением.' + escapeHtml(currentSuffix) + '</small></div>');
     };
 
     form.addEventListener('input', (event) => {
@@ -457,13 +465,18 @@
         if (!token.value) throw new Error('Сервер не выдал подтверждение проверки');
         saveButton.disabled = false;
         const detail = body.detail && body.detail !== 'xray run -test: OK' ? body.detail : 'xray run -test: OK';
+        const warnings = Array.isArray(body.warnings) ? body.warnings.filter(Boolean) : [];
+        const successTitle = warnings.length ? 'Проверка пройдена с предупреждением' : (body.message || 'Проверка пройдена');
+        const successDetail = warnings.length
+          ? warnings.join(' · ') + ' Схема ещё не применена — нажмите «Сохранить и применить».'
+          : detail + (currentTitle ? ' Схема проверена, но ещё не применена.' : '');
         showStatus('is-success', compactValidation
-          ? '<span class="validation-gate-mark">✓</span><div><strong>Проверка пройдена</strong></div>'
-          : '<span class="validation-gate-mark">✓</span><div><strong>' + escapeHtml(body.message || 'Проверка пройдена') + '</strong><small>' + escapeHtml(detail) + '</small></div>', compactValidation);
+          ? '<span class="validation-gate-mark">✓</span><div><strong>' + escapeHtml(successTitle) + '</strong></div>'
+          : '<span class="validation-gate-mark">✓</span><div><strong>' + escapeHtml(successTitle) + '</strong><small>' + escapeHtml(successDetail) + '</small></div>', compactValidation);
       } catch (error) {
         token.value = '';
         saveButton.disabled = true;
-        showStatus('is-error', '<span class="validation-gate-mark">!</span><div><strong>Проверка не пройдена</strong><small>' + escapeHtml(error.message || String(error)) + '</small></div>');
+        showStatus('is-error', '<span class="validation-gate-mark">!</span><div><strong>Схема не применена</strong><small>' + escapeHtml(error.message || String(error)) + escapeHtml(currentSuffix) + '</small></div>');
       } finally {
         validateButton.disabled = false;
         validateButton.textContent = oldText;

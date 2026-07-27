@@ -217,9 +217,14 @@
   <details class="ui-card advanced update-manual-card">
     <summary><span><b>Запасной ручной способ обновления SG-Panel</b><small>Команда на случай недоступного веб-интерфейса</small></span><em>Открыть</em></summary>
     <div class="advanced-body">
-      <p>Если веб-интерфейс недоступен, распакуйте новый проверенный ZIP и запустите updater из корня нового исходного кода:</p>
-      <pre><code>cd /home/ubuntu/sg-panel-main
+      <p>Используйте этот способ только при недоступности веб-интерфейса. Команды ниже скачивают официальный ZIP текущей ветки GitHub <code>main</code>, распаковывают его в <code>/home/ubuntu/sg-panel-main</code> и запускают встроенный updater:</p>
+      <pre><code>cd /home/ubuntu
+rm -rf sg-panel-main sg-panel-main.zip
+curl -fL https://github.com/s-gor/sg-panel/archive/refs/heads/main.zip -o sg-panel-main.zip
+python3 -m zipfile -e sg-panel-main.zip .
+cd sg-panel-main
 sudo bash deploy/update-from-local-source.sh</code></pre>
+      <div class="alert warning"><span><strong>Важно:</strong> этот способ устанавливает текущую опубликованную версию из GitHub <code>main</code>. Локальная тестовая сборка в этот ZIP не входит.</span></div>
       <p>Ручной запуск использует тот же механизм страховочной копии, проверок и автоматического отката.</p>
     </div>
   </details>

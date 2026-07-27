@@ -1,0 +1,37 @@
+/* SG-Panel UI23 Repair4 · Remaining UI Fix 2
+   Final completion of the four previously partial UI items.
+   Scoped only; no global page-heading or typography changes. */
+
+/* XMUX / XHTTP: presets are choices, not nested framed windows. */
+body.server-settings-page .sg-xmux-preset {
+  border:0!important;
+  border-radius:var(--radius,14px)!important;
+  box-shadow:none!important;
+  background:color-mix(in srgb,var(--panel-3) 82%,transparent)!important;
+}
+body.server-settings-page .sg-xmux-preset:is(.is-selected,.is-current) {
+  border:0!important;
+  box-shadow:none!important;
+}
+body.server-settings-page .sg-xmux-preset.is-selected {
+  background:color-mix(in srgb,var(--accent) 10%,var(--panel-3))!important;
+}
+body.server-settings-page .sg-xmux-preset.is-current {
+  background:color-mix(in srgb,var(--success) 9%,var(--panel-3))!important;
+}
+body.server-settings-page .sg-xmux-preset.is-current.is-selected {
+  background:color-mix(in srgb,var(--success) 8%,color-mix(in srgb,var(--accent) 8%,var(--panel-3)))!important;
+}
+body.advanced-settings-page .expert-xmux-presets article,
+body.advanced-settings-page .expert-xmux-manual-block {
+  border:0!important;
+  box-shadow:none!important;
+}
+body.advanced-settings-page .expert-xmux-presets article {
+  border-radius:var(--radius,14px)!important;
+  background:color-mix(in srgb,var(--panel-2) 76%,transparent)!important;
+}
+body.advanced-settings-page .expert-xmux-manual-block {
+  border-radius:var(--radius,14px)!important;
+  background:color-mix(in srgb,var(--panel-2) 58%,transparent)!important;
+}

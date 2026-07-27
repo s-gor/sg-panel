@@ -1,0 +1,105 @@
+/* SG-Panel UI23 Repair4 · Routing final Gateway grid
+   Routing is intentionally restored after Global Buttons Preview 3.
+   Standard actions keep stable positions: Direct | WARP | Block.
+   Missing actions leave an empty slot instead of stretching neighbours. */
+
+body.routing-unified-preview1 .routing-unified-segments {
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  grid-auto-flow: row !important;
+  gap: 8px !important;
+}
+
+body.routing-unified-preview1 .routing-unified-segments > label {
+  min-width: 0 !important;
+}
+
+body.routing-unified-preview1 .routing-unified-segments > label:has(> input + span.route-direct) {
+  grid-column: 1 !important;
+}
+body.routing-unified-preview1 .routing-unified-segments > label:has(> input + span.route-warp) {
+  grid-column: 2 !important;
+}
+body.routing-unified-preview1 .routing-unified-segments > label:has(> input + span.route-block),
+body.routing-unified-preview1 .routing-unified-segments > label:has(> input + span.route-blocked) {
+  grid-column: 3 !important;
+}
+
+/* Restore the accepted Routing material after the global outline layer. */
+body.routing-unified-preview1 .routing-unified-segments label > span,
+body.routing-unified-preview1 .r096-choice-card > span {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 100% !important;
+  min-height: 44px !important;
+  box-sizing: border-box !important;
+  padding: 9px 12px !important;
+  border: 1px solid var(--rup2-option-border) !important;
+  border-radius: 10px !important;
+  background: var(--rup2-option-bg) !important;
+  background-color: transparent !important;
+  background-image: var(--rup2-option-bg) !important;
+  color: var(--rup2-option-text) !important;
+  -webkit-text-fill-color: var(--rup2-option-text) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.04) !important;
+  font-family: inherit !important;
+  font-size: 12px !important;
+  font-weight: 780 !important;
+  line-height: 1.25 !important;
+  text-align: center !important;
+  text-shadow: none !important;
+  opacity: 1 !important;
+}
+
+body.routing-unified-preview1 .routing-unified-segments label:hover > span,
+body.routing-unified-preview1 .r096-choice-card:hover > span {
+  border-color: color-mix(in srgb, var(--rup2-selected-border) 72%, var(--rup2-option-border)) !important;
+  background: var(--rup2-option-hover) !important;
+  background-image: var(--rup2-option-hover) !important;
+  color: var(--rup2-option-text) !important;
+  -webkit-text-fill-color: var(--rup2-option-text) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.06) !important;
+  transform: translateY(-1px) !important;
+}
+
+body.routing-unified-preview1 .routing-unified-segments label > input:checked + span,
+body.routing-unified-preview1 .r096-choice-card > input:checked + span {
+  border-color: var(--rup2-selected-border) !important;
+  background: var(--rup2-selected-bg) !important;
+  background-image: var(--rup2-selected-bg) !important;
+  color: var(--rup2-selected-text) !important;
+  -webkit-text-fill-color: var(--rup2-selected-text) !important;
+  box-shadow: var(--rup2-selected-shadow) !important;
+}
+
+body.routing-unified-preview1 .routing-unified-segments label:hover > input:checked + span,
+body.routing-unified-preview1 .r096-choice-card:hover > input:checked + span {
+  background: var(--rup2-selected-hover) !important;
+  background-image: var(--rup2-selected-hover) !important;
+}
+
+body.routing-unified-preview1 .routing-unified-segments label > input:disabled + span,
+body.routing-unified-preview1 .r096-choice-card > input:disabled + span {
+  border-color: var(--rup2-disabled-border) !important;
+  background: var(--rup2-disabled-bg) !important;
+  background-image: var(--rup2-disabled-bg) !important;
+  color: var(--rup2-disabled-text) !important;
+  -webkit-text-fill-color: var(--rup2-disabled-text) !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+body.routing-unified-preview1 .r096-russia-scope {
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+}
+
+@media (max-width: 760px) {
+  body.routing-unified-preview1 .routing-unified-segments,
+  body.routing-unified-preview1 .r096-russia-scope {
+    grid-template-columns: 1fr !important;
+  }
+  body.routing-unified-preview1 .routing-unified-segments > label {
+    grid-column: 1 !important;
+  }
+}

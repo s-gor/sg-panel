@@ -20,7 +20,7 @@ def test_system_tabs_and_cluster_cleanup_are_preserved() -> None:
     nodes = read("xpanel/templates/nodes.html")
     assert "grid-template-columns: repeat(3, minmax(0, 180px))" in css
     assert "background: #41586f" in css
-    assert '<details class="ui-card cluster-onboarding cluster-restore-onboarding" id="cluster-add-node">' in nodes
+    assert '<section class="ui-card cluster-onboarding cluster-restore-onboarding" id="cluster-add-node">' in nodes
     assert 'cluster-stage4-onboarding' not in nodes
 
 def test_outbounds_is_compact_and_has_one_help_control() -> None:

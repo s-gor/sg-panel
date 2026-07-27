@@ -18,12 +18,14 @@ OLD_XRAY_CONFIG_EXISTS=0
 OLD_XRAY_SECRET_EXISTS=0
 SERVER_COUNT=0
 CURRENT_STEP="Подготовка"
+FAILED_STEP=""
 SPINNER_PID=""
 STEP_STARTED=0
 WGCF_WARNING=0
 ACCESS_WARNING=0
 OLD_NODE_AGENT_EXISTS=0
 OLD_NODE_WORKER_EXISTS=0
+MAIN_BASHPID="$BASHPID"
 
 COLOR_GREEN=$'\033[1;32m'
 COLOR_RED=$'\033[1;31m'
@@ -33,6 +35,11 @@ COLOR_RESET=$'\033[0m'
 log(){ printf '[SG-Panel] %s\n' "$*" >>"$LOG_FILE"; }
 
 spinner_loop(){
+  # The progress indicator runs in a background subshell. It must never inherit
+  # the installer's rollback trap; stopping the spinner is not an update error.
+  trap - ERR
+  trap 'exit 0' INT TERM
+  set +e
   local label="$1" started="$2"
   local frames='|/-\'
   local frame_index=0 elapsed
@@ -78,17 +85,30 @@ step_ok(){
 }
 
 run_stage(){
-  local label="$1"
+  local label="$1" rc
   shift
   step_begin "$label"
+
+  # Keep command output in the detailed log, but let a non-zero status escape
+  # the redirection so the main ERR trap can print the failure to the terminal.
+  trap - ERR
+  set +e
   "$@" >>"$LOG_FILE" 2>&1
+  rc=$?
+  set -e
+  trap rollback ERR
+
+  if (( rc != 0 )); then
+    FAILED_STEP="$label"
+    return "$rc"
+  fi
   step_ok
 }
 
 show_failure(){
-  local rc="$1"
+  local rc="$1" label="${2:-${FAILED_STEP:-$CURRENT_STEP}}"
   stop_spinner
-  printf '\r\033[K[SG-Panel] [%sОШИБКА%s] %s\n' "$COLOR_RED" "$COLOR_RESET" "$CURRENT_STEP" >&2
+  printf '\r\033[K[SG-Panel] [%sОШИБКА%s] %s\n' "$COLOR_RED" "$COLOR_RESET" "$label" >&2
   if [[ -s "$LOG_FILE" ]]; then
     printf '\nПоследние полезные строки журнала:\n' >&2
     tail -n 35 "$LOG_FILE" >&2 || true
@@ -99,6 +119,13 @@ show_failure(){
 
 rollback(){
   local rc=$?
+  local failed_step="${FAILED_STEP:-$CURRENT_STEP}"
+  # ERR/TERM can be inherited by command substitutions or background helpers.
+  # Only the original installer shell may modify the live installation.
+  if [[ "$BASHPID" != "$MAIN_BASHPID" ]]; then
+    exit "$rc"
+  fi
+  trap - ERR INT TERM
   if [[ $ROLLBACK_RUNNING -eq 1 ]]; then
     exit "$rc"
   fi
@@ -117,9 +144,13 @@ rollback(){
     fi
 
     systemctl stop "$SERVICE" >>"$LOG_FILE" 2>&1 || true
-    rm -rf "$TARGET" >>"$LOG_FILE" 2>&1 || true
+    mkdir -p "$TARGET" >>"$LOG_FILE" 2>&1 || true
+    rm -rf --one-file-system "$TARGET/xpanel-mvp" >>"$LOG_FILE" 2>&1 || true
     if [[ $OLD_EXISTS -eq 1 && -d "$BACKUP_ROOT/xpanel-mvp" ]]; then
-      cp -a "$BACKUP_ROOT/xpanel-mvp" "$TARGET" >>"$LOG_FILE" 2>&1 || true
+      rsync -a --delete \
+        --exclude='.venv/' --exclude='backups/' --exclude='xpanel-mvp/' \
+        --exclude='__pycache__/' --exclude='*.pyc' \
+        "$BACKUP_ROOT/xpanel-mvp/" "$TARGET/" >>"$LOG_FILE" 2>&1 || true
     fi
     if [[ -f "$BACKUP_ROOT/web.env" ]]; then mkdir -p /etc/xpanel-mvp; cp -a "$BACKUP_ROOT/web.env" /etc/xpanel-mvp/web.env; fi
     if [[ -f "$BACKUP_ROOT/panel-access.env" ]]; then mkdir -p /etc/xpanel-mvp; cp -a "$BACKUP_ROOT/panel-access.env" /etc/xpanel-mvp/panel-access.env; fi
@@ -165,17 +196,18 @@ rollback(){
 
     local rollback_elapsed=$(( $(date +%s) - STEP_STARTED ))
     stop_spinner
-    if [[ $OLD_EXISTS -eq 1 && -d "$TARGET" ]]; then
+    if [[ $OLD_EXISTS -eq 1 && -f "$TARGET/xpanel/__init__.py" ]] && systemctl is-active --quiet "$SERVICE"; then
       printf '\r\033[K[SG-Panel] [%sOK%s] %s (%s сек)\n' \
         "$COLOR_GREEN" "$COLOR_RESET" "$CURRENT_STEP" "$rollback_elapsed" >&2
       log "Rollback завершён успешно за ${rollback_elapsed} сек"
+      rm -rf --one-file-system "$BACKUP_ROOT" >>"$LOG_FILE" 2>&1 || true
     else
       printf '\r\033[K[SG-Panel] [%sОШИБКА%s] Rollback не нашёл предыдущую установку\n' \
         "$COLOR_RED" "$COLOR_RESET" >&2
     fi
   fi
 
-  show_failure "$rc" || true
+  show_failure "$rc" "$failed_step" || true
   exit "$rc"
 }
 trap rollback ERR INT TERM
@@ -257,9 +289,52 @@ preflight(){
   fi
 }
 
+cleanup_nested_install_artifacts(){
+  local nested="$TARGET/xpanel-mvp"
+  [[ -e "$nested" ]] || return 0
+  [[ -f "$TARGET/xpanel/__init__.py" ]] || {
+    echo "обнаружен вложенный $nested, но основная установка не подтверждена; автоматическая очистка остановлена" >&2
+    return 1
+  }
+  rm -rf --one-file-system "$nested"
+}
+
+cleanup_failed_upgrade_backups(){
+  local root="/root/sg-panel-backups" backup stamp log_file
+  [[ -d "$root" ]] || return 0
+  while IFS= read -r -d '' backup; do
+    stamp="$(basename "$backup")"
+    log_file="/var/log/sg-panel-upgrade-${stamp}.log"
+    if [[ -f "$log_file" ]] \
+      && grep -Fq 'Ошибка на этапе:' "$log_file" \
+      && grep -Fq 'Rollback завершён успешно' "$log_file"; then
+      rm -rf --one-file-system "$backup"
+    fi
+  done < <(find "$root" -mindepth 1 -maxdepth 1 -type d -regextype posix-extended \
+    -regex '.*/[0-9]{8}-[0-9]{6}(-update-rollback)?' -print0)
+}
+
+check_upgrade_disk_space(){
+  local free_kb source_kb target_kb required_kb reserve_kb=262144
+  free_kb="$(df -Pk "$TARGET" 2>/dev/null | awk 'NR==2 {print $4}')"
+  [[ "$free_kb" =~ ^[0-9]+$ ]] || { echo "не удалось определить свободное место" >&2; return 1; }
+  source_kb="$(du -sk "$SOURCE_DIR" | awk '{print $1}')"
+  target_kb=0
+  if [[ -d "$TARGET" ]]; then
+    target_kb="$(du -sk --exclude='.venv' --exclude='backups' --exclude='xpanel-mvp' "$TARGET" | awk '{print $1}')"
+  fi
+  required_kb=$(( target_kb + source_kb + reserve_kb ))
+  if (( free_kb < required_kb )); then
+    printf 'недостаточно места: свободно %s MiB, требуется не менее %s MiB (включая резерв 256 MiB)\n' \
+      "$((free_kb / 1024))" "$((required_kb / 1024))" >&2
+    df -h "$TARGET" >&2 || true
+    return 1
+  fi
+}
+
 prune_upgrade_backups(){
-  local keep="${SG_PANEL_UPGRADE_BACKUP_RETENTION:-10}"
-  [[ "$keep" =~ ^[0-9]+$ ]] || keep=10
+  local keep="${SG_PANEL_UPGRADE_BACKUP_RETENTION:-3}"
+  [[ "$keep" =~ ^[0-9]+$ ]] || keep=3
   (( keep >= 2 )) || keep=2
   local root="/root/sg-panel-backups"
   [[ -d "$root" ]] || return 0
@@ -276,7 +351,11 @@ backup_stage(){
   mkdir -p "$BACKUP_ROOT"
   if [[ -d "$TARGET" ]]; then
     OLD_EXISTS=1
-    cp -a "$TARGET" "$BACKUP_ROOT/xpanel-mvp"
+    mkdir -p "$BACKUP_ROOT/xpanel-mvp"
+    rsync -a --delete \
+      --exclude='.venv/' --exclude='backups/' --exclude='xpanel-mvp/' \
+      --exclude='__pycache__/' --exclude='*.pyc' \
+      "$TARGET/" "$BACKUP_ROOT/xpanel-mvp/"
   fi
   if [[ -f /etc/xpanel-mvp/web.env ]]; then
     cp -a /etc/xpanel-mvp/web.env "$BACKUP_ROOT/web.env"
@@ -317,8 +396,9 @@ copy_stage(){
   ROLLBACK_NEEDED=1
   systemctl stop "$SERVICE" 2>/dev/null || true
   mkdir -p "$TARGET"
+  rm -rf --one-file-system "$TARGET/xpanel-mvp"
   rsync -a --delete \
-    --exclude='.git/' --exclude='.venv/' --exclude='data/' --exclude='backups/' \
+    --exclude='.git/' --exclude='.venv/' --exclude='data/' --exclude='backups/' --exclude='xpanel-mvp/' \
     --exclude='__pycache__/' --exclude='*.pyc' \
     "$SOURCE_DIR/" "$TARGET/"
   mkdir -p "$TARGET/data" "$TARGET/backups"
@@ -502,6 +582,9 @@ main(){
   preflight >>"$LOG_FILE" 2>&1
   step_ok
   printf '[SG-Panel] Все параметры приняты. Дальнейшее обновление не потребует ввода.\n'
+  run_stage "Очистка следов неудачных обновлений" cleanup_failed_upgrade_backups
+  run_stage "Удаление вложенного дубликата SG-Panel" cleanup_nested_install_artifacts
+  run_stage "Проверка свободного места" check_upgrade_disk_space
   run_stage "Создание резервной копии" backup_stage
   run_stage "Копирование SG-Panel $EXPECTED_RELEASE_LABEL" copy_stage
   run_stage "Синхронизация SG-Node Runtime, если этот сервер подключён как нода" node_runtime_stage

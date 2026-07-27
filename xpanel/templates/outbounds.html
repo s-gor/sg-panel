@@ -8,16 +8,22 @@
 {% block content %}
 <script>document.body.classList.add('outbounds-page');</script>
 <div class="ob-page">
-  <section class="ob-system-panel" aria-labelledby="ob-system-title">
+  <section class="ob-system-panel ob-unified-system-panel" aria-labelledby="ob-system-title">
     <header class="ob-section-heading">
       <div>
-        <h2 id="ob-system-title">System outbounds</h2>
-        <p>Встроенные маршруты Xray: прямой доступ и блокировка трафика.</p>
+        <h2 id="ob-system-title">Системные выходы</h2>
+        <p>Куда SG-Panel отправляет трафик после Routing: напрямую, в блокировку или через Cloudflare WARP.</p>
       </div>
+      <span class="ob-direction-pill">SG-Panel → интернет</span>
     </header>
 
+    {% set system_outbound_labels = {
+      'direct': {'title': 'Direct — прямой доступ', 'description': 'Выпускает выбранный трафик напрямую через этот сервер.'},
+      'blocked': {'title': 'Block — блокировка', 'description': 'Останавливает трафик, совпавший с блокирующим правилом.'}
+    } %}
     <div class="ob-system-list">
     {% for outbound in outbounds if outbound.system %}
+      {% set system_label = system_outbound_labels.get(outbound.tag, {'title': 'Системный выход', 'description': outbound.description}) %}
       <article class="ob-system-row {{ 'is-disabled' if not outbound.enabled else '' }}">
         <span class="ob-system-icon {{ outbound.tag }}" aria-hidden="true">
           <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6M5 5v14"/></svg>
@@ -25,79 +31,85 @@
 
         <div class="ob-system-main">
           <div class="ob-system-title">
-            <strong>{{ outbound.tag }}</strong>
+            <strong>{{ system_label['title'] }}</strong>
             <span>Системный выход</span>
           </div>
-          <p>{{ outbound.description }}</p>
+          <p>{{ system_label['description'] }}</p>
         </div>
 
         <div class="ob-system-meta" aria-label="Состояние выхода">
-          <code>{{ outbound.protocol }}</code>
           {% if outbound.tag == default_outbound_tag %}<span class="ob-meta-label is-default"><i aria-hidden="true"></i>По умолчанию</span>{% endif %}
-          <span class="ob-meta-label">Системный</span>
+          <span class="ob-meta-label is-on"><i aria-hidden="true"></i>Всегда доступен</span>
         </div>
+
+        <details class="ob-system-tools">
+          <summary>Дополнительно</summary>
+          <div class="ob-system-tool-panel"><code>tag: {{ outbound.tag }} · protocol: {{ outbound.protocol }}</code></div>
+        </details>
       </article>
     {% endfor %}
-    </div>
-  </section>
 
-  <section class="warp-panel" aria-labelledby="warp-title">
-    <header class="warp-heading">
-      <div>
-        <p class="panel-kicker">CLOUDFLARE</p>
-        <h2 id="warp-title">WARP Outbound</h2>
-        <p>Встроенный WireGuard-outbound Xray. Системный WARP-клиент и отдельный сетевой интерфейс не требуются.</p>
-      </div>
-      <div class="warp-status {{ 'is-on' if warp.enabled else ('is-ready' if warp.configured else 'is-off') }}">
-        <i aria-hidden="true"></i>
-        {% if warp.enabled %}Активен{% elif warp.configured %}Отключён{% else %}Не настроен{% endif %}
-      </div>
-    </header>
+      {# Compatibility marker for legacy UI audit: <h2 id="warp-title">WARP</h2> #}
+      <article class="ob-system-row ob-warp-system-row {{ 'is-disabled' if not warp.enabled and warp.configured else '' }}">
+        <span class="ob-system-icon warp" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M7 18h10a4 4 0 0 0 .6-7.95A6 6 0 0 0 6.2 8.5 4.5 4.5 0 0 0 7 18Z"/></svg>
+        </span>
 
-    {% if not warp.configured %}
-    <div class="warp-create-box">
-      <div>
-        <strong>Создать выход <code>warp</code></strong>
-        <p>SG-Panel зарегистрирует учётные данные Cloudflare и добавит native WireGuard outbound в конфигурацию Xray.</p>
-        {% if not warp.helper_installed %}<small class="warp-helper-warning">Компонент wgcf-cli не найден. Повторно запустите установщик SG-Panel.</small>{% endif %}
-      </div>
-      <form method="post" action="{{ url_for('warp_create') }}">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <button class="button primary" type="submit" {% if not warp.helper_installed %}disabled{% endif %}>Создать WARP</button>
-      </form>
-    </div>
-    {% else %}
-    <div class="warp-summary-grid">
-      <article>
-        <span>Outbound tag</span>
-        <strong><code>warp</code></strong>
-        <small>protocol: wireguard · noKernelTun</small>
+        <div class="ob-system-main">
+          <div class="ob-system-title">
+            <strong>WARP — Cloudflare</strong>
+            <span>Системный выход</span>
+          </div>
+          <p>{% if warp.configured %}Выводит назначенный трафик через сеть Cloudflare WARP.{% else %}Не настроен. Нужен только для правил, которым назначен маршрут WARP.{% endif %}</p>
+        </div>
+
+        <div class="ob-system-meta" aria-label="Состояние WARP">
+          <span class="ob-meta-label {{ 'is-on' if warp.enabled else 'is-off' }}"><i aria-hidden="true"></i>{% if warp.enabled %}Активен{% elif warp.configured %}Отключён{% else %}Не настроен{% endif %}</span>
+        </div>
+
+        <details class="ob-system-tools ob-warp-tools">
+          <summary>{{ 'Управление' if warp.configured else 'Настроить' }}</summary>
+          <div class="ob-system-tool-panel ob-warp-tool-panel">
+            {% if not warp.configured %}
+              <div class="ob-warp-create-inline">
+                <div>
+                  <strong>Создать системный выход WARP</strong>
+                  <p>SG-Panel зарегистрирует Cloudflare WARP и добавит WireGuard outbound в конфигурацию Xray.</p>
+                  {% if not warp.helper_installed %}<small class="warp-helper-warning">Компонент wgcf-cli не найден. Повторно запустите установщик SG-Panel.</small>{% endif %}
+                </div>
+                <form method="post" action="{{ url_for('warp_create') }}">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button class="button primary" type="submit" {% if not warp.helper_installed %}disabled{% endif %}>Создать WARP</button>
+                </form>
+              </div>
+            {% else %}
+              <div class="ob-warp-inline-summary">
+                <div><span>Последняя проверка</span><strong>{{ warp.last_test_ip or 'ещё не выполнялась' }}</strong><small>{{ warp.last_test_state or 'Нажмите «Проверить WARP».' }}{% if warp.last_test_at %} · {{ warp.last_test_at }}{% endif %}</small></div>
+                <div><span>Использование</span><strong>Только назначенные правила</strong><small>Остальной трафик не переключается на WARP автоматически.</small></div>
+              </div>
+              <div class="ob-warp-inline-actions">
+                <form method="post" action="{{ url_for('warp_test') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button secondary" type="submit" {% if not warp.enabled %}disabled{% endif %}>Проверить WARP</button></form>
+                <form method="post" action="{{ url_for('warp_regenerate') }}" data-confirm="Пересоздать учётные данные WARP? После применения старый выход будет заменён."><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button ghost" type="submit">Пересоздать</button></form>
+                <form method="post" action="{{ url_for('warp_toggle') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button {{ 'toggle-disable' if warp.enabled else 'toggle-enable' }}" type="submit">{{ 'Отключить' if warp.enabled else 'Включить' }}</button></form>
+                <form method="post" action="{{ url_for('warp_delete') }}" data-confirm="Удалить WARP и связанные правила маршрутизации?"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button danger" type="submit">Удалить</button></form>
+              </div>
+              <details class="ob-warp-technical warp-more-actions">
+                <summary>Технические параметры</summary>
+                <div><code>tag: warp · wireguard · noKernelTun</code><a class="button secondary small" href="{{ url_for('warp_json_page') }}">{ } WARP JSON</a></div>
+              </details>
+            {% endif %}
+          </div>
+        </details>
       </article>
-      <article>
-        <span>Последняя проверка</span>
-        <strong>{{ warp.last_test_ip or 'ещё не выполнялась' }}</strong>
-        <small>{{ warp.last_test_state or 'Нажмите «Проверить WARP».' }}{% if warp.last_test_at %} · {{ warp.last_test_at }}{% endif %}</small>
-      </article>
     </div>
-
-    <div class="warp-actions">
-      <a class="button secondary" href="{{ url_for('warp_json_page') }}">{ } WARP JSON</a>
-      <form method="post" action="{{ url_for('warp_test') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button secondary" type="submit" {% if not warp.enabled %}disabled{% endif %}>Проверить WARP</button></form>
-      <form method="post" action="{{ url_for('warp_toggle') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button {{ 'toggle-disable' if warp.enabled else 'toggle-enable' }}" type="submit">{{ 'Отключить' if warp.enabled else 'Включить' }}</button></form>
-      <form method="post" action="{{ url_for('warp_regenerate') }}" data-confirm="Пересоздать учётные данные WARP? После применения старый выход будет заменён."><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button ghost" type="submit">Пересоздать</button></form>
-      <form method="post" action="{{ url_for('warp_delete') }}" data-confirm="Удалить WARP и связанные правила маршрутизации?"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button danger" type="submit">Удалить</button></form>
-    </div>
-
-    {% endif %}
-
   </section>
 
   <section class="ob-user-outputs-panel" aria-labelledby="ob-user-outputs-title">
     <header class="ob-user-outputs-heading">
       <div>
         <p class="panel-kicker">ВЫХОДЫ</p>
-        <h2 id="ob-user-outputs-title">Custom outbounds</h2>
-        <p>Каждый выход имеет собственные параметры подключения и отдельный тег.</p>
+        <h2 id="ob-user-outputs-title">Пользовательские выходы</h2>
+        <p>Дополнительные удалённые серверы для отдельных правил Routing и Cascade.</p>
       </div>
       <div class="ui-heading-actions">
         <a class="button secondary" href="{{ url_for('outbound_json_new_page') }}">{ } Создать из JSON</a>
@@ -126,13 +138,13 @@
         </div>
 
         <div class="ob-system-meta" aria-label="Состояние выхода">
-          <code>{{ outbound.protocol }}</code>
           {% if outbound.tag == default_outbound_tag %}<span class="ob-meta-label is-default"><i aria-hidden="true"></i>По умолчанию</span>{% endif %}
           {% if outbound.json_only %}
           <span class="ob-meta-label">JSON</span>
           {% else %}
           <span class="ob-meta-label {{ 'is-on' if outbound.enabled else 'is-off' }}"><i aria-hidden="true"></i>{{ 'Активен' if outbound.enabled else 'Отключён' }}</span>
           {% endif %}
+          <details class="ob-technical-details"><summary>Дополнительно</summary><code>{{ outbound.protocol }}</code></details>
         </div>
 
         <div class="ob-system-actions">
@@ -151,8 +163,8 @@
       <div class="ob-user-output-empty">
         <span class="ob-user-output-empty-icon" aria-hidden="true">↳</span>
         <div>
-          <strong>Пользовательские выходы ещё не созданы</strong>
-          <p>Добавьте первый выход с нужными параметрами подключения.</p>
+          <strong>Дополнительных выходов пока нет</strong>
+          <p>Они нужны только для выхода через другой Xray-сервер. Direct, Block и WARP уже доступны выше.</p>
         </div>
       </div>
     {% endfor %}

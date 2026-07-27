@@ -1,0 +1,278 @@
+/* SG-Panel UI23 Repair4 · Final System 1
+   Replaces the three experimental Global Buttons layers and the failed Routing grid.
+   One restrained control system plus a dedicated, readable Routing composition. */
+
+body.preview-9-rc6-typography {
+  --sg-control-radius: 10px;
+  --sg-control-height: 40px;
+  --sg-control-weight: 780;
+  --sg-control-transition: .16s ease;
+}
+html[data-resolved-theme="dark"] body.preview-9-rc6-typography {
+  --sg-control-text: #dce7f1;
+  --sg-control-line: #4c657d;
+  --sg-control-line-hover: #6f89a1;
+  --sg-control-soft: rgba(92,122,151,.12);
+  --sg-control-soft-hover: rgba(92,122,151,.22);
+  --sg-control-fill: linear-gradient(180deg,#607f9c 0%,#4f6c87 100%);
+  --sg-control-fill-hover: linear-gradient(180deg,#6b8ba8 0%,#587690 100%);
+  --sg-control-fill-line: #7e9bb5;
+  --sg-control-fill-text: #fff;
+  --sg-control-shadow: 0 5px 14px rgba(3,10,18,.24), inset 0 1px 0 rgba(255,255,255,.08);
+}
+html[data-resolved-theme="light"] body.preview-9-rc6-typography {
+  --sg-control-text: #355046;
+  --sg-control-line: #8da397;
+  --sg-control-line-hover: #607d6e;
+  --sg-control-soft: rgba(80,119,100,.07);
+  --sg-control-soft-hover: rgba(80,119,100,.13);
+  --sg-control-fill: linear-gradient(180deg,#638d78 0%,#4f7764 100%);
+  --sg-control-fill-hover: linear-gradient(180deg,#6f9a84 0%,#587f6c 100%);
+  --sg-control-fill-line: #496e5b;
+  --sg-control-fill-text: #fffdf8;
+  --sg-control-shadow: 0 5px 14px rgba(48,70,59,.17), inset 0 1px 0 rgba(255,255,255,.25);
+}
+
+/* Ordinary actions are outlined. Primary and selected actions are filled. */
+body.preview-9-rc6-typography :is(
+  button.button,a.button,input.button,.login-submit,
+  .client-action:not(.more),.r096-primary-button,.r096-secondary-button,.r096-danger-button,
+  .routing-unified-footer .validation-button,.r096-rule-tabs button
+) {
+  min-height: var(--sg-control-height) !important;
+  box-sizing: border-box !important;
+  padding: 9px 15px !important;
+  border: 1px solid var(--sg-control-line) !important;
+  border-radius: var(--sg-control-radius) !important;
+  background: transparent !important;
+  color: var(--sg-control-text) !important;
+  -webkit-text-fill-color: currentColor !important;
+  box-shadow: none !important;
+  font: inherit !important;
+  font-size: 12px !important;
+  font-weight: var(--sg-control-weight) !important;
+  line-height: 1.2 !important;
+  text-decoration: none !important;
+  text-shadow: none !important;
+  transition: border-color var(--sg-control-transition),background var(--sg-control-transition),transform var(--sg-control-transition),box-shadow var(--sg-control-transition) !important;
+}
+body.preview-9-rc6-typography :is(
+  button.button,a.button,input.button,.login-submit,
+  .client-action:not(.more),.r096-primary-button,.r096-secondary-button,.r096-danger-button,
+  .routing-unified-footer .validation-button,.r096-rule-tabs button
+):not(:disabled):not([aria-disabled="true"]):hover {
+  border-color: var(--sg-control-line-hover) !important;
+  background: var(--sg-control-soft-hover) !important;
+  color: var(--sg-control-text) !important;
+  transform: translateY(-1px) !important;
+}
+body.preview-9-rc6-typography :is(.button.primary,.login-submit,.r096-primary-button),
+body.preview-9-rc6-typography :is(.section-tabs a.active,.nested-tabs a.active,.client-action.active,.r096-rule-tabs button.active) {
+  border-color: var(--sg-control-fill-line) !important;
+  background: var(--sg-control-fill) !important;
+  color: var(--sg-control-fill-text) !important;
+  -webkit-text-fill-color: currentColor !important;
+  box-shadow: var(--sg-control-shadow) !important;
+}
+body.preview-9-rc6-typography :is(.button.primary,.login-submit,.r096-primary-button):not(:disabled):hover {
+  background: var(--sg-control-fill-hover) !important;
+  color: var(--sg-control-fill-text) !important;
+}
+body.preview-9-rc6-typography :is(.button.danger,.r096-danger-button) {
+  border-color: color-mix(in srgb,var(--danger) 58%,var(--sg-control-line)) !important;
+  color: color-mix(in srgb,var(--danger) 76%,var(--sg-control-text)) !important;
+}
+body.preview-9-rc6-typography :is(button,a,input):focus-visible {
+  outline: 3px solid color-mix(in srgb,var(--sg-control-line-hover) 38%,transparent) !important;
+  outline-offset: 2px !important;
+}
+body.preview-9-rc6-typography :is(button.button,input.button,.login-submit,.r096-primary-button,.r096-secondary-button,.r096-danger-button,.routing-unified-footer .validation-button,.r096-rule-tabs button):disabled,
+body.preview-9-rc6-typography :is(a.button,.client-action:not(.more))[aria-disabled="true"] {
+  opacity: .42 !important;
+  cursor: not-allowed !important;
+  transform: none !important;
+  box-shadow: none !important;
+}
+body.preview-9-rc6-typography .button.small { min-height: 34px !important; padding: 7px 12px !important; font-size: 11px !important; }
+body.preview-9-rc6-typography :is(.section-tabs a,.nested-tabs a) {
+  border: 1px solid transparent !important;
+  border-radius: 9px !important;
+  background: transparent !important;
+  color: var(--muted) !important;
+  box-shadow: none !important;
+}
+body.preview-9-rc6-typography :is(.section-tabs a,.nested-tabs a):hover { background: var(--sg-control-soft) !important; color: var(--text) !important; }
+body.preview-9-rc6-typography :is(.section-tabs a.active,.nested-tabs a.active) { color: var(--sg-control-fill-text) !important; }
+
+/* Cluster: remove the accidental white strip and make the empty state one coherent card. */
+body.cluster-restore-ui21 .topbar-heading h1 { font-size: clamp(30px,3vw,42px) !important; line-height: 1.04 !important; }
+body.cluster-restore-ui21 .cluster-restore-page { gap: 16px !important; }
+body.cluster-restore-ui21 .cluster-list-section {
+  border: 1px solid var(--line) !important;
+  border-radius: 16px !important;
+  background: var(--panel) !important;
+  box-shadow: var(--shadow) !important;
+  padding: 18px 20px !important;
+  overflow: hidden !important;
+}
+body.cluster-restore-ui21 .compact-section-heading { margin: 0 !important; padding: 0 0 15px !important; background: transparent !important; border-bottom: 0 !important; }
+body.cluster-restore-ui21 .compact-section-heading h2 { margin: 4px 0 5px !important; font-size: 23px !important; }
+body.cluster-restore-ui21 .cluster-restore-empty {
+  margin: 0 !important;
+  padding: 17px 0 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+body.cluster-restore-ui21 .cluster-restore-onboarding-head { min-height: 64px !important; padding: 16px 20px 8px !important; }
+body.cluster-restore-ui21 .cluster-restore-onboarding-body { padding-top: 4px !important; }
+
+/* Routing final composition. */
+body.routing-final-system1 .content { padding-bottom: 30px !important; }
+body.routing-final-system1 .r096-page { max-width: 1560px !important; }
+body.routing-final-system1 #unified-routing-form { display: grid !important; gap: 16px !important; }
+body.routing-final-system1 .routing-scheme-status { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 14px; }
+body.routing-final-system1 .routing-status-card {
+  min-width: 0; border: 1px solid var(--r096-line-strong); border-radius: 14px;
+  background: var(--r096-card); padding: 17px 18px; box-shadow: var(--r096-shadow);
+}
+body.routing-final-system1 .routing-status-card.is-current { border-left: 4px solid var(--r096-accent); }
+body.routing-final-system1 .routing-status-card.is-selected { border-left: 4px solid var(--r096-line-strong); }
+body.routing-final-system1 .routing-status-card.is-selected.is-pending { border-left-color: var(--r096-warning); }
+body.routing-final-system1 .routing-status-card h2 { margin: 5px 0 5px; color: var(--r096-text); font-size: 20px; line-height: 1.2; }
+body.routing-final-system1 .routing-status-card > p:not(.panel-kicker) { margin: 0; color: var(--r096-muted); font-size: 12px; line-height: 1.45; }
+body.routing-final-system1 .routing-status-facts { display:flex; flex-wrap:wrap; gap:7px; margin-top:13px; }
+body.routing-final-system1 .routing-status-facts > span {
+  display:inline-flex; align-items:center; min-height:28px; border:1px solid var(--r096-line); border-radius:999px;
+  background:var(--r096-soft); padding:5px 9px; color:var(--r096-muted); font-size:10.5px;
+}
+body.routing-final-system1 .routing-status-facts b { margin-left:4px; color:var(--r096-text); }
+body.routing-final-system1 .routing-draft-pill { font-weight:800; }
+body.routing-final-system1 .is-pending .routing-draft-pill { border-color:color-mix(in srgb,var(--r096-warning) 55%,var(--r096-line)); color:var(--r096-warning); }
+body.routing-final-system1 .routing-current-warning { display:grid; gap:5px; margin-top:11px; color:var(--r096-warning); font-size:10.5px; }
+
+body.routing-final-system1 :is(.r096-card,.r096-user-rules,.routing-unified-footer) { border-radius:14px !important; }
+body.routing-final-system1 .routing-card-heading { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; margin-bottom:13px; }
+body.routing-final-system1 .routing-card-heading h2 { margin:0 0 5px; }
+body.routing-final-system1 .routing-card-heading p { margin:0; color:var(--r096-muted); font-size:11.5px; line-height:1.45; }
+body.routing-final-system1 .routing-order-hint { color:var(--r096-muted); font-size:10px; font-weight:800; white-space:nowrap; text-transform:uppercase; letter-spacing:.08em; }
+
+body.routing-final-system1 .r096-preset-grid { display:grid !important; grid-template-columns:repeat(2,minmax(0,1fr)) !important; gap:9px !important; }
+body.routing-final-system1 .r096-choice-card { min-width:0 !important; }
+body.routing-final-system1 .r096-choice-card > span,
+body.routing-final-system1 .r096-segments label > span,
+body.routing-final-system1 .routing-extra-actions label > span {
+  display:flex !important; align-items:center !important; justify-content:center !important; gap:8px !important;
+  min-height:42px !important; width:100% !important; box-sizing:border-box !important;
+  border:1px solid var(--sg-control-line) !important; border-radius:10px !important;
+  background:transparent !important; color:var(--sg-control-text) !important; -webkit-text-fill-color:currentColor !important;
+  padding:8px 11px !important; box-shadow:none !important; font-size:11.5px !important; font-weight:780 !important;
+  text-align:center !important; cursor:pointer !important; transition:all var(--sg-control-transition) !important;
+}
+body.routing-final-system1 .r096-choice-card > span { flex-wrap:wrap; }
+body.routing-final-system1 .r096-choice-card:hover > span,
+body.routing-final-system1 .r096-segments label:hover > span,
+body.routing-final-system1 .routing-extra-actions label:hover > span { border-color:var(--sg-control-line-hover) !important; background:var(--sg-control-soft-hover) !important; transform:translateY(-1px); }
+body.routing-final-system1 .r096-choice-card > input:checked + span,
+body.routing-final-system1 .r096-segments label > input:checked + span,
+body.routing-final-system1 .routing-extra-actions label > input:checked + span {
+  border-color:var(--sg-control-fill-line) !important; background:var(--sg-control-fill) !important;
+  color:var(--sg-control-fill-text) !important; box-shadow:var(--sg-control-shadow) !important;
+}
+body.routing-final-system1 .routing-current-preset-mark {
+  display:inline-flex; align-items:center; min-height:20px; border:1px solid currentColor; border-radius:999px;
+  padding:2px 7px; color:inherit !important; font-size:8.5px; font-weight:800; opacity:.88;
+}
+body.routing-final-system1 .r096-choice-card.disabled > span,
+body.routing-final-system1 .r096-choice-card > input:disabled + span { opacity:.42 !important; cursor:not-allowed !important; transform:none !important; }
+
+body.routing-final-system1 .r096-main-rules { padding:18px 20px !important; }
+body.routing-final-system1 .r096-rule-row {
+  display:grid !important; grid-template-columns:minmax(250px,.86fr) minmax(540px,1.4fr) !important;
+  align-items:center !important; gap:22px !important; min-height:66px !important; padding:10px 0 !important;
+}
+body.routing-final-system1 .r096-rule-row > div:first-child { min-width:0; }
+body.routing-final-system1 .r096-rule-row strong { font-size:12px !important; }
+body.routing-final-system1 .r096-rule-row small { font-size:10.5px !important; line-height:1.4 !important; }
+body.routing-final-system1 .routing-action-control { min-width:0; width:100%; max-width:760px; justify-self:end; }
+body.routing-final-system1 .routing-unified-segments { display:grid !important; grid-template-columns:repeat(3,minmax(0,1fr)) !important; gap:8px !important; width:100%; }
+body.routing-final-system1 .route-slot { min-width:0 !important; }
+body.routing-final-system1 .route-slot.is-empty { display:block; min-height:42px; visibility:hidden; }
+body.routing-final-system1 .routing-extra-actions { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; margin-top:8px; }
+body.routing-final-system1 .routing-extra-actions:empty { display:none; }
+body.routing-final-system1 .routing-extra-actions label { min-width:0; }
+body.routing-final-system1 .r096-russia-block {
+  margin:7px 0; border:1px solid var(--r096-line-strong) !important; border-radius:12px !important;
+  background:color-mix(in srgb,var(--r096-raised) 82%,transparent) !important; padding:13px 14px 4px !important;
+}
+body.routing-final-system1 .routing-subheading { display:grid; gap:4px; margin-bottom:10px; }
+body.routing-final-system1 .routing-subheading strong { color:var(--r096-text); font-size:12px; }
+body.routing-final-system1 .routing-subheading small { color:var(--r096-muted); font-size:10.5px; }
+body.routing-final-system1 .r096-russia-scope { display:grid !important; grid-template-columns:repeat(3,minmax(0,1fr)) !important; gap:8px !important; }
+body.routing-final-system1 .r096-rule-row.nested { margin-top:5px; padding-top:10px !important; }
+body.routing-final-system1 .routing-category-missing { color:var(--r096-warning); font-weight:750; }
+
+body.routing-final-system1 .routing-unified-footer {
+  position:static !important; display:grid !important; grid-template-columns:minmax(0,1fr) auto !important;
+  grid-template-rows:auto auto !important; align-items:center !important; gap:8px 18px !important;
+  margin:0 !important; padding:16px 18px !important; border:1px solid var(--r096-line-strong) !important;
+  background:var(--r096-card) !important; box-shadow:var(--r096-shadow) !important;
+}
+body.routing-final-system1 .routing-apply-copy { display:grid; gap:4px; grid-column:1; grid-row:1; }
+body.routing-final-system1 .routing-apply-copy strong { color:var(--r096-text); font-size:13px; }
+body.routing-final-system1 .routing-apply-copy span { color:var(--r096-muted); font-size:11px; }
+body.routing-final-system1 .routing-unified-footer > .validation-gate { grid-column:1; grid-row:2; width:auto !important; margin:3px 0 0 !important; }
+body.routing-final-system1 .routing-unified-footer > .ui-actions { grid-column:2; grid-row:1 / span 2; justify-self:end; margin:0 !important; }
+body.routing-final-system1 .routing-unified-footer .validation-button,
+body.routing-final-system1 .routing-unified-footer .r096-primary-button { min-width:190px; }
+body.routing-final-system1 .routing-unified-footer .validation-gate small { line-height:1.45; }
+
+body.routing-final-system1 .routing-summary-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
+body.routing-final-system1 .routing-summary-grid .r096-card { margin:0; }
+body.routing-final-system1 .r096-warning-card { align-items:flex-start !important; line-height:1.5 !important; }
+
+@media (max-width:1100px) {
+  body.routing-final-system1 .routing-scheme-status,
+  body.routing-final-system1 .routing-summary-grid { grid-template-columns:1fr; }
+  body.routing-final-system1 .r096-rule-row { grid-template-columns:1fr !important; gap:9px !important; }
+  body.routing-final-system1 .routing-action-control { max-width:none; justify-self:stretch; }
+}
+@media (max-width:760px) {
+  body.routing-final-system1 .r096-preset-grid { grid-template-columns:1fr !important; }
+  body.routing-final-system1 .routing-unified-segments,
+  body.routing-final-system1 .r096-russia-scope,
+  body.routing-final-system1 .routing-extra-actions { grid-template-columns:1fr !important; }
+  body.routing-final-system1 .route-slot.is-empty { display:none; }
+  body.routing-final-system1 .routing-unified-footer { grid-template-columns:1fr !important; }
+  body.routing-final-system1 .routing-unified-footer > :is(.routing-apply-copy,.validation-gate,.ui-actions) { grid-column:1 !important; grid-row:auto !important; justify-self:stretch !important; }
+  body.routing-final-system1 .routing-unified-footer .ui-actions { display:grid !important; grid-template-columns:1fr !important; }
+  body.routing-final-system1 .routing-unified-footer :is(.validation-button,.r096-primary-button) { width:100%; min-width:0; }
+}
+
+/* UI23 Repair4 Final Fix 1 · Routing local visual alignment only. */
+body.routing-final-system1 .topbar-heading h1,
+body.routing-final-system1 .topbar-heading .page-subtitle {
+  display: block !important;
+}
+body.routing-final-system1 .topbar-heading { min-height: 0 !important; }
+body.routing-final-system1 :is(.routing-status-card,.r096-card,.r096-user-rules,.routing-unified-footer) {
+  border-color: var(--line) !important;
+  background: var(--panel) !important;
+  box-shadow: var(--shadow) !important;
+}
+body.routing-final-system1 .routing-status-card h2 { font-size: 22px !important; }
+body.routing-final-system1 .routing-status-card > p:not(.panel-kicker) { font-size: 13px !important; }
+body.routing-final-system1 .routing-status-facts > span { font-size: 11px !important; }
+body.routing-final-system1 .routing-current-warning { font-size: 11.5px !important; }
+body.routing-final-system1 .routing-card-heading h2 { font-size: 20px !important; }
+body.routing-final-system1 .routing-card-heading p { font-size: 12.5px !important; }
+body.routing-final-system1 .routing-order-hint { font-size: 10.5px !important; }
+body.routing-final-system1 .r096-rule-row strong,
+body.routing-final-system1 .routing-subheading strong { font-size: 13.5px !important; }
+body.routing-final-system1 .r096-rule-row small,
+body.routing-final-system1 .routing-subheading small { font-size: 11.5px !important; }
+body.routing-final-system1 .r096-russia-block {
+  border-color: var(--line) !important;
+  background: var(--panel-2) !important;
+}
