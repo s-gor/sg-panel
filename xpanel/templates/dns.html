@@ -4,14 +4,29 @@
 {% block heading %}DNS{% endblock %}
 {% block subtitle %}Понятный список резолверов, их порядок и состояние{% endblock %}
 {% block page_actions %}<a class="button secondary" href="{{ url_for('settings_advanced_page') }}#dns-expert">Expert DNS</a>{% endblock %}
+
 {% block content %}
-<script>document.body.classList.add('ui-standard-page','dns-page','dns-simple-page');</script>
-<div class="ui-page ui-page-wide dns-simple-layout">
-  <span hidden aria-hidden="true">Контекстный JSON DNS · Общие настройки DNS</span>
-  <section class="dns-simple-top">
-    <article class="ui-card dns-current-card">
-      <header class="ui-card-heading"><div><p class="panel-kicker">ТЕКУЩЕЕ СОСТОЯНИЕ</p><h2>Встроенный DNS Xray</h2><p>Основной экран показывает только то, что нужно для ежедневной работы.</p></div><span class="pill {{ 'enabled' if settings.enabled else 'disabled' }}"><i></i>{{ 'Включён' if settings.enabled else 'Выключен' }}</span></header>
-      <form method="post" action="{{ url_for('dns_settings_save') }}" class="ui-form dns-simple-settings" data-validated-form>
+<script>document.body.classList.add('ui-standard-page','dns-rebuild-page');</script>
+
+<div class="dnsr-page">
+  <section class="dnsr-top">
+
+    <article class="dnsr-card dnsr-current">
+      <header class="dnsr-card-head">
+        <div>
+          <p class="panel-kicker">ТЕКУЩЕЕ СОСТОЯНИЕ</p>
+          <h2>Встроенный DNS Xray</h2>
+          <p>Основной экран показывает только то, что нужно для ежедневной работы.</p>
+        </div>
+        <span class="pill {{ 'enabled' if settings.enabled else 'disabled' }}">
+          <i></i>{{ 'Включён' if settings.enabled else 'Выключен' }}
+        </span>
+      </header>
+
+      <form method="post"
+            action="{{ url_for('dns_settings_save') }}"
+            class="ui-form dnsr-form dnsr-settings-form"
+            data-validated-form data-validation-compact>
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         {% if settings.disable_cache %}<input type="hidden" name="disable_cache" value="1">{% endif %}
         {% if settings.disable_fallback %}<input type="hidden" name="disable_fallback" value="1">{% endif %}
@@ -19,36 +34,135 @@
         {% if settings.enable_parallel_query %}<input type="hidden" name="enable_parallel_query" value="1">{% endif %}
         {% if settings.use_system_hosts %}<input type="hidden" name="use_system_hosts" value="1">{% endif %}
         <input type="hidden" name="query_strategy" value="{{ settings.query_strategy }}">
-        <label class="ui-toggle-row"><span><strong>Использовать DNS Xray</strong><small>{{ servers|length }} {{ 'сервер настроен' if servers|length == 1 else 'серверов настроено' }} · расширенные параметры сохранены в Expert DNS</small></span><input type="checkbox" name="enabled" {% if settings.enabled %}checked{% endif %}><span class="switch"></span></label>
-        <div class="ui-actions"><button class="button primary" type="submit">Проверить и применить</button></div>
+
+        <label class="ui-toggle-row dnsr-toggle-row">
+          <span>
+            <strong>Использовать DNS Xray</strong>
+            <small>{{ servers|length }} {{ 'сервер настроен' if servers|length == 1 else 'серверов настроено' }} · расширенные параметры сохранены в Expert DNS</small>
+          </span>
+          <input type="checkbox" name="enabled" {% if settings.enabled %}checked{% endif %}>
+          <span class="switch"></span>
+        </label>
+
+        <div class="ui-actions dnsr-actions">
+          <button class="button primary" type="submit">Применить</button>
+        </div>
       </form>
     </article>
 
-    <article class="ui-card dns-basic-add-card">
-      <header class="ui-card-heading"><div><p class="panel-kicker">НОВЫЙ DNS-СЕРВЕР</p><h2>Добавить резолвер</h2><p>Название, адрес и порядок. Условия и специальные параметры доступны в Expert DNS.</p></div></header>
-      <form method="post" action="{{ url_for('dns_server_add') }}" class="ui-form" data-validated-form>
+    <article class="dnsr-card dnsr-add">
+      <header class="dnsr-card-head">
+        <div>
+          <p class="panel-kicker">НОВЫЙ DNS-СЕРВЕР</p>
+          <h2>Добавить резолвер</h2>
+          <p>Название, адрес и порядок. Условия и специальные параметры доступны в Expert DNS.</p>
+        </div>
+      </header>
+
+      <form method="post"
+            action="{{ url_for('dns_server_add') }}"
+            class="ui-form dnsr-form dnsr-add-form"
+            data-validated-form data-validation-compact>
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <input type="hidden" name="query_strategy" value="">
         <input type="hidden" name="timeout_ms" value="4000">
-        <div class="ui-field-grid dns-name-grid"><label><span>Название</span><input name="name" required placeholder="Cloudflare DoH"></label><label><span>Приоритет</span><input name="priority" type="number" min="1" max="9999" value="100" required></label></div>
-        <label><span>Адрес резолвера</span><input name="address" required placeholder="1.1.1.1"><small>Укажите IP-адрес или обычный HTTPS-адрес DoH. Специальные схемы и условия доступны в Expert DNS.</small></label>
-        <div class="ui-actions"><button class="button primary" type="submit">Добавить сервер</button></div>
+
+        <div class="dnsr-field-grid">
+          <label class="dnsr-field">
+            <span>Название</span>
+            <input name="name" required placeholder="Cloudflare DoH">
+          </label>
+          <label class="dnsr-field dnsr-priority">
+            <span>Приоритет</span>
+            <input name="priority" type="number" min="1" max="9999" value="100" required>
+          </label>
+        </div>
+
+        <label class="dnsr-field">
+          <span>Адрес резолвера</span>
+          <input name="address" required placeholder="1.1.1.1">
+          <small>Укажите IP-адрес или обычный HTTPS-адрес DoH. Специальные схемы и условия доступны в Expert DNS.</small>
+        </label>
+
+        <div class="ui-actions dnsr-actions">
+          <button class="button primary" type="submit">Добавить сервер</button>
+        </div>
       </form>
     </article>
+
   </section>
 
-  <section class="ui-card ui-table-card dns-simple-servers">
-    <header class="ui-card-heading ui-card-heading-row"><div><h2>DNS-серверы</h2><p>Чем меньше число приоритета, тем раньше сервер участвует в обработке запроса.</p></div><span class="ui-counter">{{ servers|length }} {{ 'сервер' if servers|length == 1 else 'серверов' }}</span></header>
+  <section class="dnsr-list-card">
+    <header class="dnsr-list-head">
+      <div>
+        <h2>DNS-серверы</h2>
+        <p>Чем меньше число приоритета, тем раньше сервер участвует в обработке запроса.</p>
+      </div>
+      <span class="ui-counter">{{ servers|length }} {{ 'сервер' if servers|length == 1 else 'серверов' }}</span>
+    </header>
+
     {% if servers %}
-    <div class="table-wrap"><table class="dns-server-table"><thead><tr><th>DNS-сервер / приоритет</th><th>Статус</th><th>Действия</th></tr></thead><tbody>
-    {% for server in servers %}
-      {% set server_kind = 'Защищённый DNS (DoH)' if server.address.startswith('https') else ('DNS over TCP' if server.address.startswith('tcp') else ('DNS over QUIC' if server.address.startswith('quic') else 'Обычный DNS')) %}
-      <tr><td><div class="dns-server-identity"><div><strong>{{ server.name }}</strong><small class="block-muted">{{ server_kind }}</small></div><span class="dns-priority-note">Приоритет {{ server.priority }}</span></div></td><td><span class="pill {{ 'enabled' if server.enabled else 'disabled' }}"><i></i>{{ 'Активен' if server.enabled else 'Отключён' }}</span></td><td><div class="row-actions"><a class="button ghost small" href="{{ url_for('dns_server_edit_page', server_id=server.id) }}">Изменить</a><form method="post" action="{{ url_for('dns_server_toggle', server_id=server.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button small {{ 'toggle-disable' if server.enabled else 'toggle-enable' }}" type="submit">{{ 'Отключить' if server.enabled else 'Включить' }}</button></form><form method="post" action="{{ url_for('dns_server_delete', server_id=server.id) }}" data-confirm="Удалить DNS-сервер {{ server.name }}?"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button danger small" type="submit">Удалить</button></form></div></td></tr>
-    {% endfor %}
-    </tbody></table></div>
-    {% else %}<div class="ui-empty-compact"><strong>DNS-серверов пока нет</strong><p>Добавьте первый резолвер в форме выше.</p></div>{% endif %}
+    <div class="dnsr-table-wrap">
+      <table class="dnsr-table">
+        <thead>
+          <tr>
+            <th>DNS-сервер / приоритет</th>
+            <th>Статус</th>
+            <th>Действия</th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for server in servers %}
+          {% set server_kind = 'Защищённый DNS (DoH)' if server.address.startswith('https') else ('DNS over TCP' if server.address.startswith('tcp') else ('DNS over QUIC' if server.address.startswith('quic') else 'Обычный DNS')) %}
+          <tr>
+            <td>
+              <div class="dnsr-server-id">
+                <div>
+                  <strong>{{ server.name }}</strong>
+                  <small>{{ server_kind }}</small>
+                </div>
+                <span class="dnsr-priority-note">Приоритет {{ server.priority }}</span>
+              </div>
+            </td>
+            <td>
+              <span class="pill {{ 'enabled' if server.enabled else 'disabled' }}">
+                <i></i>{{ 'Активен' if server.enabled else 'Отключён' }}
+              </span>
+            </td>
+            <td>
+              <div class="row-actions">
+                <a class="button ghost small" href="{{ url_for('dns_server_edit_page', server_id=server.id) }}">Изменить</a>
+                <form method="post" action="{{ url_for('dns_server_toggle', server_id=server.id) }}">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button class="button small {{ 'toggle-disable' if server.enabled else 'toggle-enable' }}" type="submit">
+                    {{ 'Отключить' if server.enabled else 'Включить' }}
+                  </button>
+                </form>
+                <form method="post"
+                      action="{{ url_for('dns_server_delete', server_id=server.id) }}"
+                      data-confirm="Удалить DNS-сервер {{ server.name }}?">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button class="button danger small" type="submit">Удалить</button>
+                </form>
+              </div>
+            </td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="dnsr-empty">
+      <strong>DNS-серверов пока нет</strong>
+      <p>Добавьте первый резолвер в форме выше.</p>
+    </div>
+    {% endif %}
   </section>
 
-  <aside class="ui-info-note dns-expert-pointer"><span>i</span><p><strong>Hosts, Контекстный JSON DNS и специальные условия перенесены в Expert.</strong> Там доступны domains, expected IP, fallback, cache и полный DNS-фрагмент Xray.</p><a class="button secondary" href="{{ url_for('settings_advanced_page') }}#dns-expert">Открыть Expert DNS</a></aside>
+  <aside class="dnsr-expert-note">
+    <span class="dnsr-info-icon">i</span>
+    <p><strong>Расширенные параметры находятся в Expert DNS.</strong> Там доступны domains, expected IP, fallback, cache, Hosts и полный DNS-фрагмент Xray.</p>
+    <a class="button secondary" href="{{ url_for('settings_advanced_page') }}#dns-expert">Открыть Expert DNS</a>
+  </aside>
 </div>
 {% endblock %}

@@ -128,9 +128,9 @@ body.outbounds-gateway-style2 .ob-gw-warp-head .panel-kicker {
 }
 body.outbounds-gateway-style2 .ob-gw-warp-head h2 {
   margin: 0 0 8px !important;
-  font-size: 32px !important;
-  line-height: 1.1 !important;
-  letter-spacing: -.02em !important;
+  font-size: 24px !important;
+  line-height: 1.15 !important;
+  letter-spacing: -.01em !important;
 }
 body.outbounds-gateway-style2 .ob-gw-warp-head p:not(.panel-kicker) {
   margin: 0 !important;
@@ -315,7 +315,7 @@ body.outbounds-gateway-style2 .ob-user-outputs-heading .ui-heading-actions .butt
     padding: 20px 18px 14px !important;
   }
   body.outbounds-gateway-style2 .ob-gw-warp-head h2 {
-    font-size: 26px !important;
+    font-size: 22px !important;
   }
   body.outbounds-gateway-style2 .ob-gw-warp-body {
     padding: 0 18px 18px !important;

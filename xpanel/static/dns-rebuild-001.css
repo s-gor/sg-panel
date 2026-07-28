@@ -1,0 +1,429 @@
+/* SG-Panel DNS Rebuild 001
+   Clean DNS page built on independent dnsr-* classes.
+   No dependency on old dns-simple-* or dns-*-card geometry. */
+
+body.dns-rebuild-page .dnsr-page {
+  display: grid;
+  gap: 16px;
+  width: 100%;
+}
+
+body.dns-rebuild-page .dnsr-top {
+  display: grid;
+  grid-template-columns: minmax(0,.9fr) minmax(0,1.1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+body.dns-rebuild-page .dnsr-card,
+body.dns-rebuild-page .dnsr-list-card {
+  min-width: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: 16px;
+  background: var(--panel, var(--panel-2));
+  box-shadow: 0 8px 22px rgba(35,47,49,.10);
+}
+
+body.dns-rebuild-page .dnsr-card::before,
+body.dns-rebuild-page .dnsr-card::after,
+body.dns-rebuild-page .dnsr-list-card::before,
+body.dns-rebuild-page .dnsr-list-card::after {
+  display: none !important;
+}
+
+body.dns-rebuild-page .dnsr-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 20px 22px 14px;
+  border: 0;
+  background: transparent;
+}
+
+body.dns-rebuild-page .dnsr-card-head > div {
+  min-width: 0;
+}
+
+body.dns-rebuild-page .dnsr-card-head .panel-kicker {
+  margin: 0 0 7px;
+}
+
+body.dns-rebuild-page .dnsr-card-head h2,
+body.dns-rebuild-page .dnsr-list-head h2 {
+  margin: 0;
+  color: var(--text);
+  font-size: 20px;
+  line-height: 1.2;
+}
+
+body.dns-rebuild-page .dnsr-card-head p:last-child,
+body.dns-rebuild-page .dnsr-list-head p {
+  margin: 7px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+body.dns-rebuild-page .dnsr-form {
+  display: grid !important;
+  gap: 14px;
+  margin: 0 !important;
+  padding: 0 22px 20px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+body.dns-rebuild-page .dnsr-toggle-row {
+  display: grid;
+  grid-template-columns: minmax(0,1fr) auto auto;
+  align-items: center;
+  gap: 12px;
+  margin: 0;
+  padding: 15px 0 2px;
+  border: 0;
+  background: transparent;
+}
+
+body.dns-rebuild-page .dnsr-toggle-row > span:first-child {
+  display: grid;
+  gap: 5px;
+}
+
+body.dns-rebuild-page .dnsr-toggle-row strong {
+  color: var(--text);
+  font-size: 15px;
+}
+
+body.dns-rebuild-page .dnsr-toggle-row small,
+body.dns-rebuild-page .dnsr-field small,
+body.dns-rebuild-page .dnsr-server-id small {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+body.dns-rebuild-page .dnsr-field-grid {
+  display: grid;
+  grid-template-columns: minmax(0,1fr) 150px;
+  gap: 14px;
+}
+
+body.dns-rebuild-page .dnsr-field {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+}
+
+body.dns-rebuild-page .dnsr-field > span {
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 750;
+}
+
+body.dns-rebuild-page .dnsr-field input,
+body.dns-rebuild-page .dnsr-field select,
+body.dns-rebuild-page .dnsr-field textarea {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+}
+
+/* Validation UI injected by data-validated-form:
+   keep it as information, never as another card. */
+body.dns-rebuild-page .dnsr-form :is(
+  .validation-gate,
+  .ui-validation-gate,
+  .validation-card,
+  .validation-state,
+  .validation-result,
+  .check-card,
+  .check-state,
+  .ui-validation,
+  .ui-validation-card,
+  .ui-check-card
+) {
+  box-sizing: border-box !important;
+  width: 100% !important;
+  margin: 2px 0 0 !important;
+  padding: 13px 0 0 !important;
+  border: 0 !important;
+  border-top: 1px solid color-mix(in srgb,var(--line) 58%,transparent) !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+body.dns-rebuild-page .dnsr-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 2px 0 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+body.dns-rebuild-page .dnsr-list-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 18px 22px 14px;
+  border-bottom: 1px solid color-mix(in srgb,var(--line) 64%,transparent);
+}
+
+body.dns-rebuild-page .dnsr-table-wrap {
+  margin: 0;
+  padding: 0 16px 16px;
+  overflow-x: auto;
+}
+
+body.dns-rebuild-page .dnsr-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: transparent;
+}
+
+body.dns-rebuild-page .dnsr-table th,
+body.dns-rebuild-page .dnsr-table td {
+  padding: 14px 16px;
+  border: 0;
+  border-bottom: 1px solid color-mix(in srgb,var(--line) 62%,transparent);
+  text-align: left;
+  vertical-align: middle;
+}
+
+body.dns-rebuild-page .dnsr-table th {
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 750;
+}
+
+body.dns-rebuild-page .dnsr-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+body.dns-rebuild-page .dnsr-server-id {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+body.dns-rebuild-page .dnsr-server-id > div {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+body.dns-rebuild-page .dnsr-server-id strong {
+  color: var(--text);
+  font-size: 15px;
+}
+
+body.dns-rebuild-page .dnsr-priority-note {
+  flex: 0 0 auto;
+  padding: 5px 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+body.dns-rebuild-page .dnsr-empty {
+  padding: 18px 22px 22px;
+}
+
+body.dns-rebuild-page .dnsr-empty p {
+  margin: 6px 0 0;
+  color: var(--muted);
+}
+
+body.dns-rebuild-page .dnsr-expert-note {
+  display: grid;
+  grid-template-columns: auto minmax(0,1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid color-mix(in srgb,var(--line) 68%,transparent);
+  border-radius: 14px;
+  background: color-mix(in srgb,var(--panel) 86%,transparent);
+}
+
+body.dns-rebuild-page .dnsr-expert-note p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+body.dns-rebuild-page .dnsr-info-icon {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border-radius: 50%;
+  background: color-mix(in srgb,var(--accent) 14%,transparent);
+  color: var(--accent);
+  font-weight: 800;
+}
+
+html[data-resolved-theme="light"] body.dns-rebuild-page .dnsr-card,
+html[data-resolved-theme="light"] body.dns-rebuild-page .dnsr-list-card {
+  box-shadow: 0 8px 20px rgba(71,86,82,.10);
+}
+
+@media (max-width:1050px) {
+  body.dns-rebuild-page .dnsr-top {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width:760px) {
+  body.dns-rebuild-page .dnsr-card-head,
+  body.dns-rebuild-page .dnsr-list-head {
+    padding-inline: 16px;
+  }
+
+  body.dns-rebuild-page .dnsr-form {
+    padding-inline: 16px !important;
+  }
+
+  body.dns-rebuild-page .dnsr-field-grid {
+    grid-template-columns: 1fr;
+  }
+
+  body.dns-rebuild-page .dnsr-list-head,
+  body.dns-rebuild-page .dnsr-expert-note {
+    grid-template-columns: 1fr;
+  }
+
+  body.dns-rebuild-page .dnsr-table-wrap {
+    padding-inline: 8px;
+  }
+}
+
+
+/* SG-Panel DNS Rebuild 001 - Functional Fix 1
+   Real checkbox + independent switch visuals.
+   Validation status is a compact inline message, never a nested card. */
+
+/* Keep the real checkbox functional but visually hidden. */
+body.dns-rebuild-page .dnsr-toggle-row {
+  position: relative;
+}
+
+body.dns-rebuild-page .dnsr-toggle-row > input[type="checkbox"] {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  opacity: 0 !important;
+  overflow: hidden !important;
+  clip: rect(0 0 0 0) !important;
+  clip-path: inset(50%) !important;
+}
+
+/* Own switch geometry: no dependency on old DNS classes. */
+body.dns-rebuild-page .dnsr-toggle-row > .switch {
+  position: relative !important;
+  display: inline-block !important;
+  width: 42px !important;
+  height: 24px !important;
+  min-width: 42px !important;
+  border: 1px solid var(--line) !important;
+  border-radius: 999px !important;
+  background: color-mix(in srgb, var(--muted) 18%, var(--panel)) !important;
+  box-shadow: none !important;
+  cursor: pointer !important;
+  transition: background .16s ease, border-color .16s ease !important;
+}
+
+body.dns-rebuild-page .dnsr-toggle-row > .switch::after {
+  content: "" !important;
+  position: absolute !important;
+  top: 3px !important;
+  left: 3px !important;
+  width: 16px !important;
+  height: 16px !important;
+  border-radius: 50% !important;
+  background: var(--muted) !important;
+  box-shadow: none !important;
+  transform: translateX(0) !important;
+  transition: transform .16s ease, background .16s ease !important;
+}
+
+body.dns-rebuild-page .dnsr-toggle-row > input[type="checkbox"]:checked + .switch {
+  border-color: color-mix(in srgb, var(--sg-jade, #5f9a7d) 55%, var(--line)) !important;
+  background: color-mix(in srgb, var(--sg-jade, #5f9a7d) 22%, var(--panel)) !important;
+}
+
+body.dns-rebuild-page .dnsr-toggle-row > input[type="checkbox"]:checked + .switch::after {
+  transform: translateX(18px) !important;
+  background: var(--sg-jade, #5f9a7d) !important;
+}
+
+body.dns-rebuild-page .dnsr-toggle-row > input[type="checkbox"]:focus-visible + .switch {
+  outline: 2px solid var(--accent) !important;
+  outline-offset: 2px !important;
+}
+
+/* Exact JS-injected validation element. No white bar, no side/bottom edges. */
+body.dns-rebuild-page .dnsr-form > .validation-gate,
+body.dns-rebuild-page .dnsr-form .validation-gate {
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  width: auto !important;
+  min-height: 0 !important;
+  margin: 4px 0 0 !important;
+  padding: 10px 0 0 !important;
+  border: 0 !important;
+  border-top: 1px solid color-mix(in srgb, var(--line) 46%, transparent) !important;
+  border-radius: 0 !important;
+  outline: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+body.dns-rebuild-page .dnsr-form .validation-gate::before,
+body.dns-rebuild-page .dnsr-form .validation-gate::after,
+body.dns-rebuild-page .dnsr-form .validation-gate > * {
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+body.dns-rebuild-page .dnsr-form .validation-gate.is-compact {
+  padding-block: 9px 0 !important;
+}
+
+body.dns-rebuild-page .dnsr-form .validation-gate[hidden] {
+  display: none !important;
+}
+
+body.dns-rebuild-page .dnsr-form .validation-gate-mark {
+  flex: 0 0 auto !important;
+  display: grid !important;
+  width: 24px !important;
+  height: 24px !important;
+  place-items: center !important;
+  border-radius: 50% !important;
+}
+
+body.dns-rebuild-page .dnsr-form .validation-gate strong {
+  font-size: 13px !important;
+}
+
+body.dns-rebuild-page .dnsr-form .validation-gate small {
+  display: block !important;
+  margin-top: 2px !important;
+  color: var(--muted) !important;
+  font-size: 12px !important;
+}

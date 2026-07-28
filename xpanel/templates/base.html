@@ -55,6 +55,7 @@
   {% if request.endpoint in ['settings_page','outbounds_page'] %}<link rel="stylesheet" href="{{ url_for('static', filename='fix40-inbound-outbounds-ux-fix1.css') }}?v={{ xpanel_version }}-{{ xpanel_build|lower }}-inbound-outbounds-ux-fix1">{% endif %}
   {% if request.endpoint == 'dns_page' %}<link rel="stylesheet" href="{{ url_for('static', filename='fix40-dns-frame-fix1.css') }}?v={{ xpanel_version }}-{{ xpanel_build|lower }}-dns-frame-fix1">{% endif %}
   {% if request.endpoint == 'outbounds_page' %}<link rel="stylesheet" href="{{ url_for('static', filename='fix40-outbounds-gateway-style2.css') }}?v={{ xpanel_version }}-{{ xpanel_build|lower }}-outbounds-gateway-style2">{% endif %}
+  {% if request.endpoint == 'dns_page' %}<link rel="stylesheet" href="{{ url_for('static', filename='dns-rebuild-001.css') }}?v={{ xpanel_version }}-dns-rebuild-001-f1">{% endif %}
 </head>
 <body class="app-body ui-v097-standard rc20-awg-shell preview-2-awg-graphite preview-3-sidebar-polish preview-5-awg-clients-cascade preview-6-awg-clients-cascade-scale preview-7-awg-exact preview-9-rc6-typography {% if request.endpoint == 'cascade_page' %}sg-awg-cascade-rc6{% endif %} {% if request.endpoint == 'users_page' %}awg-clients-page{% endif %} {% if request.endpoint == 'nodes_page' %}awg-cluster-page{% endif %}">
 {% from "_country_flag.html" import country_flag %}
