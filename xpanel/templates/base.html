@@ -54,6 +54,7 @@
   {% if request.endpoint in ['outbounds_page','dns_page','security_page','settings_page','settings_advanced_page'] %}<link rel="stylesheet" href="{{ url_for('static', filename='fix40-ui-remaining-fix2.css') }}?v={{ xpanel_version }}-{{ xpanel_build|lower }}-ui-remaining-fix2">{% endif %}
   {% if request.endpoint in ['settings_page','outbounds_page'] %}<link rel="stylesheet" href="{{ url_for('static', filename='fix40-inbound-outbounds-ux-fix1.css') }}?v={{ xpanel_version }}-{{ xpanel_build|lower }}-inbound-outbounds-ux-fix1">{% endif %}
   {% if request.endpoint == 'dns_page' %}<link rel="stylesheet" href="{{ url_for('static', filename='fix40-dns-frame-fix1.css') }}?v={{ xpanel_version }}-{{ xpanel_build|lower }}-dns-frame-fix1">{% endif %}
+  {% if request.endpoint == 'outbounds_page' %}<link rel="stylesheet" href="{{ url_for('static', filename='fix40-outbounds-gateway-style2.css') }}?v={{ xpanel_version }}-{{ xpanel_build|lower }}-outbounds-gateway-style2">{% endif %}
 </head>
 <body class="app-body ui-v097-standard rc20-awg-shell preview-2-awg-graphite preview-3-sidebar-polish preview-5-awg-clients-cascade preview-6-awg-clients-cascade-scale preview-7-awg-exact preview-9-rc6-typography {% if request.endpoint == 'cascade_page' %}sg-awg-cascade-rc6{% endif %} {% if request.endpoint == 'users_page' %}awg-clients-page{% endif %} {% if request.endpoint == 'nodes_page' %}awg-cluster-page{% endif %}">
 {% from "_country_flag.html" import country_flag %}
@@ -83,53 +84,53 @@
     </div>
 
     <nav class="main-nav grouped-main-nav" aria-label="Основная навигация">
-      <a href="{{ url_for('dashboard') }}" class="{% if is_system %}active{% endif %}">
+<a href="{{ url_for('dashboard') }}" class="{% if is_system %}active{% endif %}">
         <svg viewBox="0 0 24 24"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z"/></svg>
         <span><b>System</b><small>Ресурсы и состояние</small></span>
       </a>
-      <a href="{{ url_for('nodes_page') }}" class="{% if is_nodes %}active{% endif %}">
-        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="6" rx="2"/><rect x="3" y="15" width="18" height="6" rx="2"/><path d="M7 6h.01M7 18h.01M11 6h6M11 18h6M12 9v6"/></svg>
-        <span><b>Cluster</b><small>Серверы и SG-Node</small></span>
-      </a>
-      <a href="{{ url_for('cascade_page') }}" class="{% if is_cascade %}active{% endif %}">
-        <svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="2"/><circle cx="19" cy="12" r="2"/><path d="M7 12h3l2-4 2 8 2-4h1"/></svg>
-        <span><b>Cascade</b><small>Выход через второй сервер</small></span>
-      </a>
-      <a href="{{ url_for('users_page') }}" class="{% if is_clients %}active{% endif %}">
+<a href="{{ url_for('users_page') }}" class="{% if is_clients %}active{% endif %}">
         <svg viewBox="0 0 24 24"><path d="M16 20v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 10a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM22 20v-2a4 4 0 0 0-3-3.87M16 2.13a4 4 0 0 1 0 7.75"/></svg>
         <span><b>Clients</b><small>Пользователи и подписки</small></span>
       </a>
-      <a href="{{ url_for('settings_page') }}" class="{% if is_xray %}active{% endif %}">
-        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56V21h-4v-.07A1.7 1.7 0 0 0 8.97 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.53-1.03H3v-4h.07A1.7 1.7 0 0 0 4.6 8.94a1.7 1.7 0 0 0-.34-1.88L4.2 7l2.83-2.83.06.06a1.7 1.7 0 0 0 1.88.34A1.7 1.7 0 0 0 10 3.04V3h4v.07a1.7 1.7 0 0 0 1.03 1.53 1.7 1.7 0 0 0 1.88-.34l.06-.06L19.8 7l-.06.06a1.7 1.7 0 0 0-.34 1.88A1.7 1.7 0 0 0 20.93 10H21v4h-.07A1.7 1.7 0 0 0 19.4 15Z"/></svg>
-        <span><b>Xray Server</b><small>Inbound и конфигурация</small></span>
-      </a>
-      <a href="{{ url_for('settings_advanced_page') }}" class="{% if is_expert %}active{% endif %}">
-        <svg viewBox="0 0 24 24"><path d="M12 2a4 4 0 0 0-4 4v2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8a2 2 0 0 0-2-2h-2V6a4 4 0 0 0-4-4Zm-2 6V6a2 2 0 1 1 4 0v2h-4Zm2 4a2 2 0 0 1 1 3.73V18h-2v-2.27A2 2 0 0 1 12 12Z"/></svg>
-        <span><b>Expert</b><small>Подключения, резервные Inbound и JSON</small></span>
-      </a>
-      <a href="{{ url_for('routing_page') }}" class="{% if is_routing %}active{% endif %}">
-        <svg viewBox="0 0 24 24"><circle cx="6" cy="6" r="2"/><circle cx="18" cy="6" r="2"/><circle cx="12" cy="18" r="2"/><path d="M8 6h8M7.5 7.5l3.3 8M16.5 7.5l-3.3 8"/></svg>
-        <span><b>Routing</b><small>Маршрутизация и GeoFiles</small></span>
-      </a>
-      <a href="{{ url_for('outbounds_page') }}" class="{% if is_outbounds %}active{% endif %}">
-        <svg viewBox="0 0 24 24"><path d="M4 12h12M12 6l6 6-6 6"/><circle cx="5" cy="12" r="2"/></svg>
-        <span><b>Outbounds</b><small>Direct, Block, WARP и Cascade</small></span>
-      </a>
-      <a href="{{ url_for('dns_page') }}" class="{% if is_dns %}active{% endif %}">
-        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18"/></svg>
-        <span><b>DNS</b><small>Резолверы, правила и hosts</small></span>
-      </a>
-      <a href="{{ url_for('security_page') }}" class="{% if is_security %}active{% endif %}">
+<a href="{{ url_for('security_page') }}" class="{% if is_security %}active{% endif %}">
         <svg viewBox="0 0 24 24"><path d="M12 2 20 5v6c0 5.2-3.4 9.2-8 11-4.6-1.8-8-5.8-8-11V5l8-3Z"/><path d="M9 12l2 2 4-5"/></svg>
         <span><b>Security</b><small>Доступ и защита</small></span>
       </a>
-      <a href="{{ url_for('backups_page') }}" class="{% if is_maintenance %}active{% endif %}">
+<a href="{{ url_for('settings_page') }}" class="{% if is_xray %}active{% endif %}">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56V21h-4v-.07A1.7 1.7 0 0 0 8.97 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.53-1.03H3v-4h.07A1.7 1.7 0 0 0 4.6 8.94a1.7 1.7 0 0 0-.34-1.88L4.2 7l2.83-2.83.06.06a1.7 1.7 0 0 0 1.88.34A1.7 1.7 0 0 0 10 3.04V3h4v.07a1.7 1.7 0 0 0 1.03 1.53 1.7 1.7 0 0 0 1.88-.34l.06-.06L19.8 7l-.06.06a1.7 1.7 0 0 0-.34 1.88A1.7 1.7 0 0 0 20.93 10H21v4h-.07A1.7 1.7 0 0 0 19.4 15Z"/></svg>
+        <span><b>Connections</b><small>Xray · Vision · Hysteria 2</small></span>
+      </a>
+<a href="{{ url_for('outbounds_page') }}" class="{% if is_outbounds %}active{% endif %}">
+        <svg viewBox="0 0 24 24"><path d="M4 12h12M12 6l6 6-6 6"/><circle cx="5" cy="12" r="2"/></svg>
+        <span><b>Outbounds</b><small>Direct · Block · WARP</small></span>
+      </a>
+<a href="{{ url_for('routing_page') }}" class="{% if is_routing %}active{% endif %}">
+        <svg viewBox="0 0 24 24"><circle cx="6" cy="6" r="2"/><circle cx="18" cy="6" r="2"/><circle cx="12" cy="18" r="2"/><path d="M8 6h8M7.5 7.5l3.3 8M16.5 7.5l-3.3 8"/></svg>
+        <span><b>Routing</b><small>Маршрутизация и GeoFiles</small></span>
+      </a>
+<a href="{{ url_for('nodes_page') }}" class="{% if is_nodes %}active{% endif %}">
+        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="6" rx="2"/><rect x="3" y="15" width="18" height="6" rx="2"/><path d="M7 6h.01M7 18h.01M11 6h6M11 18h6M12 9v6"/></svg>
+        <span><b>Cluster</b><small>Серверы и SG-Node</small></span>
+      </a>
+<a href="{{ url_for('cascade_page') }}" class="{% if is_cascade %}active{% endif %}">
+        <svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="2"/><circle cx="19" cy="12" r="2"/><path d="M7 12h3l2-4 2 8 2-4h1"/></svg>
+        <span><b>Cascade</b><small>Выход через второй сервер</small></span>
+      </a>
+<a href="{{ url_for('dns_page') }}" class="{% if is_dns %}active{% endif %}">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18"/></svg>
+        <span><b>DNS</b><small>Резолверы, правила и hosts</small></span>
+      </a>
+<a href="{{ url_for('backups_page') }}" class="{% if is_maintenance %}active{% endif %}">
         <svg viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v7c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12v7c0 1.7 3.6 3 8 3s8-1.3 8-3v-7"/></svg>
         <span><b>Maintenance</b><small>Копии и обновления</small></span>
       </a>
-      <a href="{{ url_for('help_page') }}" class="{% if is_help %}active{% endif %}">
+<a href="{{ url_for('help_page') }}" class="{% if is_help %}active{% endif %}">
         <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.6 9a2.6 2.6 0 1 1 4.7 1.55c-.9 1.05-2.3 1.25-2.3 3.05M12 17h.01"/></svg>
         <span><b>Help</b><small>Профили и настройки</small></span>
+      </a>
+<a href="{{ url_for('settings_advanced_page') }}" class="{% if is_expert %}active{% endif %}">
+        <svg viewBox="0 0 24 24"><path d="M12 2a4 4 0 0 0-4 4v2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8a2 2 0 0 0-2-2h-2V6a4 4 0 0 0-4-4Zm-2 6V6a2 2 0 1 1 4 0v2h-4Zm2 4a2 2 0 0 1 1 3.73V18h-2v-2.27A2 2 0 0 1 12 12Z"/></svg>
+        <span><b>Expert</b><small>Подключения, резервные Inbound и JSON</small></span>
       </a>
     </nav>
     {# Stable technical workflow markers retained for compatibility and automated audits. #}

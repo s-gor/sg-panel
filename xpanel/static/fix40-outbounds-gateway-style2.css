@@ -1,0 +1,333 @@
+/* SG-Panel UI23 Repair4 - Outbounds Gateway Style 2
+   VMware visual acceptance only.
+   Geometry follows the accepted SG-Gateway 021 Outbounds reference.
+   No backend, Routing, WARP runtime, Cascade or outbound actions are changed. */
+
+body.outbounds-gateway-style2 .ob-page.ob-gateway-page {
+  display: grid !important;
+  gap: 16px !important;
+}
+
+/* ===== System outbounds ===== */
+body.outbounds-gateway-style2 .ob-gw-card.ob-gw-system {
+  overflow: hidden !important;
+  border: 1px solid var(--line) !important;
+  border-radius: 18px !important;
+  background: var(--panel) !important;
+  box-shadow: var(--shadow-sm) !important;
+}
+body.outbounds-gateway-style2 .ob-gw-system .ob-gw-card-head {
+  padding: 18px 22px 16px !important;
+  border-bottom: 1px solid var(--line) !important;
+  background: color-mix(in srgb,var(--panel-2) 76%,var(--panel)) !important;
+}
+body.outbounds-gateway-style2 .ob-gw-system .ob-gw-card-head h2 {
+  margin: 0 0 5px !important;
+  font-size: 20px !important;
+  line-height: 1.2 !important;
+}
+body.outbounds-gateway-style2 .ob-gw-system .ob-gw-card-head p {
+  margin: 0 !important;
+  color: var(--muted) !important;
+  font-size: 13.5px !important;
+  line-height: 1.45 !important;
+}
+body.outbounds-gateway-style2 .ob-gw-system-list {
+  display: grid !important;
+  padding: 0 !important;
+}
+body.outbounds-gateway-style2 .ob-gw-system-row {
+  display: grid !important;
+  grid-template-columns: 42px minmax(0,1fr) auto !important;
+  align-items: center !important;
+  gap: 14px !important;
+  min-height: 80px !important;
+  padding: 14px 20px !important;
+  border: 0 !important;
+  border-bottom: 1px solid var(--line) !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+body.outbounds-gateway-style2 .ob-gw-system-row:last-child {
+  border-bottom: 0 !important;
+}
+body.outbounds-gateway-style2 .ob-gw-route-icon {
+  width: 38px !important;
+  height: 38px !important;
+  display: grid !important;
+  place-items: center !important;
+  border: 1px solid var(--line-strong,var(--line)) !important;
+  border-radius: 10px !important;
+  background: color-mix(in srgb,var(--success) 6%,var(--panel-2)) !important;
+  color: var(--success) !important;
+}
+body.outbounds-gateway-style2 .ob-gw-route-icon svg {
+  width: 20px !important;
+  height: 20px !important;
+}
+body.outbounds-gateway-style2 .ob-gw-system-name {
+  display: flex !important;
+  align-items: baseline !important;
+  gap: 8px !important;
+  flex-wrap: wrap !important;
+}
+body.outbounds-gateway-style2 .ob-gw-system-name strong {
+  font-size: 16px !important;
+}
+body.outbounds-gateway-style2 .ob-gw-system-name span {
+  color: var(--muted) !important;
+  font-size: 12.5px !important;
+}
+body.outbounds-gateway-style2 .ob-gw-system-main p {
+  margin: 5px 0 0 !important;
+  color: var(--muted) !important;
+  font-size: 13.5px !important;
+}
+body.outbounds-gateway-style2 .ob-gw-system-facts {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 9px !important;
+  flex-wrap: wrap !important;
+  min-width: 240px !important;
+}
+body.outbounds-gateway-style2 .ob-gw-system-facts code {
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  color: var(--text) !important;
+  font-size: 12.5px !important;
+}
+body.outbounds-gateway-style2 .ob-gw-static {
+  color: var(--muted) !important;
+  font-size: 12.5px !important;
+  font-weight: 700 !important;
+}
+
+/* ===== WARP card ===== */
+body.outbounds-gateway-style2 .ob-gw-card.ob-gw-warp {
+  overflow: hidden !important;
+  padding: 0 !important;
+  border: 1px solid var(--line) !important;
+  border-radius: 18px !important;
+  background: var(--panel) !important;
+  box-shadow: var(--shadow-sm) !important;
+}
+body.outbounds-gateway-style2 .ob-gw-warp-head {
+  display: flex !important;
+  align-items: flex-start !important;
+  justify-content: space-between !important;
+  gap: 20px !important;
+  padding: 24px 28px 17px !important;
+  border: 0 !important;
+  background: transparent !important;
+}
+body.outbounds-gateway-style2 .ob-gw-warp-head .panel-kicker {
+  margin: 0 0 10px !important;
+}
+body.outbounds-gateway-style2 .ob-gw-warp-head h2 {
+  margin: 0 0 8px !important;
+  font-size: 32px !important;
+  line-height: 1.1 !important;
+  letter-spacing: -.02em !important;
+}
+body.outbounds-gateway-style2 .ob-gw-warp-head p:not(.panel-kicker) {
+  margin: 0 !important;
+  color: var(--muted) !important;
+  font-size: 14px !important;
+  line-height: 1.5 !important;
+}
+body.outbounds-gateway-style2 .ob-gw-warp-state {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  margin-top: 3px !important;
+  white-space: nowrap !important;
+  font-weight: 800 !important;
+}
+body.outbounds-gateway-style2 .ob-gw-warp-body {
+  display: grid !important;
+  gap: 0 !important;
+  padding: 0 28px 28px !important;
+}
+body.outbounds-gateway-style2 .ob-gw-warp-strip,
+body.outbounds-gateway-style2 .ob-gw-warp-create {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 22px !important;
+  min-height: 140px !important;
+  padding: 22px 24px !important;
+  border: 1px dashed var(--line-strong,var(--line)) !important;
+  border-radius: 16px !important;
+  background: color-mix(in srgb,var(--panel-2) 58%,transparent) !important;
+  box-shadow: none !important;
+}
+body.outbounds-gateway-style2 .ob-gw-warp-info {
+  display: grid !important;
+  gap: 8px !important;
+  min-width: 0 !important;
+}
+body.outbounds-gateway-style2 .ob-gw-warp-info strong {
+  font-size: 17px !important;
+}
+body.outbounds-gateway-style2 .ob-gw-warp-info code {
+  display: inline-block !important;
+  padding: 2px 6px !important;
+  border: 1px solid var(--line) !important;
+  border-radius: 6px !important;
+  background: var(--panel) !important;
+  color: var(--success) !important;
+}
+body.outbounds-gateway-style2 .ob-gw-warp-info span,
+body.outbounds-gateway-style2 .ob-gw-warp-info small {
+  color: var(--muted) !important;
+  font-size: 13px !important;
+}
+body.outbounds-gateway-style2 .ob-gw-warp-actions {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 9px !important;
+  flex-wrap: wrap !important;
+}
+body.outbounds-gateway-style2 .ob-gw-warp-actions form {
+  margin: 0 !important;
+}
+
+/* The Routing strip is intentionally attached visually to the WARP details,
+   as in the SG-Gateway reference. */
+body.outbounds-gateway-style2 .ob-gw-routing-note {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 20px !important;
+  min-height: 104px !important;
+  margin-top: -1px !important;
+  padding: 18px 24px !important;
+  border: 1px solid var(--line-strong,var(--line)) !important;
+  border-radius: 16px !important;
+  background: color-mix(in srgb,var(--panel-2) 80%,var(--panel)) !important;
+  box-shadow: none !important;
+}
+body.outbounds-gateway-style2 .ob-gw-routing-note strong {
+  display: block !important;
+  margin-bottom: 6px !important;
+  font-size: 17px !important;
+}
+body.outbounds-gateway-style2 .ob-gw-routing-note p {
+  margin: 0 !important;
+  color: var(--muted) !important;
+  font-size: 13.5px !important;
+}
+body.outbounds-gateway-style2 .ob-gw-routing-actions {
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  flex: 0 0 auto !important;
+}
+
+/* ===== Custom outbounds ===== */
+body.outbounds-gateway-style2 .ob-user-outputs-panel {
+  overflow: hidden !important;
+  margin: 0 !important;
+  border: 1px solid var(--line) !important;
+  border-radius: 18px !important;
+  background: var(--panel) !important;
+  box-shadow: var(--shadow-sm) !important;
+}
+body.outbounds-gateway-style2 .ob-user-outputs-heading {
+  display: flex !important;
+  align-items: flex-start !important;
+  justify-content: space-between !important;
+  gap: 16px !important;
+  padding: 18px 22px 16px !important;
+  border: 0 !important;
+  border-bottom: 1px solid var(--line) !important;
+  border-radius: 0 !important;
+  background: color-mix(in srgb,var(--panel-2) 76%,var(--panel)) !important;
+}
+body.outbounds-gateway-style2 .ob-user-outputs-heading .panel-kicker {
+  margin-bottom: 7px !important;
+}
+body.outbounds-gateway-style2 .ob-user-outputs-heading h2 {
+  margin: 0 0 5px !important;
+  font-size: 20px !important;
+}
+body.outbounds-gateway-style2 .ob-user-outputs-heading p {
+  margin: 0 !important;
+  color: var(--muted) !important;
+  font-size: 13.5px !important;
+}
+body.outbounds-gateway-style2 .ob-user-output-list {
+  padding: 0 !important;
+}
+body.outbounds-gateway-style2 .ob-user-output-empty {
+  min-height: 98px !important;
+  margin: 0 !important;
+  padding: 20px 24px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+body.outbounds-gateway-style2 .ob-user-output-empty strong {
+  font-size: 15px !important;
+}
+body.outbounds-gateway-style2 .ob-user-output-empty p {
+  margin-top: 5px !important;
+  color: var(--muted) !important;
+  font-size: 13.5px !important;
+}
+
+/* Preserve SG-Panel custom-outbound controls; make them visually secondary. */
+body.outbounds-gateway-style2 .ob-user-outputs-heading .ui-heading-actions {
+  align-self: center !important;
+}
+body.outbounds-gateway-style2 .ob-user-outputs-heading .ui-heading-actions .button {
+  min-height: 38px !important;
+}
+
+@media (max-width: 1000px) {
+  body.outbounds-gateway-style2 .ob-gw-system-row {
+    grid-template-columns: 42px minmax(0,1fr) !important;
+  }
+  body.outbounds-gateway-style2 .ob-gw-system-facts {
+    grid-column: 2 !important;
+    justify-content: flex-start !important;
+    min-width: 0 !important;
+  }
+  body.outbounds-gateway-style2 .ob-gw-warp-strip,
+  body.outbounds-gateway-style2 .ob-gw-warp-create,
+  body.outbounds-gateway-style2 .ob-gw-routing-note {
+    align-items: stretch !important;
+    flex-direction: column !important;
+  }
+  body.outbounds-gateway-style2 .ob-gw-warp-actions,
+  body.outbounds-gateway-style2 .ob-gw-routing-actions {
+    justify-content: flex-start !important;
+  }
+}
+@media (max-width: 700px) {
+  body.outbounds-gateway-style2 .ob-gw-warp-head {
+    flex-direction: column !important;
+    padding: 20px 18px 14px !important;
+  }
+  body.outbounds-gateway-style2 .ob-gw-warp-head h2 {
+    font-size: 26px !important;
+  }
+  body.outbounds-gateway-style2 .ob-gw-warp-body {
+    padding: 0 18px 18px !important;
+  }
+  body.outbounds-gateway-style2 .ob-gw-warp-actions,
+  body.outbounds-gateway-style2 .ob-gw-routing-actions,
+  body.outbounds-gateway-style2 .ob-user-outputs-heading {
+    align-items: stretch !important;
+    flex-direction: column !important;
+  }
+  body.outbounds-gateway-style2 .ob-gw-warp-actions .button,
+  body.outbounds-gateway-style2 .ob-gw-routing-actions .button {
+    width: 100% !important;
+  }
+}

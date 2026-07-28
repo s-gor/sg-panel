@@ -1,9 +1,9 @@
 {% extends "base.html" %}
 {% from '_fingerprint_select.html' import fingerprint_select %}
-{% block title %}Xray Server — SG-Panel{% endblock %}
-{% block section %}XRAY SERVER{% endblock %}
-{% block heading %}Входящие подключения{% endblock %}
-{% block subtitle %}Каналы, по которым клиенты подключаются к этому SG-Panel: Reality и XHTTP Reality работают сразу, TLS-каналы — после готовности HTTPS{% endblock %}
+{% block title %}Connections — SG-Panel{% endblock %}
+{% block section %}CONNECTIONS{% endblock %}
+{% block heading %}Connections{% endblock %}
+{% block subtitle %}Reality TCP · XHTTP Reality · XHTTP TLS · Hysteria 2{% endblock %}
 {% block content %}
 <script>document.body.classList.add('ui-standard-page','server-settings-page','sg-always-on-xray-page');</script>
 <style>
@@ -199,7 +199,7 @@ html[data-resolved-theme="light"] .sg-always-on-xray-page .sg-vision-explainer c
       <div>
         <p class="panel-kicker">XRAY · INBOUND</p>
         {# Compatibility marker for legacy audit: Четыре независимых канала #}
-        <div class="sg-ao-title-row"><h2>Четыре канала подключения</h2><span class="sg-direction-pill">Клиент → SG-Panel</span></div>
+        <div class="sg-ao-title-row"><h2>Xray Server</h2><span class="sg-direction-pill">Клиент → SG-Panel</span></div>
         <p>Это входящие каналы сервера. Панель собирает единый Xray config и одновременно принимает подключения по всем каналам, которые технически доступны серверу.</p>
       </div>
       <a class="button secondary" href="{{ url_for('settings_expert_inbound_page') }}">Эксперт · резервные Inbound</a>
