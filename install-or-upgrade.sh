@@ -316,7 +316,13 @@ cleanup_failed_upgrade_backups(){
 
 check_upgrade_disk_space(){
   local free_kb source_kb target_kb required_kb reserve_kb=262144
-  free_kb="$(df -Pk "$TARGET" 2>/dev/null | awk 'NR==2 {print $4}')"
+  # SG_PANEL_FRESH_INSTALL_STORAGE_FIX1: TARGET may not exist yet on a clean install.
+  disk_check_path="$TARGET"
+  if [[ ! -e "$disk_check_path" ]]; then
+    disk_check_path="$(dirname -- "$TARGET")"
+  fi
+  [[ -e "$disk_check_path" ]] || disk_check_path="/"
+  free_kb="$(df -Pk "$disk_check_path" 2>/dev/null | awk 'NR==2 {print $4}')"
   [[ "$free_kb" =~ ^[0-9]+$ ]] || { echo "не удалось определить свободное место" >&2; return 1; }
   source_kb="$(du -sk "$SOURCE_DIR" | awk '{print $1}')"
   target_kb=0
