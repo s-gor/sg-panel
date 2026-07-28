@@ -697,7 +697,7 @@ apply_xray_stage(){
 
 configure_panel_access_stage(){
   if [[ $PRESERVE_PANEL_ACCESS -eq 0 ]]; then
-    bash "$TARGET/deploy/configure-http.sh" --host "$XRAY_ADDRESS" --port "$PANEL_PUBLIC_PORT"
+    bash "$TARGET/deploy/configure-http.sh" --host "$XRAY_ADDRESS" --port "$PANEL_PUBLIC_PORT" >>"$LOG_FILE" 2>&1
   else
     log "Сохраняю существующий HTTP/HTTPS-доступ к панели"
   fi
@@ -715,7 +715,7 @@ validate_installation_stage(){
   systemctl is-active --quiet xray || fail "xray не active"
   systemctl is-active --quiet nginx || fail "nginx не active"
   systemctl is-active --quiet xpanel-traffic.timer || fail "xpanel-traffic.timer не active"
-  .venv/bin/python -m xpanel collect-traffic --online --strict
+  .venv/bin/python -m xpanel collect-traffic --online --strict >>"$LOG_FILE" 2>&1
 
   detect_panel_access
   mode="$PANEL_MODE"
@@ -815,6 +815,6 @@ if [[ "$PANEL_MODE" == "https" ]]; then
 else
   PANEL_HTTPS_STATUS="можно включить позже в «Безопасность → Доступ к панели»"
 fi
-ACTIVE_XRAY_VERSION="v$(/usr/local/bin/xray version | awk 'NR==1 {print $2}' | sed 's/^v//')"
-
-print_service_summary
+printf '%s[SG-Panel] SG-Panel: active%s\n' "$COLOR_GREEN" "$COLOR_RESET"
+printf '%s[SG-Panel] Nginx:    active%s\n' "$COLOR_GREEN" "$COLOR_RESET"
+printf '%s[SG-Panel] Xray:     active%s\n' "$COLOR_GREEN" "$COLOR_RESET"
