@@ -753,9 +753,9 @@ validate_result(){
 }
 
 show_result(){
-  printf '%s[SG-Panel] SG-Panel: active%s\n' "$C_GREEN" "$C_RESET"
-  printf '%s[SG-Panel] Nginx:    active%s\n' "$C_GREEN" "$C_RESET"
-  printf '%s[SG-Panel] Xray:     active%s\n' "$C_GREEN" "$C_RESET"
+  printf '\n[SG-Panel] SG-Panel: %sactive%s\n' "$C_GREEN" "$C_RESET"
+  printf '[SG-Panel] Nginx:    %sactive%s\n' "$C_GREEN" "$C_RESET"
+  printf '[SG-Panel] Xray:     %sactive%s\n' "$C_GREEN" "$C_RESET"
 }
 
 main(){
