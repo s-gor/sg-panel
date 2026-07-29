@@ -2,7 +2,7 @@ name: Tests
 
 on:
   push:
-    branches: [main, sg-panel-safe-cleanup-20260729-102453]
+    branches: [main]
   pull_request:
     branches: [main]
   workflow_dispatch:
