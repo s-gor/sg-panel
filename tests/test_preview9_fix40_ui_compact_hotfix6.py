@@ -8,11 +8,14 @@ def read(relative: str) -> str:
 def test_release_and_final_stylesheet_contract() -> None:
     init = read("xpanel/__init__.py")
     base = read("xpanel/templates/base.html")
+    # Phase 6 consolidated stylesheet contract: Hotfix 5→9 is one active layer.
+    assert "fix40-light-buttons-theme-icon-hotfix9.css" in base
+    assert "fix40-interface-cleanup-hotfix5.css" not in base
+    assert "fix40-ui-compact-hotfix6.css" not in base
+    assert "fix40-global-tabs-dark-buttons-hotfix7.css" not in base
+    assert "fix40-interface-verification-hotfix8.css" not in base
     css = read("xpanel/static/fix40-ui-compact-hotfix6.css")
     assert '__release_label__ = "Preview 9 · FIX40 · UI23"' in init
-    assert "fix40-interface-cleanup-hotfix5.css" in base
-    assert "fix40-ui-compact-hotfix6.css" in base
-    assert base.rfind("fix40-ui-compact-hotfix6.css") > base.rfind("fix40-interface-cleanup-hotfix5.css")
     assert "UI Compact Hotfix 6" in css
 
 def test_system_tabs_and_cluster_cleanup_are_preserved() -> None:

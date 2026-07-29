@@ -10,9 +10,13 @@ def text(rel: str) -> str:
 def test_release_identity_and_stylesheet_order():
     init = text("xpanel/__init__.py")
     base = text("xpanel/templates/base.html")
+    # Phase 6 consolidated stylesheet contract: Hotfix 5→9 is one active layer.
+    assert "fix40-light-buttons-theme-icon-hotfix9.css" in base
+    assert "fix40-interface-cleanup-hotfix5.css" not in base
+    assert "fix40-ui-compact-hotfix6.css" not in base
+    assert "fix40-global-tabs-dark-buttons-hotfix7.css" not in base
+    assert "fix40-interface-verification-hotfix8.css" not in base
     assert '__release_label__ = "Preview 9 · FIX40 · UI23"' in init
-    assert "fix40-interface-verification-hotfix8.css" in base
-    assert base.rfind("fix40-interface-verification-hotfix8.css") > base.rfind("fix40-global-tabs-dark-buttons-hotfix7.css")
 
 
 def test_tab_labels_are_explicit_and_routing_has_no_duplicate_tabs():

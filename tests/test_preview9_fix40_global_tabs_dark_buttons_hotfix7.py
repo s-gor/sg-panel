@@ -9,8 +9,12 @@ def read(relative: str) -> str:
 
 def test_hotfix7_css_is_loaded_last() -> None:
     base = read("xpanel/templates/base.html")
-    assert "fix40-global-tabs-dark-buttons-hotfix7.css" in base
-    assert base.rfind("fix40-global-tabs-dark-buttons-hotfix7.css") > base.rfind("fix40-ui-compact-hotfix6.css")
+    # Phase 6 consolidated stylesheet contract: Hotfix 5→9 is one active layer.
+    assert "fix40-light-buttons-theme-icon-hotfix9.css" in base
+    assert "fix40-interface-cleanup-hotfix5.css" not in base
+    assert "fix40-ui-compact-hotfix6.css" not in base
+    assert "fix40-global-tabs-dark-buttons-hotfix7.css" not in base
+    assert "fix40-interface-verification-hotfix8.css" not in base
 
 
 def test_all_section_tabs_are_equal_buttons_without_underline() -> None:
