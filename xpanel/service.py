@@ -12253,26 +12253,6 @@ def run_xray_test(xray_bin: str, config_path: Path) -> subprocess.CompletedProce
     return _run([xray_bin, "run", "-test", "-config", str(config_path)], timeout=30)
 
 
-def validate_generated_config() -> dict[str, object]:
-    text, server, users = render_text()
-    with tempfile.NamedTemporaryFile(
-        mode="w", suffix=".json", prefix="sg-panel-", encoding="utf-8", delete=False
-    ) as fh:
-        fh.write(text)
-        path = Path(fh.name)
-    try:
-        result = run_xray_test(server["xray_bin"], path)
-        detail = (result.stderr or result.stdout).strip()
-        return {
-            "ok": result.returncode == 0,
-            "detail": detail,
-            "users": len(users),
-            "json": text,
-        }
-    finally:
-        path.unlink(missing_ok=True)
-
-
 def _nginx_transport_paths() -> tuple[Path, Path]:
     available = Path(os.environ.get(
         "XPANEL_NGINX_TRANSPORT_CONF",
@@ -12649,96 +12629,6 @@ def _activate_nginx_frontend(server: sqlite3.Row) -> str:
         _enable_reality_edge(server)
         return "reality-sni-edge"
     return "direct"
-
-def apply_config() -> dict[str, object]:
-    require_root()
-    text, server, users = render_text()
-    config_path = Path(server["config_path"])
-    config_path.parent.mkdir(parents=True, exist_ok=True)
-    temp_fd, temp_name = tempfile.mkstemp(
-        prefix=".config.", suffix=".json", dir=str(config_path.parent), text=True
-    )
-    temp_path = Path(temp_name)
-    backup_path: Path | None = None
-    nginx_snapshot = _snapshot_nginx_frontends()
-    previous_config: bytes | None = config_path.read_bytes() if config_path.exists() else None
-    profile = str(server["inbound_profile"] or "raw_reality")
-    hysteria_tls_snapshot = _snapshot_hysteria_tls_material() if profile in HYSTERIA_ACTIVE_PROFILES else None
-    try:
-        if profile in HYSTERIA_ACTIVE_PROFILES:
-            runtime_cert, runtime_key = _sync_hysteria_tls_material(server)
-            text = _runtime_hysteria_config_text(text, runtime_cert, runtime_key)
-        temp_handle = os.fdopen(temp_fd, "w", encoding="utf-8")
-        temp_fd = -1
-        with temp_handle as fh:
-            fh.write(text)
-            fh.flush()
-            os.fsync(fh.fileno())
-        os.chmod(temp_path, 0o644)
-        test = run_xray_test(server["xray_bin"], temp_path)
-        if test.returncode != 0:
-            detail = (test.stderr or test.stdout).strip()
-            raise XPanelError(f"новый config.json не прошёл xray run -test:\n{detail}")
-
-        if profile == RUSSIA_KIT_PROFILE:
-            _nginx_reality_edge_configs(server)
-        elif profile in CERTIFICATE_INBOUND_PROFILES:
-            _nginx_transport_config(server)
-        elif profile in REALITY_INBOUND_PROFILES and _reality_edge_settings(server).get("enabled"):
-            _nginx_reality_edge_configs(server)
-        if config_path.exists():
-            stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
-            backup_path = config_path.with_name(f"{config_path.name}.bak-{stamp}")
-            shutil.copy2(config_path, backup_path)
-
-        _prepare_nginx_frontend()
-
-        os.replace(temp_path, config_path)
-        restart = _run(["systemctl", "restart", server["xray_service"]], timeout=30)
-        if restart.returncode != 0:
-            detail = (restart.stderr or restart.stdout).strip()
-            raise XPanelError(f"Xray не перезапустился: {detail}")
-        if _run(["systemctl", "is-active", "--quiet", server["xray_service"]]).returncode != 0:
-            raise XPanelError("после перезапуска служба Xray не активна")
-
-        frontend = _activate_nginx_frontend(server)
-
-        return {
-            "config_path": str(config_path),
-            "backup_path": str(backup_path) if backup_path else None,
-            "enabled_users": len(users),
-            "enabled_rules": len([r for r in list_routing_rules() if r["enabled"]]),
-            "service": "active",
-            "profile": profile,
-            "nginx_transport": profile in TLS_INBOUND_PROFILES,
-            "nginx_frontend": frontend,
-        }
-    except Exception:
-        try:
-            if previous_config is None:
-                config_path.unlink(missing_ok=True)
-            else:
-                config_path.write_bytes(previous_config)
-                os.chmod(config_path, 0o644)
-            _disable_nginx_transport(reload=False)
-            _disable_reality_edge(reload=False)
-            if shutil.which("nginx") is not None:
-                _nginx_test_reload()
-            if hysteria_tls_snapshot is not None:
-                _restore_hysteria_tls_material(hysteria_tls_snapshot)
-            _run(["systemctl", "restart", server["xray_service"]], timeout=30)
-            _restore_nginx_frontends(nginx_snapshot)
-        except Exception:
-            pass
-        raise
-    finally:
-        if temp_fd >= 0:
-            try:
-                os.close(temp_fd)
-            except OSError:
-                pass
-        temp_path.unlink(missing_ok=True)
-
 
 def restart_xray() -> str:
     require_root()
@@ -14382,28 +14272,6 @@ def _make_links_for_profile(
     }]
 
 
-def make_links(
-    identifier: str | int, allow_disabled: bool = False, *, device_id: int | None = None
-) -> list[dict[str, object]]:
-    server = get_server()
-    person = find_user(identifier)
-    user = _access_identity(int(person["id"]), device_id)
-    if (not bool(user["enabled"]) or _expiry_is_past(user["expiry_at"])) and not allow_disabled:
-        raise XPanelError("доступ отключён или срок действия истёк")
-    profile = str(server["inbound_profile"] or "raw_reality")
-
-    if profile == RUSSIA_KIT_PROFILE:
-        return _make_russia_kit_links(user, server)
-    if profile == "xhttp_hysteria_tls":
-        xhttp_links = _make_links_for_profile(user, server, "xhttp_tls")
-        hysteria_links = _make_links_for_profile(user, server, "hysteria2_tls")
-        for item in hysteria_links:
-            if int(item["id"]) == 1:
-                item["tag"] = HYSTERIA_COMBINED_PRIMARY_TAG
-        return xhttp_links + hysteria_links
-    return _make_links_for_profile(user, server, profile)
-
-
 def _deployment_sort_key(
     item: dict[str, object], *, manual_order: bool
 ) -> tuple[int, int, int, str]:
@@ -14585,56 +14453,6 @@ def make_cluster_saved_links(
     active = make_cluster_links(identifier, allow_disabled=allow_disabled, device_id=device_id)
     remote = [item for item in active if item.get("source") == "sg-node"]
     return local + remote
-
-
-def make_saved_links(
-    identifier: str | int, allow_disabled: bool = False, *, device_id: int | None = None
-) -> list[dict[str, object]]:
-    """Return active links plus links saved for currently inactive profile families.
-
-    The public subscription deliberately continues to use make_links(), so clients
-    receive only endpoints that the server is serving right now.
-    """
-    server = get_server()
-    person = find_user(identifier)
-    user = _access_identity(int(person["id"]), device_id)
-    if (not bool(user["enabled"]) or _expiry_is_past(user["expiry_at"])) and not allow_disabled:
-        raise XPanelError("доступ отключён или срок действия истёк")
-
-    current = str(server["inbound_profile"] or "raw_reality")
-    active_families: set[str]
-    if current == RUSSIA_KIT_PROFILE:
-        active_families = {"xhttp_reality", "hysteria2_tls", "ws_tls", "xhttp_tls"}
-    elif current == "xhttp_hysteria_tls":
-        active_families = {"xhttp_tls", "hysteria2_tls"}
-    else:
-        active_families = {current}
-
-    if current == RUSSIA_KIT_PROFILE:
-        return [
-            {**item, "profile_label": SAVED_LINK_PROFILE_LABELS[str(item["profile"])], "active": True}
-            for item in _make_russia_kit_links(user, server)
-        ]
-    profiles = ("raw_reality", "xhttp_tls", "xhttp_reality", "hysteria2_tls", "ws_tls")
-    if current == "grpc_tls":
-        profiles = ("grpc_tls", *profiles)
-    links: list[dict[str, object]] = []
-    for profile in profiles:
-        try:
-            profile_links = _make_links_for_profile(user, server, profile)
-        except XPanelError:
-            continue
-        is_active = profile in active_families
-        for item in profile_links:
-            if current == "xhttp_hysteria_tls" and profile == "hysteria2_tls" and int(item["id"]) == 1:
-                item["tag"] = HYSTERIA_COMBINED_PRIMARY_TAG
-            links.append({
-                **item,
-                "profile": profile,
-                "profile_label": SAVED_LINK_PROFILE_LABELS[profile],
-                "active": is_active,
-            })
-    return links
 
 
 def make_link(

@@ -54,14 +54,10 @@ def test_clients_inspector_contract() -> None:
 
 
 def test_dns_page_has_no_summary_cards_or_detached_priority_column() -> None:
-    dns = read("xpanel/templates/dns.html")
-    assert "{% block section %}DNS{% endblock %}" in dns
-    assert "{% block heading %}DNS{% endblock %}" in dns
-    assert "dns-context-metrics" not in dns
-    assert "<th>Приоритет</th>" not in dns
-    assert '<table class="dns-server-table">' in dns
-    assert "dns-priority-note" in dns
-    assert "Приоритет {{ server.priority }}" in dns
-    assert '<p class="panel-kicker">UPSTREAM</p><h2>DNS-серверы</h2>' not in dns
-    assert "Контекстный JSON DNS" in dns
-    assert dns.index("Контекстный JSON DNS") < dns.index("Общие настройки DNS")
+    template = read("xpanel/templates/dns.html")
+    assert "dns-rebuild-page" in template
+    assert '<table class="dnsr-table">' in template
+    assert "<th>DNS-сервер / приоритет</th>" in template
+    assert "dnsr-priority-note" in template
+    assert "dns-simple-page" not in template
+    assert "dns-server-table" not in template

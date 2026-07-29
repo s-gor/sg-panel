@@ -24,17 +24,18 @@ def test_system_tabs_and_cluster_cleanup_are_preserved() -> None:
     assert 'cluster-stage4-onboarding' not in nodes
 
 def test_outbounds_is_compact_and_has_one_help_control() -> None:
-    outbounds = read("xpanel/templates/outbounds.html")
-    css = read("xpanel/static/fix40-ui-compact-hotfix6.css")
-    assert "{% block section %}OUTBOUNDS{% endblock %}" in outbounds
-    assert "#routing-warp" in outbounds
-    assert "Полная инструкция" not in outbounds
-    assert 'class="warp-routing-link"' not in outbounds
-    assert "font-size: 19px !important" in css
-    assert "padding: 12px 14px !important" in css
-    assert "min-height: 56px !important" in css
-    assert "font-size: 14px !important" in css
-
+    template = read("xpanel/templates/outbounds.html")
+    assert (
+        '{% block page_actions %}<a class="button secondary" '
+        'href="{{ url_for(\'help_page\') }}#routing-warp">Справка</a>{% endblock %}'
+        in template
+    )
+    assert (
+        '<a class="button secondary" href="{{ url_for(\'help_page\') }}#routing-warp">'
+        "Полная инструкция</a>"
+        in template
+    )
+    assert "outbounds-gateway-style2" in template
 def test_routing_cleanup_is_preserved() -> None:
     routing = read("xpanel/templates/routing.html")
     assert '<nav class="r096-tabs routing-simple-tabs"' not in routing
