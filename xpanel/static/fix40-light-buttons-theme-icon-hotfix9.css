@@ -1,3 +1,584 @@
+/* SG-Panel Preview 9 · FIX40 Interface Cleanup Hotfix 5
+   Confirmed visual corrections only: System tabs, diagnostics logs, Cluster onboarding,
+   Outbounds identity/summary cleanup and Routing workspace cleanup. */
+
+/* System navigation: three equal real buttons, no underline. */
+body.preview-9-rc6-typography:is(.dashboard-page,.diagnostics-page) .section-tabs {
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 180px)) !important;
+  justify-content: start !important;
+  gap: 10px !important;
+  width: min(100%, 560px) !important;
+  max-width: none !important;
+  margin: -4px 0 24px !important;
+  padding: 0 !important;
+  overflow: visible !important;
+  border: 0 !important;
+  background: transparent !important;
+}
+body.preview-9-rc6-typography:is(.dashboard-page,.diagnostics-page) .section-tabs a {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-sizing: border-box !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  min-height: 44px !important;
+  padding: 10px 12px !important;
+  color: #fff !important;
+  border: 1px solid color-mix(in srgb, var(--sg-jade) 78%, #20382f) !important;
+  border-radius: 10px !important;
+  background: color-mix(in srgb, var(--sg-jade) 88%, #6f8c7d) !important;
+  box-shadow: 0 5px 14px rgba(38, 66, 54, .14) !important;
+  font-size: 12px !important;
+  font-weight: 800 !important;
+  text-align: center !important;
+}
+body.preview-9-rc6-typography:is(.dashboard-page,.diagnostics-page) .section-tabs a:hover {
+  color: #fff !important;
+  background: color-mix(in srgb, var(--sg-jade-strong) 92%, #718d80) !important;
+}
+body.preview-9-rc6-typography:is(.dashboard-page,.diagnostics-page) .section-tabs a.active {
+  color: #fff !important;
+  border-color: color-mix(in srgb, var(--sg-jade-strong) 82%, #223d32) !important;
+  background: var(--sg-jade-strong) !important;
+  box-shadow: 0 6px 16px rgba(38, 66, 54, .20) !important;
+}
+html[data-resolved-theme="dark"] body.preview-9-rc6-typography:is(.dashboard-page,.diagnostics-page) .section-tabs a {
+  color: #fff !important;
+  border-color: #587087 !important;
+  background: #41586f !important;
+  box-shadow: 0 5px 14px rgba(5, 12, 20, .24) !important;
+}
+html[data-resolved-theme="dark"] body.preview-9-rc6-typography:is(.dashboard-page,.diagnostics-page) .section-tabs a:hover {
+  background: #4b6680 !important;
+}
+html[data-resolved-theme="dark"] body.preview-9-rc6-typography:is(.dashboard-page,.diagnostics-page) .section-tabs a.active {
+  border-color: #7892aa !important;
+  background: #58738d !important;
+}
+
+/* Logs: the gaps between cards must never expose the dark console background. */
+body.diagnostics-page .diagnostics-log-console {
+  background: var(--panel) !important;
+}
+body.diagnostics-page .diagnostic-log-accordion-list {
+  gap: 10px !important;
+  background: transparent !important;
+}
+html[data-resolved-theme="light"] body.diagnostics-page .diagnostics-log-console {
+  background: var(--lux-surface-hi, #f7f3eb) !important;
+}
+html[data-resolved-theme="light"] body.diagnostics-page .diagnostic-log-panel {
+  background: var(--lux-surface-mid, #eee7dc) !important;
+}
+
+/* Cluster: onboarding is permanently visible; no reveal badge or close button. */
+.cluster-stage4-onboarding.is-always-open {
+  overflow: hidden !important;
+  padding: 0 !important;
+}
+.cluster-stage4-onboarding-header {
+  display: flex !important;
+  align-items: center !important;
+  min-height: 78px !important;
+  padding: 17px 20px !important;
+  border-bottom: 1px solid var(--line-soft) !important;
+}
+.cluster-stage4-onboarding-header > div { min-width: 0; }
+.cluster-stage4-onboarding-header strong,
+.cluster-stage4-onboarding-header small { display: block; }
+.cluster-stage4-onboarding-header strong {
+  margin-top: 3px;
+  color: var(--text) !important;
+  font-size: 15px;
+}
+.cluster-stage4-onboarding-header small {
+  margin-top: 4px;
+  color: var(--muted) !important;
+  font-size: 10.5px;
+}
+.cluster-stage4-onboarding.is-always-open .cluster-stage4-onboarding-body {
+  padding-top: 18px !important;
+  border-top: 0 !important;
+}
+
+/* Outbounds and Routing: start with useful content, not duplicate summaries. */
+body.outbounds-page .outbound-context-metrics { display: none !important; }
+body.routing-fix40-simple .routing-simple-tabs,
+body.routing-fix40-simple .routing-status-strip,
+body.routing-fix40-simple .routing-simple-footer { display: none !important; }
+body.routing-fix40-simple .routing-clean-workspace {
+  gap: 14px !important;
+}
+
+@media (max-width: 720px) {
+  body.preview-9-rc6-typography:is(.dashboard-page,.diagnostics-page) .section-tabs {
+    grid-template-columns: 1fr !important;
+    width: 100% !important;
+  }
+}
+
+/* SG-Panel Preview 9 · FIX40 UI Compact Hotfix 6
+   Final compact pass for Outbounds. Loaded after Hotfix 5. */
+
+/* Keep the page full-width and use the same vertical rhythm as the rest of SG-Panel. */
+body.outbounds-page .ob-page {
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 !important;
+  gap: 14px !important;
+}
+
+body.outbounds-page :is(.ob-system-panel,.warp-panel,.ob-user-outputs-panel) {
+  margin: 0 !important;
+  border-radius: 16px !important;
+  box-shadow: var(--shadow-sm) !important;
+}
+
+/* System and custom headings: ordinary card typography, not display typography. */
+body.outbounds-page :is(.ob-section-heading,.ob-user-outputs-heading) {
+  min-height: 0 !important;
+  padding: 13px 18px !important;
+  gap: 14px !important;
+}
+body.outbounds-page :is(.ob-section-heading,.ob-user-outputs-heading) h2 {
+  margin: 0 0 3px !important;
+  font-size: 17px !important;
+  line-height: 1.22 !important;
+  letter-spacing: -.01em !important;
+}
+body.outbounds-page :is(.ob-section-heading,.ob-user-outputs-heading) p:last-child {
+  margin: 0 !important;
+  font-size: 12.5px !important;
+  line-height: 1.4 !important;
+}
+body.outbounds-page .ob-user-outputs-heading .panel-kicker {
+  margin: 0 0 4px !important;
+  font-size: 9px !important;
+}
+
+/* Two system outputs should read as compact rows, not oversized cards. */
+body.outbounds-page .ob-system-row {
+  min-height: 56px !important;
+  padding: 9px 16px !important;
+  gap: 11px !important;
+}
+body.outbounds-page .ob-system-icon {
+  width: 32px !important;
+  height: 32px !important;
+  border-radius: 9px !important;
+}
+body.outbounds-page .ob-system-title {
+  gap: 6px !important;
+  margin-bottom: 2px !important;
+}
+body.outbounds-page .ob-system-title strong {
+  font-size: 14px !important;
+  line-height: 1.25 !important;
+}
+body.outbounds-page .ob-system-title span {
+  font-size: 11.5px !important;
+  line-height: 1.3 !important;
+}
+body.outbounds-page .ob-system-main p {
+  font-size: 12px !important;
+  line-height: 1.35 !important;
+}
+body.outbounds-page .ob-system-main small,
+body.outbounds-page .ob-system-meta code,
+body.outbounds-page .ob-meta-label {
+  font-size: 10.5px !important;
+}
+
+/* WARP becomes one compact operational card. */
+body.outbounds-page .warp-panel {
+  padding: 16px 18px !important;
+}
+body.outbounds-page .warp-heading {
+  align-items: center !important;
+  gap: 18px !important;
+  margin: 0 0 12px !important;
+}
+body.outbounds-page .warp-heading .panel-kicker {
+  margin: 0 0 4px !important;
+  font-size: 9px !important;
+}
+body.outbounds-page .warp-heading h2 {
+  margin: 0 0 4px !important;
+  font-size: 19px !important;
+  line-height: 1.18 !important;
+  letter-spacing: -.015em !important;
+}
+body.outbounds-page .warp-heading p:last-child {
+  max-width: 900px !important;
+  margin: 0 !important;
+  font-size: 12.5px !important;
+  line-height: 1.4 !important;
+}
+body.outbounds-page .warp-status {
+  gap: 7px !important;
+  min-height: 30px !important;
+  padding: 5px 10px !important;
+  font-size: 12px !important;
+}
+body.outbounds-page .warp-status i {
+  width: 8px !important;
+  height: 8px !important;
+}
+body.outbounds-page .warp-create-box {
+  gap: 16px !important;
+  padding: 12px 14px !important;
+  border-radius: 12px !important;
+}
+body.outbounds-page .warp-create-box strong {
+  font-size: 14px !important;
+  line-height: 1.3 !important;
+}
+body.outbounds-page .warp-create-box p {
+  margin: 4px 0 0 !important;
+  font-size: 12px !important;
+  line-height: 1.4 !important;
+}
+body.outbounds-page .warp-helper-warning {
+  margin-top: 5px !important;
+  font-size: 11px !important;
+}
+body.outbounds-page .warp-summary-grid {
+  gap: 10px !important;
+  margin: 0 0 10px !important;
+}
+body.outbounds-page .warp-summary-grid article {
+  padding: 11px 13px !important;
+  border-radius: 11px !important;
+}
+body.outbounds-page .warp-summary-grid span,
+body.outbounds-page .warp-summary-grid small {
+  font-size: 11px !important;
+  line-height: 1.35 !important;
+}
+body.outbounds-page .warp-summary-grid strong {
+  margin: 3px 0 !important;
+  font-size: 13.5px !important;
+}
+body.outbounds-page .warp-actions {
+  gap: 8px !important;
+  margin: 0 !important;
+}
+
+/* Local action sizing: same compact controls used elsewhere in the panel. */
+body.outbounds-page :is(.warp-panel,.ob-system-panel,.ob-user-outputs-panel) .button {
+  min-height: 38px !important;
+  padding: 8px 13px !important;
+  font-size: 12.5px !important;
+  line-height: 1.2 !important;
+}
+body.outbounds-page :is(.warp-panel,.ob-system-panel,.ob-user-outputs-panel) .button.small {
+  min-height: 34px !important;
+  padding: 7px 10px !important;
+  font-size: 11.5px !important;
+}
+
+/* Empty custom-output state must not create another large visual block. */
+body.outbounds-page .ob-user-output-empty {
+  min-height: 64px !important;
+  padding: 12px 18px !important;
+}
+body.outbounds-page .ob-user-output-empty strong {
+  font-size: 13.5px !important;
+}
+body.outbounds-page .ob-user-output-empty p {
+  margin-top: 3px !important;
+  font-size: 12px !important;
+}
+
+/* The page-level Instruction button is the only help control on this page. */
+body.outbounds-page .warp-routing-link,
+body.outbounds-page .warp-routing-actions {
+  display: none !important;
+}
+
+@media (max-width: 760px) {
+  body.outbounds-page .warp-heading,
+  body.outbounds-page .warp-create-box {
+    align-items: stretch !important;
+    flex-direction: column !important;
+  }
+  body.outbounds-page .warp-create-box form,
+  body.outbounds-page .warp-create-box .button {
+    width: 100% !important;
+  }
+  body.outbounds-page .ob-system-row {
+    grid-template-columns: 32px minmax(0, 1fr) !important;
+  }
+  body.outbounds-page .ob-system-meta,
+  body.outbounds-page .ob-system-actions {
+    grid-column: 2 !important;
+    justify-content: flex-start !important;
+  }
+}
+
+/* SG-Panel Preview 9 · FIX40 · Global Tabs and Dark Buttons Hotfix 7
+   Global correction agreed during fresh-EC2 visual review.
+   - All section tabs are equal real buttons without an underline.
+   - Light theme uses calm jade with white text.
+   - Dark theme uses SG blue-gray with white text.
+   - Green remains reserved for statuses, not primary actions. */
+
+/* One shared component for System, Security, Maintenance and every other section. */
+body.preview-9-rc6-typography .section-tabs {
+  display: grid !important;
+  grid-auto-flow: column !important;
+  grid-auto-columns: 180px !important;
+  justify-content: start !important;
+  align-items: stretch !important;
+  gap: 10px !important;
+  width: max-content !important;
+  max-width: 100% !important;
+  margin: -4px 0 24px !important;
+  padding: 0 !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  border: 0 !important;
+  border-bottom: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  scrollbar-width: thin;
+}
+
+body.preview-9-rc6-typography .section-tabs a {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-sizing: border-box !important;
+  width: 180px !important;
+  min-width: 180px !important;
+  min-height: 42px !important;
+  padding: 9px 12px !important;
+  color: #fff !important;
+  border: 1px solid color-mix(in srgb, var(--sg-jade, #4d806b) 78%, #29463a) !important;
+  border-bottom: 1px solid color-mix(in srgb, var(--sg-jade, #4d806b) 78%, #29463a) !important;
+  border-radius: 10px !important;
+  background: color-mix(in srgb, var(--sg-jade, #4d806b) 84%, #789286) !important;
+  box-shadow: 0 5px 14px rgba(38, 66, 54, .14) !important;
+  font-size: 12px !important;
+  font-weight: 800 !important;
+  line-height: 1.2 !important;
+  text-align: center !important;
+  text-decoration: none !important;
+  white-space: nowrap !important;
+}
+
+body.preview-9-rc6-typography .section-tabs a:hover {
+  color: #fff !important;
+  border-color: color-mix(in srgb, var(--sg-jade-strong, #3f715d) 82%, #29463a) !important;
+  background: color-mix(in srgb, var(--sg-jade-strong, #3f715d) 90%, #789286) !important;
+}
+
+body.preview-9-rc6-typography .section-tabs a.active {
+  color: #fff !important;
+  border-color: color-mix(in srgb, var(--sg-jade-strong, #3f715d) 86%, #21382f) !important;
+  border-bottom-color: color-mix(in srgb, var(--sg-jade-strong, #3f715d) 86%, #21382f) !important;
+  background: var(--sg-jade-strong, #3f715d) !important;
+  box-shadow: 0 6px 16px rgba(38, 66, 54, .20) !important;
+}
+
+/* Dark SG palette: blue-gray actions, green only for semantic statuses. */
+html[data-resolved-theme="dark"] body.preview-9-rc6-typography .section-tabs a {
+  color: #fff !important;
+  border-color: #587087 !important;
+  border-bottom-color: #587087 !important;
+  background: #41586f !important;
+  box-shadow: 0 5px 14px rgba(5, 12, 20, .24) !important;
+}
+
+html[data-resolved-theme="dark"] body.preview-9-rc6-typography .section-tabs a:hover {
+  color: #fff !important;
+  border-color: #688198 !important;
+  background: #4b6680 !important;
+}
+
+html[data-resolved-theme="dark"] body.preview-9-rc6-typography .section-tabs a.active {
+  color: #fff !important;
+  border-color: #7892aa !important;
+  border-bottom-color: #7892aa !important;
+  background: #58738d !important;
+  box-shadow: 0 6px 16px rgba(5, 12, 20, .30) !important;
+}
+
+html[data-resolved-theme="dark"] body.preview-9-rc6-typography .button.primary,
+html[data-resolved-theme="dark"] body.preview-9-rc6-typography .login-submit {
+  color: #fff !important;
+  border-color: #587087 !important;
+  background: #41586f !important;
+  box-shadow: 0 8px 20px rgba(5, 12, 20, .26) !important;
+}
+
+html[data-resolved-theme="dark"] body.preview-9-rc6-typography .button.primary:hover,
+html[data-resolved-theme="dark"] body.preview-9-rc6-typography .login-submit:hover {
+  color: #fff !important;
+  border-color: #688198 !important;
+  background: #4b6680 !important;
+  box-shadow: 0 10px 24px rgba(5, 12, 20, .32) !important;
+}
+
+html[data-resolved-theme="dark"] body.preview-9-rc6-typography .button.primary:active,
+html[data-resolved-theme="dark"] body.preview-9-rc6-typography .login-submit:active {
+  color: #fff !important;
+  border-color: #7892aa !important;
+  background: #58738d !important;
+}
+
+@media (max-width: 760px) {
+  body.preview-9-rc6-typography .section-tabs {
+    grid-auto-flow: row !important;
+    grid-auto-columns: minmax(0, 1fr) !important;
+    grid-template-columns: 1fr !important;
+    width: 100% !important;
+    overflow: visible !important;
+  }
+  body.preview-9-rc6-typography .section-tabs a {
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+}
+
+/* SG-Panel Preview 9 · FIX40 · Interface Verification Hotfix 8
+   Confirmed on fresh EC2 review:
+   - section-tab labels must stay visible and white in every theme;
+   - dark primary actions use SG blue-gray;
+   - Routing has no duplicate inner navigation and keeps the English title;
+   - Network Controller uses a compact semantic status, not a giant metric word. */
+
+/* Keep every tab label visible even when older theme rules use text fill or opacity. */
+body.preview-9-rc6-typography .section-tabs a,
+body.preview-9-rc6-typography .section-tabs a:link,
+body.preview-9-rc6-typography .section-tabs a:visited,
+body.preview-9-rc6-typography .section-tabs a:hover,
+body.preview-9-rc6-typography .section-tabs a:active,
+body.preview-9-rc6-typography .section-tabs a.active,
+body.preview-9-rc6-typography .section-tabs .section-tab-label {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  filter: none !important;
+  mix-blend-mode: normal !important;
+  text-shadow: 0 1px 1px rgba(0,0,0,.18) !important;
+}
+
+body.preview-9-rc6-typography .section-tabs .section-tab-label {
+  display: block !important;
+  width: 100% !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  text-align: center !important;
+  font: inherit !important;
+  letter-spacing: inherit !important;
+}
+
+/* Remove any old underline/rail regardless of section-specific rules. */
+body.preview-9-rc6-typography .section-tabs,
+body.preview-9-rc6-typography .section-tabs::before,
+body.preview-9-rc6-typography .section-tabs::after {
+  border-bottom: 0 !important;
+  background-image: none !important;
+}
+body.preview-9-rc6-typography .section-tabs::before,
+body.preview-9-rc6-typography .section-tabs::after {
+  content: none !important;
+  display: none !important;
+}
+body.preview-9-rc6-typography .section-tabs a,
+body.preview-9-rc6-typography .section-tabs a.active {
+  background-image: none !important;
+}
+
+/* Dark-theme actions: SG blue-gray, white label. Green remains only for statuses. */
+html[data-resolved-theme="dark"] body.preview-9-rc6-typography :is(
+  .button.primary,
+  button.button.primary,
+  a.button.primary,
+  .client-action.primary,
+  .login-submit
+) {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+  border-color: #587087 !important;
+  background: #41586f !important;
+  background-image: none !important;
+  opacity: 1 !important;
+}
+html[data-resolved-theme="dark"] body.preview-9-rc6-typography :is(
+  .button.primary,
+  button.button.primary,
+  a.button.primary,
+  .client-action.primary,
+  .login-submit
+):hover {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+  border-color: #6b859d !important;
+  background: #4c6881 !important;
+  background-image: none !important;
+}
+
+/* Routing title uses the same scale as the rest of SG-Panel. */
+body.page-routing .topbar-heading h1 {
+  font-size: 31px !important;
+  line-height: 1.05 !important;
+  letter-spacing: -.035em !important;
+}
+
+/* Compact semantic state in the fourth Clients metric. */
+body.awg-clients-page .clients-awg-metrics article.network-controller-metric > .network-controller-state {
+  align-self: flex-start !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 7px !important;
+  width: auto !important;
+  max-width: 100% !important;
+  min-height: 28px !important;
+  margin-top: 12px !important;
+  padding: 5px 10px !important;
+  border: 1px solid color-mix(in srgb, var(--success, #4f8e75) 58%, transparent) !important;
+  border-radius: 999px !important;
+  background: color-mix(in srgb, var(--success, #4f8e75) 14%, transparent) !important;
+  color: var(--success, #4f8e75) !important;
+  -webkit-text-fill-color: currentColor !important;
+  font-size: 12px !important;
+  font-weight: 800 !important;
+  line-height: 1 !important;
+  letter-spacing: 0 !important;
+  box-shadow: none !important;
+}
+body.awg-clients-page .clients-awg-metrics article.network-controller-metric > .network-controller-state.warning {
+  border-color: color-mix(in srgb, var(--warning, #b28138) 58%, transparent) !important;
+  background: color-mix(in srgb, var(--warning, #b28138) 14%, transparent) !important;
+  color: var(--warning, #b28138) !important;
+}
+body.awg-clients-page .clients-awg-metrics article.network-controller-metric > .network-controller-state > i {
+  display: block !important;
+  width: 7px !important;
+  height: 7px !important;
+  flex: 0 0 7px !important;
+  border-radius: 50% !important;
+  background: currentColor !important;
+  box-shadow: 0 0 0 4px color-mix(in srgb, currentColor 14%, transparent) !important;
+}
+
+html[data-resolved-theme="dark"] body.awg-clients-page .clients-awg-metrics article.network-controller-metric > .network-controller-state {
+  color: #6fd3a6 !important;
+  border-color: rgba(111,211,166,.42) !important;
+  background: rgba(111,211,166,.10) !important;
+}
+html[data-resolved-theme="dark"] body.awg-clients-page .clients-awg-metrics article.network-controller-metric > .network-controller-state.warning {
+  color: #e4b86d !important;
+  border-color: rgba(228,184,109,.42) !important;
+  background: rgba(228,184,109,.10) !important;
+}
+
 /* SG-Panel Preview 9 · FIX40 · Light Button Gradient and Theme Icon Hotfix 9
    Small verified UI step:
    - every shared section button in the light theme uses the same Luxury Jade
