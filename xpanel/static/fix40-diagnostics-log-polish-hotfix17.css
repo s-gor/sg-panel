@@ -1,3 +1,62 @@
+/* SG-Panel Preview 9 FIX40 Hotfix 13
+   Diagnostics: equal restart controls and clean service-state text. */
+
+body.diagnostics-page .diagnostics-controls-card .diagnostics-service-list > div > .service-state-label {
+  min-width: 78px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  line-height: 1.25 !important;
+  text-align: left !important;
+  text-transform: none !important;
+  letter-spacing: normal !important;
+}
+
+body.diagnostics-page .diagnostics-controls-card .diagnostics-service-list > div > .service-restart-form {
+  width: 220px !important;
+  min-width: 220px !important;
+}
+
+body.diagnostics-page .diagnostics-controls-card .diagnostics-service-list .service-restart-button {
+  width: 100% !important;
+  min-width: 0 !important;
+  justify-content: center !important;
+  text-align: center !important;
+}
+
+@media (max-width: 900px) {
+  body.diagnostics-page .diagnostics-controls-card .diagnostics-service-list > div > .service-restart-form {
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+}
+
+/* Preview 9 · FIX40 · Hotfix 16
+   Logs & Diagnostics: card gaps must use the page surface, never the dark terminal color. */
+body.diagnostics-page .diagnostics-log-console,
+body.diagnostics-page .diagnostic-log-accordion-list {
+  background: var(--panel) !important;
+}
+
+body.diagnostics-page .diagnostic-log-accordion-list {
+  gap: 10px !important;
+}
+
+html[data-theme="light"] body.diagnostics-page .diagnostics-log-console,
+html[data-theme="light"] body.diagnostics-page .diagnostic-log-accordion-list,
+html[data-resolved-theme="light"] body.diagnostics-page .diagnostics-log-console,
+html[data-resolved-theme="light"] body.diagnostics-page .diagnostic-log-accordion-list {
+  background: var(--lux-surface-hi, #f7f3eb) !important;
+}
+
+html[data-theme="light"] body.diagnostics-page .diagnostic-log-panel,
+html[data-resolved-theme="light"] body.diagnostics-page .diagnostic-log-panel {
+  background: var(--lux-surface-mid, #eee7dc) !important;
+}
+
 /* Preview 9 · FIX40 · Hotfix 17
    Logs & Diagnostics: no dark strip above Xray and equal inner spacing. */
 body.diagnostics-page .diagnostics-log-console {
