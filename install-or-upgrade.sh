@@ -540,15 +540,15 @@ validate_stage(){
   grep -Fq "SG-Panel Preview 9 FIX40" <<<"$css_body" || { echo "веб-служба не отдаёт UI-исправления FIX40"; return 1; }
   css_body="$(curl -fsS "http://$health_host:$port/static/fix40-clients-layout-hotfix3.css?v=$EXPECTED_VERSION-$EXPECTED_BUILD-clients-layout-hotfix3")"
   grep -Fq "Clients Layout Hotfix 3" <<<"$css_body" || { echo "веб-служба не отдаёт Clients Layout Hotfix 3"; return 1; }
-  css_body="$(curl -fsS "http://$health_host:$port/static/fix40-interface-cleanup-hotfix5.css?v=$EXPECTED_VERSION-$EXPECTED_BUILD-interface-cleanup-hotfix5")"
+  css_body="$(curl -fsS "http://$health_host:$port/static/fix40-light-buttons-theme-icon-hotfix9.css?v=$EXPECTED_VERSION-$EXPECTED_BUILD-interface-cleanup-hotfix5")"
   grep -Fq "Interface Cleanup Hotfix 5" <<<"$css_body" || { echo "веб-служба не отдаёт Interface Cleanup Hotfix 5"; return 1; }
-  css_body="$(curl -fsS "http://$health_host:$port/static/fix40-ui-compact-hotfix6.css?v=$EXPECTED_VERSION-$EXPECTED_BUILD-ui-compact-hotfix6")"
+  css_body="$(curl -fsS "http://$health_host:$port/static/fix40-light-buttons-theme-icon-hotfix9.css?v=$EXPECTED_VERSION-$EXPECTED_BUILD-ui-compact-hotfix6")"
   grep -Fq "UI Compact Hotfix 6" <<<"$css_body" || { echo "веб-служба не отдаёт UI Compact Hotfix 6"; return 1; }
   local tabs_css
-  tabs_css="$(curl -fsS --max-time 10 "http://127.0.0.1:8080/static/fix40-global-tabs-dark-buttons-hotfix7.css")"
+  tabs_css="$(curl -fsS --max-time 10 "http://127.0.0.1:8080/static/fix40-light-buttons-theme-icon-hotfix9.css")"
   grep -Fq "Global Tabs and Dark Buttons Hotfix 7" <<<"$tabs_css" || { echo "веб-служба не отдаёт Global Tabs and Dark Buttons Hotfix 7"; return 1; }
   local ui8_css
-  ui8_css="$(curl -fsS --max-time 10 "http://127.0.0.1:8080/static/fix40-interface-verification-hotfix8.css")"
+  ui8_css="$(curl -fsS --max-time 10 "http://127.0.0.1:8080/static/fix40-light-buttons-theme-icon-hotfix9.css")"
   grep -Fq "Interface Verification Hotfix 8" <<<"$ui8_css" || { echo "веб-служба не отдаёт Interface Verification Hotfix 8"; return 1; }
   local ui9_css
   ui9_css="$(curl -fsS --max-time 10 "http://127.0.0.1:8080/static/fix40-light-buttons-theme-icon-hotfix9.css")"

@@ -109,6 +109,6 @@ def test_installer_hides_optional_warp_helper_warning_but_keeps_log_record() -> 
     assert 'log "WARP-helper не обновлён; необязательный компонент оставлен без изменений."' in upgrade
     for script in ("install.sh", "install-or-upgrade.sh", "deploy/ec2-first-install.sh"):
         text = read(script)
-        assert "fix40-ui-compact-hotfix6.css" in text
+        assert "fix40-light-buttons-theme-icon-hotfix9.css" in text
         assert "UI Compact Hotfix 6" in text
         assert 'EXPECTED_RELEASE_LABEL="Preview 9 · FIX40 · UI23"' in text

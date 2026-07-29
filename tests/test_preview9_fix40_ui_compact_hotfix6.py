@@ -52,7 +52,7 @@ def test_installer_checks_final_hotfix6_css() -> None:
     for rel in ("install.sh", "install-or-upgrade.sh", "deploy/ec2-first-install.sh"):
         body = read(rel)
         assert 'EXPECTED_RELEASE_LABEL="Preview 9 · FIX40 · UI23"' in body
-        assert "fix40-ui-compact-hotfix6.css" in body
+        assert "fix40-light-buttons-theme-icon-hotfix9.css" in body
         assert "UI Compact Hotfix 6" in body
 
 

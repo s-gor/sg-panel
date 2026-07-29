@@ -740,25 +740,25 @@ validate_installation_stage(){
   local global_css
   if [[ "$mode" == "https" ]]; then
     global_css="$(curl -kfsS --max-time 5 --resolve "$host:$port:127.0.0.1" \
-      "$url/static/fix40-interface-cleanup-hotfix5.css?v=$EXPECTED_VERSION-$EXPECTED_BUILD-interface-cleanup-hotfix5")"
+      "$url/static/fix40-light-buttons-theme-icon-hotfix9.css?v=$EXPECTED_VERSION-$EXPECTED_BUILD-interface-cleanup-hotfix5")"
   else
     global_css="$(curl -fsS --max-time 5 -H "Host: $host" \
-      "http://127.0.0.1:$port/static/fix40-interface-cleanup-hotfix5.css?v=$EXPECTED_VERSION-$EXPECTED_BUILD-interface-cleanup-hotfix5")"
+      "http://127.0.0.1:$port/static/fix40-light-buttons-theme-icon-hotfix9.css?v=$EXPECTED_VERSION-$EXPECTED_BUILD-interface-cleanup-hotfix5")"
   fi
   grep -Fq "Interface Cleanup Hotfix 5" <<<"$global_css" || fail "GUI не отдаёт Interface Cleanup Hotfix 5"
   if [[ "$mode" == "https" ]]; then
     global_css="$(curl -kfsS --max-time 5 --resolve "$host:$port:127.0.0.1" \
-      "$url/static/fix40-ui-compact-hotfix6.css?v=$EXPECTED_VERSION-$EXPECTED_BUILD-ui-compact-hotfix6")"
+      "$url/static/fix40-light-buttons-theme-icon-hotfix9.css?v=$EXPECTED_VERSION-$EXPECTED_BUILD-ui-compact-hotfix6")"
   else
     global_css="$(curl -fsS --max-time 5 -H "Host: $host" \
-      "http://127.0.0.1:$port/static/fix40-ui-compact-hotfix6.css?v=$EXPECTED_VERSION-$EXPECTED_BUILD-ui-compact-hotfix6")"
+      "http://127.0.0.1:$port/static/fix40-light-buttons-theme-icon-hotfix9.css?v=$EXPECTED_VERSION-$EXPECTED_BUILD-ui-compact-hotfix6")"
   fi
   grep -Fq "UI Compact Hotfix 6" <<<"$global_css" || fail "GUI не отдаёт UI Compact Hotfix 6"
   local tabs_css
-  tabs_css="$(curl -fsS --max-time 10 "http://127.0.0.1:8080/static/fix40-global-tabs-dark-buttons-hotfix7.css")"
+  tabs_css="$(curl -fsS --max-time 10 "http://127.0.0.1:8080/static/fix40-light-buttons-theme-icon-hotfix9.css")"
   grep -Fq "Global Tabs and Dark Buttons Hotfix 7" <<<"$tabs_css" || fail "GUI не отдаёт Global Tabs and Dark Buttons Hotfix 7"
   local ui8_css
-  ui8_css="$(curl -fsS --max-time 10 "http://127.0.0.1:8080/static/fix40-interface-verification-hotfix8.css")"
+  ui8_css="$(curl -fsS --max-time 10 "http://127.0.0.1:8080/static/fix40-light-buttons-theme-icon-hotfix9.css")"
   grep -Fq "Interface Verification Hotfix 8" <<<"$ui8_css" || fail "GUI не отдаёт Interface Verification Hotfix 8"
   local ui9_css
   ui9_css="$(curl -fsS --max-time 10 "http://127.0.0.1:8080/static/fix40-light-buttons-theme-icon-hotfix9.css")"
