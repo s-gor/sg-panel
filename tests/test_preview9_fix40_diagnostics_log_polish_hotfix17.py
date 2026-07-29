@@ -10,8 +10,8 @@ def test_ui17_release_and_css_contract():
     assert '__release_label__ = "Preview 9 · FIX40 · UI23"' in text('xpanel/__init__.py')
     base = text('xpanel/templates/base.html')
     Environment().parse(base)
-    assert base.count('fix40-diagnostics-log-polish-hotfix17.css') == 1
-    css = text('xpanel/static/fix40-diagnostics-log-polish-hotfix17.css')
+    assert base.count('diagnostics.css') == 1
+    css = text('xpanel/static/diagnostics.css')
     assert 'margin-bottom: 0 !important' in css
     assert 'padding: 10px 12px 12px !important' in css
     assert 'padding: 13px 18px !important' in css

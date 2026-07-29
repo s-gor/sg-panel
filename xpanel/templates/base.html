@@ -39,7 +39,7 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='fix40-interface-verification-hotfix8.css') }}?v={{ xpanel_version }}-{{ xpanel_build|lower }}-interface-verification-hotfix8">
   <link rel="stylesheet" href="{{ url_for('static', filename='fix40-light-buttons-theme-icon-hotfix9.css') }}?v={{ xpanel_version }}-{{ xpanel_build|lower }}-light-buttons-theme-icon-hotfix9">
   <link rel="stylesheet" href="{{ url_for('static', filename='fix40-security-global-controls-hotfix11.css') }}?v={{ xpanel_version }}-{{ xpanel_build|lower }}-security-global-controls-hotfix11">
-  <link rel="stylesheet" href="{{ url_for('static', filename='fix40-diagnostics-log-polish-hotfix17.css') }}?v={{ xpanel_version }}-{{ xpanel_build|lower }}-diagnostics-log-polish-hotfix17">
+  <link rel="stylesheet" href="{{ url_for('static', filename='diagnostics.css') }}?v={{ xpanel_version }}-{{ xpanel_build|lower }}-diagnostics-consolidated1">
   <link rel="stylesheet" href="{{ url_for('static', filename='fix40-node-simple-hotfix18.css') }}?v={{ xpanel_version }}-{{ xpanel_build|lower }}-node-simple-hotfix18">
   {% if request.endpoint == 'nodes_page' or (request.endpoint or '').startswith('node_') %}<link rel="stylesheet" href="{{ url_for('static', filename='fix40-cluster-restore-ui21.css') }}?v={{ xpanel_version }}-{{ xpanel_build|lower }}-cluster-restore-ui21-final-fix2">{% endif %}
   {% if request.endpoint == 'nodes_page' %}<link rel="stylesheet" href="{{ url_for('static', filename='fix40-cluster-empty-fix1.css') }}?v={{ xpanel_version }}-{{ xpanel_build|lower }}-cluster-empty-fix1">{% endif %}
