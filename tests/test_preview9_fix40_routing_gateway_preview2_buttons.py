@@ -32,5 +32,5 @@ def test_missing_standard_slots_do_not_stretch_neighbours() -> None:
 
 
 def test_preview2_notes_remain_historical() -> None:
-    notes = read("ROUTING-GATEWAY-PREVIEW2-BUTTONS-NOTES.md")
+    notes = read("docs/history/build-notes/ROUTING-GATEWAY-PREVIEW2-BUTTONS-NOTES.md")
     assert "Не изменялось" in notes

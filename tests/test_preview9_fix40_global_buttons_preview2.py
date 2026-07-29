@@ -33,5 +33,5 @@ def test_outbounds_problem_buttons_remain_ordinary_actions():
 
 
 def test_preview2_notes_remain_historical_record():
-    notes = (ROOT / "GLOBAL-BUTTONS-PREVIEW2-NOTES.md").read_text(encoding="utf-8")
+    notes = (ROOT / "docs/history/build-notes/GLOBAL-BUTTONS-PREVIEW2-NOTES.md").read_text(encoding="utf-8")
     assert "No backend" in notes

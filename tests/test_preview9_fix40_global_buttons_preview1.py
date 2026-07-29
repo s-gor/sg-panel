@@ -33,5 +33,5 @@ def test_semantic_variants_are_deliberate_not_one_fill_for_everything():
 
 
 def test_preview1_notes_remain_historical_record():
-    notes = (ROOT / "GLOBAL-BUTTONS-PREVIEW1-NOTES.md").read_text(encoding="utf-8")
+    notes = (ROOT / "docs/history/build-notes/GLOBAL-BUTTONS-PREVIEW1-NOTES.md").read_text(encoding="utf-8")
     assert "No backend" in notes

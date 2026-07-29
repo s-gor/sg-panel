@@ -24,3 +24,14 @@ backups/*
 /*-SHA256.txt
 /SG-PANEL-*.run
 /SG-PANEL-*.zip
+
+# SG-Panel repository hygiene (safe cleanup 5, 2026-07-29)
+# Generated packages, local audits and temporary build notes do not belong in main.
+/artifacts/
+/*-NOTES.md
+/*.zip
+/*.run
+/*.sha256
+/*-AUDIT.txt
+/*-SHA256.txt
+/PUBLISHED-COMMIT.txt

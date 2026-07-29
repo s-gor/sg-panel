@@ -64,7 +64,7 @@ body.preview-9-rc6-typography :is(button.primary,a.primary):disabled {
   box-shadow: none !important;
 }
 
-body.preview-9-rc6-typography :is(.client-status-badge.online,.client-status-badge.active,.status-badge.success,.pill.enabled,.pill.success,.expert-status.configured,.online-label,.text-success,.status.ok,.summary-ok) {
+body.preview-9-rc6-typography :is(.client-status-badge.online,.client-status-badge.active,.status-badge.success,.pill.enabled,.pill.success,.expert-status.configured,.online-label,.status.ok,.summary-ok) {
   color: var(--sg-jade-deep) !important;
   border-color: var(--sg-jade-border) !important;
   background: var(--sg-jade-soft) !important;

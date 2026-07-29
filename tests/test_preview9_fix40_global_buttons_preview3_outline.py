@@ -3,7 +3,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 BASE = (ROOT / "xpanel/templates/base.html").read_text(encoding="utf-8")
 CSS = (ROOT / "xpanel/static/fix40-ui23-repair4-final-system1.css").read_text(encoding="utf-8")
-NOTES = (ROOT / "GLOBAL-BUTTONS-PREVIEW3-OUTLINE-NOTES.md").read_text(encoding="utf-8")
+NOTES = (ROOT / "docs/history/build-notes/GLOBAL-BUTTONS-PREVIEW3-OUTLINE-NOTES.md").read_text(encoding="utf-8")
 
 
 def test_preview_layers_are_not_loaded_after_final_replacement():
