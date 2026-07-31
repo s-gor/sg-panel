@@ -213,15 +213,15 @@ fail(){
     STEP_ACTIVE=0
   fi
   printf '[SG-Panel] [ERROR] %s\n' "$message" >&2
-  if [[ -s "$CORE_LOG" ]]; then
-    printf '\nПоследние строки внутренней установки:\n' >&2
-    tail -n 80 "$CORE_LOG" >&2 || true
-  elif [[ -s "$LOG_FILE" ]]; then
-    printf '\nПоследние полезные строки журнала мастера:\n' >&2
-    tail -n 80 "$LOG_FILE" >&2 || true
+  # SG-PANEL CAP4 ERROR OUTPUT ONLY
+  if [[ -s "$LOG_FILE" ]]; then
+    printf '\nПоследние сообщения мастера:\n' >&2
+    tail -n 40 "$LOG_FILE" >&2 || true
   fi
-  printf '\nПолный журнал: %s\n' "$LOG_FILE" >&2
-  printf 'Журнал внутренней установки: %s\n' "$CORE_LOG" >&2
+  printf '\nПолный журнал мастера: %s\n' "$LOG_FILE" >&2
+  if [[ -s "$CORE_LOG" ]]; then
+    printf 'Технический журнал внутренней установки: %s\n' "$CORE_LOG" >&2
+  fi
   exit 1
 }
 
