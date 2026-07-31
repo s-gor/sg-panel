@@ -15894,3 +15894,113 @@ def apply_config() -> dict[str, object]:
         temp_path.unlink(missing_ok=True)
 
 # SG_GATEWAY_ALWAYS_ON_CHANNELS_V1_END
+
+# SG-PANEL GEOFILES CUSTOM URL FIX1
+# Live-confirmed on clean VMware based on f750908.
+# Custom URL candidates must not inherit SG-owned RoscomVPN routing rows.
+# Manual/user rules are never removed or rewritten by this wrapper.
+_SG_GCUF1_ORIG_VALIDATE_PUBLIC = validate_geofiles_source
+_SG_GCUF1_ORIG_VALIDATE_UNLOCKED = _validate_geofiles_source_unlocked
+_SG_GCUF1_ORIG_APPLY_PUBLIC = apply_geofiles_source
+_SG_GCUF1_ORIG_APPLY_UNLOCKED = _apply_geofiles_source_unlocked
+_SG_GCUF1_ROSCOM_OWNER = "roscomvpn-server-preset"
+
+
+def _sg_gcuf1_routing_columns() -> list[str]:
+    with connect() as con:
+        rows = con.execute("PRAGMA table_info(routing_rules)").fetchall()
+    columns: list[str] = []
+    for row in rows:
+        try:
+            value = row["name"]
+        except (TypeError, KeyError, IndexError):
+            value = row[1]
+        columns.append(str(value))
+    if not columns:
+        raise XPanelError("не удалось прочитать структуру routing_rules")
+    return columns
+
+
+def _sg_gcuf1_snapshot_roscom_rules() -> tuple[list[str], list[tuple[object, ...]]]:
+    columns = _sg_gcuf1_routing_columns()
+    quoted = ", ".join('"' + c.replace('"', '""') + '"' for c in columns)
+    with connect() as con:
+        raw = con.execute(
+            f"SELECT {quoted} FROM routing_rules WHERE managed_by=? ORDER BY id",
+            (_SG_GCUF1_ROSCOM_OWNER,),
+        ).fetchall()
+    result: list[tuple[object, ...]] = []
+    for row in raw:
+        values: list[object] = []
+        for index, column in enumerate(columns):
+            try:
+                values.append(row[column])
+            except (TypeError, KeyError, IndexError):
+                values.append(row[index])
+        result.append(tuple(values))
+    return columns, result
+
+
+def _sg_gcuf1_delete_roscom_rules() -> int:
+    with connect() as con:
+        cursor = con.execute(
+            "DELETE FROM routing_rules WHERE managed_by=?",
+            (_SG_GCUF1_ROSCOM_OWNER,),
+        )
+        return int(cursor.rowcount or 0)
+
+
+def _sg_gcuf1_restore_roscom_rules(snapshot: tuple[list[str], list[tuple[object, ...]]]) -> None:
+    columns, rows = snapshot
+    if not rows:
+        return
+    quoted = ", ".join('"' + c.replace('"', '""') + '"' for c in columns)
+    placeholders = ", ".join("?" for _ in columns)
+    with connect() as con:
+        con.execute("DELETE FROM routing_rules WHERE managed_by=?", (_SG_GCUF1_ROSCOM_OWNER,))
+        con.executemany(f"INSERT INTO routing_rules ({quoted}) VALUES ({placeholders})", rows)
+
+
+def validate_geofiles_source(**values: object) -> dict[str, object]:
+    source = str(values.get("source", "sgclient") or "sgclient").strip().lower()
+    if source != "custom":
+        return _SG_GCUF1_ORIG_VALIDATE_PUBLIC(**values)
+    with _geofiles_operation_lock("проверку"):
+        first = _SG_GCUF1_ORIG_VALIDATE_UNLOCKED(**values)
+        settings = dict(get_geofiles_settings())
+        if str(settings.get("last_check_state") or "") != "blocked":
+            return first
+        snapshot = _sg_gcuf1_snapshot_roscom_rules()
+        if not snapshot[1]:
+            return first
+        _sg_gcuf1_delete_roscom_rules()
+        try:
+            return _SG_GCUF1_ORIG_VALIDATE_UNLOCKED(**values)
+        finally:
+            _sg_gcuf1_restore_roscom_rules(snapshot)
+
+
+def apply_geofiles_source(*, server_preset: str | None = None,
+                          enable_block: bool | None = None,
+                          final_outbound_tag: str | None = None) -> dict[str, object]:
+    settings = dict(get_geofiles_settings())
+    try:
+        manifest = json.loads(str(settings.get("staged_manifest_json") or "{}"))
+    except json.JSONDecodeError:
+        manifest = {}
+    source = str(manifest.get("source") or "").strip().lower()
+    staged_preset = str(manifest.get("server_preset") or "none").strip().lower()
+    if source != "custom" or staged_preset == "roscomvpn":
+        return _SG_GCUF1_ORIG_APPLY_PUBLIC(
+            server_preset=server_preset, enable_block=enable_block,
+            final_outbound_tag=final_outbound_tag)
+    with _geofiles_operation_lock("применение"):
+        snapshot = _sg_gcuf1_snapshot_roscom_rules()
+        _sg_gcuf1_delete_roscom_rules()
+        try:
+            return _SG_GCUF1_ORIG_APPLY_UNLOCKED(
+                server_preset=server_preset, enable_block=enable_block,
+                final_outbound_tag=final_outbound_tag)
+        except Exception:
+            _sg_gcuf1_restore_roscom_rules(snapshot)
+            raise

@@ -38,7 +38,6 @@
       <p class="r096-geo-note">Категория <code>category-ads-all</code> не обязательна: проверка использует реальные категории выбранной пары и блокирует только действительно несовместимые активные правила.</p>
     </div>
     <div class="advanced-safety-actions">
-      <span class="expert-lock-state" data-geofiles-lock-state>Только чтение</span>
       <button class="button secondary" type="button" data-geofiles-edit-toggle>Включить выбор источника</button>
     </div>
   </section>
@@ -140,7 +139,7 @@
     form.classList.toggle('is-readonly', !enabled);
     toggle.textContent = enabled ? 'Выключить выбор источника' : 'Включить выбор источника';
     toggle.classList.toggle('danger', enabled);
-    if (state) state.textContent = enabled ? 'Редактирование включено' : 'Только чтение';
+    if (state) state.textContent = enabled ? 'Редактирование включено' : '';
   };
 
   const syncSource = () => {
