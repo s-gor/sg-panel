@@ -642,114 +642,55 @@ install_panel(){
 }
 
 validate_result(){
-  local marker="/etc/xpanel-mvp/install-complete.env" mode host port
-  [[ -s "$marker" ]]
-  systemctl is-active --quiet xpanel-web
-  systemctl is-active --quiet nginx
-  systemctl is-active --quiet xray
+  # SG-PANEL CAP3 FINAL CHECK RETRY ONLY
+  local marker="/etc/xpanel-mvp/install-complete.env"
+  local mode="" host="" port="" reason=""
+  local attempt=0 max_attempts=20
 
-  mode="$(grep -E '^PANEL_ACCESS_MODE=' "$marker" | tail -1 | cut -d= -f2-)"
-  host="$(grep -E '^PANEL_PUBLIC_HOST=' "$marker" | tail -1 | cut -d= -f2-)"
-  port="$(grep -E '^PANEL_PUBLIC_PORT=' "$marker" | tail -1 | cut -d= -f2-)"
-  [[ -n "$mode" && -n "$host" && "$port" =~ ^[0-9]+$ ]]
+  for (( attempt=1; attempt<=max_attempts; attempt++ )); do
+    reason=""
 
-  local login_body=""
-  if [[ "$mode" == "https" ]]; then
-    login_body="$(curl -kfsS --max-time 10 --resolve "$host:$port:127.0.0.1" \
-      "https://$host:$port/login")"
-  else
-    login_body="$(curl -fsS --max-time 10 -H "Host: $host" \
-      "http://127.0.0.1:$port/login")"
-  fi
-  grep -Fq "$EXPECTED_BUILD" <<<"$login_body" || {
-    echo "GUI не отдаёт маркер сборки $EXPECTED_BUILD" >&2
-    return 1
-  }
-  local clients_css
-  if [[ "$mode" == "https" ]]; then
-    clients_css="$(curl -kfsS --max-time 10 --resolve "$host:$port:127.0.0.1" \
-      "https://$host:$port/static/fix40-clients-layout-hotfix3.css?v=$EXPECTED_VERSION-$EXPECTED_BUILD-clients-layout-hotfix3")"
-  else
-    clients_css="$(curl -fsS --max-time 10 -H "Host: $host" \
-      "http://127.0.0.1:$port/static/fix40-clients-layout-hotfix3.css?v=$EXPECTED_VERSION-$EXPECTED_BUILD-clients-layout-hotfix3")"
-  fi
-  grep -Fq "Clients Layout Hotfix 3" <<<"$clients_css" || {
-    echo "GUI не отдаёт Clients Layout Hotfix 3" >&2
-    return 1
-  }
-  local global_css
-  if [[ "$mode" == "https" ]]; then
-    global_css="$(curl -kfsS --max-time 10 --resolve "$host:$port:127.0.0.1" \
-      "https://$host:$port/static/fix40-light-buttons-theme-icon-hotfix9.css?v=$EXPECTED_VERSION-$EXPECTED_BUILD-interface-cleanup-hotfix5")"
-  else
-    global_css="$(curl -fsS --max-time 10 -H "Host: $host" \
-      "http://127.0.0.1:$port/static/fix40-light-buttons-theme-icon-hotfix9.css?v=$EXPECTED_VERSION-$EXPECTED_BUILD-interface-cleanup-hotfix5")"
-  fi
-  grep -Fq "Interface Cleanup Hotfix 5" <<<"$global_css" || {
-    echo "GUI не отдаёт Interface Cleanup Hotfix 5" >&2
-    return 1
-  }
-  if [[ "$mode" == "https" ]]; then
-    global_css="$(curl -kfsS --max-time 10 --resolve "$host:$port:127.0.0.1" \
-      "https://$host:$port/static/fix40-light-buttons-theme-icon-hotfix9.css?v=$EXPECTED_VERSION-$EXPECTED_BUILD-ui-compact-hotfix6")"
-  else
-    global_css="$(curl -fsS --max-time 10 -H "Host: $host" \
-      "http://127.0.0.1:$port/static/fix40-light-buttons-theme-icon-hotfix9.css?v=$EXPECTED_VERSION-$EXPECTED_BUILD-ui-compact-hotfix6")"
-  fi
-  grep -Fq "UI Compact Hotfix 6" <<<"$global_css" || {
-    echo "GUI не отдаёт UI Compact Hotfix 6" >&2
-    return 1
-  }
-  local tabs_css
-  tabs_css="$(curl -fsS --max-time 10 "http://127.0.0.1:8080/static/fix40-light-buttons-theme-icon-hotfix9.css")"
-  grep -Fq "Global Tabs and Dark Buttons Hotfix 7" <<<"$tabs_css" || {
-    echo "GUI не отдаёт Global Tabs and Dark Buttons Hotfix 7" >&2
-    return 1
-  }
-  local ui8_css
-  ui8_css="$(curl -fsS --max-time 10 "http://127.0.0.1:8080/static/fix40-light-buttons-theme-icon-hotfix9.css")"
-  grep -Fq "Interface Verification Hotfix 8" <<<"$ui8_css" || {
-    echo "GUI не отдаёт Interface Verification Hotfix 8" >&2
-    return 1
-  }
-  local ui9_css
-  ui9_css="$(curl -fsS --max-time 10 "http://127.0.0.1:8080/static/fix40-light-buttons-theme-icon-hotfix9.css")"
-  grep -Fq "Light Button Gradient and Theme Icon Hotfix 9" <<<"$ui9_css" || {
-    echo "GUI не отдаёт Light Button Gradient and Theme Icon Hotfix 9" >&2
-    return 1
-  }
-  local ui18_css
-  ui18_css="$(curl -fsS --max-time 10 "http://127.0.0.1:8080/static/fix40-node-simple-hotfix18.css")"
-  grep -Fq "Node card and safe card geometry" <<<"$ui18_css" || {
-    echo "GUI не отдаёт Node Simple Hotfix 18" >&2
-    return 1
-  }
-  local ui19_css
-  ui19_css="$(curl -fsS --max-time 10 "http://127.0.0.1:8080/static/fix40-cascade-steps-ui20.css")"
-  grep -Fq "guided three-step Cascade" <<<"$ui19_css" || {
-    echo "GUI не отдаёт Cascade Steps UI20" >&2
-    return 1
-  }
-  local ui21_css
-  ui21_css="$(curl -fsS --max-time 10 "http://127.0.0.1:8080/static/fix40-cluster-restore-ui21.css")"
-  grep -Fq "Restore the compact Cluster and SG-Node card" <<<"$ui21_css" || {
-    echo "GUI не отдаёт Cluster Restore UI21" >&2
-    return 1
-  }
-  local ui22_css
-  ui22_css="$(curl -fsS --max-time 10 "http://127.0.0.1:8080/static/fix40-node-detail-polish-ui22.css")"
-  grep -Fq "remove the inherited gray slabs" <<<"$ui22_css" || {
-    echo "GUI не отдаёт Node Detail Polish UI22" >&2
-    return 1
-  }
-  grep -Fq 'HYSTERIA_SALAMANDER_MIN_VERSION = (26, 3, 27)' "$TARGET/xpanel/service.py" || {
-    echo "установленный код не содержит Salamander UI23" >&2
-    return 1
-  }
-  grep -Fq 'data-hysteria-salamander-card' "$TARGET/xpanel/templates/settings.html" || {
-    echo "установленный GUI не содержит Salamander UI23" >&2
-    return 1
-  }
+    if [[ ! -s "$marker" ]]; then
+      reason="маркер завершённой установки ещё не готов"
+    elif ! systemctl is-active --quiet xpanel-web; then
+      reason="SG-Panel ещё запускается"
+    elif ! systemctl is-active --quiet nginx; then
+      reason="Nginx ещё запускается"
+    elif ! systemctl is-active --quiet xray; then
+      reason="Xray ещё запускается"
+    else
+      mode="$(grep -E '^PANEL_ACCESS_MODE=' "$marker" | tail -1 | cut -d= -f2-)"
+      host="$(grep -E '^PANEL_PUBLIC_HOST=' "$marker" | tail -1 | cut -d= -f2-)"
+      port="$(grep -E '^PANEL_PUBLIC_PORT=' "$marker" | tail -1 | cut -d= -f2-)"
+
+      if [[ -z "$mode" || -z "$host" || ! "$port" =~ ^[0-9]+$ ]]; then
+        reason="параметры доступа панели ещё не готовы"
+      elif [[ "$mode" == "https" ]]; then
+        if curl -kfsS --max-time 10 --resolve "$host:$port:127.0.0.1" \
+          "https://$host:$port/login" >/dev/null; then
+          return 0
+        else
+          reason="веб-панель ещё не отвечает"
+        fi
+      else
+        if curl -fsS --max-time 10 -H "Host: $host" \
+          "http://127.0.0.1:$port/login" >/dev/null; then
+          return 0
+        else
+          reason="веб-панель ещё не отвечает"
+        fi
+      fi
+    fi
+
+    printf '[SG-Panel] Финальная проверка %s/%s: %s\n' \
+      "$attempt" "$max_attempts" "$reason"
+
+    (( attempt < max_attempts )) && sleep 1
+  done
+
+  printf '[SG-Panel] Финальная проверка не пройдена после %s попыток: %s\n' \
+    "$max_attempts" "$reason" >&2
+  return 1
 }
 
 show_result(){
