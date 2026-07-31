@@ -220,7 +220,7 @@ fail(){
   fi
   printf '\nПолный журнал: %s\n' "$LOG_FILE" >&2
   if [[ -s "$CORE_LOG" ]]; then
-    printf 'Технический журнал внутренней установки: %s\n' "$CORE_LOG" >&2
+    printf 'Журнал внутренней установки: %s\n' "$CORE_LOG" >&2
   fi
   exit 1
 }
