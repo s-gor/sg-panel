@@ -1,0 +1,16 @@
+SG-Panel UI23 CAP5 - confirmed checkpoint
+Date: 2026-08-01
+
+Base source commit:
+e39890b86d2d1121aaadbdd1b2002707626c38d3
+
+Installer:
+SG-PANEL-UI23-CAP5-FULL-CLEAN.run
+
+SHA-256:
+f7eb34af52fabc8acb1249acd562b33b51c6cbd899d9b6d11e30f9b3b5bb94f1
+
+Status:
+- Clean installation confirmed by user.
+- This checkpoint is frozen before further UI/function revisions.
+- The installer is pinned to the exact base source commit above.
