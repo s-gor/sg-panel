@@ -218,7 +218,7 @@ fail(){
     printf '\nПоследние сообщения мастера:\n' >&2
     tail -n 40 "$LOG_FILE" >&2 || true
   fi
-  printf '\nПолный журнал мастера: %s\n' "$LOG_FILE" >&2
+  printf '\nПолный журнал: %s\n' "$LOG_FILE" >&2
   if [[ -s "$CORE_LOG" ]]; then
     printf 'Технический журнал внутренней установки: %s\n' "$CORE_LOG" >&2
   fi
