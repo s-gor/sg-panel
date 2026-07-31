@@ -11,12 +11,12 @@
       <div><p class="panel-kicker">ЖИВОЙ ЖУРНАЛ</p><h2 id="job-title">Подготовка {{ job.mode|upper }}</h2><p>Целевой адрес: <code>{{ job.target_url }}</code></p></div>
       <span class="pill warning" id="job-status"><i></i>{{ job.status }}</span>
     </header>
-    <div class="access-switch-state" id="switch-state"><span class="access-spinner" aria-hidden="true"></span><div><strong>Настройка выполняется</strong><p>Не закрывайте вкладку. После переключения SG-Panel автоматически перейдёт на новый адрес в этой же вкладке.</p></div></div>
+    <div class="access-switch-state" id="switch-state"><span class="access-spinner" aria-hidden="true"></span><div><strong>Настройка выполняется</strong><p>Оставайтесь на этой вкладке. SG-Panel перейдёт на HTTPS только после подтверждённого статуса success.</p></div></div>
     <pre class="terminal-box tall" id="job-log">{{ job.log or 'Задача поставлена в очередь…' }}</pre>
-    <div class="ui-warning-note"><span>i</span><p>Новое окно не открывается: автоматический переход выполняется в этой вкладке. Если JavaScript или расширение браузера помешает переходу, нажмите кнопку ниже. Старый HTTP-адрес после переключения также отвечает перенаправлением 308 на HTTPS.</p></div>
+    <div class="ui-warning-note"><span>i</span><p>Пока задача выполняется, текущий HTTP-адрес не считается ошибкой и вкладка не переключается. Новый HTTPS-адрес открывается только после подтверждённого успеха. При ошибке предыдущий доступ восстанавливается.</p></div>
     <noscript><div class="alert warning"><span>JavaScript отключён. Дождитесь завершения настройки и перейдите по новому адресу вручную.</span></div></noscript>
     <div class="ui-actions">
-      <a class="button primary" id="target-link" href="{{ job.target_url }}" target="_self">Перейти на новый адрес вручную</a>
+      <a class="button primary" id="target-link" href="{{ job.target_url }}" target="_self" hidden>Перейти на подтверждённый HTTPS-адрес</a>
       <a class="button ghost" href="{{ url_for('security_page') }}">Вернуться в Безопасность</a>
     </div>
   </section>
@@ -30,11 +30,10 @@
   const stateNode = document.getElementById('switch-state');
   const targetLink = document.getElementById('target-link');
   let finished = false;
-  let hadSuccessfulPoll = false;
   let redirectScheduled = false;
   let consecutiveFailures = 0;
 
-  targetLink.href = targetUrl;
+  targetLink.hidden = true;
 
   function targetLoginUrl() {
     return targetUrl.replace(/\/$/, '') + '/login?panel_access_switched=1';
@@ -47,8 +46,22 @@
     statusNode.textContent = 'готово';
     statusNode.className = 'pill enabled';
     stateNode.className = 'access-switch-state is-success';
-    stateNode.innerHTML = '<span class="access-success-mark">✓</span><div><strong>' + message + '</strong><p>Перехожу на новый адрес в этой вкладке…</p></div>';
+    stateNode.innerHTML = '<span class="access-success-mark">✓</span><div><strong>' + message + '</strong><p>HTTPS подтверждён. Перехожу на новый адрес в этой вкладке…</p></div>';
+    targetLink.href = targetUrl;
+    targetLink.hidden = false;
     window.setTimeout(() => window.location.replace(targetLoginUrl()), delay);
+  }
+
+  function failureMessage(logText) {
+    const value = (logText || '').toLowerCase();
+    if (value.includes('timeout during connect') ||
+        (value.includes('certbot failed to authenticate') && value.includes('type:   connection'))) {
+      return "Let's Encrypt не смог подключиться к TCP 80 снаружи. HTTPS не включён, предыдущий доступ восстановлен.";
+    }
+    if (value.includes('a-запись домена ещё не указывает')) {
+      return 'DNS домена ещё не указывает на этот сервер. HTTPS не включён, предыдущий доступ восстановлен.';
+    }
+    return 'HTTPS не включён. Предыдущий доступ восстановлен. Причина указана в журнале выше.';
   }
 
   async function poll() {
@@ -56,7 +69,6 @@
     try {
       const response = await fetch(statusUrl, {cache: 'no-store'});
       if (!response.ok) throw new Error('HTTP ' + response.status);
-      hadSuccessfulPoll = true;
       consecutiveFailures = 0;
       const data = await response.json();
       statusNode.textContent = data.status;
@@ -70,18 +82,19 @@
       if (data.status === 'failed') {
         finished = true;
         stateNode.className = 'access-switch-state is-failed';
-        stateNode.innerHTML = '<span class="access-failed-mark">!</span><div><strong>Настройка не завершена</strong><p>Предыдущий адрес восстановлен. Проверьте журнал выше.</p></div>';
+        stateNode.innerHTML = '<span class="access-failed-mark">!</span><div><strong>Настройка не завершена</strong><p>' + failureMessage(data.log) + '</p></div>';
+        targetLink.hidden = true;
         return;
       }
     } catch (error) {
       consecutiveFailures += 1;
-      statusNode.textContent = 'соединение переключается';
-      if (hadSuccessfulPoll || consecutiveFailures >= 3) {
-        scheduleRedirect('Nginx уже перешёл на новый адрес', 1100);
-        return;
-      }
+      statusNode.textContent = 'ожидаю подтверждение';
+      statusNode.className = 'pill warning';
+      stateNode.className = 'access-switch-state';
+      stateNode.innerHTML = '<span class="access-spinner" aria-hidden="true"></span><div><strong>Жду подтверждённый результат</strong><p>Связь с текущим адресом временно потеряна. На HTTPS не переходим, пока сервер не вернёт status=success.</p></div>';
+      targetLink.hidden = true;
     }
-    window.setTimeout(poll, 1000);
+    window.setTimeout(poll, consecutiveFailures ? 1500 : 1000);
   }
   poll();
 })();
