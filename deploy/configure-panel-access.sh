@@ -140,6 +140,12 @@ trap rollback ERR INT TERM
 
 log "Готовлю HTTP-01 на TCP 80"
 mkdir -p "$ACME_ROOT/.well-known/acme-challenge" /etc/nginx/sites-available /etc/nginx/sites-enabled
+
+# configure-http.sh keeps the HTTP placeholder and panel proxy in one site.
+# Its :80 block can compete with the temporary ACME site for the same domain.
+# The old symlink was backed up above and rollback restores it on failure.
+log "Временно отключаю прежний HTTP-сайт панели на TCP 80"
+rm -f /etc/nginx/sites-enabled/sg-panel /etc/nginx/sites-enabled/default
 cat > /etc/nginx/sites-available/sg-panel-acme <<EOF_ACME
 server {
     listen 80;
@@ -166,7 +172,7 @@ PROBE_NAME="sg-panel-local-$(openssl rand -hex 8)"
 PROBE_TOKEN="sg-panel-http01-ready-$PROBE_NAME"
 PROBE_FILE="$ACME_ROOT/.well-known/acme-challenge/$PROBE_NAME"
 printf '%s\n' "$PROBE_TOKEN" > "$PROBE_FILE"
-PROBE_RESULT="$(curl -fsS --max-time 5 \
+PROBE_RESULT="$(curl --noproxy '*' -fsS --max-time 5 \
   --resolve "$HOST:80:127.0.0.1" \
   "http://$HOST/.well-known/acme-challenge/$PROBE_NAME" 2>/dev/null || true)"
 rm -f "$PROBE_FILE"
