@@ -1,0 +1,23 @@
+SG-Panel UI23 CAP6 - accepted GeoFiles checkpoint
+Date: 2026-08-01
+
+Source commit:
+692288a0c034a2de10cd294aa4035160ea4e0668
+
+Installer:
+SG-PANEL-UI23-CAP6-FULL-CLEAN.run
+
+SHA-256:
+c43c81530d65cab42e64657503bb359c4b514851f38f062fe2a97aade20a91cb
+
+Accepted state:
+- GeoFiles source selection is always available.
+- Six source cards use one compact row on wide screens.
+- Check and Apply actions are located in the top header.
+- Temporary candidate blocks disappear after successful apply.
+- Installed pair is compact and does not expose SHA in the normal UI.
+- SG Client naming is normalized to SG-Client.
+- Light and dark themes follow the Connections visual language.
+- The technical staging block is replaced with a compact safety line.
+- Xray receives a persistent ExecStartPre permission repair for geoip.dat and geosite.dat.
+- The installer is pinned to the exact source commit above.
