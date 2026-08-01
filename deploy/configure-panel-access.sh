@@ -140,12 +140,6 @@ trap rollback ERR INT TERM
 
 log "Готовлю HTTP-01 на TCP 80"
 mkdir -p "$ACME_ROOT/.well-known/acme-challenge" /etc/nginx/sites-available /etc/nginx/sites-enabled
-
-# configure-http.sh keeps the HTTP placeholder and panel proxy in one site.
-# Its :80 block can compete with the temporary ACME site for the same domain.
-# The old symlink was backed up above and rollback restores it on failure.
-log "Временно отключаю прежний HTTP-сайт панели на TCP 80"
-rm -f /etc/nginx/sites-enabled/sg-panel /etc/nginx/sites-enabled/default
 cat > /etc/nginx/sites-available/sg-panel-acme <<EOF_ACME
 server {
     listen 80;
@@ -167,21 +161,6 @@ nginx -t
 systemctl enable --now nginx
 systemctl reload nginx
 
-log "Проверяю локальный HTTP-01 Nginx/webroot"
-PROBE_NAME="sg-panel-local-$(openssl rand -hex 8)"
-PROBE_TOKEN="sg-panel-http01-ready-$PROBE_NAME"
-PROBE_FILE="$ACME_ROOT/.well-known/acme-challenge/$PROBE_NAME"
-printf '%s\n' "$PROBE_TOKEN" > "$PROBE_FILE"
-PROBE_RESULT="$(curl --noproxy '*' -fsS --max-time 5 \
-  --resolve "$HOST:80:127.0.0.1" \
-  "http://$HOST/.well-known/acme-challenge/$PROBE_NAME" 2>/dev/null || true)"
-rm -f "$PROBE_FILE"
-if [[ "$PROBE_RESULT" != "$PROBE_TOKEN" ]]; then
-  printf '[SG-Panel Access] ERROR: локальная проверка HTTP-01 через Nginx/webroot не пройдена\n' >&2
-  false
-fi
-log "Локальный HTTP-01 готов; внешнюю доступность TCP 80 проверит Let's Encrypt"
-
 CERT_DIR="/etc/letsencrypt/live/$HOST"
 CERT_FILE="$CERT_DIR/fullchain.pem"
 KEY_FILE="$CERT_DIR/privkey.pem"
@@ -189,16 +168,13 @@ if [[ -s "$CERT_FILE" && -s "$KEY_FILE" ]] && openssl x509 -checkend 604800 -noo
   log "Использую существующий сертификат"
 else
   log "Получаю сертификат Let's Encrypt для $HOST"
-  if ! certbot certonly \
+  certbot certonly \
     --webroot -w "$ACME_ROOT" \
     --domain "$HOST" \
     --register-unsafely-without-email \
     --agree-tos \
     --non-interactive \
-    --keep-until-expiring; then
-    printf '[SG-Panel Access] ERROR: Let\047s Encrypt не смог подтвердить домен. Проверьте внешний TCP 80; HTTPS не включён, предыдущий доступ будет восстановлен.\n' >&2
-    false
-  fi
+    --keep-until-expiring
 fi
 
 log "Переключаю панель на HTTPS"
