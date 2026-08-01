@@ -1,23 +1,21 @@
-SG-Panel UI23 CAP6 - accepted GeoFiles checkpoint
+SG-Panel UI23 CAP6 - confirmed corrected checkpoint
 Date: 2026-08-01
 
 Source commit:
-692288a0c034a2de10cd294aa4035160ea4e0668
+63c8059f874e1511496fde4e576cf2f48a71eaf6
 
 Installer:
 SG-PANEL-UI23-CAP6-FULL-CLEAN.run
 
 SHA-256:
-c43c81530d65cab42e64657503bb359c4b514851f38f062fe2a97aade20a91cb
+cf873af2a0371072459b9deaf86cebe1ecfa28383787990961561cfefa87098e
 
 Accepted state:
-- GeoFiles source selection is always available.
-- Six source cards use one compact row on wide screens.
-- Check and Apply actions are located in the top header.
-- Temporary candidate blocks disappear after successful apply.
-- Installed pair is compact and does not expose SHA in the normal UI.
-- SG Client naming is normalized to SG-Client.
-- Light and dark themes follow the Connections visual language.
-- The technical staging block is replaced with a compact safety line.
-- Xray receives a persistent ExecStartPre permission repair for geoip.dat and geosite.dat.
-- The installer is pinned to the exact source commit above.
+- All accepted GeoFiles CAP6 UI and runtime changes are preserved.
+- The exact proven Certbot webroot access script from before commit
+  1126c3df7eea2b610e91a533623ba5c6bf34de36 is restored.
+- The later local HTTP-01 probe is removed completely.
+- The experimental temporary Nginx-site workaround is removed completely.
+- Existing transactional rollback remains in place.
+- Xray receives the persistent GeoFiles permission repair.
+- The installer is pinned to the exact corrected source commit above.
