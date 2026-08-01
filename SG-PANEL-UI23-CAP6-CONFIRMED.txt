@@ -1,31 +1,28 @@
-SG-Panel UI23 CAP6 - confirmed cumulative checkpoint
+SG-Panel UI23 CAP6 - confirmed full clean checkpoint
 Date: 2026-08-01
 
 Source commit:
-d4b9dfc592332d641cac3c3944b2c9e8b058ce10
+bd982c9a4c20c9e70f2fa373c278e2d4e7f1c32c
 
-Full installer:
+The only installation file:
 SG-PANEL-UI23-CAP6-FULL-CLEAN.run
 
-Full installer SHA-256:
-db0a7dd1ff4bc1f613fbb0862cb59cc6b5fc4309baad0e22fda21934bba10549
-
-Installed-server repair:
-SG-PANEL-UI23-CAP6-HTTPS-TRANSITION-UX1.run
-
-Installed-server repair SHA-256:
-caa7740a96e015c1a193d6f40853e0cbed472544de413e723a0301f71613c3b8
+SHA-256:
+43de5c3924c5bccc95883964abbc218ebf8a072f058fb7ba800c9c092969e850
 
 Accepted state:
+- One full clean installer only; no server hotfix is published.
 - All accepted GeoFiles CAP6 UI and runtime changes are preserved.
 - The proven Certbot webroot flow remains unchanged.
 - The local HTTP-01 pre-probe remains removed.
-- After the log confirms that HTTPS switching has started, a temporary loss
-  of the old HTTP page shows a clear completed state.
+- The clean installation contains the corrected HTTPS transition screen.
+- The result page never forces window.location navigation.
+- The obsolete panel_access_switched query parameter is removed.
 - Completion text:
   Соединение защищено, панель переведена на HTTPS.
   Если страница не открылась автоматически, обновите её.
-- The visible fallback button is:
+- Button:
   Открыть панель по HTTPS
+- The result remains visible with a direct HTTPS button; refresh also follows the HTTP 308 redirect.
 - Certbot, Nginx configuration and transactional rollback are unchanged.
 - Xray retains the persistent GeoFiles permission repair.
