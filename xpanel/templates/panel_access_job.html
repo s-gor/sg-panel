@@ -11,12 +11,12 @@
       <div><p class="panel-kicker">ЖИВОЙ ЖУРНАЛ</p><h2 id="job-title">Подготовка {{ job.mode|upper }}</h2><p>Целевой адрес: <code>{{ job.target_url }}</code></p></div>
       <span class="pill warning" id="job-status"><i></i>{{ job.status }}</span>
     </header>
-    <div class="access-switch-state" id="switch-state"><span class="access-spinner" aria-hidden="true"></span><div><strong>Настройка выполняется</strong><p>Оставайтесь на этой вкладке. SG-Panel перейдёт на HTTPS только после подтверждённого статуса success.</p></div></div>
+    <div class="access-switch-state" id="switch-state"><span class="access-spinner" aria-hidden="true"></span><div><strong>Настройка выполняется</strong><p>Во время перехода на HTTPS связь с этой страницей может временно прерваться.</p></div></div>
     <pre class="terminal-box tall" id="job-log">{{ job.log or 'Задача поставлена в очередь…' }}</pre>
-    <div class="ui-warning-note"><span>i</span><p>Пока задача выполняется, текущий HTTP-адрес не считается ошибкой и вкладка не переключается. Новый HTTPS-адрес открывается только после подтверждённого успеха. При ошибке предыдущий доступ восстанавливается.</p></div>
+    <div class="ui-warning-note"><span>i</span><p>После получения сертификата панель автоматически откроется по защищённому адресу. Если переход не произойдёт, появится кнопка для открытия HTTPS.</p></div>
     <noscript><div class="alert warning"><span>JavaScript отключён. Дождитесь завершения настройки и перейдите по новому адресу вручную.</span></div></noscript>
     <div class="ui-actions">
-      <a class="button primary" id="target-link" href="{{ job.target_url }}" target="_self" hidden>Перейти на подтверждённый HTTPS-адрес</a>
+      <a class="button primary" id="target-link" href="{{ job.target_url }}" target="_self" hidden>Открыть панель по HTTPS</a>
       <a class="button ghost" href="{{ url_for('security_page') }}">Вернуться в Безопасность</a>
     </div>
   </section>
@@ -39,15 +39,16 @@
     return targetUrl.replace(/\/$/, '') + '/login?panel_access_switched=1';
   }
 
-  function scheduleRedirect(message, delay = 1400) {
+  function showHttpsReady(message, delay = 1400) {
     if (redirectScheduled) return;
     redirectScheduled = true;
     finished = true;
-    statusNode.textContent = 'готово';
+    statusNode.textContent = 'HTTPS готов';
     statusNode.className = 'pill enabled';
     stateNode.className = 'access-switch-state is-success';
-    stateNode.innerHTML = '<span class="access-success-mark">✓</span><div><strong>' + message + '</strong><p>HTTPS подтверждён. Перехожу на новый адрес в этой вкладке…</p></div>';
-    targetLink.href = targetUrl;
+    stateNode.innerHTML = '<span class="access-success-mark">✓</span><div><strong>Соединение защищено, панель переведена на HTTPS.</strong><p>Если страница не открылась автоматически, обновите её.</p></div>';
+    targetLink.href = targetLoginUrl();
+    targetLink.textContent = 'Открыть панель по HTTPS';
     targetLink.hidden = false;
     window.setTimeout(() => window.location.replace(targetLoginUrl()), delay);
   }
@@ -76,7 +77,7 @@
       logNode.textContent = data.log || 'Ожидание вывода…';
       logNode.scrollTop = logNode.scrollHeight;
       if (data.status === 'success') {
-        scheduleRedirect('Доступ успешно переключён');
+        showHttpsReady('Доступ успешно переключён');
         return;
       }
       if (data.status === 'failed') {
@@ -88,10 +89,15 @@
       }
     } catch (error) {
       consecutiveFailures += 1;
-      statusNode.textContent = 'ожидаю подтверждение';
+      const switchingStarted = (logNode.textContent || '').includes('[SG-Panel Access] Переключаю панель на HTTPS');
+      if (switchingStarted && consecutiveFailures >= 2) {
+        showHttpsReady('Соединение защищено');
+        return;
+      }
+      statusNode.textContent = 'ожидаю переключение';
       statusNode.className = 'pill warning';
       stateNode.className = 'access-switch-state';
-      stateNode.innerHTML = '<span class="access-spinner" aria-hidden="true"></span><div><strong>Жду подтверждённый результат</strong><p>Связь с текущим адресом временно потеряна. На HTTPS не переходим, пока сервер не вернёт status=success.</p></div>';
+      stateNode.innerHTML = '<span class="access-spinner" aria-hidden="true"></span><div><strong>Выполняется переход на HTTPS</strong><p>Связь с текущей HTTP-страницей может временно прерваться.</p></div>';
       targetLink.hidden = true;
     }
     window.setTimeout(poll, consecutiveFailures ? 1500 : 1000);
