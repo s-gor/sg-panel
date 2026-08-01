@@ -1,0 +1,68 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+COMMIT="d4b9dfc592332d641cac3c3944b2c9e8b058ce10"
+TARGET="/opt/xpanel-mvp/xpanel/templates/panel_access_job.html"
+TMP="$(mktemp /tmp/sg-panel-https-transition-ux1.XXXXXX)"
+STAMP="$(date -u +%Y%m%d-%H%M%S)"
+BACKUP_DIR="/root/sg-panel-backups/${STAMP}-https-transition-ux1"
+COMMITTED=0
+
+log() {
+  printf '[SG-Panel HTTPS UX] %s\n' "$*"
+}
+
+cleanup() {
+  rm -f "$TMP"
+}
+trap cleanup EXIT
+
+rollback() {
+  local rc=$?
+  trap - ERR INT TERM
+  set +e
+  if [[ $COMMITTED -eq 0 && -f "$BACKUP_DIR/panel_access_job.html" ]]; then
+    cp -a "$BACKUP_DIR/panel_access_job.html" "$TARGET"
+    systemctl restart xpanel-web >/dev/null 2>&1 || true
+  fi
+  exit "$rc"
+}
+trap rollback ERR INT TERM
+
+[[ ${EUID:-$(id -u)} -eq 0 ]] || {
+  printf '[SG-Panel HTTPS UX] ERROR: запустите через sudo/root.\n' >&2
+  exit 1
+}
+[[ -f "$TARGET" ]] || {
+  printf '[SG-Panel HTTPS UX] ERROR: установленная SG-Panel не найдена.\n' >&2
+  exit 1
+}
+
+if ! command -v curl >/dev/null 2>&1; then
+  apt-get update
+  DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends curl ca-certificates
+fi
+
+mkdir -p "$BACKUP_DIR"
+chmod 0700 "$BACKUP_DIR"
+cp -a "$TARGET" "$BACKUP_DIR/panel_access_job.html"
+
+log "Загружаю подтверждённый экран перехода HTTPS..."
+curl -fL --retry 3 --connect-timeout 15 \
+  "https://raw.githubusercontent.com/s-gor/sg-panel/$COMMIT/xpanel/templates/panel_access_job.html" \
+  -o "$TMP"
+
+grep -Fq 'Соединение защищено, панель переведена на HTTPS.' "$TMP"
+grep -Fq 'Если страница не открылась автоматически, обновите её.' "$TMP"
+grep -Fq 'Открыть панель по HTTPS' "$TMP"
+
+install -o root -g root -m 0644 "$TMP" "$TARGET"
+systemctl restart xpanel-web
+systemctl is-active --quiet xpanel-web
+
+COMMITTED=1
+trap - ERR INT TERM
+
+log "[OK] Экран перехода HTTPS обновлён."
+log "[OK] SG-Panel: $(systemctl is-active xpanel-web)"
+log "[OK] Резервная копия: $BACKUP_DIR"
