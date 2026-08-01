@@ -23,7 +23,8 @@ def test_routing_and_geofiles_keep_sgclient096_contract_without_duplicate_tabs()
         assert marker in routing
     assert 'data-r096-tab="' not in routing
     assert "{% include '_geofiles_panel_fix39.html' %}" in geofiles
-    assert "category-ads-all" in panel
+    assert "Безопасная проверка:" in panel
+    assert "category-ads-all" not in panel
     assert "Global Jade / Routing / Vision Hotfix 4" in css
     assert "routing-sgclient096-fix39.css" in read("xpanel/templates/base.html")
 
@@ -31,7 +32,7 @@ def test_routing_and_geofiles_keep_sgclient096_contract_without_duplicate_tabs()
 def test_geofiles_is_standalone_and_actions_return_to_it() -> None:
     base = read("xpanel/templates/base.html")
     web = read("xpanel/web.py")
-    assert '>GeoFiles</a>' not in base
+    assert ">GeoFiles</a>" not in base
     assert 'render_template(\n            "geofiles.html"' in web
     assert 'return redirect(url_for("routing_page") + "#geofiles")' not in web
     assert web.count('return redirect(url_for("geofiles_page"))') >= 3
@@ -44,14 +45,15 @@ def test_transactional_roscom_contract_is_visible_and_preserved() -> None:
     combined = routing + geofiles
     for marker in (
         "protobuf",
-        "category-ads-all",
         "необязательный Block",
         "Совместимая серверная основа обязательна",
+        "Безопасная проверка:",
     ):
         assert marker in combined
+    assert "category-ads-all" not in combined
     for marker in (
         "Оба файла всегда загружаются, проверяются и применяются вместе",
-        "полный будущий Routing и полный Xray config",
+        "полный future Routing/Xray config",
         "xray run -test",
         "Rollback считается успешным",
         "Построить совместимую серверную основу",

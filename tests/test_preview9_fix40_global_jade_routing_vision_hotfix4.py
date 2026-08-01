@@ -51,7 +51,7 @@ def test_routing_is_one_readable_workspace_and_geofiles_is_separate() -> None:
     assert "Пользовательские правила" in routing
     assert "Основные правила" in routing
     assert "Серверная маршрутизация SG-Panel" in routing
-    assert '_geofiles_panel_fix39.html' not in routing
+    assert "_geofiles_panel_fix39.html" not in routing
     assert "{% include '_geofiles_panel_fix39.html' %}" in geofiles_page
     assert "body.routing-fix40-simple .section-tabs { display: none" in css
     for obsolete in (
@@ -71,11 +71,12 @@ def test_geofiles_and_roscomvpn_contract_remains_on_geofiles_tab() -> None:
     for marker in (
         "RoscomVPN · отдельная совместимость",
         "Совместимая серверная основа обязательна",
-        "category-ads-all",
         "Оба файла всегда загружаются, проверяются и применяются вместе",
         "Применить проверенный план",
+        "Безопасная проверка:",
     ):
         assert marker in panel
+    assert "category-ads-all" not in panel
     assert "GEOFILES_OPERATION_LOCK" in service
     assert "candidate_config_sha256" in service
     assert "remove_missing" not in service
