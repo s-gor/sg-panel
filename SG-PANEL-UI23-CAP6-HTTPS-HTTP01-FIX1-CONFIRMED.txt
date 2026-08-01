@@ -1,0 +1,20 @@
+SG-Panel UI23 CAP6 HTTPS HTTP01 Fix 1
+Date: 2026-08-01
+
+Source commit:
+d38238809c7e4640ea50713e5d2866383a10570b
+
+Installer:
+SG-PANEL-UI23-CAP6-HTTPS-HTTP01-FIX1-FULL-CLEAN.run
+
+SHA-256:
+ee215a49b082804974439511f0ae9d7a05edc6d13a1f7d78cdd41f0a1a7af6f4
+
+Fix:
+- Temporarily disables the previous sg-panel Nginx site before enabling the
+  temporary ACME HTTP-01 site.
+- Prevents equal server_name blocks on TCP 80 from competing.
+- Restores the previous site through the existing transactional rollback.
+- Forces the local HTTP-01 curl probe to bypass environment proxies.
+- Keeps all accepted CAP6 GeoFiles changes and the persistent Xray GeoFiles
+  permission repair.

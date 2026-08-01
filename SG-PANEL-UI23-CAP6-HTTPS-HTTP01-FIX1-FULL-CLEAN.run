@@ -1,0 +1,96 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+COMMIT="d38238809c7e4640ea50713e5d2866383a10570b"
+WORK="$(mktemp -d /tmp/sg-panel-cap6-https-http01-fix1.XXXXXX)"
+CORE_INSTALLER="$WORK/install.sh"
+SOURCE_ZIP="$WORK/sg-panel-source.zip"
+
+PERM_HELPER="/usr/local/libexec/sg-panel-fix-geofiles-permissions"
+DROPIN_DIR="/etc/systemd/system/xray.service.d"
+DROPIN="$DROPIN_DIR/20-sg-panel-geofiles-permissions.conf"
+
+cleanup() {
+  rm -rf "$WORK"
+}
+trap cleanup EXIT
+
+log() {
+  printf '[SG-Panel] %s\n' "$*"
+}
+
+die() {
+  printf '[SG-Panel] [ERROR] %s\n' "$*" >&2
+  exit 1
+}
+
+if [[ "${EUID:-$(id -u)}" -ne 0 ]]; then
+  die "Запустите установщик через sudo/root."
+fi
+
+if ! command -v curl >/dev/null 2>&1; then
+  log "Установка curl и корневых сертификатов..."
+  apt-get update
+  DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends curl ca-certificates
+fi
+
+log "Source commit: $COMMIT"
+log "Подготовка постоянной защиты прав GeoFiles..."
+
+install -d -m 0755 "$(dirname "$PERM_HELPER")"
+cat > "$PERM_HELPER" <<'PERMISSION_HELPER_EOF'
+#!/bin/sh
+set -eu
+
+install -d -o root -g root -m 0755 /usr/local/share/xray
+
+for file in \
+  /usr/local/share/xray/geoip.dat \
+  /usr/local/share/xray/geosite.dat
+do
+  if [ -e "$file" ]; then
+    chown root:root "$file"
+    chmod 0644 "$file"
+  fi
+done
+PERMISSION_HELPER_EOF
+chown root:root "$PERM_HELPER"
+chmod 0755 "$PERM_HELPER"
+
+install -d -m 0755 "$DROPIN_DIR"
+cat > "$DROPIN" <<DROPIN_EOF
+[Service]
+ExecStartPre=+$PERM_HELPER
+DROPIN_EOF
+chown root:root "$DROPIN"
+chmod 0644 "$DROPIN"
+systemctl daemon-reload
+
+log "Загрузка точной версии SG-Panel..."
+curl -fL --retry 3 --connect-timeout 15 \
+  "https://raw.githubusercontent.com/s-gor/sg-panel/$COMMIT/install.sh" \
+  -o "$CORE_INSTALLER"
+
+curl -fL --retry 3 --connect-timeout 15 \
+  "https://codeload.github.com/s-gor/sg-panel/zip/$COMMIT" \
+  -o "$SOURCE_ZIP"
+
+chmod 0755 "$CORE_INSTALLER"
+
+log "Запуск чистой установки..."
+bash "$CORE_INSTALLER" --source-zip "$SOURCE_ZIP"
+
+"$PERM_HELPER"
+systemctl daemon-reload
+systemctl restart xray
+systemctl restart xpanel-web
+sleep 2
+
+systemctl is-active --quiet xray ||
+  die "Xray не перешёл в active после финальной проверки."
+systemctl is-active --quiet xpanel-web ||
+  die "SG-Panel не перешла в active после финальной проверки."
+
+log "[OK] Чистая установка UI23 CAP6 HTTPS HTTP01 Fix 1 завершена."
+log "[OK] Xray: $(systemctl is-active xray)"
+log "[OK] SG-Panel: $(systemctl is-active xpanel-web)"
