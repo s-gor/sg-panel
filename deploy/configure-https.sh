@@ -275,6 +275,8 @@ UPDATED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 EOF_EDGE
 chmod 600 "$REALITY_EDGE_STATE"
 
+bash /opt/xpanel-mvp/deploy/install-xray-cert-access.sh "$CERT" "$KEY"
+
 cd /opt/xpanel-mvp
 .venv/bin/python -m xpanel apply >/dev/null
 
