@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-COMMIT="9b88fb70fb4ae54272d24506cac38fc27b6b2616"
+COMMIT="27dc2e32c4bfca9fab8b50e68847a3d6748c653d"
 WORK="$(mktemp -d /tmp/sg-panel-cap6-full-clean.XXXXXX)"
 CORE_INSTALLER="$WORK/install.sh"
 SOURCE_ZIP="$WORK/sg-panel-source.zip"
@@ -24,19 +24,128 @@ die() {
   exit 1
 }
 
+package_manager_busy() {
+  local locks=(
+    /var/lib/dpkg/lock-frontend
+    /var/lib/dpkg/lock
+    /var/lib/apt/lists/lock
+    /var/cache/apt/archives/lock
+  )
+  if command -v fuser >/dev/null 2>&1; then
+    fuser "${locks[@]}" >/dev/null 2>&1
+    return
+  fi
+  pgrep -x apt >/dev/null 2>&1 ||
+    pgrep -x apt-get >/dev/null 2>&1 ||
+    pgrep -x dpkg >/dev/null 2>&1 ||
+    pgrep -f '[u]nattended-upgrade' >/dev/null 2>&1
+}
+
+wait_for_apt() {
+  local waited=0 timeout=900
+  while package_manager_busy; do
+    (( waited < timeout )) || die "apt/dpkg занят более $timeout секунд."
+    sleep 5
+    waited=$((waited + 5))
+  done
+}
+
+download_file() {
+  local target="$1"
+  shift
+  local url part="${target}.part"
+  rm -f "$target" "$part"
+  for url in "$@"; do
+    log "Загрузка: $url"
+    rm -f "$part"
+    if curl -fL \
+      --retry 5 --retry-all-errors --retry-delay 3 \
+      --connect-timeout 15 --max-time 300 \
+      -H 'Cache-Control: no-cache' \
+      -o "$part" "$url"; then
+      if [[ -s "$part" ]]; then
+        mv -f "$part" "$target"
+        return 0
+      fi
+    fi
+  done
+  rm -f "$part"
+  return 1
+}
+
+wait_for_service_active() {
+  local unit="$1" label="$2"
+  local attempt state=""
+  for ((attempt=1; attempt<=20; attempt++)); do
+    state="$(systemctl is-active "$unit" 2>/dev/null || true)"
+    [[ "$state" == "active" ]] && return 0
+    sleep 3
+  done
+  systemctl --no-pager --full status "$unit" >&2 2>/dev/null || true
+  journalctl -u "$unit" -n 60 --no-pager >&2 2>/dev/null || true
+  die "$label не находится в active после 60 секунд."
+}
+
+verify_panel_endpoint() {
+  local marker="/etc/xpanel-mvp/install-complete.env"
+  local mode host port attempt
+  [[ -s "$marker" ]] || die "Не найден итоговый install-complete.env."
+  mode="$(grep -E '^PANEL_ACCESS_MODE=' "$marker" | tail -1 | cut -d= -f2-)"
+  host="$(grep -E '^PANEL_PUBLIC_HOST=' "$marker" | tail -1 | cut -d= -f2-)"
+  port="$(grep -E '^PANEL_PUBLIC_PORT=' "$marker" | tail -1 | cut -d= -f2-)"
+  [[ -n "$mode" && -n "$host" && "$port" =~ ^[0-9]+$ ]] ||
+    die "Некорректное итоговое состояние доступа к панели."
+
+  for ((attempt=1; attempt<=20; attempt++)); do
+    if [[ "$mode" == "https" ]]; then
+      if curl -kfsS --max-time 5 --resolve "$host:$port:127.0.0.1" \
+        "https://$host:$port/login" | grep -Fq FIX40; then
+        return 0
+      fi
+    else
+      if curl -fsS --max-time 5 -H "Host: $host" \
+        "http://127.0.0.1:$port/login" | grep -Fq FIX40; then
+        return 0
+      fi
+    fi
+    sleep 3
+  done
+  die "Панель не отдала страницу входа FIX40 после 60 секунд."
+}
+
 if [[ "${EUID:-$(id -u)}" -ne 0 ]]; then
   die "Запустите установщик через sudo/root."
 fi
 
-if ! command -v curl >/dev/null 2>&1; then
-  log "Установка curl и корневых сертификатов..."
-  apt-get update
-  DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends curl ca-certificates
+if ! command -v curl >/dev/null 2>&1 || ! command -v python3 >/dev/null 2>&1; then
+  log "Установка bootstrap-компонентов curl, сертификатов и Python..."
+  wait_for_apt
+  export DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a
+  dpkg --configure -a
+  apt-get -o DPkg::Lock::Timeout=900 -o Dpkg::Use-Pty=0 update -qq
+  apt-get -o DPkg::Lock::Timeout=900 -o Dpkg::Use-Pty=0 install -y -qq \
+    --no-install-recommends curl ca-certificates python3
 fi
 
 log "Source commit: $COMMIT"
-log "Подготовка постоянной защиты прав GeoFiles..."
+log "Загрузка и проверка точной версии SG-Panel..."
 
+download_file "$CORE_INSTALLER" \
+  "https://raw.githubusercontent.com/s-gor/sg-panel/$COMMIT/install.sh" \
+  "https://github.com/s-gor/sg-panel/raw/$COMMIT/install.sh" ||
+  die "Не удалось скачать install.sh."
+
+download_file "$SOURCE_ZIP" \
+  "https://codeload.github.com/s-gor/sg-panel/zip/$COMMIT" \
+  "https://github.com/s-gor/sg-panel/archive/$COMMIT.zip" ||
+  die "Не удалось скачать архив исходников."
+
+bash -n "$CORE_INSTALLER" || die "Скачанный install.sh повреждён."
+python3 -m zipfile -t "$SOURCE_ZIP" >/dev/null ||
+  die "Скачанный архив исходников повреждён."
+chmod 0755 "$CORE_INSTALLER"
+
+log "Подготовка постоянной защиты прав GeoFiles..."
 install -d -m 0755 "$(dirname "$PERM_HELPER")"
 cat > "$PERM_HELPER" <<'PERMISSION_HELPER_EOF'
 #!/bin/sh
@@ -66,44 +175,18 @@ chown root:root "$DROPIN"
 chmod 0644 "$DROPIN"
 systemctl daemon-reload
 
-log "Загрузка точной версии SG-Panel..."
-curl -fL --retry 3 --connect-timeout 15 \
-  "https://raw.githubusercontent.com/s-gor/sg-panel/$COMMIT/install.sh" \
-  -o "$CORE_INSTALLER"
-
-curl -fL --retry 3 --connect-timeout 15 \
-  "https://codeload.github.com/s-gor/sg-panel/zip/$COMMIT" \
-  -o "$SOURCE_ZIP"
-
-chmod 0755 "$CORE_INSTALLER"
-
-log "Запуск чистой установки..."
+log "Запуск чистой или безопасно возобновляемой установки..."
 bash "$CORE_INSTALLER" --source-zip "$SOURCE_ZIP"
 
 "$PERM_HELPER"
 systemctl daemon-reload
 
-wait_for_service_active() {
-  local service="$1"
-  local label="$2"
-  local attempt state=""
-
-  for ((attempt=1; attempt<=20; attempt++)); do
-    state="$(systemctl is-active "$service" 2>/dev/null || true)"
-    if [[ "$state" == "active" ]]; then
-      return 0
-    fi
-    sleep 3
-  done
-
-  systemctl --no-pager --full status "$service" >&2 2>/dev/null || true
-  journalctl -u "$service" -n 60 --no-pager >&2 2>/dev/null || true
-  die "$label не находится в active после 60 секунд повторных проверок."
-}
-
 wait_for_service_active xray "Xray"
 wait_for_service_active xpanel-web "SG-Panel"
+wait_for_service_active nginx "Nginx"
+verify_panel_endpoint
 
 log "[OK] Чистая установка UI23 CAP6 завершена."
 log "[OK] Xray: active"
 log "[OK] SG-Panel: active"
+log "[OK] Nginx: active"

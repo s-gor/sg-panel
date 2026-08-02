@@ -2,13 +2,13 @@ SG-Panel UI23 CAP6 - confirmed full clean checkpoint
 Date: 2026-08-01
 
 Source commit:
-9b88fb70fb4ae54272d24506cac38fc27b6b2616
+27dc2e32c4bfca9fab8b50e68847a3d6748c653d
 
 The only installation file:
 SG-PANEL-UI23-CAP6-FULL-CLEAN.run
 
 SHA-256:
-48b0fae9c4ed8f3f40b5dae34efe799a61dca165b836229789c0d0a3177ffe48
+f648af389fe1cc68cc599ef3b9823ceac02c14edaa5475a5b98f08c9c811f815
 
 Accepted state:
 - One full clean installer only; no server hotfix is published.
@@ -27,5 +27,10 @@ Accepted state:
 - Certbot, Nginx configuration and transactional rollback are unchanged.
 - Xray retains the persistent GeoFiles permission repair.
 - HTTPS transition now uses the proven SG-Gateway same-terminal handoff: the live job page moves to the HTTPS origin and waits for real job success.
-- Xray certificate access no longer installs apt packages during HTTPS; the requested direct chmod permission model is reapplied after renewal.
+- Xray certificate access uses a preinstalled ACL, never makes the private key world-readable, and is reapplied after renewal.
 - The outer full-clean wrapper no longer restarts Xray or SG-Panel after the core installer has already completed; transient D-Bus errors are handled by retrying service checks for up to 60 seconds.
+- Full Install Audit 1: interrupted clean installations are resumable without destructive reset.
+- Xray installer downloads to a validated file and HTTP 503 can never become a false success.
+- All final service checks retry transient systemd/D-Bus failures for up to 60 seconds.
+- HTTPS performs no package installation during the switch and restores Xray certificate access before apply.
+- The full wrapper validates install.sh and the source ZIP before modifying service configuration.
