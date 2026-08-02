@@ -82,15 +82,28 @@ bash "$CORE_INSTALLER" --source-zip "$SOURCE_ZIP"
 
 "$PERM_HELPER"
 systemctl daemon-reload
-systemctl restart xray
-systemctl restart xpanel-web
-sleep 2
 
-systemctl is-active --quiet xray ||
-  die "Xray не перешёл в active после финальной проверки."
-systemctl is-active --quiet xpanel-web ||
-  die "SG-Panel не перешла в active после финальной проверки."
+wait_for_service_active() {
+  local service="$1"
+  local label="$2"
+  local attempt state=""
+
+  for ((attempt=1; attempt<=20; attempt++)); do
+    state="$(systemctl is-active "$service" 2>/dev/null || true)"
+    if [[ "$state" == "active" ]]; then
+      return 0
+    fi
+    sleep 3
+  done
+
+  systemctl --no-pager --full status "$service" >&2 2>/dev/null || true
+  journalctl -u "$service" -n 60 --no-pager >&2 2>/dev/null || true
+  die "$label не находится в active после 60 секунд повторных проверок."
+}
+
+wait_for_service_active xray "Xray"
+wait_for_service_active xpanel-web "SG-Panel"
 
 log "[OK] Чистая установка UI23 CAP6 завершена."
-log "[OK] Xray: $(systemctl is-active xray)"
-log "[OK] SG-Panel: $(systemctl is-active xpanel-web)"
+log "[OK] Xray: active"
+log "[OK] SG-Panel: active"

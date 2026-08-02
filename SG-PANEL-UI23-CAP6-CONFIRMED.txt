@@ -8,7 +8,7 @@ The only installation file:
 SG-PANEL-UI23-CAP6-FULL-CLEAN.run
 
 SHA-256:
-e32cc84807330187071ed0aadd0542dc99397e68f33b3e3ca326b1ecdc6dac6c
+48b0fae9c4ed8f3f40b5dae34efe799a61dca165b836229789c0d0a3177ffe48
 
 Accepted state:
 - One full clean installer only; no server hotfix is published.
@@ -28,3 +28,4 @@ Accepted state:
 - Xray retains the persistent GeoFiles permission repair.
 - HTTPS transition now uses the proven SG-Gateway same-terminal handoff: the live job page moves to the HTTPS origin and waits for real job success.
 - Xray certificate access no longer installs apt packages during HTTPS; the requested direct chmod permission model is reapplied after renewal.
+- The outer full-clean wrapper no longer restarts Xray or SG-Panel after the core installer has already completed; transient D-Bus errors are handled by retrying service checks for up to 60 seconds.
