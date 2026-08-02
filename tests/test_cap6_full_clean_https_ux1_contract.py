@@ -12,13 +12,12 @@ def page() -> str:
 def test_completion_stays_visible_and_has_direct_button():
     text = page()
     assert "Соединение защищено, панель переведена на HTTPS." in text
-    assert "Если страница не открылась автоматически, обновите её." in text
     assert "Открыть панель по HTTPS" in text
     assert "targetLink.href = targetUrl" in text
     assert "targetLink.hidden = false" in text
 
 
-def test_page_never_forces_premature_navigation():
+def test_page_never_forces_navigation():
     text = page()
     assert "window.location.replace" not in text
     assert "window.location.assign" not in text
@@ -27,19 +26,15 @@ def test_page_never_forces_premature_navigation():
     assert "redirectScheduled" not in text
 
 
-def test_lost_http_connection_never_marks_https_ready():
+def test_lost_http_connection_probes_real_https_before_ready():
     text = page()
     assert "[SG-Panel Access] Переключаю панель на HTTPS" in text
-    assert "switchingStarted" in text
-    assert "switchingStarted && consecutiveFailures >= 2" not in text
-
-    catch_block = text.split("} catch (error) {", 1)[1].split(
-        "window.setTimeout(poll", 1
-    )[0]
-    assert "showHttpsReady" not in catch_block
-    assert "Настройка HTTPS ещё выполняется" in catch_block
-    assert "Не открывайте панель до завершения." in catch_block
-    assert "targetLink.hidden = true" in catch_block
+    assert "const httpsProbeUrl" in text
+    assert "async function probeHttpsReady()" in text
+    assert "await probeHttpsReady()" in text
+    assert "switchingStarted && consecutiveFailures >= 2" in text
+    assert "Проверяю новый HTTPS-адрес" in text
+    assert "targetLink.hidden = true" in text
 
 
 def test_no_server_hotfix_is_published():

@@ -13,7 +13,7 @@
     </header>
     <div class="access-switch-state" id="switch-state"><span class="access-spinner" aria-hidden="true"></span><div><strong>Настройка выполняется</strong><p>Во время перехода на HTTPS связь с этой страницей может временно прерваться.</p></div></div>
     <pre class="terminal-box tall" id="job-log">{{ job.log or 'Задача поставлена в очередь…' }}</pre>
-    <div class="ui-warning-note"><span>i</span><p>Во время настройки не открывайте панель по HTTPS. Дождитесь сообщения о завершении. Если связь прервётся, подождите около минуты и обновите эту страницу.</p></div>
+    <div class="ui-warning-note"><span>i</span><p>Во время настройки не открывайте панель по HTTPS. Дождитесь сообщения о завершении.</p></div>
     <noscript><div class="alert warning"><span>JavaScript отключён. Дождитесь завершения настройки и перейдите по новому адресу вручную.</span></div></noscript>
     <div class="ui-actions">
       <a class="button primary" id="target-link" href="{{ job.target_url }}" target="_self" hidden>Открыть панель по HTTPS</a>
@@ -25,6 +25,7 @@
 (() => {
   const statusUrl = {{ url_for('panel_access_job_status', job_id=job.job_id)|tojson }};
   const targetUrl = {{ job.target_url|tojson }};
+  const httpsProbeUrl = targetUrl.replace(/\/$/, '') + '/login';
   const statusNode = document.getElementById('job-status');
   const logNode = document.getElementById('job-log');
   const stateNode = document.getElementById('switch-state');
@@ -41,10 +42,25 @@
     statusNode.textContent = 'HTTPS готов';
     statusNode.className = 'pill enabled';
     stateNode.className = 'access-switch-state is-success';
-    stateNode.innerHTML = '<span class="access-success-mark">✓</span><div><strong>Соединение защищено, панель переведена на HTTPS.</strong><p>Если страница не открылась автоматически, обновите её.</p></div>';
+    stateNode.innerHTML = '<span class="access-success-mark">✓</span><div><strong>Соединение защищено, панель переведена на HTTPS.</strong><p>Нажмите кнопку, чтобы открыть панель.</p></div>';
     targetLink.href = targetUrl;
     targetLink.textContent = 'Открыть панель по HTTPS';
     targetLink.hidden = false;
+  }
+
+  async function probeHttpsReady() {
+    try {
+      await fetch(httpsProbeUrl + '?sg_https_probe=' + Date.now(), {
+        method: 'GET',
+        mode: 'no-cors',
+        cache: 'no-store',
+        credentials: 'omit',
+        redirect: 'follow'
+      });
+      return true;
+    } catch (error) {
+      return false;
+    }
   }
 
   function failureMessage(logText) {
@@ -84,11 +100,15 @@
     } catch (error) {
       consecutiveFailures += 1;
       const switchingStarted = (logNode.textContent || '').includes('[SG-Panel Access] Переключаю панель на HTTPS');
-      statusNode.textContent = switchingStarted ? 'HTTPS настраивается' : 'ожидаю переключение';
+      if (switchingStarted && consecutiveFailures >= 2 && await probeHttpsReady()) {
+        showHttpsReady();
+        return;
+      }
+      statusNode.textContent = switchingStarted ? 'проверяю HTTPS' : 'ожидаю переключение';
       statusNode.className = 'pill warning';
       stateNode.className = 'access-switch-state';
       stateNode.innerHTML = switchingStarted
-        ? '<span class="access-spinner" aria-hidden="true"></span><div><strong>Настройка HTTPS ещё выполняется</strong><p>Не открывайте панель до завершения. Подождите около минуты, затем обновите эту страницу.</p></div>'
+        ? '<span class="access-spinner" aria-hidden="true"></span><div><strong>Проверяю новый HTTPS-адрес</strong><p>Кнопка появится, когда защищённая панель реально начнёт отвечать.</p></div>'
         : '<span class="access-spinner" aria-hidden="true"></span><div><strong>Выполняется переход на HTTPS</strong><p>Связь с текущей HTTP-страницей может временно прерваться.</p></div>';
       targetLink.hidden = true;
     }

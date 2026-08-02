@@ -9,7 +9,7 @@ def read_page() -> str:
     )
 
 
-def test_https_transition_shows_completion_only_after_success_status():
+def test_https_transition_shows_completion_after_success_status():
     page = read_page()
 
     success_block = page.split("if (data.status === 'success')", 1)[1].split(
@@ -20,17 +20,19 @@ def test_https_transition_shows_completion_only_after_success_status():
     assert "Открыть панель по HTTPS" in page
 
 
-def test_connection_loss_never_claims_https_is_ready():
+def test_connection_loss_uses_real_https_probe_before_showing_button():
     page = read_page()
 
-    catch_block = page.split("} catch (error) {", 1)[1].split(
-        "window.setTimeout(poll", 1
-    )[0]
-    assert "showHttpsReady" not in catch_block
-    assert "switchingStarted && consecutiveFailures >= 2" not in page
-    assert "Настройка HTTPS ещё выполняется" in catch_block
-    assert "Не открывайте панель до завершения." in catch_block
-    assert "targetLink.hidden = true" in catch_block
+    assert "const httpsProbeUrl" in page
+    assert "async function probeHttpsReady()" in page
+    assert "mode: 'no-cors'" in page
+    assert "credentials: 'omit'" in page
+    assert (
+        "switchingStarted && consecutiveFailures >= 2 && await probeHttpsReady()"
+        in page
+    )
+    assert "Проверяю новый HTTPS-адрес" in page
+    assert "Кнопка появится" in page
 
 
 def test_https_transition_never_forces_browser_navigation():
@@ -40,6 +42,7 @@ def test_https_transition_never_forces_browser_navigation():
     assert "window.location.assign" not in page
     assert "panel_access_switched" not in page
     assert "targetLoginUrl" not in page
+    assert "redirectScheduled" not in page
 
 
 def test_https_failure_still_hides_the_https_button():
