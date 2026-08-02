@@ -2,13 +2,13 @@ SG-Panel UI23 CAP6 - confirmed full clean checkpoint
 Date: 2026-08-01
 
 Source commit:
-6177ccd4082bac854ea81c837496cbec3c9fbb35
+1fbede0bf7b7be236230e70bbf2cee03bc5bdb0d
 
 The only installation file:
 SG-PANEL-UI23-CAP6-FULL-CLEAN.run
 
 SHA-256:
-4f5a49571dafdc08ec99abaa314d8d96e13692e822cc18a7539eab74506f7dac
+a2ff348dd0894606d97f1be453e22fe1b165ba56ea071a6bc2cb181632295d5b
 
 Accepted state:
 - One full clean installer only; no server hotfix is published.
@@ -28,3 +28,4 @@ Accepted state:
 - Xray retains the persistent GeoFiles permission repair.
 - HTTPS completion is shown only after the background job reports success; a lost HTTP connection never marks the job as complete.
 - Published full clean installer is stored with Unix LF line endings.
+- Xray certificate ACL access is restored automatically during HTTPS setup, panel updates and Certbot renewals.
