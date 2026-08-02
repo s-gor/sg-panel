@@ -9,5 +9,7 @@
 *.yaml text eol=lf
 
 *.dat binary
-*.run binary
+*.run text eol=lf
 *.zip binary
+*.sha256 text eol=lf
+*.txt text eol=lf

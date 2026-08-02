@@ -8,7 +8,7 @@ The only installation file:
 SG-PANEL-UI23-CAP6-FULL-CLEAN.run
 
 SHA-256:
-424497ddc9e21477ed1af64ac67b58d07452a4b1869e7e3786db46a7f3426a26
+4f5a49571dafdc08ec99abaa314d8d96e13692e822cc18a7539eab74506f7dac
 
 Accepted state:
 - One full clean installer only; no server hotfix is published.
@@ -27,3 +27,4 @@ Accepted state:
 - Certbot, Nginx configuration and transactional rollback are unchanged.
 - Xray retains the persistent GeoFiles permission repair.
 - HTTPS completion is shown only after the background job reports success; a lost HTTP connection never marks the job as complete.
+- Published full clean installer is stored with Unix LF line endings.
