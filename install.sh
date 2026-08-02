@@ -33,6 +33,9 @@ STARTUP_SPINNER_PID=""
 STARTUP_STARTED=0
 PREDETECTED_PUBLIC_IPV4=""
 SOURCE_ZIP_ARG=""
+BOOTSTRAP_STATE_DIR="/var/lib/sg-panel-installer"
+BOOTSTRAP_MARKER="$BOOTSTRAP_STATE_DIR/active.env"
+INSTALL_SUCCEEDED=0
 
 if [[ -t 1 && "${TERM:-dumb}" != "dumb" ]]; then
   C_GREEN=$'\033[1;32m'
@@ -230,6 +233,10 @@ cleanup(){
   startup_stop
   stop_spinner
   [[ -n "$WORK_DIR" && -d "$WORK_DIR" ]] && rm -rf "$WORK_DIR"
+  if (( INSTALL_SUCCEEDED == 1 )); then
+    rm -f "$BOOTSTRAP_MARKER"
+    rmdir "$BOOTSTRAP_STATE_DIR" 2>/dev/null || true
+  fi
 }
 trap cleanup EXIT
 
@@ -245,8 +252,7 @@ run_step(){
   step_ok
 }
 
-wait_for_apt(){
-  local waited=0 timeout=900
+package_manager_busy(){
   local locks=(
     /var/lib/dpkg/lock-frontend
     /var/lib/dpkg/lock
@@ -254,12 +260,22 @@ wait_for_apt(){
     /var/cache/apt/archives/lock
   )
   if command -v fuser >/dev/null 2>&1; then
-    while fuser "${locks[@]}" >/dev/null 2>&1; do
-      (( waited < timeout )) || return 1
-      sleep 5
-      waited=$((waited + 5))
-    done
+    fuser "${locks[@]}" >/dev/null 2>&1
+    return
   fi
+  pgrep -x apt >/dev/null 2>&1 ||
+    pgrep -x apt-get >/dev/null 2>&1 ||
+    pgrep -x dpkg >/dev/null 2>&1 ||
+    pgrep -f '[u]nattended-upgrade' >/dev/null 2>&1
+}
+
+wait_for_apt(){
+  local waited=0 timeout=900
+  while package_manager_busy; do
+    (( waited < timeout )) || return 1
+    sleep 5
+    waited=$((waited + 5))
+  done
 }
 
 prompt_secret(){
@@ -529,7 +545,7 @@ apt_install_dependencies(){
     curl ca-certificates unzip rsync zstd psmisc \
     python3 python3-venv python3-pip \
     sqlite3 jq iproute2 dnsutils \
-    nginx libnginx-mod-stream certbot openssl
+    nginx libnginx-mod-stream certbot openssl acl
 }
 
 detect_public_address_stage(){
@@ -580,7 +596,9 @@ prepare_source(){
     cp -f "$local_archive" "$archive"
   else
     printf '[SG-Panel] Локальный архив не найден. Загрузка: %s\n' "$ARCHIVE_URL" >>"$LOG_FILE"
-    curl -fL --retry 3 --retry-delay 2 --connect-timeout 20 \
+    curl -fL \
+      --retry 5 --retry-all-errors --retry-delay 3 \
+      --connect-timeout 20 --max-time 300 \
       -o "$archive" "$ARCHIVE_URL"
   fi
 
@@ -822,14 +840,60 @@ required_ports_confirmation(){
   done
 }
 
+
+complete_install_artifacts_exist(){
+  [[ -d /opt/xpanel-mvp/xpanel ]] &&
+  [[ -x /opt/xpanel-mvp/.venv/bin/python ]] &&
+  [[ -f /etc/xpanel-mvp/web.env ]] &&
+  [[ -f /etc/systemd/system/xpanel-web.service ]] &&
+  [[ -s /usr/local/etc/xray/config.json ]] &&
+  [[ -s /etc/nginx/sites-available/sg-panel ]]
+}
+
+known_partial_attempt_exists(){
+  local file
+  [[ -f "$BOOTSTRAP_MARKER" ]] && return 0
+  for file in \
+    /var/log/sg-panel-installer-* \
+    /var/log/sg-panel-core-install-*; do
+    [[ -f "$file" ]] || continue
+    find "$file" -mmin -10080 -print -quit 2>/dev/null | grep -q . || continue
+    grep -Eq '\[ERROR\]|\[ОШИБКА\]|завершился с кодом' "$file" && return 0
+  done
+  return 1
+}
+
+runtime_artifacts_exist(){
+  [[ -e /opt/xpanel-mvp || -e /etc/xpanel-mvp ||
+     -e /var/lib/xpanel-mvp || -e /var/log/xpanel-mvp ||
+     -e /etc/systemd/system/xpanel-web.service ||
+     -e /etc/systemd/system/xray.service ||
+     -e /usr/local/bin/xray ||
+     -e /etc/nginx/sites-available/sg-panel ]] && return 0
+  command -v nginx >/dev/null 2>&1 && return 0
+  return 1
+}
+
+mark_bootstrap_attempt(){
+  install -d -m 0700 "$BOOTSTRAP_STATE_DIR"
+  cat > "$BOOTSTRAP_MARKER" <<EOF_BOOTSTRAP
+STARTED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+INSTALLER_PID=$$
+EOF_BOOTSTRAP
+  chmod 0600 "$BOOTSTRAP_MARKER"
+}
+
 main(){
   startup_begin "Запуск мастера полной установки SG-Panel"
   [[ $EUID -eq 0 ]] || startup_error "Запустите установщик через sudo bash."
-  if [[ -e /opt/xpanel-mvp || -e /etc/xpanel-mvp || -e /var/lib/xpanel-mvp || -e /var/log/xpanel-mvp ]]; then
-    startup_error "Этот файл предназначен только для новой EC2. Обнаружены следы установленной SG-Panel; ничего не удалено."
+  if complete_install_artifacts_exist; then
+    startup_error "Обнаружена завершённая SG-Panel. Полный clean-installer её не изменяет."
   fi
-  if command -v systemctl >/dev/null 2>&1 && systemctl list-unit-files --no-legend 2>/dev/null | awk '{print $1}' | grep -Eq '^(xpanel-web|xray|nginx)\.service$'; then
-    startup_error "Этот файл предназначен только для новой EC2. Обнаружены уже установленные службы SG-Panel/Xray/Nginx; ничего не удалено."
+  if runtime_artifacts_exist && ! known_partial_attempt_exists; then
+    startup_error "Обнаружены сторонние или неподтверждённые Nginx/Xray/SG-Panel-компоненты; ничего не изменено."
+  fi
+  if known_partial_attempt_exists; then
+    printf '[SG-Panel] Обнаружена предыдущая незавершённая установка. Продолжаю безопасно, без удаления данных.\n'
   fi
   check_supported_platform
   [[ -r /dev/tty && -w /dev/tty ]] || \
@@ -847,6 +911,7 @@ main(){
   WORK_DIR="$(mktemp -d /tmp/sg-panel-install.XXXXXX)"
   startup_ok "Мастер полной установки SG-Panel запущен"
   required_ports_confirmation
+  mark_bootstrap_attempt
 
   # Надёжный bootstrap выполняется до вопросов. Пользователь с первой секунды
   # видит зелёную вертушку, а весь apt/dpkg-вывод остаётся в журнале.
@@ -863,6 +928,9 @@ main(){
   unset ADMIN_PASSWORD
   run_step "Этап 7/7 · Финальная проверка панели и служб" validate_result
   show_result
+  INSTALL_SUCCEEDED=1
+  rm -f "$BOOTSTRAP_MARKER"
+  rmdir "$BOOTSTRAP_STATE_DIR" 2>/dev/null || true
 }
 
 main "$@"

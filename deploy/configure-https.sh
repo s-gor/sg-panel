@@ -53,10 +53,16 @@ done
 [[ -f "$CERT" ]] || { echo "Не найден сертификат: $CERT" >&2; exit 1; }
 [[ -f "$KEY" ]] || { echo "Не найден ключ: $KEY" >&2; exit 1; }
 command -v nginx >/dev/null || { echo "Сначала установите nginx" >&2; exit 1; }
-if ! dpkg-query -W -f='${Status}' libnginx-mod-stream 2>/dev/null | grep -q 'install ok installed'; then
-  apt-get update
-  DEBIAN_FRONTEND=noninteractive apt-get install -y libnginx-mod-stream
-fi
+command -v sqlite3 >/dev/null || { echo "Не найден sqlite3" >&2; exit 1; }
+command -v setfacl >/dev/null || { echo "Не найден setfacl: сначала обновите SG-Panel, пакет acl ставится до HTTPS-перехода" >&2; exit 1; }
+dpkg-query -W -f='${Status}' libnginx-mod-stream 2>/dev/null | grep -q 'install ok installed' || {
+  echo "Не установлен libnginx-mod-stream: он должен быть установлен до HTTPS-перехода" >&2
+  exit 1
+}
+[[ -x /opt/xpanel-mvp/deploy/install-xray-cert-access.sh ]] || {
+  echo "Не найден install-xray-cert-access.sh" >&2
+  exit 1
+}
 
 case "$HTTPS_PORT" in
   22|80|443|8080) echo "Порт $HTTPS_PORT зарезервирован для другого назначения" >&2; exit 1 ;;
@@ -66,6 +72,15 @@ esac
 if ss -lntH | awk '{print $4}' | grep -Eq "(^|:)$HTTPS_PORT$"; then
   if ! nginx -T 2>/dev/null | grep -Eq "listen[[:space:]]+${HTTPS_PORT}([[:space:]]|;)"; then
     echo "Порт $HTTPS_PORT уже занят другим процессом" >&2
+    exit 1
+  fi
+fi
+
+CURRENT_PROFILE="$(sqlite3 /opt/xpanel-mvp/data/panel.db 'SELECT inbound_profile FROM server_settings WHERE id=1;' 2>/dev/null || true)"
+REALITY_SNI="$(sqlite3 /opt/xpanel-mvp/data/panel.db 'SELECT server_name FROM server_settings WHERE id=1;' 2>/dev/null || true)"
+if [[ "$CURRENT_PROFILE" == "raw_reality" || "$CURRENT_PROFILE" == "xhttp_reality" ]]; then
+  if [[ "${REALITY_SNI,,}" == "${DOMAIN,,}" ]]; then
+    echo "Reality SNI должен отличаться от домена локальной HTTPS-заглушки" >&2
     exit 1
   fi
 fi
@@ -255,14 +270,6 @@ PYSEC
 bash /opt/xpanel-mvp/deploy/install-service.sh
 systemctl restart xpanel-web
 
-CURRENT_PROFILE="$(sqlite3 /opt/xpanel-mvp/data/panel.db 'SELECT inbound_profile FROM server_settings WHERE id=1;' 2>/dev/null || true)"
-REALITY_SNI="$(sqlite3 /opt/xpanel-mvp/data/panel.db 'SELECT server_name FROM server_settings WHERE id=1;' 2>/dev/null || true)"
-if [[ "$CURRENT_PROFILE" == "raw_reality" || "$CURRENT_PROFILE" == "xhttp_reality" ]]; then
-  if [[ "${REALITY_SNI,,}" == "${DOMAIN,,}" ]]; then
-    echo "Reality SNI должен отличаться от домена локальной HTTPS-заглушки" >&2
-    exit 1
-  fi
-fi
 mkdir -p "$(dirname "$REALITY_EDGE_STATE")"
 cat > "$REALITY_EDGE_STATE" <<EOF_EDGE
 ENABLED=1
@@ -275,8 +282,23 @@ UPDATED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 EOF_EDGE
 chmod 600 "$REALITY_EDGE_STATE"
 
+bash /opt/xpanel-mvp/deploy/install-xray-cert-access.sh "$CERT" "$KEY"
+
 cd /opt/xpanel-mvp
 .venv/bin/python -m xpanel apply >/dev/null
+
+wait_for_xray(){
+  local attempt state=""
+  for ((attempt=1; attempt<=20; attempt++)); do
+    state="$(systemctl is-active xray.service 2>/dev/null || true)"
+    [[ "$state" == "active" ]] && return 0
+    sleep 3
+  done
+  printf '%s %s\n' '[SG-Panel HTTPS]' "ERROR: Xray не стал active после применения HTTPS" >&2
+  systemctl --no-pager --full status xray.service >&2 2>/dev/null || true
+  journalctl -u xray.service -n 60 --no-pager >&2 2>/dev/null || true
+  return 1
+}
 
 wait_for_backend(){
   local attempt
@@ -339,6 +361,7 @@ wait_for_fallback(){
   return 1
 }
 
+wait_for_xray || exit 1
 wait_for_backend || exit 1
 wait_for_https || exit 1
 wait_for_fallback || exit 1

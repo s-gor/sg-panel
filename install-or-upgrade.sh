@@ -60,6 +60,71 @@ stop_spinner(){
   SPINNER_PID=""
 }
 
+
+package_manager_busy(){
+  local locks=(
+    /var/lib/dpkg/lock-frontend
+    /var/lib/dpkg/lock
+    /var/lib/apt/lists/lock
+    /var/cache/apt/archives/lock
+  )
+  if command -v fuser >/dev/null 2>&1; then
+    fuser "${locks[@]}" >/dev/null 2>&1
+    return
+  fi
+  pgrep -x apt >/dev/null 2>&1 ||
+    pgrep -x apt-get >/dev/null 2>&1 ||
+    pgrep -x dpkg >/dev/null 2>&1 ||
+    pgrep -f '[u]nattended-upgrade' >/dev/null 2>&1
+}
+
+wait_for_apt(){
+  local waited=0 timeout=900
+  while package_manager_busy; do
+    (( waited < timeout )) || {
+      echo "apt/dpkg не освободил блокировку за ${timeout} секунд" >&2
+      return 1
+    }
+    sleep 5
+    waited=$((waited + 5))
+  done
+}
+
+ensure_acl_dependency(){
+  command -v setfacl >/dev/null 2>&1 && return 0
+  command -v apt-get >/dev/null 2>&1 || {
+    echo "не найден apt-get для установки пакета acl" >&2
+    return 1
+  }
+  wait_for_apt
+  export DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a
+  dpkg --configure -a
+  if ! apt-get -o DPkg::Lock::Timeout=900 -o Dpkg::Use-Pty=0 \\
+      install -y -qq --no-install-recommends acl; then
+    apt-get -o DPkg::Lock::Timeout=900 -o Dpkg::Use-Pty=0 update -qq
+    apt-get -o DPkg::Lock::Timeout=900 -o Dpkg::Use-Pty=0 \\
+      install -y -qq --no-install-recommends acl
+  fi
+  command -v setfacl >/dev/null 2>&1 || {
+    echo "пакет acl установлен, но setfacl не найден" >&2
+    return 1
+  }
+}
+
+wait_for_service_active(){
+  local unit="$1" label="${2:-$1}" attempts="${3:-20}" delay="${4:-3}"
+  local attempt state=""
+  for ((attempt=1; attempt<=attempts; attempt++)); do
+    state="$(systemctl is-active "$unit" 2>/dev/null || true)"
+    [[ "$state" == "active" ]] && return 0
+    sleep "$delay"
+  done
+  echo "$label не находится в active после $((attempts * delay)) секунд" >&2
+  systemctl --no-pager --full status "$unit" >&2 2>/dev/null || true
+  journalctl -u "$unit" -n 60 --no-pager >&2 2>/dev/null || true
+  return 1
+}
+
 step_begin(){
   CURRENT_STEP="$1"
   STEP_STARTED="$(date +%s)"
@@ -425,12 +490,12 @@ node_runtime_stage(){
     if [[ -f /etc/systemd/system/sg-node-worker.service ]]; then
       systemctl enable --now sg-node-worker.service
       systemctl restart sg-node-worker.service
-      systemctl is-active --quiet sg-node-worker.service
+      wait_for_service_active sg-node-worker.service "SG-Node Worker"
     fi
     if [[ -f /etc/systemd/system/sg-node-agent.service ]]; then
       systemctl enable --now sg-node-agent.service
       systemctl restart sg-node-agent.service
-      systemctl is-active --quiet sg-node-agent.service
+      wait_for_service_active sg-node-agent.service "SG-Node Agent"
     fi
   fi
 }
@@ -516,8 +581,8 @@ validate_stage(){
   local cli_version bind port health_host http_body css_body
   cli_version="$(.venv/bin/python -m xpanel --version | awk '{print $2}')"
   [[ "$cli_version" == "$EXPECTED_VERSION" ]] || { echo "CLI сообщает версию $cli_version"; return 1; }
-  systemctl is-active --quiet "$SERVICE" || { echo "служба $SERVICE не active"; return 1; }
-  systemctl is-active --quiet xpanel-traffic.timer || { echo "служба xpanel-traffic.timer не active"; return 1; }
+  wait_for_service_active "$SERVICE" "служба $SERVICE" || return 1
+  wait_for_service_active xpanel-traffic.timer "служба xpanel-traffic.timer" || return 1
 
   if ! bash deploy/repair-panel-access.sh; then
     ACCESS_WARNING=1
@@ -572,10 +637,10 @@ validate_stage(){
     grep -Fq 'WORKER_VERSION = "0.7.0"' /usr/local/libexec/sg-node-worker.py || { echo "SG-Node Worker не обновлён до UI19"; return 1; }
   fi
   if [[ -f /etc/systemd/system/sg-node-worker.service ]]; then
-    systemctl is-active --quiet sg-node-worker.service || { echo "sg-node-worker.service не active"; return 1; }
+    wait_for_service_active sg-node-worker.service "sg-node-worker.service" || return 1
   fi
   if [[ -f /etc/systemd/system/sg-node-agent.service ]]; then
-    systemctl is-active --quiet sg-node-agent.service || { echo "sg-node-agent.service не active"; return 1; }
+    wait_for_service_active sg-node-agent.service "sg-node-agent.service" || return 1
   fi
 }
 
@@ -588,6 +653,7 @@ main(){
   preflight >>"$LOG_FILE" 2>&1
   step_ok
   printf '[SG-Panel] Все параметры приняты. Дальнейшее обновление не потребует ввода.\n'
+  run_stage "Подготовка безопасного доступа Xray к сертификатам" ensure_acl_dependency
   run_stage "Очистка следов неудачных обновлений" cleanup_failed_upgrade_backups
   run_stage "Удаление вложенного дубликата SG-Panel" cleanup_nested_install_artifacts
   run_stage "Проверка свободного места" check_upgrade_disk_space

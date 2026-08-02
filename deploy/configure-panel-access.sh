@@ -39,9 +39,13 @@ if [[ "$MODE" == "http" ]]; then
 fi
 
 [[ "$HOST" =~ ^([A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,63}$ ]] || fail "для HTTPS укажите корректное доменное имя"
-for command in nginx certbot openssl getent curl; do
+for command in nginx certbot openssl getent curl sqlite3 setfacl; do
   command -v "$command" >/dev/null 2>&1 || fail "не найден $command"
 done
+dpkg-query -W -f='${Status}' libnginx-mod-stream 2>/dev/null | grep -q 'install ok installed' ||
+  fail "не установлен libnginx-mod-stream; обновите SG-Panel до запуска HTTPS"
+[[ -x /opt/xpanel-mvp/deploy/install-xray-cert-access.sh ]] ||
+  fail "не найден install-xray-cert-access.sh"
 
 detect_public_ipv4(){
   local token="" value=""
@@ -99,6 +103,10 @@ backup_path /etc/nginx/sites-available/sg-panel-reality-placeholder reality-web-
 backup_path /etc/nginx/sites-enabled/sg-panel-reality-placeholder reality-web-link
 backup_path /etc/xpanel-mvp/reality-edge.env reality-edge.env
 backup_path /usr/local/etc/xray/config.json xray-config.json
+backup_path /usr/local/sbin/sg-panel-fix-xray-cert-access cert-access-helper
+backup_path /etc/letsencrypt/renewal-hooks/deploy/sg-panel-xray-cert-access cert-access-hook
+backup_path /etc/letsencrypt/renewal-hooks/deploy/reload-sg-panel-nginx.sh nginx-renewal-hook
+backup_path /etc/sysctl.d/99-sg-panel-port.conf reserved-port-conf
 if [[ -f /opt/xpanel-mvp/data/panel.db ]]; then
   cp -a /opt/xpanel-mvp/data/panel.db "$BACKUP_DIR/panel.db"
 fi
@@ -130,6 +138,15 @@ rollback(){
     restore_path "$BACKUP_DIR/reality-web-conf" /etc/nginx/sites-available/sg-panel-reality-placeholder
     restore_path "$BACKUP_DIR/reality-web-link" /etc/nginx/sites-enabled/sg-panel-reality-placeholder
     restore_path "$BACKUP_DIR/panel.db" /opt/xpanel-mvp/data/panel.db
+    rm -f /usr/local/sbin/sg-panel-fix-xray-cert-access \
+      /etc/letsencrypt/renewal-hooks/deploy/sg-panel-xray-cert-access \
+      /etc/letsencrypt/renewal-hooks/deploy/reload-sg-panel-nginx.sh \
+      /etc/sysctl.d/99-sg-panel-port.conf
+    restore_path "$BACKUP_DIR/cert-access-helper" /usr/local/sbin/sg-panel-fix-xray-cert-access
+    restore_path "$BACKUP_DIR/cert-access-hook" /etc/letsencrypt/renewal-hooks/deploy/sg-panel-xray-cert-access
+    restore_path "$BACKUP_DIR/nginx-renewal-hook" /etc/letsencrypt/renewal-hooks/deploy/reload-sg-panel-nginx.sh
+    restore_path "$BACKUP_DIR/reserved-port-conf" /etc/sysctl.d/99-sg-panel-port.conf
+    sysctl --system >/dev/null 2>&1 || true
     systemctl restart xray >/dev/null 2>&1 || true
     nginx -t >/dev/null 2>&1 && systemctl reload nginx >/dev/null 2>&1 || true
     systemctl restart xpanel-web >/dev/null 2>&1 || true

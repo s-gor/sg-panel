@@ -9,6 +9,10 @@ RENEWAL_HOOK="/etc/letsencrypt/renewal-hooks/deploy/sg-panel-xray-cert-access"
   echo "Ошибка: настройку доступа к сертификатам запустите от root." >&2
   exit 1
 }
+command -v setfacl >/dev/null 2>&1 || {
+  echo "Ошибка: setfacl не найден. Пакет acl должен устанавливаться до HTTPS-перехода." >&2
+  exit 1
+}
 
 install -d -m 0755 "$(dirname "$RUNTIME_HELPER")"
 cat >"$RUNTIME_HELPER" <<'EOF_HELPER'
@@ -17,6 +21,24 @@ set -Eeuo pipefail
 
 PROJECT_DIR="${XPANEL_PROJECT_DIR:-/opt/xpanel-mvp}"
 declare -a CERT_PATHS=("$@")
+
+command -v setfacl >/dev/null 2>&1 || {
+  echo "setfacl не найден" >&2
+  exit 1
+}
+
+xray_user() {
+  local value="" attempt
+  for ((attempt=1; attempt<=10; attempt++)); do
+    value="$(systemctl show -p User --value xray.service 2>/dev/null || true)"
+    [[ -n "$value" ]] && break
+    sleep 1
+  done
+  if [[ -z "$value" && -f /etc/systemd/system/xray.service ]]; then
+    value="$(sed -n 's/^User=//p' /etc/systemd/system/xray.service | tail -1)"
+  fi
+  printf '%s' "${value:-root}"
+}
 
 collect_config_paths() {
   local config="/usr/local/etc/xray/config.json"
@@ -54,18 +76,15 @@ collect_database_paths() {
   python3 - "$database" <<'PY'
 import sqlite3
 import sys
-from pathlib import Path
 
-path = Path(sys.argv[1])
 con = None
-row = None
 try:
-    con = sqlite3.connect(path)
+    con = sqlite3.connect(sys.argv[1])
     row = con.execute(
         "SELECT tls_cert_path, tls_key_path FROM server_settings WHERE id=1"
     ).fetchone()
 except sqlite3.Error:
-    pass
+    row = None
 finally:
     if con is not None:
         con.close()
@@ -95,27 +114,39 @@ if ((${#CERT_PATHS[@]} == 0)); then
   )
 fi
 
-open_directory_chain() {
+SERVICE_USER="$(xray_user)"
+[[ "$SERVICE_USER" == "root" ]] && exit 0
+id "$SERVICE_USER" >/dev/null 2>&1 || {
+  echo "Пользователь службы Xray не найден: $SERVICE_USER" >&2
+  exit 1
+}
+
+grant_directory_chain() {
   local current="$1"
-  while [[ "$current" != "/" && -n "$current" ]]; do
-    [[ -d "$current" ]] && chmod o+x "$current"
+  while [[ -n "$current" && "$current" != "/" ]]; do
+    if [[ -d "$current" ]]; then
+      setfacl -m "u:${SERVICE_USER}:--x" "$current"
+    fi
     current="$(dirname "$current")"
   done
 }
 
-open_file() {
-  local requested="$1"
-  local resolved=""
+grant_file() {
+  local requested="$1" resolved=""
+  [[ "$requested" == /* ]] || {
+    echo "Путь сертификата должен быть абсолютным: $requested" >&2
+    return 1
+  }
   [[ -e "$requested" || -L "$requested" ]] || return 0
 
-  open_directory_chain "$(dirname "$requested")"
+  grant_directory_chain "$(dirname "$requested")"
   resolved="$(readlink -f "$requested" 2>/dev/null || true)"
-  if [[ -n "$resolved" && -f "$resolved" ]]; then
-    open_directory_chain "$(dirname "$resolved")"
-    chmod o+r "$resolved"
-  elif [[ -f "$requested" ]]; then
-    chmod o+r "$requested"
-  fi
+  [[ -n "$resolved" && -f "$resolved" ]] || {
+    echo "Не удалось разрешить путь сертификата: $requested" >&2
+    return 1
+  }
+  grant_directory_chain "$(dirname "$resolved")"
+  setfacl -m "u:${SERVICE_USER}:r--" "$resolved"
 }
 
 declare -A SEEN=()
@@ -123,7 +154,7 @@ for path in "${CERT_PATHS[@]}"; do
   [[ -n "$path" ]] || continue
   [[ -z "${SEEN[$path]:-}" ]] || continue
   SEEN["$path"]=1
-  open_file "$path"
+  grant_file "$path"
 done
 EOF_HELPER
 chmod 0755 "$RUNTIME_HELPER"
@@ -134,6 +165,15 @@ cat >"$RENEWAL_HOOK" <<'EOF_HOOK'
 set -eu
 /usr/local/sbin/sg-panel-fix-xray-cert-access
 systemctl restart xray.service
+attempt=0
+while [ "$attempt" -lt 20 ]; do
+  state="$(systemctl is-active xray.service 2>/dev/null || true)"
+  [ "$state" = "active" ] && exit 0
+  attempt=$((attempt + 1))
+  sleep 3
+done
+systemctl --no-pager --full status xray.service >&2 2>/dev/null || true
+exit 1
 EOF_HOOK
 chmod 0755 "$RENEWAL_HOOK"
 

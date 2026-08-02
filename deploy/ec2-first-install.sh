@@ -146,16 +146,26 @@ run_stage(){
   step_ok
 }
 
-wait_for_apt(){
-  local waited=0 timeout=900
+package_manager_busy(){
   local locks=(
     /var/lib/dpkg/lock-frontend
     /var/lib/dpkg/lock
     /var/lib/apt/lists/lock
     /var/cache/apt/archives/lock
   )
-  while command -v fuser >/dev/null 2>&1 \
-    && fuser "${locks[@]}" >/dev/null 2>&1; do
+  if command -v fuser >/dev/null 2>&1; then
+    fuser "${locks[@]}" >/dev/null 2>&1
+    return
+  fi
+  pgrep -x apt >/dev/null 2>&1 ||
+    pgrep -x apt-get >/dev/null 2>&1 ||
+    pgrep -x dpkg >/dev/null 2>&1 ||
+    pgrep -f '[u]nattended-upgrade' >/dev/null 2>&1
+}
+
+wait_for_apt(){
+  local waited=0 timeout=900
+  while package_manager_busy; do
     if (( waited == 0 )); then
       printf '[SG-Panel] Ожидание завершения apt/dpkg...\n' >>"$LOG_FILE"
     fi
@@ -163,6 +173,22 @@ wait_for_apt(){
     sleep 5
     waited=$((waited + 5))
   done
+}
+
+wait_for_service_active(){
+  local unit="$1" label="${2:-$1}" attempts="${3:-20}" delay="${4:-3}"
+  local attempt state=""
+  for ((attempt=1; attempt<=attempts; attempt++)); do
+    state="$(systemctl is-active "$unit" 2>/dev/null || true)"
+    if [[ "$state" == "active" ]]; then
+      return 0
+    fi
+    sleep "$delay"
+  done
+  echo "$label не находится в active после $((attempts * delay)) секунд" >&2
+  systemctl --no-pager --full status "$unit" >&2 2>/dev/null || true
+  journalctl -u "$unit" -n 60 --no-pager >&2 2>/dev/null || true
+  return 1
 }
 
 migrate_reality_edge_web_port(){
@@ -176,6 +202,14 @@ migrate_reality_edge_web_port(){
 
 ensure_xray_version(){
   local current="" backup_dir="" installed="" config="/usr/local/etc/xray/config.json"
+  local xray_install_script="" xray_install_url=""
+  local -a curl_args=(
+    --retry 5
+    --retry-all-errors
+    --retry-delay 3
+    --connect-timeout 15
+    --max-time 180
+  )
   if [[ -x /usr/local/bin/xray ]]; then
     current="v$(/usr/local/bin/xray version | awk 'NR==1 {print $2}' | sed 's/^v//')"
   fi
@@ -191,8 +225,7 @@ ensure_xray_version(){
     systemctl enable xray >/dev/null 2>&1 || true
     if [[ -s "$config" ]]; then
       systemctl restart xray
-      sleep 1
-      systemctl is-active --quiet xray || {
+      wait_for_service_active xray "установленный Xray $current" || {
         echo "установленный Xray $current не запустился с текущей конфигурацией" >&2
         return 1
       }
@@ -218,7 +251,38 @@ ensure_xray_version(){
     fi
   }
 
-  if ! bash -c "$(curl -fsSL https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install --version "$XRAY_VERSION"; then
+  xray_install_script="$(mktemp /tmp/sg-panel-xray-install.XXXXXX.sh)"
+  for xray_install_url in \
+    "https://raw.githubusercontent.com/XTLS/Xray-install/main/install-release.sh" \
+    "https://github.com/XTLS/Xray-install/raw/main/install-release.sh"
+  do
+    rm -f "$xray_install_script"
+    if curl -fL "${curl_args[@]}" "$xray_install_url" -o "$xray_install_script"; then
+      break
+    fi
+  done
+
+  if [[ ! -s "$xray_install_script" ]]; then
+    echo "не удалось скачать официальный установщик Xray после повторных попыток" >&2
+    rm -f "$xray_install_script"
+    rollback_xray
+    return 1
+  fi
+  if ! bash -n "$xray_install_script"; then
+    echo "скачанный официальный установщик Xray повреждён" >&2
+    rm -f "$xray_install_script"
+    rollback_xray
+    return 1
+  fi
+  if ! bash "$xray_install_script" install --version "$XRAY_VERSION"; then
+    rm -f "$xray_install_script"
+    rollback_xray
+    return 1
+  fi
+  rm -f "$xray_install_script"
+
+  if [[ ! -x /usr/local/bin/xray ]]; then
+    echo "официальный установщик завершился без /usr/local/bin/xray" >&2
     rollback_xray
     return 1
   fi
@@ -260,8 +324,7 @@ PY_XRAY_PLACEHOLDER
 
   if [[ -s "$config" && "$bootstrap_placeholder" -eq 0 ]]; then
     systemctl restart xray
-    sleep 1
-    systemctl is-active --quiet xray || {
+    wait_for_service_active xray "Xray $XRAY_VERSION" || {
       echo "Xray $XRAY_VERSION не запустился с текущей конфигурацией" >&2
       rollback_xray
       return 1
@@ -413,9 +476,9 @@ if existing_install_is_complete && [[ $RECONFIGURE -eq 0 ]]; then
   validate_updated_panel_stage(){
     NEW_VERSION="$(cd "$TARGET" && .venv/bin/python -m xpanel --version | awk '{print $2}')"
     [[ "$NEW_VERSION" == "$EXPECTED_VERSION" ]] || return 1
-    systemctl is-active --quiet "$SERVICE"
-    systemctl is-active --quiet xray
-    systemctl is-active --quiet nginx
+    wait_for_service_active "$SERVICE" "SG-Panel"
+    wait_for_service_active xray "Xray"
+    wait_for_service_active nginx "Nginx"
   }
 
   step_ok
@@ -603,7 +666,7 @@ check_memory_and_disk(){
 install_system_packages(){
   if [[ "${SG_PANEL_SYSTEM_READY:-0}" == "1" ]]; then
     local required
-    for required in curl unzip rsync python3 sqlite3 jq nginx certbot openssl; do
+    for required in curl unzip rsync python3 sqlite3 jq nginx certbot openssl setfacl; do
       command -v "$required" >/dev/null 2>&1 || {
         echo "после системного этапа не найден обязательный компонент: $required" >&2
         return 1
@@ -621,7 +684,7 @@ install_system_packages(){
     curl ca-certificates unzip rsync zstd psmisc \
     python3 python3-venv python3-pip \
     sqlite3 jq iproute2 dnsutils \
-    nginx libnginx-mod-stream certbot openssl
+    nginx libnginx-mod-stream certbot openssl acl
 }
 
 install_xray_stage(){
@@ -711,10 +774,10 @@ validate_installation_stage(){
   xray_version="v$(/usr/local/bin/xray version | awk 'NR==1 {print $2}' | sed 's/^v//')"
   [[ "$xray_version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || fail "не удалось определить версию Xray: $xray_version"
   [[ "$(printf '%s\n%s\n' "$xray_version" "$XRAY_VERSION" | sort -V | tail -n 1)" == "$xray_version" ]] || fail "версия Xray $xray_version старее рекомендуемой $XRAY_VERSION"
-  systemctl is-active --quiet xpanel-web || fail "xpanel-web не active"
-  systemctl is-active --quiet xray || fail "xray не active"
-  systemctl is-active --quiet nginx || fail "nginx не active"
-  systemctl is-active --quiet xpanel-traffic.timer || fail "xpanel-traffic.timer не active"
+  wait_for_service_active xpanel-web "xpanel-web" || fail "xpanel-web не active"
+  wait_for_service_active xray "xray" || fail "xray не active"
+  wait_for_service_active nginx "nginx" || fail "nginx не active"
+  wait_for_service_active xpanel-traffic.timer "xpanel-traffic.timer" || fail "xpanel-traffic.timer не active"
   .venv/bin/python -m xpanel collect-traffic --online --strict
 
   detect_panel_access
