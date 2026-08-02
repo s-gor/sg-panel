@@ -13,7 +13,7 @@
     </header>
     <div class="access-switch-state" id="switch-state"><span class="access-spinner" aria-hidden="true"></span><div><strong>Настройка выполняется</strong><p>Во время перехода на HTTPS связь с этой страницей может временно прерваться.</p></div></div>
     <pre class="terminal-box tall" id="job-log">{{ job.log or 'Задача поставлена в очередь…' }}</pre>
-    <div class="ui-warning-note"><span>i</span><p>После переключения останьтесь на этой странице. Откройте защищённую панель кнопкой ниже или обновите страницу.</p></div>
+    <div class="ui-warning-note"><span>i</span><p>Во время настройки не открывайте панель по HTTPS. Дождитесь сообщения о завершении. Если связь прервётся, подождите около минуты и обновите эту страницу.</p></div>
     <noscript><div class="alert warning"><span>JavaScript отключён. Дождитесь завершения настройки и перейдите по новому адресу вручную.</span></div></noscript>
     <div class="ui-actions">
       <a class="button primary" id="target-link" href="{{ job.target_url }}" target="_self" hidden>Открыть панель по HTTPS</a>
@@ -84,14 +84,12 @@
     } catch (error) {
       consecutiveFailures += 1;
       const switchingStarted = (logNode.textContent || '').includes('[SG-Panel Access] Переключаю панель на HTTPS');
-      if (switchingStarted && consecutiveFailures >= 2) {
-        showHttpsReady();
-        return;
-      }
-      statusNode.textContent = 'ожидаю переключение';
+      statusNode.textContent = switchingStarted ? 'HTTPS настраивается' : 'ожидаю переключение';
       statusNode.className = 'pill warning';
       stateNode.className = 'access-switch-state';
-      stateNode.innerHTML = '<span class="access-spinner" aria-hidden="true"></span><div><strong>Выполняется переход на HTTPS</strong><p>Связь с текущей HTTP-страницей может временно прерваться.</p></div>';
+      stateNode.innerHTML = switchingStarted
+        ? '<span class="access-spinner" aria-hidden="true"></span><div><strong>Настройка HTTPS ещё выполняется</strong><p>Не открывайте панель до завершения. Подождите около минуты, затем обновите эту страницу.</p></div>'
+        : '<span class="access-spinner" aria-hidden="true"></span><div><strong>Выполняется переход на HTTPS</strong><p>Связь с текущей HTTP-страницей может временно прерваться.</p></div>';
       targetLink.hidden = true;
     }
     window.setTimeout(poll, consecutiveFailures ? 1500 : 1000);
