@@ -7,13 +7,16 @@ def read(relative: str) -> str:
     return (ROOT / relative).read_text(encoding="utf-8")
 
 
-def test_full_installer_is_fresh_ec2_only() -> None:
+def test_full_installer_is_fresh_ec2_or_safe_resume_only() -> None:
     body = read("install.sh")
     assert 'LOCAL_ARCHIVE_NAME="SG-PANEL-FIX40-FULL-UI23-SOURCE.zip"' in body
-    assert "только для новой EC2" in body
-    assert "/opt/xpanel-mvp" in body
-    assert "/etc/xpanel-mvp" in body
-    assert "ничего не удалено" in body
+    assert 'BOOTSTRAP_MARKER="$BOOTSTRAP_STATE_DIR/active.env"' in body
+    assert "complete_install_artifacts_exist()" in body
+    assert "known_partial_attempt_exists()" in body
+    assert "runtime_artifacts_exist()" in body
+    assert "Обнаружена завершённая SG-Panel" in body
+    assert "Обнаружена предыдущая незавершённая установка" in body
+    assert "Обнаружены сторонние или неподтверждённые" in body
 
 
 def test_full_installer_uses_current_release_identity() -> None:
