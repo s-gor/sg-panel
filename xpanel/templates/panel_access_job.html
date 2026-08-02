@@ -11,10 +11,10 @@
       <div><p class="panel-kicker">ЖИВОЙ ЖУРНАЛ</p><h2 id="job-title">Подготовка {{ job.mode|upper }}</h2><p>Целевой адрес: <code>{{ job.target_url }}</code></p></div>
       <span class="pill warning" id="job-status"><i></i>{{ job.status }}</span>
     </header>
-    <div class="access-switch-state" id="switch-state"><span class="access-spinner" aria-hidden="true"></span><div><strong>Настройка выполняется</strong><p>Во время перехода на HTTPS связь с этой страницей может временно прерваться.</p></div></div>
+    <div class="access-switch-state" id="switch-state"><span class="access-spinner" aria-hidden="true"></span><div><strong>Настройка выполняется</strong><p>Во время перехода терминал автоматически продолжит работу по HTTPS.</p></div></div>
     <pre class="terminal-box tall" id="job-log">{{ job.log or 'Задача поставлена в очередь…' }}</pre>
-    <div class="ui-warning-note"><span>i</span><p>После переключения останьтесь на этой странице. Откройте защищённую панель кнопкой ниже или обновите страницу.</p></div>
-    <noscript><div class="alert warning"><span>JavaScript отключён. Дождитесь завершения настройки и перейдите по новому адресу вручную.</span></div></noscript>
+    <div class="ui-warning-note"><span>i</span><p>Не закрывайте вкладку. После включения Nginx этот же терминал откроется по защищённому адресу.</p></div>
+    <noscript><div class="alert warning"><span>JavaScript отключён. Дождитесь завершения и откройте целевой адрес вручную.</span></div></noscript>
     <div class="ui-actions">
       <a class="button primary" id="target-link" href="{{ job.target_url }}" target="_self" hidden>Открыть панель по HTTPS</a>
       <a class="button ghost" href="{{ url_for('security_page') }}">Вернуться в Безопасность</a>
@@ -30,6 +30,8 @@
   const stateNode = document.getElementById('switch-state');
   const targetLink = document.getElementById('target-link');
   let finished = false;
+  let hadSuccessfulPoll = false;
+  let redirectScheduled = false;
   let consecutiveFailures = 0;
 
   targetLink.href = targetUrl;
@@ -41,10 +43,25 @@
     statusNode.textContent = 'HTTPS готов';
     statusNode.className = 'pill enabled';
     stateNode.className = 'access-switch-state is-success';
-    stateNode.innerHTML = '<span class="access-success-mark">✓</span><div><strong>Соединение защищено, панель переведена на HTTPS.</strong><p>Если страница не открылась автоматически, обновите её.</p></div>';
+    stateNode.innerHTML = '<span class="access-success-mark">✓</span><div><strong>Соединение защищено, панель переведена на HTTPS.</strong><p>Терминал завершён. Откройте панель кнопкой ниже.</p></div>';
     targetLink.href = targetUrl;
     targetLink.textContent = 'Открыть панель по HTTPS';
     targetLink.hidden = false;
+  }
+
+  function continueTerminalOverHttps() {
+    if (redirectScheduled || !targetUrl) return;
+    redirectScheduled = true;
+    const resultUrl = new URL(targetUrl, window.location.href);
+    const secureJobUrl = new URL(window.location.href);
+    secureJobUrl.protocol = 'https:';
+    secureJobUrl.hostname = resultUrl.hostname;
+    secureJobUrl.port = resultUrl.port;
+    statusNode.textContent = 'перехожу на HTTPS';
+    statusNode.className = 'pill warning';
+    stateNode.className = 'access-switch-state';
+    stateNode.innerHTML = '<span class="access-spinner" aria-hidden="true"></span><div><strong>Nginx включил HTTPS</strong><p>Продолжаю этот же терминал по защищённому адресу…</p></div>';
+    window.setTimeout(() => window.location.replace(secureJobUrl.toString()), 900);
   }
 
   function failureMessage(logText) {
@@ -64,8 +81,9 @@
     try {
       const response = await fetch(statusUrl, {cache: 'no-store'});
       if (!response.ok) throw new Error('HTTP ' + response.status);
-      consecutiveFailures = 0;
       const data = await response.json();
+      hadSuccessfulPoll = true;
+      consecutiveFailures = 0;
       statusNode.textContent = data.status;
       statusNode.className = 'pill ' + (data.status === 'success' ? 'enabled' : data.status === 'failed' ? 'disabled' : 'warning');
       logNode.textContent = data.log || 'Ожидание вывода…';
@@ -81,21 +99,24 @@
         targetLink.hidden = true;
         return;
       }
+      stateNode.className = 'access-switch-state';
+      stateNode.innerHTML = '<span class="access-spinner" aria-hidden="true"></span><div><strong>Настройка выполняется</strong><p>Журнал обновляется автоматически.</p></div>';
     } catch (error) {
       consecutiveFailures += 1;
       const switchingStarted = (logNode.textContent || '').includes('[SG-Panel Access] Переключаю панель на HTTPS');
-      if (switchingStarted && consecutiveFailures >= 2) {
-        showHttpsReady();
+      if (switchingStarted && (hadSuccessfulPoll || consecutiveFailures >= 3)) {
+        continueTerminalOverHttps();
         return;
       }
-      statusNode.textContent = 'ожидаю переключение';
+      statusNode.textContent = 'связь временно потеряна';
       statusNode.className = 'pill warning';
       stateNode.className = 'access-switch-state';
-      stateNode.innerHTML = '<span class="access-spinner" aria-hidden="true"></span><div><strong>Выполняется переход на HTTPS</strong><p>Связь с текущей HTTP-страницей может временно прерваться.</p></div>';
-      targetLink.hidden = true;
+      stateNode.innerHTML = '<span class="access-spinner" aria-hidden="true"></span><div><strong>Повторяю соединение</strong><p>Терминал продолжит работу автоматически.</p></div>';
     }
-    window.setTimeout(poll, consecutiveFailures ? 1500 : 1000);
+    window.setTimeout(poll, 1000);
   }
+
+  logNode.scrollTop = logNode.scrollHeight;
   poll();
 })();
 </script>

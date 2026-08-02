@@ -3,39 +3,45 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def read_page() -> str:
-    return (ROOT / "xpanel/templates/panel_access_job.html").read_text(encoding="utf-8")
+def page() -> str:
+    return (ROOT / "xpanel/templates/panel_access_job.html").read_text(
+        encoding="utf-8"
+    )
 
 
-def test_https_transition_shows_completion_message_and_direct_button():
-    page = read_page()
-    assert "Соединение защищено, панель переведена на HTTPS." in page
-    assert "Если страница не открылась автоматически, обновите её." in page
-    assert "Открыть панель по HTTPS" in page
-    assert "targetLink.href = targetUrl" in page
-    assert "targetLink.hidden = false" in page
+def test_sg_gateway_same_terminal_https_handoff():
+    text = page()
+
+    required = (
+        "let hadSuccessfulPoll = false",
+        "let redirectScheduled = false",
+        "function continueTerminalOverHttps()",
+        "secureJobUrl.protocol = 'https:'",
+        "secureJobUrl.hostname = resultUrl.hostname",
+        "secureJobUrl.port = resultUrl.port",
+        "window.location.replace(secureJobUrl.toString())",
+        "switchingStarted && (hadSuccessfulPoll || consecutiveFailures >= 3)",
+    )
+    for value in required:
+        assert value in text
 
 
-def test_https_transition_never_forces_browser_navigation():
-    page = read_page()
-    assert "window.location.replace" not in page
-    assert "window.location.assign" not in page
-    assert "panel_access_switched" not in page
-    assert "targetLoginUrl" not in page
-    assert "setTimeout(() => window.location" not in page
+def test_button_is_shown_only_after_job_success():
+    text = page()
+
+    success = text.split("if (data.status === 'success')", 1)[1].split(
+        "if (data.status === 'failed')", 1
+    )[0]
+    assert "showHttpsReady();" in success
+    assert "targetLink.hidden = false" in text
+    assert "Открыть панель по HTTPS" in text
 
 
-def test_https_transition_fallback_requires_real_switch_marker():
-    page = read_page()
-    marker = "[SG-Panel Access] Переключаю панель на HTTPS"
-    assert marker in page
-    assert "switchingStarted && consecutiveFailures >= 2" in page
-    assert "showHttpsReady();" in page
-    assert "hadSuccessfulPoll || consecutiveFailures >= 3" not in page
+def test_no_login_redirect_or_https_probe_experiments_remain():
+    text = page()
 
-
-def test_https_failure_still_hides_the_https_button():
-    page = read_page()
-    failed = page.split("if (data.status === 'failed')", 1)[1].split("} catch (error)", 1)[0]
-    assert "targetLink.hidden = true" in failed
-    assert "HTTPS не включён. Предыдущий доступ восстановлен." in page
+    assert "targetLoginUrl" not in text
+    assert "panel_access_switched" not in text
+    assert "httpsProbeUrl" not in text
+    assert "probeHttpsReady" not in text
+    assert "window.location.assign" not in text
