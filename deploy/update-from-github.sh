@@ -36,8 +36,6 @@ MANAGED_PATHS=(
   /etc/nginx/sites-enabled/sg-panel-reality-placeholder
   /var/www/sg-panel-placeholder
   /etc/letsencrypt/renewal-hooks/deploy/sync-sg-panel-hysteria-tls.sh
-  /usr/local/sbin/sg-panel-fix-xray-cert-access
-  /etc/letsencrypt/renewal-hooks/deploy/sg-panel-xray-cert-access
 )
 SYSTEMD_UNITS=(
   xpanel-web.service
@@ -417,7 +415,6 @@ PY
 )"; then
   fail "не удалось открыть SQLite после обновления"
 fi
-bash deploy/install-xray-cert-access.sh
 if [[ "$SERVER_COUNT" != "0" ]]; then
   .venv/bin/python -m xpanel apply
 fi

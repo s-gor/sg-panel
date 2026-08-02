@@ -2,13 +2,13 @@ SG-Panel UI23 CAP6 - confirmed full clean checkpoint
 Date: 2026-08-01
 
 Source commit:
-ce26fb5ad5abfb346720a77476a02f0405eccdd3
+bd982c9a4c20c9e70f2fa373c278e2d4e7f1c32c
 
 The only installation file:
 SG-PANEL-UI23-CAP6-FULL-CLEAN.run
 
 SHA-256:
-e7754652fb9436eebb2730ae74c9871f5ebf535b9bc720b10ec9f5b1cc5f1a06
+43de5c3924c5bccc95883964abbc218ebf8a072f058fb7ba800c9c092969e850
 
 Accepted state:
 - One full clean installer only; no server hotfix is published.
@@ -26,7 +26,3 @@ Accepted state:
 - The result remains visible with a direct HTTPS button; refresh also follows the HTTP 308 redirect.
 - Certbot, Nginx configuration and transactional rollback are unchanged.
 - Xray retains the persistent GeoFiles permission repair.
-- HTTPS completion is shown only after the background job reports success; a lost HTTP connection never marks the job as complete.
-- Published full clean installer is stored with Unix LF line endings.
-- Xray certificate ACL access is restored automatically during HTTPS setup, panel updates and Certbot renewals.
-- After the old HTTP connection is lost, the page probes the real HTTPS /login endpoint and shows the direct button only when it answers.

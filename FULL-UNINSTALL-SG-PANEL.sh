@@ -300,7 +300,6 @@ remove_panel_node_and_xray() {
     /usr/local/bin/sg-panel \
     /usr/local/bin/xray \
     /usr/local/bin/wgcf-cli \
-    /usr/local/sbin/sg-panel-fix-xray-cert-access \
     /usr/local/sbin/sg-node-connect \
     /usr/local/libexec/sg-node-worker.py
 
