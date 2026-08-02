@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-COMMIT="1fbede0bf7b7be236230e70bbf2cee03bc5bdb0d"
+COMMIT="ce26fb5ad5abfb346720a77476a02f0405eccdd3"
 WORK="$(mktemp -d /tmp/sg-panel-cap6-full-clean.XXXXXX)"
 CORE_INSTALLER="$WORK/install.sh"
 SOURCE_ZIP="$WORK/sg-panel-source.zip"
