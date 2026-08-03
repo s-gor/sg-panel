@@ -29,7 +29,9 @@ def test_clean_installer_does_not_run_distribution_upgrade_or_use_old_space_gate
     assert "dist-upgrade" not in combined
     assert "614400" not in combined
     assert "не менее 600 MiB" not in combined
-    assert "apt-get -o DPkg::Lock::Timeout=900 -o Dpkg::Use-Pty=0 update -qq" in installer
+    assert "DPkg::Lock::Timeout=900" not in combined
+    assert "apt-get -o DPkg::Lock::Timeout=30 -o Dpkg::Use-Pty=0 update -qq" in installer
+    assert "apt-get -o DPkg::Lock::Timeout=30 -o Dpkg::Use-Pty=0 update -qq" in first_install
 
 
 def test_country_database_is_dedicated_and_not_live_routing_fallback() -> None:
