@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-EXPECTED_VERSION="0.10.0-rc70"
+EXPECTED_VERSION="0.10.0-rc80"
 EXPECTED_BUILD="FIX40"
 EXPECTED_RELEASE_LABEL="Preview 9 · FIX40 · UI23"
-EXPECTED_UI_REVISION="sg070"
+EXPECTED_UI_REVISION="sg080"
 TARGET="/opt/xpanel-mvp"
 SERVICE="xpanel-web"
 SOURCE_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"

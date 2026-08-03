@@ -9,8 +9,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version" src="https://img.shields.io/badge/version-v0.10.0--rc70-35d69a">
-  <img alt="Build" src="https://img.shields.io/badge/build-FIX40%20UI23-5b8def">
+  <img alt="Version" src="https://img.shields.io/badge/version-v0.10.0--rc80-35d69a">
   <img alt="Ubuntu" src="https://img.shields.io/badge/Ubuntu-22.04%2B-E95420?logo=ubuntu&logoColor=white">
   <img alt="Python" src="https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white">
   <img alt="Xray" src="https://img.shields.io/badge/Xray-v26.6.27-5b8def">
@@ -20,14 +19,13 @@
   <img src="docs/assets/sg-panel-rc45-graphite.png" alt="SG-Panel — тема Графит">
 </p>
 
-> Текущая чистая GitHub-база: **`v0.10.0-rc70` · `Preview 9 · FIX40 · UI23`**.
->
-> Ветка содержит Hysteria2 Salamander FinalMask, компактный Cluster, пошаговый Cascade, восстановленную карточку SG-Node и Worker `0.7.0`. Отвергнутый Routing UI25 и экспериментальные UI24-обёртки установщика в базу не входят.
+> Текущая версия: **SG-Panel `v0.10.0-rc80`**.
 
 
 \
-<!-- UI23-PUBLICATION-START -->
-## Что изменилось в UI23
+
+<!-- RC80-PUBLICATION-START -->
+## Что изменилось в RC80
 
 ### Несколько каналов вместо одного выбранного профиля
 
@@ -43,7 +41,7 @@
 В полной конфигурации доступны до трёх Reality TCP, один XHTTP Reality, до трёх XHTTP TLS и до трёх Hysteria 2 — всего до десяти отдельных точек подключения.
 
 <p align="center">
-  <img src="docs/assets/ui23-update/01-connections.png" alt="SG-Panel — одновременно работающие каналы подключения">
+  <img src="docs/assets/rc80-update/01-connections.png" alt="SG-Panel — одновременно работающие каналы подключения">
 </p>
 
 ### XMUX и Salamander
@@ -53,7 +51,7 @@
 Каждый Hysteria 2 Inbound получил собственную настройку Salamander FinalMask. Основной, второй и третий Hysteria могут использовать разные UDP-порты, auth и пароли Salamander. Параметры автоматически попадают в ссылки, QR-коды и постоянные подписки.
 
 <p align="center">
-  <img src="docs/assets/ui23-update/02-xmux-salamander.png" alt="SG-Panel — XMUX и Hysteria 2 Salamander">
+  <img src="docs/assets/rc80-update/02-xmux-salamander.png" alt="SG-Panel — XMUX и Hysteria 2 Salamander">
 </p>
 
 ### Несколько устройств у одного клиента
@@ -63,7 +61,7 @@
 У каждого устройства собственные реквизиты подключения, ссылка, QR-код, постоянная подписка, срок действия и состояние доступа. Одно устройство можно отключить или заменить, не затрагивая остальные устройства владельца.
 
 <p align="center">
-  <img src="docs/assets/ui23-update/08-client-device.png" alt="SG-Panel — добавление отдельного устройства клиенту">
+  <img src="docs/assets/rc80-update/08-client-device.png" alt="SG-Panel — добавление отдельного устройства клиенту">
 </p>
 
 ### Общая клиентская база Controller и SG-Node
@@ -79,17 +77,23 @@
 Команда сама определяет состояние машины. На чистой Ubuntu устанавливаются необходимые компоненты; при наличии полноценной SG-Panel сохраняются её Xray, Nginx, HTTPS, клиенты и веб-интерфейс, а добавляются только Agent и Worker. После подтверждённого heartbeat Node появляется в Cluster, а центральную клиентскую базу можно развернуть на ней одной операцией.
 
 <p align="center">
-  <img src="docs/assets/ui23-update/04-cluster.png" alt="SG-Panel — упрощённое подключение SG-Node">
+  <img src="docs/assets/rc80-update/04-cluster.png" alt="SG-Panel — упрощённое подключение SG-Node">
 </p>
 
-### Cascade настраивается без ручного редактирования Xray
+### Cascade теперь настраивается ещё проще
 
-Для Cascade через Cluster достаточно выбрать доступную SG-Node и включить маршрут. SG-Panel сама создаёт служебный доступ, проверяет полный будущий config, делает резервную копию, применяет изменения и проверяет выходной IP.
+Cascade и раньше настраивался через интерфейс SG-Panel, без ручного редактирования конфигурации Xray.
 
-Для двух самостоятельных SG-Panel достаточно создать служебную ссылку на выходном сервере и вставить её на входном. Обычные клиенты и их ссылки при этом не меняются.
+В RC80 процесс стал короче и понятнее.
+
+Для каскада через Cluster достаточно выбрать подключённую SG-Node и включить Cascade. Controller сам создаёт служебное подключение, передаёт задание на Node, проверяет конфигурацию и показывает результат подключения и реальный выходной IP.
+
+Для каскада между двумя самостоятельными SG-Panel по-прежнему используется служебная ссылка: она создаётся на выходном сервере и добавляется на входном.
+
+То есть принцип работы не изменился — изменился сам процесс настройки. Стало меньше промежуточных действий, а состояние каскада и результат проверки теперь видны прямо в панели.
 
 <p align="center">
-  <img src="docs/assets/ui23-update/05-cascade.png" alt="SG-Panel — упрощённая настройка Cascade">
+  <img src="docs/assets/rc80-update/05-cascade.png" alt="SG-Panel — упрощённая настройка Cascade">
 </p>
 
 ### GeoFiles проверяются до изменения рабочих файлов
@@ -99,7 +103,7 @@
 Если необходимых категорий нет, применение блокируется. Пользовательские правила автоматически не удаляются и не отключаются.
 
 <p align="center">
-  <img src="docs/assets/ui23-update/03-geofiles.png" alt="SG-Panel — обновлённая страница GeoFiles">
+  <img src="docs/assets/rc80-update/03-geofiles.png" alt="SG-Panel — обновлённая страница GeoFiles">
 </p>
 
 ### Обычные настройки отделены от экспертных
@@ -107,7 +111,7 @@
 Основные действия оставлены на обычных страницах, а резервные Inbound, ручной XMUX, DNS и полный Xray config собраны в Expert. Это позволяет работать с панелью без постоянного перехода к техническим JSON-настройкам.
 
 <p align="center">
-  <img src="docs/assets/ui23-update/06-expert.png" alt="SG-Panel — раздел Expert">
+  <img src="docs/assets/rc80-update/06-expert.png" alt="SG-Panel — раздел Expert">
 </p>
 
 ### Установка, HTTPS и обновление
@@ -117,9 +121,9 @@
 Переход с HTTP на HTTPS отслеживается до фактического завершения. Обновления SG-Panel и Xray Core разделены, перед изменениями создаётся страховочная копия, а при ошибке выполняется автоматический rollback.
 
 <p align="center">
-  <img src="docs/assets/ui23-update/07-maintenance.png" alt="SG-Panel — Maintenance и обновления">
+  <img src="docs/assets/rc80-update/07-maintenance.png" alt="SG-Panel — Maintenance и обновления">
 </p>
-<!-- UI23-PUBLICATION-END -->
+<!-- RC80-PUBLICATION-END -->
 
 ## Что умеет SG-Panel
 
@@ -302,4 +306,4 @@ assets/       встроенные GeoFiles
 
 ## Текущая линия
 
-Эта публикация является чистой cumulative-базой UI23. Дальнейшие изменения должны идти от неё без возврата удалённых build-отчётов, временных архивов и отвергнутых UI24/UI25.
+Текущая опубликованная линия — SG-Panel v0.10.0-rc80.

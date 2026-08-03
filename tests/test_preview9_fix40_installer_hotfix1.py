@@ -9,14 +9,14 @@ def read(relative: str) -> str:
 
 def test_core_build_and_release_are_separate_identities() -> None:
     init = read("xpanel/__init__.py")
-    assert '__version__ = "0.10.0-rc70"' in init
+    assert '__version__ = "0.10.0-rc80"' in init
     assert '__build__ = "FIX40"' in init
     assert '__release_label__ = "Preview 9 · FIX40 · UI23"' in init
 
 
 def test_upgrade_validator_checks_live_build_not_hidden_core_version() -> None:
     script = read("install-or-upgrade.sh")
-    assert 'EXPECTED_VERSION="0.10.0-rc70"' in script
+    assert 'EXPECTED_VERSION="0.10.0-rc80"' in script
     assert 'EXPECTED_BUILD="FIX40"' in script
     assert 'EXPECTED_RELEASE_LABEL="Preview 9 · FIX40 · UI23"' in script
     assert 'grep -Fq "$EXPECTED_BUILD" <<<"$http_body"' in script

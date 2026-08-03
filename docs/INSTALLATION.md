@@ -70,7 +70,7 @@ Bootstrap загружает `install.sh`, проверяет его Bash-син
 
 ## Что устанавливается
 
-- SG-Panel `v0.10.0-rc70`;
+- SG-Panel `v0.10.0-rc80`;
 - build `FIX40`, UI23;
 - Xray `v26.6.27` или более новая уже установленная совместимая версия;
 - Nginx;
@@ -107,7 +107,7 @@ systemctl is-active nginx
 sudo /usr/local/bin/xray run -test -config /usr/local/etc/xray/config.json
 ```
 
-Ожидается версия `0.10.0-rc70`, службы `active` и успешная проверка Xray config.
+Ожидается версия `0.10.0-rc80`, службы `active` и успешная проверка Xray config.
 
 ## Журналы
 

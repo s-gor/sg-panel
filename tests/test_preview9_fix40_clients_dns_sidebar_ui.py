@@ -11,7 +11,7 @@ def test_build_label_is_separate_from_legacy_core_version() -> None:
     init = read("xpanel/__init__.py")
     web = read("xpanel/web.py")
     base = read("xpanel/templates/base.html")
-    assert '__version__ = "0.10.0-rc70"' in init
+    assert '__version__ = "0.10.0-rc80"' in init
     assert '__build__ = "FIX40"' in init
     assert '__release_label__ = "Preview 9 · FIX40 · UI23"' in init
     assert '"xpanel_build": __build__' in web

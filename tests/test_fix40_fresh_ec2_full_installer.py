@@ -21,7 +21,7 @@ def test_full_installer_is_fresh_ec2_or_safe_resume_only() -> None:
 
 def test_full_installer_uses_current_release_identity() -> None:
     body = read("install.sh")
-    assert 'EXPECTED_VERSION="0.10.0-rc70"' in body
+    assert 'EXPECTED_VERSION="0.10.0-rc80"' in body
     assert 'EXPECTED_BUILD="FIX40"' in body
     assert 'EXPECTED_RELEASE_LABEL="Preview 9 · FIX40 · UI23"' in body
     assert "Мастер полной установки SG-Panel" in body
