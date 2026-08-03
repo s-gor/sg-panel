@@ -4,7 +4,7 @@ set -Eeuo pipefail
 EXPECTED_VERSION="0.10.0-rc80"
 EXPECTED_BUILD="FIX40"
 EXPECTED_RELEASE_LABEL="Preview 9 · FIX40 · UI23"
-EXPECTED_UI_REVISION="sg080"
+EXPECTED_UI_REVISION="sg070"
 TARGET="/opt/xpanel-mvp"
 SERVICE="xpanel-web"
 SOURCE_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
@@ -316,7 +316,7 @@ preflight(){
   grep -q "try_files /index.html =404" "$SOURCE_DIR/deploy/configure-http.sh" || { echo "в исходниках отсутствует безопасный 404 fallback" >&2; return 1; }
   [[ -f "$SOURCE_DIR/deploy/migrate-placeholder-404.sh" ]] || { echo "в исходниках отсутствует миграция 404 fallback" >&2; return 1; }
   bash -n "$SOURCE_DIR/deploy/migrate-placeholder-404.sh" || { echo "миграция 404 fallback повреждена" >&2; return 1; }
-  grep -q "$EXPECTED_UI_REVISION" "$SOURCE_DIR/xpanel/templates/base.html" || { echo "в шаблоне отсутствует ревизия CSS SG-Panel RC70" >&2; return 1; }
+  grep -q "$EXPECTED_UI_REVISION" "$SOURCE_DIR/xpanel/templates/base.html" || { echo "в шаблоне отсутствует ожидаемая ревизия CSS $EXPECTED_UI_REVISION" >&2; return 1; }
   [[ -f "$SOURCE_DIR/xpanel/static/fix40-cascade-steps-ui20.css" ]] || { echo "в исходниках отсутствует Cascade Steps UI20" >&2; return 1; }
   grep -Fq "guided three-step Cascade" "$SOURCE_DIR/xpanel/static/fix40-cascade-steps-ui20.css" || { echo "CSS Cascade Steps UI20 повреждён" >&2; return 1; }
   [[ -f "$SOURCE_DIR/xpanel/static/fix40-cluster-restore-ui21.css" ]] || { echo "в исходниках отсутствует Cluster Restore UI21" >&2; return 1; }
