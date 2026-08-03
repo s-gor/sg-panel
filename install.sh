@@ -870,38 +870,6 @@ show_result(){
 }
 
 
-# SG-PANEL CAP2 REQUIRED PORTS NOTICE
-required_ports_confirmation(){
-  local answer=""
-  printf '\n'
-  printf '[SG-Panel] Для работы SG-Panel должны быть открыты/проброшены на этот сервер:\n'
-  printf '  TCP 80     — публичная заглушка и получение HTTPS-сертификата\n'
-  printf '  TCP 443    — Xray / VLESS REALITY\n'
-  printf '  TCP %s — веб-панель SG-Panel\n' "$DEFAULT_PANEL_PORT"
-  printf '\n'
-  printf '[SG-Panel] Без этих портов SG-Panel полностью работать не будет.\n'
-  printf '[SG-Panel] Если они ещё не настроены — откройте/пробросьте TCP 80, TCP 443 и TCP %s,\n' "$DEFAULT_PANEL_PORT"
-  printf '[SG-Panel] затем снова запустите установщик.\n'
-  printf '\n'
-  while true; do
-    printf 'Все три порта уже открыты/проброшены на этот сервер? [да/нет]: ' >/dev/tty
-    IFS= read -r answer </dev/tty || exit 10
-    case "${answer,,}" in
-      да|д|yes|y)
-        printf '[SG-Panel] Порты подтверждены. Продолжаю установку.\n'
-        return 0
-        ;;
-      нет|н|no|n)
-        printf '\n[SG-Panel] Установка остановлена до настройки TCP 80, TCP 443 и TCP %s.\n' "$DEFAULT_PANEL_PORT"
-        printf '[SG-Panel] Настройте порты и запустите установщик снова.\n'
-        exit 10
-        ;;
-      *)
-        printf 'Введите "да" или "нет".\n' >/dev/tty
-        ;;
-    esac
-  done
-}
 
 
 complete_install_artifacts_exist(){
@@ -973,7 +941,6 @@ main(){
   chmod 0600 "$CORE_LOG"
   WORK_DIR="$(mktemp -d /tmp/sg-panel-install.XXXXXX)"
   startup_ok "Мастер полной установки SG-Panel запущен"
-  required_ports_confirmation
   mark_bootstrap_attempt
 
   # Надёжный bootstrap выполняется до вопросов. Пользователь с первой секунды
