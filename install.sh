@@ -252,30 +252,70 @@ run_step(){
   step_ok
 }
 
-package_manager_busy(){
+wait_notice(){
+  local message="$*"
+  printf '[SG-Panel] %s\n' "$message" >>"$LOG_FILE"
+  if [[ -w /dev/tty ]]; then
+    printf '\r[SG-Panel] %s\033[K\n' "$message" >/dev/tty 2>/dev/null || true
+  fi
+}
+
+package_manager_busy_details(){
   local locks=(
     /var/lib/dpkg/lock-frontend
     /var/lib/dpkg/lock
     /var/lib/apt/lists/lock
     /var/cache/apt/archives/lock
   )
+  local lock pids pid command_line output found=0
+
   if command -v fuser >/dev/null 2>&1; then
-    fuser "${locks[@]}" >/dev/null 2>&1
-    return
+    for lock in "${locks[@]}"; do
+      pids="$(fuser "$lock" 2>/dev/null || true)"
+      [[ -n "$pids" ]] || continue
+      found=1
+      for pid in $pids; do
+        command_line="$(ps -p "$pid" -o args= 2>/dev/null || true)"
+        printf '%s: PID %s%s\n' \
+          "$lock" "$pid" "${command_line:+ · $command_line}"
+      done
+    done
+    (( found == 1 )) && return 0
   fi
-  pgrep -x apt >/dev/null 2>&1 ||
-    pgrep -x apt-get >/dev/null 2>&1 ||
-    pgrep -x dpkg >/dev/null 2>&1 ||
-    pgrep -f '[u]nattended-upgrade' >/dev/null 2>&1
+
+  output="$({
+    pgrep -a -x apt 2>/dev/null || true
+    pgrep -a -x apt-get 2>/dev/null || true
+    pgrep -a -x dpkg 2>/dev/null || true
+    pgrep -a -f '(^|[[:space:]/])[u]nattended-upgrade([[:space:]]|$)' 2>/dev/null || true
+  } | awk 'NF && !seen[$0]++')"
+  [[ -n "$output" ]] || return 1
+  printf '%s\n' "$output"
+}
+
+package_manager_busy(){
+  package_manager_busy_details >/dev/null 2>&1
 }
 
 wait_for_apt(){
-  local waited=0 timeout=900
+  local waited=0 timeout=300 detail=""
   while package_manager_busy; do
-    (( waited < timeout )) || return 1
+    if (( waited % 15 == 0 )); then
+      detail="$(package_manager_busy_details 2>/dev/null | tr '\n' ';' | sed 's/;*$//' || true)"
+      [[ -n "$detail" ]] || detail="активна блокировка APT/DPKG"
+      wait_notice "APT/DPKG занят: $detail · ожидание ${waited}/${timeout} сек."
+    fi
+    if (( waited >= timeout )); then
+      detail="$(package_manager_busy_details 2>/dev/null | tr '\n' ';' | sed 's/;*$//' || true)"
+      wait_notice "APT/DPKG не освободил блокировку за ${timeout} секунд: ${detail:-владелец не определён}."
+      fail "apt/dpkg не освободил блокировку за ${timeout} секунд"
+    fi
     sleep 5
     waited=$((waited + 5))
   done
+  if (( waited > 0 )); then
+    wait_notice "APT/DPKG блокировка снята; установка продолжается."
+  fi
 }
 
 prompt_secret(){
@@ -523,11 +563,34 @@ collect_inputs(){
     "$XRAY_ADDRESS" "$PANEL_PUBLIC_PORT"
 }
 
+wait_for_cloud_init(){
+  local cloud_status=""
+
+  if [[ -e /etc/cloud/cloud-init.disabled ]]; then
+    wait_notice "cloud-init отключён marker-файлом; ожидание пропущено."
+    return 0
+  fi
+  command -v cloud-init >/dev/null 2>&1 || return 0
+
+  cloud_status="$(cloud-init status 2>/dev/null || true)"
+  if grep -Eq '^status:[[:space:]]*disabled([[:space:]]|$)' <<<"$cloud_status"; then
+    wait_notice "cloud-init сообщает status: disabled; ожидание пропущено."
+    return 0
+  fi
+  if grep -Eq '^status:[[:space:]]*done([[:space:]]|$)' <<<"$cloud_status"; then
+    return 0
+  fi
+
+  wait_notice "cloud-init ещё выполняется; ожидание ограничено 180 секундами."
+  if timeout 180 cloud-init status --wait >/dev/null 2>&1; then
+    return 0
+  fi
+  wait_notice "cloud-init не завершился за 180 секунд; продолжаем по фактическим APT/DPKG lock-файлам."
+}
+
 prepare_system(){
   export DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a APT_LISTCHANGES_FRONTEND=none
-  if command -v cloud-init >/dev/null 2>&1; then
-    timeout 600 cloud-init status --wait >/dev/null 2>&1 || true
-  fi
+  wait_for_cloud_init
   wait_for_apt
 }
 
@@ -535,13 +598,13 @@ apt_update_indexes(){
   wait_for_apt
   export DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a APT_LISTCHANGES_FRONTEND=none
   dpkg --configure -a
-  apt-get -o DPkg::Lock::Timeout=900 -o Dpkg::Use-Pty=0 update -qq
+  apt-get -o DPkg::Lock::Timeout=30 -o Dpkg::Use-Pty=0 update -qq
 }
 
 apt_install_dependencies(){
   wait_for_apt
   export DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a APT_LISTCHANGES_FRONTEND=none
-  apt-get -o DPkg::Lock::Timeout=900 -o Dpkg::Use-Pty=0 install -y -qq \
+  apt-get -o DPkg::Lock::Timeout=30 -o Dpkg::Use-Pty=0 install -y -qq \
     curl ca-certificates unzip rsync zstd psmisc \
     python3 python3-venv python3-pip \
     sqlite3 jq iproute2 dnsutils \
