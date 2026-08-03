@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-COMMIT="27dc2e32c4bfca9fab8b50e68847a3d6748c653d"
+COMMIT="352b53059bfdb0da8e9fbb0aa2600b8b7f1f3a49"
 WORK="$(mktemp -d /tmp/sg-panel-cap6-full-clean.XXXXXX)"
 CORE_INSTALLER="$WORK/install.sh"
 SOURCE_ZIP="$WORK/sg-panel-source.zip"
@@ -24,30 +24,65 @@ die() {
   exit 1
 }
 
-package_manager_busy() {
+wait_notice() {
+  log "$*"
+}
+
+package_manager_busy_details() {
   local locks=(
     /var/lib/dpkg/lock-frontend
     /var/lib/dpkg/lock
     /var/lib/apt/lists/lock
     /var/cache/apt/archives/lock
   )
+  local lock pids pid command_line output found=0
+
   if command -v fuser >/dev/null 2>&1; then
-    fuser "${locks[@]}" >/dev/null 2>&1
-    return
+    for lock in "${locks[@]}"; do
+      pids="$(fuser "$lock" 2>/dev/null || true)"
+      [[ -n "$pids" ]] || continue
+      found=1
+      for pid in $pids; do
+        command_line="$(ps -p "$pid" -o args= 2>/dev/null || true)"
+        printf '%s: PID %s%s\n' \
+          "$lock" "$pid" "${command_line:+ · $command_line}"
+      done
+    done
+    (( found == 1 )) && return 0
   fi
-  pgrep -x apt >/dev/null 2>&1 ||
-    pgrep -x apt-get >/dev/null 2>&1 ||
-    pgrep -x dpkg >/dev/null 2>&1 ||
-    pgrep -f '[u]nattended-upgrade' >/dev/null 2>&1
+
+  output="$({
+    pgrep -a -x apt 2>/dev/null || true
+    pgrep -a -x apt-get 2>/dev/null || true
+    pgrep -a -x dpkg 2>/dev/null || true
+    pgrep -a -f '(^|[[:space:]/])[u]nattended-upgrade([[:space:]]|$)' 2>/dev/null || true
+  } | awk 'NF && !seen[$0]++')"
+  [[ -n "$output" ]] || return 1
+  printf '%s\n' "$output"
+}
+
+package_manager_busy() {
+  package_manager_busy_details >/dev/null 2>&1
 }
 
 wait_for_apt() {
-  local waited=0 timeout=900
+  local waited=0 timeout=300 detail=""
   while package_manager_busy; do
-    (( waited < timeout )) || die "apt/dpkg занят более $timeout секунд."
+    if (( waited % 15 == 0 )); then
+      detail="$(package_manager_busy_details 2>/dev/null | tr '\n' ';' | sed 's/;*$//' || true)"
+      [[ -n "$detail" ]] || detail="активна блокировка APT/DPKG"
+      wait_notice "APT/DPKG занят: $detail · ожидание ${waited}/${timeout} сек."
+    fi
+    if (( waited >= timeout )); then
+      detail="$(package_manager_busy_details 2>/dev/null | tr '\n' ';' | sed 's/;*$//' || true)"
+      die "APT/DPKG не освободил блокировку за ${timeout} секунд: ${detail:-владелец не определён}."
+    fi
     sleep 5
     waited=$((waited + 5))
   done
+  if (( waited > 0 )); then
+    wait_notice "APT/DPKG блокировка снята; установка продолжается."
+  fi
 }
 
 download_file() {
@@ -122,8 +157,8 @@ if ! command -v curl >/dev/null 2>&1 || ! command -v python3 >/dev/null 2>&1; th
   wait_for_apt
   export DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a
   dpkg --configure -a
-  apt-get -o DPkg::Lock::Timeout=900 -o Dpkg::Use-Pty=0 update -qq
-  apt-get -o DPkg::Lock::Timeout=900 -o Dpkg::Use-Pty=0 install -y -qq \
+  apt-get -o DPkg::Lock::Timeout=30 -o Dpkg::Use-Pty=0 update -qq
+  apt-get -o DPkg::Lock::Timeout=30 -o Dpkg::Use-Pty=0 install -y -qq \
     --no-install-recommends curl ca-certificates python3
 fi
 
