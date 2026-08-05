@@ -2465,104 +2465,55 @@ def create_app(test_config: dict | None = None) -> Flask:
             return jsonify({"ok": False, "message": str(exc)}), 400
 
     def geofiles_form_values() -> dict[str, object]:
-        source = str(request.form.get("source", "sgclient") or "sgclient").strip().lower()
+        # SG-PANEL RC80 GEOFILES SOURCE HOTFIX1 FIXED
+        # Built-in sources must ignore stale Custom URL and Local path values.
+        source = request.form.get("source", "xray").strip().lower()
+        custom_urls = source == "custom"
+        local_files = source == "local"
         return {
             "source": source,
-            "geoip_url": request.form.get("geoip_url", ""),
-            "geosite_url": request.form.get("geosite_url", ""),
-            "geoip_local_path": request.form.get("geoip_local_path", ""),
-            "geosite_local_path": request.form.get("geosite_local_path", ""),
-            # RoscomVPN compatibility is inseparable from that source.  The UI
-            # no longer offers an unsafe "raw RoscomVPN without compatibility" path.
-            "server_preset": "roscomvpn" if source == "roscomvpn" else "none",
-            "enable_block": "enable_block" in request.form,
-            "final_outbound_tag": request.form.get("final_outbound_tag", "direct"),
+            "geoip_url": (
+                request.form.get("geoip_url", "") if custom_urls else ""
+            ),
+            "geosite_url": (
+                request.form.get("geosite_url", "") if custom_urls else ""
+            ),
+            "geoip_local_path": (
+                request.form.get("geoip_local_path", "") if local_files else ""
+            ),
+            "geosite_local_path": (
+                request.form.get("geosite_local_path", "") if local_files else ""
+            ),
         }
 
     @app.get("/routing/geofiles")
     @login_required
     def geofiles_page():
-        outbound_options = routing_outbound_options(enabled_only=True)
-        return render_template(
-            "geofiles.html",
-            settings=get_routing_settings(),
-            outbound_options=outbound_options,
-            outbound_by_tag=routing_outbound_map(enabled_only=False),
-            geofiles=get_geofiles_overview(),
-            format_bytes=format_bytes,
+        # SG-PANEL RC80 UNIFIED ROUTING SINGLE ENTRY PREVIEW7
+        session.pop("_flashes", None)
+        return redirect(
+            url_for("routing_unified_planner_preview4_page")
         )
 
     @app.post("/settings/geofiles/check")
     @app.post("/routing/geofiles/check")
     @login_required
     def settings_geofiles_check():
-        try:
-            source = request.form.get("source", "sgclient")
-            uploaded_geoip = request.files.get("geoip_file")
-            uploaded_geosite = request.files.get("geosite_file")
-            has_geoip = bool(uploaded_geoip and uploaded_geoip.filename)
-            has_geosite = bool(uploaded_geosite and uploaded_geosite.filename)
-            if has_geoip or has_geosite:
-                if source != "local":
-                    raise ValueError(
-                        "загрузка файлов доступна только для источника «Локальные файлы»"
-                    )
-                if not has_geoip or not has_geosite:
-                    raise ValueError(
-                        "выберите одновременно geoip.dat и geosite.dat"
-                    )
-                values = geofiles_form_values()
-                result = validate_uploaded_geofiles(
-                    uploaded_geoip.stream,
-                    uploaded_geosite.stream,
-                    server_preset=str(values["server_preset"]),
-                    enable_block=bool(values["enable_block"]),
-                    final_outbound_tag=str(values["final_outbound_tag"]),
-                )
-            else:
-                result = validate_geofiles_source(**geofiles_form_values())
-            if result.get("compatible"):
-                flash(
-                    "GeoFiles и полный будущий Xray config проверены в staging",
-                    "success",
-                )
-            else:
-                missing = ", ".join(result.get("missing_categories", []))
-                flash(
-                    "Применение заблокировано: отсутствуют категории " + missing
-                    + ". Пользовательские правила не изменены.",
-                    "error",
-                )
-            write_audit(
-                "geofiles_checked", detail=str(result.get("source", "")),
-                ip_address=getattr(g, "client_ip", ""),
-                user_agent=request.headers.get("User-Agent", ""), success=True,
-            )
-        except (ValueError, XPanelError, OSError, subprocess.TimeoutExpired) as exc:
-            flash(str(exc), "error")
-        return redirect(url_for("geofiles_page"))
+        # SG-PANEL RC80 UNIFIED ROUTING SINGLE ENTRY PREVIEW7
+        session.pop("_flashes", None)
+        return redirect(
+            url_for("routing_unified_planner_preview4_page")
+        )
 
     @app.post("/settings/geofiles/apply")
     @app.post("/routing/geofiles/apply")
     @login_required
     def settings_geofiles_apply():
-        try:
-            # Apply exactly the plan stored by the successful staging check.
-            # No route, block option or compatibility mode may change here.
-            result = apply_geofiles_source()
-            detail = (
-                f"GeoFiles применены: {result.get('source_label', result['source'])}; "
-                f"generation {result.get('generation', '')}; Xray active"
-            )
-            flash(detail, "success")
-            write_audit(
-                "geofiles_applied", detail=str(result.get("source", "")),
-                ip_address=getattr(g, "client_ip", ""),
-                user_agent=request.headers.get("User-Agent", ""), success=True,
-            )
-        except (ValueError, XPanelError, OSError) as exc:
-            flash(str(exc), "error")
-        return redirect(url_for("geofiles_page"))
+        # SG-PANEL RC80 UNIFIED ROUTING SINGLE ENTRY PREVIEW7
+        session.pop("_flashes", None)
+        return redirect(
+            url_for("routing_unified_planner_preview4_page")
+        )
 
     @app.get("/settings")
     @login_required
@@ -4074,32 +4025,515 @@ def create_app(test_config: dict | None = None) -> Flask:
             flash(str(exc), "error")
         return _dns_redirect()
 
-    @app.get("/routing")
+    @app.get("/routing/legacy")
     @login_required
     def routing_page():
+        # SG-PANEL RC80 UNIFIED ROUTING SINGLE ENTRY PREVIEW7
+        session.pop("_flashes", None)
+        return redirect(
+            url_for("routing_unified_planner_preview4_page")
+        )
+
+    @app.route("/routing", methods=["GET", "POST"])
+    @login_required
+    def routing_unified_planner_preview4_page():
+        result_session_key = "sg_unified_planner_preview8_result"
+        update_state_session_key = "sg_unified_geofiles_update_state"
+        update_token_session_key = "sg_unified_geofiles_update_token"
+
+
+        def load_page_state():
+            page_geofiles = get_geofiles_overview()
+            page_unified = unified_routing_overview()
+            page_settings = get_routing_settings()
+            page_model = dict(page_unified["model"])
+            page_selection = dict(page_geofiles.get("selection") or {})
+
+            def model_text(name):
+                value = page_model.get(name) or []
+                if isinstance(value, str):
+                    return value
+                return "\n".join(str(item) for item in value)
+
+            page_draft = {
+                "source": str(page_geofiles.get("active_source") or "sgclient"),
+                "source_label": str(
+                    page_geofiles.get("active_label") or "SG-Client"
+                ).replace("SG Client", "SG-Client"),
+                "geoip_url": str(page_selection.get("geoip_url") or ""),
+                "geosite_url": str(page_selection.get("geosite_url") or ""),
+                "geoip_local_path": str(
+                    page_selection.get("geoip_local_path") or ""
+                ),
+                "geosite_local_path": str(
+                    page_selection.get("geosite_local_path") or ""
+                ),
+                "local_action": str(page_model.get("local_action") or "direct"),
+                "russia_scope": str(page_model.get("russia_scope") or "none"),
+                "russia_action": str(page_model.get("russia_action") or "direct"),
+                "blocked_action": str(page_model.get("blocked_action") or "direct"),
+                "ads_action": str(page_model.get("ads_action") or "direct"),
+                "default_action": str(page_model.get("default_action") or "direct"),
+                "custom_direct_domains": model_text("custom_direct_domains"),
+                "custom_direct_ips": model_text("custom_direct_ips"),
+                "custom_warp_domains": model_text("custom_warp_domains"),
+                "custom_warp_ips": model_text("custom_warp_ips"),
+                "custom_block_domains": model_text("custom_block_domains"),
+                "custom_block_ips": model_text("custom_block_ips"),
+            }
+            return (
+                page_geofiles,
+                page_unified,
+                page_settings,
+                page_model,
+                page_draft,
+            )
+
+
+        def compact_result(value):
+            allowed = (
+                "status",
+                "message",
+                "xray_test",
+                "source_label",
+                "family",
+                "geoip_count",
+                "geosite_count",
+                "warnings",
+                "missing_categories",
+                "selected_categories",
+                "generation",
+                "backup",
+                "service",
+            )
+            compact = {key: value.get(key) for key in allowed}
+            compact["warnings"] = list(compact.get("warnings") or [])[:5]
+            compact["missing_categories"] = list(
+                compact.get("missing_categories") or []
+            )[:30]
+            compact["selected_categories"] = dict(
+                compact.get("selected_categories") or {}
+            )
+            return compact
+
+
+        def compact_update(value):
+            allowed = (
+                "status",
+                "message",
+                "checked_at",
+                "source_label",
+                "family",
+                "geoip_count",
+                "geosite_count",
+                "xray_test",
+                "geoip_changed",
+                "geosite_changed",
+                "active_geoip_sha256",
+                "active_geosite_sha256",
+                "candidate_geoip_sha256",
+                "candidate_geosite_sha256",
+            )
+            return {key: value.get(key) for key in allowed}
+
+
+        def route_label(route_map, tag):
+            value = str(tag or "")
+            lowered = value.lower()
+            if value == "direct":
+                return "Через SG-Panel"
+            if value in {"blocked", "block"}:
+                return "Заблокировать"
+            if "warp" in lowered:
+                return "Через WARP"
+            item = route_map.get(value) or {}
+            return str(item.get("label") or value)
+
+
+        # SG-Panel RC80 User Rules Preview 23 Fixed
+        def normalise_rule_text(value):
+            return "\n".join(
+                line.strip()
+                for line in str(value or "").splitlines()
+                if line.strip()
+            )
+
+
+        def plan_signature(value):
+            source = str(value.get("source") or "sgclient")
+            signature = {
+                "source": source,
+                "local_action": str(value.get("local_action") or "direct"),
+                "russia_scope": str(value.get("russia_scope") or "none"),
+                "russia_action": str(value.get("russia_action") or "direct"),
+                "blocked_action": str(value.get("blocked_action") or "direct"),
+                "ads_action": str(value.get("ads_action") or "direct"),
+                "default_action": str(value.get("default_action") or "direct"),
+                "custom_direct_domains": normalise_rule_text(
+                    value.get("custom_direct_domains")
+                ),
+                "custom_direct_ips": normalise_rule_text(
+                    value.get("custom_direct_ips")
+                ),
+                "custom_warp_domains": normalise_rule_text(
+                    value.get("custom_warp_domains")
+                ),
+                "custom_warp_ips": normalise_rule_text(
+                    value.get("custom_warp_ips")
+                ),
+                "custom_block_domains": normalise_rule_text(
+                    value.get("custom_block_domains")
+                ),
+                "custom_block_ips": normalise_rule_text(
+                    value.get("custom_block_ips")
+                ),
+                "geoip_url": "",
+                "geosite_url": "",
+                "geoip_local_path": "",
+                "geosite_local_path": "",
+            }
+            if source == "custom":
+                signature["geoip_url"] = str(value.get("geoip_url") or "").strip()
+                signature["geosite_url"] = str(
+                    value.get("geosite_url") or ""
+                ).strip()
+            if source == "local":
+                signature["geoip_local_path"] = str(
+                    value.get("geoip_local_path") or ""
+                ).strip()
+                signature["geosite_local_path"] = str(
+                    value.get("geosite_local_path") or ""
+                ).strip()
+            return signature
+
+
+        def build_values(page_draft, page_model, page_settings):
+            return {
+                **page_draft,
+                "preset": "custom",
+                "custom_direct_domains": str(
+                    page_draft.get("custom_direct_domains") or ""
+                ),
+                "custom_direct_ips": str(
+                    page_draft.get("custom_direct_ips") or ""
+                ),
+                "custom_warp_domains": str(
+                    page_draft.get("custom_warp_domains") or ""
+                ),
+                "custom_warp_ips": str(
+                    page_draft.get("custom_warp_ips") or ""
+                ),
+                "custom_block_domains": str(
+                    page_draft.get("custom_block_domains") or ""
+                ),
+                "custom_block_ips": str(
+                    page_draft.get("custom_block_ips") or ""
+                ),
+                "domain_strategy": str(page_settings["domain_strategy"]),
+                "sniffing_enabled": bool(page_settings["sniffing_enabled"]),
+                "sniffing_route_only": bool(
+                    page_settings["sniffing_route_only"]
+                ),
+                "sniff_http": bool(page_settings["sniff_http"]),
+                "sniff_tls": bool(page_settings["sniff_tls"]),
+                "sniff_quic": bool(page_settings["sniff_quic"]),
+            }
+
+
+        def error_result(message, source_label):
+            return {
+                "status": "blocked",
+                "message": str(message),
+                "xray_test": "not-run",
+                "source_label": source_label,
+                "family": "Не определено",
+                "geoip_count": 0,
+                "geosite_count": 0,
+                "warnings": [],
+                "missing_categories": [],
+                "selected_categories": {},
+            }
+
+
+        def format_size(value):
+            size = int(value or 0)
+            if size >= 1024 * 1024:
+                return f"{size / (1024 * 1024):.1f} MB"
+            if size >= 1024:
+                return f"{size / 1024:.1f} KB"
+            return f"{size} B"
+
+
+        geofiles, unified, settings, model, draft = load_page_state()
+        current_plan = plan_signature(draft)
+        candidate_result = None
+        geo_update_state = session.get(update_state_session_key)
+        if not isinstance(geo_update_state, dict):
+            geo_update_state = None
+
+        if request.method == "GET":
+            saved = session.pop(result_session_key, None)
+            if isinstance(saved, dict):
+                saved_draft = saved.get("draft")
+                if isinstance(saved_draft, dict):
+                    for key in draft:
+                        if key in saved_draft:
+                            draft[key] = saved_draft[key]
+                saved_result = saved.get("result")
+                if isinstance(saved_result, dict):
+                    candidate_result = saved_result
+                session.modified = True
+        else:
+            action = str(request.form.get("action") or "apply_plan")
+
+            if action == "apply_plan":
+                for key in draft:
+                    if key == "source_label":
+                        continue
+                    if key in request.form:
+                        draft[key] = request.form.get(key, draft[key])
+                source_info = geofiles.get("sources", {}).get(draft["source"], {})
+                draft["source_label"] = str(
+                    source_info.get("label") or draft["source"]
+                ).replace("SG Client", "SG-Client")
+
+            values = build_values(draft, model, settings)
+
+            try:
+                from .unified_planner_preview4 import (
+                    apply_checked_plan,
+                    checked_geofiles_update_status,
+                    validate_plan,
+                )
+
+                if action == "check_geofiles_update":
+                    checked = validate_plan(values)
+                    if str(checked.get("status")) != "ok":
+                        geo_update_state = {
+                            **compact_update(checked),
+                            "status": "geofiles_blocked",
+                        }
+                        session.pop(update_token_session_key, None)
+                    else:
+                        token = str(checked.get("candidate_token") or "")
+                        comparison = checked_geofiles_update_status(token)
+                        geo_update_state = compact_update(
+                            {**checked, **comparison}
+                        )
+                        if comparison["status"] == "geofiles_update_ready":
+                            session[update_token_session_key] = token
+                        else:
+                            session.pop(update_token_session_key, None)
+                    session[update_state_session_key] = geo_update_state
+                    session.modified = True
+                    return redirect(
+                        url_for("routing_unified_planner_preview4_page")
+                    )
+
+                if action == "apply_geofiles_update":
+                    token = str(session.get(update_token_session_key) or "")
+                    if not token:
+                        raise XPanelError(
+                            "проверенное обновление GeoFiles отсутствует; "
+                            "выполните проверку снова"
+                        )
+                    candidate_result = apply_checked_plan(token)
+                    session.pop(update_token_session_key, None)
+                    session.pop(update_state_session_key, None)
+
+                elif plan_signature(draft) == current_plan:
+                    candidate_result = {
+                        "status": "unchanged",
+                        "message": "Выбранный план уже работает",
+                        "xray_test": "not-run",
+                        "source_label": draft["source_label"],
+                        "family": str(
+                            dict(geofiles.get("active_analysis") or {}).get("family")
+                            or "Не определено"
+                        ),
+                        "geoip_count": len(
+                            dict(geofiles.get("active_analysis") or {}).get(
+                                "geoip_categories", []
+                            )
+                        ),
+                        "geosite_count": len(
+                            dict(geofiles.get("active_analysis") or {}).get(
+                                "geosite_categories", []
+                            )
+                        ),
+                        "warnings": [],
+                        "missing_categories": [],
+                        "selected_categories": {},
+                    }
+
+                else:
+                    session.pop(update_token_session_key, None)
+                    session.pop(update_state_session_key, None)
+                    checked = validate_plan(values)
+                    if str(checked.get("status")) != "ok":
+                        candidate_result = checked
+                    else:
+                        candidate_result = apply_checked_plan(
+                            str(checked.get("candidate_token") or "")
+                        )
+
+            except (
+                ValueError,
+                XPanelError,
+                OSError,
+                subprocess.TimeoutExpired,
+            ) as exc:
+                if action == "check_geofiles_update":
+                    geo_update_state = {
+                        "status": "geofiles_blocked",
+                        "message": str(exc),
+                        "xray_test": "not-run",
+                        "source_label": draft["source_label"],
+                        "family": "Не определено",
+                        "geoip_count": 0,
+                        "geosite_count": 0,
+                    }
+                    session[update_state_session_key] = geo_update_state
+                    session.pop(update_token_session_key, None)
+                    session.modified = True
+                    return redirect(
+                        url_for("routing_unified_planner_preview4_page")
+                    )
+                candidate_result = error_result(exc, draft["source_label"])
+                if action == "apply_geofiles_update":
+                    session.pop(update_token_session_key, None)
+                    session.pop(update_state_session_key, None)
+
+            session[result_session_key] = {
+                "draft": draft,
+                "result": compact_result(candidate_result),
+            }
+            session.modified = True
+            return redirect(url_for("routing_unified_planner_preview4_page"))
+
         outbound_options = routing_outbound_options(enabled_only=True)
         outbound_by_tag = routing_outbound_map(enabled_only=False)
-        routing_nodes = list_nodes()
-        for node in routing_nodes:
-            if not node.get("is_local"):
-                node["geofiles_rollout"] = get_node_geofiles_rollout_status(int(node["id"]))
+        roles = {
+            str(rule.get("managed_role") or ""): rule
+            for rule in unified.get("managed_rules", [])
+        }
+        local_rule = roles.get("local")
+        russia_rule = roles.get("russia")
+        blocked_rule = roles.get("blocked")
+        ads_rule = roles.get("ads")
+        scope_labels = {
+            "none": "Выключены",
+            "tld": "Только доменные зоны",
+            "sites_ip": "Сайты и IP",
+        }
+        live = {
+            "source_label": str(
+                geofiles.get("active_label") or "SG-Client"
+            ).replace("SG Client", "SG-Client"),
+            "family": str(
+                dict(geofiles.get("active_analysis") or {}).get("family")
+                or "Не определено"
+            ),
+            "local": route_label(
+                outbound_by_tag,
+                (
+                    local_rule["outbound_tag"]
+                    if local_rule is not None
+                    else model.get("local_action") or "direct"
+                ),
+            ),
+            "russia_enabled": russia_rule is not None,
+            "russia": (
+                scope_labels.get(
+                    str(model.get("russia_scope") or "none"), "Выключены"
+                )
+                + " · "
+                + route_label(outbound_by_tag, russia_rule["outbound_tag"])
+                if russia_rule is not None
+                else "Выключено"
+            ),
+            "blocked_enabled": blocked_rule is not None,
+            "blocked": (
+                route_label(outbound_by_tag, blocked_rule["outbound_tag"])
+                if blocked_rule is not None
+                else "Недоступно для текущего комплекта"
+            ),
+            "ads_enabled": ads_rule is not None,
+            "ads": (
+                route_label(outbound_by_tag, ads_rule["outbound_tag"])
+                if ads_rule is not None
+                else "Не используется"
+            ),
+            "default": route_label(
+                outbound_by_tag,
+                model.get("default_action") or settings["default_outbound_tag"],
+            ),
+            "manual_count": len(unified.get("manual_rules", [])),
+        }
+
+        blocked_candidates = {
+            "refilter",
+            "antifilter-community",
+            "antifilter-download-community",
+            "ru-blocked",
+            "russia-blocked",
+            "category-blocked",
+            "blocked",
+            "geoblock",
+        }
+        active_source = str(geofiles.get("active_source") or "sgclient")
+        active_analysis = dict(geofiles.get("active_analysis") or {})
+        active_categories = set(
+            str(item) for item in active_analysis.get("geosite_categories", [])
+        )
+        source_blocked_capabilities = {
+            "loyalsoldier": False,
+            "runetfreedom": True,
+            "roscomvpn": False,
+            "sgclient": None,
+            "custom": None,
+            "local": None,
+        }
+        source_blocked_capabilities[active_source] = bool(
+            active_categories & blocked_candidates
+        )
+        no_changes = plan_signature(draft) == current_plan
+
+        geoip_info = dict(geofiles.get("geoip") or {})
+        geosite_info = dict(geofiles.get("geosite") or {})
+        geofiles_summary = {
+            "source": live["source_label"],
+            "family": live["family"],
+            "installed_at": str(
+                geoip_info.get("updated_at")
+                or geosite_info.get("updated_at")
+                or "Не указано"
+            ),
+            "geoip_size": format_size(geoip_info.get("size")),
+            "geosite_size": format_size(geosite_info.get("size")),
+            "geoip_count": len(active_analysis.get("geoip_categories", [])),
+            "geosite_count": len(active_analysis.get("geosite_categories", [])),
+            "geoip_sha256": str(geoip_info.get("sha256") or ""),
+            "geosite_sha256": str(geosite_info.get("sha256") or ""),
+        }
+
         return render_template(
-            "routing.html",
-            settings=get_routing_settings(),
-            rules=routing_rules_overview(),
-            unified=unified_routing_overview(),
-            outbound_tags=[str(item["tag"]) for item in outbound_options],
+            "routing_unified_planner_preview4.html",
+            settings=settings,
+            unified=unified,
+            geofiles=geofiles,
             outbound_options=outbound_options,
             outbound_by_tag=outbound_by_tag,
-            balancer_tags=list_balancer_tags(),
-            geodata=get_geodata_status(),
-            geofiles=get_geofiles_overview(),
-            format_bytes=format_bytes,
-            users=list_users(),
-            warp=get_warp_overview(),
-            server_identity=get_instance_identity(),
-            routing_nodes=routing_nodes,
+            draft=draft,
+            candidate_result=candidate_result,
+            geo_update_state=geo_update_state,
+            geofiles_summary=geofiles_summary,
+            live=live,
+            current_plan=current_plan,
+            source_blocked_capabilities=source_blocked_capabilities,
+            no_changes=no_changes,
         )
+
 
     def unified_routing_form_values() -> dict[str, object]:
         return {
