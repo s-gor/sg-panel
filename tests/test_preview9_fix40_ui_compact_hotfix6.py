@@ -56,12 +56,11 @@ def test_installer_checks_final_hotfix6_css() -> None:
         assert "UI Compact Hotfix 6" in body
 
 
-def test_geofiles_is_a_real_standalone_page() -> None:
-    base = read("xpanel/templates/base.html")
-    page = read("xpanel/templates/geofiles.html")
+def test_geofiles_uses_the_active_unified_rc80_page() -> None:
     web = read("xpanel/web.py")
-    assert "request.endpoint in ['routing_page', 'geofiles_page']" in base
-    assert "{% include '_geofiles_panel_fix39.html' %}" in page
-    assert 'render_template(\n            "geofiles.html"' in web
-    assert 'return redirect(url_for("routing_page") + "#geofiles")' not in web
-    assert web.count('return redirect(url_for("geofiles_page"))') >= 3
+    base = read("xpanel/templates/base.html")
+    page = read("xpanel/templates/routing_unified_planner_preview4.html")
+    assert "def routing_unified_planner_preview4_page" in web
+    assert '"routing_unified_planner_preview4.html"' in web
+    assert "routing_unified_planner_preview4_page" in base
+    assert "GeoFiles" in page

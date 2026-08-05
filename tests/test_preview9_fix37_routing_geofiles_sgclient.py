@@ -29,13 +29,14 @@ def test_routing_and_geofiles_keep_sgclient096_contract_without_duplicate_tabs()
     assert "routing-sgclient096-fix39.css" in read("xpanel/templates/base.html")
 
 
-def test_geofiles_is_standalone_and_actions_return_to_it() -> None:
-    base = read("xpanel/templates/base.html")
+def test_geofiles_actions_use_unified_rc80_planner() -> None:
     web = read("xpanel/web.py")
-    assert ">GeoFiles</a>" not in base
-    assert 'render_template(\n            "geofiles.html"' in web
-    assert 'return redirect(url_for("routing_page") + "#geofiles")' not in web
-    assert web.count('return redirect(url_for("geofiles_page"))') >= 3
+    base = read("xpanel/templates/base.html")
+    template = read("xpanel/templates/routing_unified_planner_preview4.html")
+    assert "def routing_unified_planner_preview4_page" in web
+    assert '"routing_unified_planner_preview4.html"' in web
+    assert "routing_unified_planner_preview4_page" in base
+    assert "GeoFiles" in template
 
 
 def test_transactional_roscom_contract_is_visible_and_preserved() -> None:

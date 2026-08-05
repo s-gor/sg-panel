@@ -86,33 +86,19 @@ def test_roscomvpn_final_route_rejects_disabled_or_block_outbound(tmp_path, monk
 
 
 def test_geofiles_check_freezes_the_exact_plan_before_apply() -> None:
-    service_text = read("xpanel/service.py")
-    web = read("xpanel/web.py")
-    panel = read("xpanel/templates/_geofiles_panel_fix39.html")
-    for marker in (
-        '"server_preset": server_preset',
-        '"block_enabled": bool(enable_block)',
-        '"final_outbound_tag": final_outbound_tag',
-        "режим совместимости изменён после проверки",
-        "финальный outbound изменён после проверки",
-    ):
-        assert marker in service_text
-    assert "result = apply_geofiles_source()" in web
-    assert "Выбор совместимости и финального Outbound входит в проверяемый candidate" in panel
-    assert "Применить проверенный план" in panel
+    module = read("xpanel/unified_planner_preview4.py")
+    assert "def validate_plan" in module
+    assert "def apply_checked_plan" in module
+    assert '"kind": "unified-routing-geofiles-xray"' in module
+    assert "xray run -test" in module
 
 
 def test_roscomvpn_can_be_validated_in_the_same_staging_flow() -> None:
-    service_text = read("xpanel/service.py")
-    web = read("xpanel/web.py")
-    panel = read("xpanel/templates/_geofiles_panel_fix39.html")
-    assert 'server_preset == "roscomvpn"' in service_text
-    assert 'server_preset="roscomvpn"' in service_text
-    assert "остальной трафик → {final_outbound_tag}" in service_text
-    assert '"server_preset": "roscomvpn" if source == "roscomvpn" else "none"' in web
-    assert "Совместимая серверная основа обязательна" in panel
-    assert 'name="final_outbound_tag"' in panel
-    assert 'name="enable_block"' in panel
+    module = read("xpanel/unified_planner_preview4.py")
+    assert 'if family == "RoscomVPN":' in module
+    assert '("category-ru", "whitelist")' in module
+    assert '("direct", "whitelist")' in module
+    assert "def validate_plan" in module
 
 
 def test_node_geofiles_is_two_phase_and_apply_requires_validation() -> None:
